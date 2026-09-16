@@ -26,6 +26,8 @@ jobs:
         run: node --test scripts/vibpe-optimizer-closure.test.mjs
       - name: Optimizer cash timing authority
         run: node --test scripts/optimizer-cash-timing-authority.test.mjs
+      - name: Optimizer hard capital authority
+        run: node --test scripts/optimizer-hard-capital-authority.test.mjs
       - name: Five-tranche hard capital authority
         run: node --experimental-strip-types --test src/lib/advanced-planning-hard-capital.test.ts
       - name: Optimizer preparation funding evidence
