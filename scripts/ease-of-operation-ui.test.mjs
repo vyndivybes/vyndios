@@ -22,6 +22,10 @@ const actualsSource = fs.readFileSync(
   new URL("../src/routes/command/actuals.tsx", import.meta.url),
   "utf8",
 );
+const commandRouteSource = fs.readFileSync(
+  new URL("../src/routes/command/route.tsx", import.meta.url),
+  "utf8",
+);
 const rootSource = fs.readFileSync(
   new URL("../src/routes/__root.tsx", import.meta.url),
   "utf8",
@@ -133,6 +137,20 @@ test("Finance actuals use full-view responsive registers without inner horizonta
   assert.ok(actualsSource.includes("lg:hidden"));
   assert.ok(actualsSource.includes("md:grid"));
   assert.ok(actualsSource.includes("md:hidden"));
+});
+
+test("Command system enforces the no-horizontal-scroll full-view contract", () => {
+  assert.ok(commandRouteSource.includes('data-vyndi-full-view="command-system"'));
+  assert.ok(commandRouteSource.includes('overflow-x: clip'));
+  assert.ok(commandRouteSource.includes('.max-w-7xl'));
+  assert.ok(commandRouteSource.includes('max-width: none !important'));
+  assert.ok(commandRouteSource.includes(':where(.overflow-x-auto, .overflow-x-scroll)'));
+  assert.ok(commandRouteSource.includes('overflow-x: visible !important'));
+  assert.ok(commandRouteSource.includes('[class*="min-w-["]'));
+  assert.ok(commandRouteSource.includes('table-layout: fixed'));
+  assert.ok(commandRouteSource.includes('overflow-wrap: anywhere'));
+  assert.ok(commandRouteSource.includes('nav.overflow-x-auto > .min-w-max'));
+  assert.ok(commandRouteSource.includes('flex-wrap: wrap'));
 });
 
 test("App root exposes a connected page-loading status bar for route transitions", () => {

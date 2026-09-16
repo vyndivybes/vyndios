@@ -37,6 +37,84 @@ const CONTROLLED_DOCUMENT_ROUTES = new Set([
   "/command/receivables",
 ]);
 
+const COMMAND_FULL_VIEW_CSS = `
+[data-vyndi-full-view="command-system"] {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: clip;
+}
+
+[data-vyndi-full-view="command-system"] .max-w-7xl {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+[data-vyndi-full-view="command-system"] :where(main, section, article, fieldset, form, nav, div) {
+  min-width: 0;
+}
+
+[data-vyndi-full-view="command-system"] fieldset > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+[data-vyndi-full-view="command-system"] :where(.overflow-x-auto, .overflow-x-scroll) {
+  overflow-x: visible !important;
+  max-width: 100% !important;
+}
+
+[data-vyndi-full-view="command-system"] nav.overflow-x-auto > .min-w-max {
+  display: flex;
+  width: 100%;
+  min-width: 0 !important;
+  flex-wrap: wrap;
+}
+
+[data-vyndi-full-view="command-system"] [class*="min-w-["] {
+  min-width: 0 !important;
+}
+
+[data-vyndi-full-view="command-system"] table {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  table-layout: fixed;
+}
+
+[data-vyndi-full-view="command-system"] :where(th, td) {
+  min-width: 0 !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+[data-vyndi-full-view="command-system"] :where(table input, table select, table textarea, table button) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+[data-vyndi-full-view="command-system"] :where(svg, canvas, img, .recharts-responsive-container) {
+  max-width: 100% !important;
+}
+
+[data-vyndi-full-view="command-system"] pre {
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1279px) {
+  [data-vyndi-full-view="command-system"] table {
+    font-size: clamp(0.62rem, 0.78vw, 0.78rem);
+  }
+
+  [data-vyndi-full-view="command-system"] :where(th, td) {
+    padding-left: 0.35rem !important;
+    padding-right: 0.35rem !important;
+  }
+}
+`;
+
 function normalizeCommandPath(pathname: string) {
   if (pathname === "/") return pathname;
   return pathname.replace(/\/+$/, "") || "/";
@@ -99,11 +177,14 @@ function CommandRoot() {
   return (
     <>
       <ProtectedNavigationBridge />
-      <Suspense fallback={null}>
-        <LazyIbpeWorkspaceProjection />
-      </Suspense>
-      <CommandShell initialRole={commandRole} />
-      <DeferredCommandTools />
+      <style>{COMMAND_FULL_VIEW_CSS}</style>
+      <div data-vyndi-full-view="command-system">
+        <Suspense fallback={null}>
+          <LazyIbpeWorkspaceProjection />
+        </Suspense>
+        <CommandShell initialRole={commandRole} />
+        <DeferredCommandTools />
+      </div>
     </>
   );
 }
