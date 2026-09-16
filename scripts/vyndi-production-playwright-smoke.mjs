@@ -54,14 +54,26 @@ try {
   if (expectedSha) {
     const markerResponse = await context.request.get(`${baseUrl}/api/runtime/release-marker`);
     const markerText = await markerResponse.text().catch(() => "");
+    assert.ok(markerResponse.ok(), `Release marker returned HTTP ${markerResponse.status()}`);
+
+    let markerJson;
+    try {
+      markerJson = JSON.parse(markerText);
+    } catch {
+      throw new Error(`Release marker did not return valid JSON: ${markerText.slice(0, 240)}`);
+    }
+
     evidence.releaseMarker = {
       status: markerResponse.status(),
-      text: markerText.slice(0, 1000),
+      marker: markerJson,
     };
-    assert.ok(markerResponse.ok(), `Release marker returned HTTP ${markerResponse.status()}`);
-    assert.ok(
-      markerText.includes(expectedSha) || markerText.includes(expectedSha.slice(0, 12)),
-      `Target deployment does not report expected SHA ${expectedSha}`,
+
+    const reportedSha = typeof markerJson?.sourceSha === "string" ? markerJson.sourceSha.trim() : "";
+    assert.ok(reportedSha, "Release marker does not expose sourceSha; exact deployment certification is unavailable.");
+    assert.equal(
+      reportedSha.toLowerCase(),
+      expectedSha.toLowerCase(),
+      `Target deployment reports SHA ${reportedSha}; expected ${expectedSha}`,
     );
   }
 
