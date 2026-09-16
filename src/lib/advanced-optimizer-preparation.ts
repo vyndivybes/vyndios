@@ -17,8 +17,9 @@ import {
   type AdvancedCashGuardrail,
   type AdvancedCashTimingControls,
 } from "./advanced-planning-cash-guardrails.ts";
+import type { GovernedFundingPlanRow } from "./advanced-planning-hard-capital.ts";
 
-export const ADVANCED_OPTIMIZER_PREPARATION_VERSION = "VYNDI-OPTIMIZER-PREPARATION-0.2" as const;
+export const ADVANCED_OPTIMIZER_PREPARATION_VERSION = "VYNDI-OPTIMIZER-PREPARATION-0.3" as const;
 
 export type AdvancedOptimizerPreparationIssue = {
   severity: "error" | "warning";
@@ -37,6 +38,7 @@ export type AdvancedOptimizerPreparationEnvelope = {
     cashAnchorPeriod: number;
     cashAnchorSourceRef?: string;
   };
+  fundingPlan: GovernedFundingPlanRow[];
   readyForGovernedOptimization: boolean;
   issues: AdvancedOptimizerPreparationIssue[];
   evidence: {
@@ -51,6 +53,9 @@ export type AdvancedOptimizerPreparationEnvelope = {
     cashAnalysisStartPeriod: number;
     cashAnchorSourceRef?: string;
     paymentLagControlCount: number;
+    approvedFundingPlanLakh: number;
+    forwardFundingPlanLakh: number;
+    fundingPlanRowCount: number;
   };
 };
 
@@ -147,6 +152,26 @@ function buildCashTiming(input: RuntimeIbpeInput, horizon: number) {
   };
 }
 
+function buildFundingPlan(input: RuntimeIbpeInput, horizon: number): GovernedFundingPlanRow[] {
+  return (input.cashFlows ?? [])
+    .filter((row) =>
+      row.direction === "inflow"
+      && row.category === "funding"
+      && Number.isInteger(row.period)
+      && row.period >= 1
+      && row.period <= horizon
+      && Number.isFinite(row.amountLakh)
+      && row.amountLakh > 0,
+    )
+    .map((row) => ({
+      period: row.period,
+      amountLakh: Number(row.amountLakh),
+      sourceRef: row.sourceRef?.trim() || row.id,
+      businessKey: row.businessKey,
+    }))
+    .sort((left, right) => left.period - right.period || left.amountLakh - right.amountLakh || left.sourceRef.localeCompare(right.sourceRef));
+}
+
 function buildEnvelope(
   source: PrepareFrozenAdvancedOptimizerInput,
   initialIssues: AdvancedOptimizerPreparationIssue[] = [],
@@ -165,6 +190,7 @@ function buildEnvelope(
   }
 
   const cashTiming = buildCashTiming(source.input, source.model.horizonPeriods);
+  const fundingPlan = buildFundingPlan(source.input, source.model.horizonPeriods);
   const cashSourceRef = `${source.lineage.sourceSnapshotId}:${source.lineage.sourceInputHash}:CASH`;
   const cash = compileCashGuardrailsFromIbpe(
     source.result.cash ?? [],
@@ -175,6 +201,11 @@ function buildEnvelope(
   for (const issue of cash.issues) {
     issues.push({ severity: issue.severity, code: `CASH_${issue.code}`, message: issue.message });
   }
+
+  const approvedFundingPlanLakh = fundingPlan.reduce((sum, row) => sum + row.amountLakh, 0);
+  const forwardFundingPlanLakh = fundingPlan
+    .filter((row) => row.period >= cashTiming.analysisStartPeriod)
+    .reduce((sum, row) => sum + row.amountLakh, 0);
 
   const readyForGovernedOptimization =
     modelValidation.valid &&
@@ -193,6 +224,7 @@ function buildEnvelope(
     model: source.model,
     cashGuardrails: cash.valid ? cash.guardrails : [],
     cashTiming,
+    fundingPlan,
     readyForGovernedOptimization,
     issues,
     evidence: {
@@ -207,6 +239,9 @@ function buildEnvelope(
       cashAnalysisStartPeriod: cashTiming.analysisStartPeriod,
       cashAnchorSourceRef: cashTiming.cashAnchorSourceRef,
       paymentLagControlCount: Object.keys(cashTiming.paymentLagBySku).length,
+      approvedFundingPlanLakh,
+      forwardFundingPlanLakh,
+      fundingPlanRowCount: fundingPlan.length,
     },
   };
 }
