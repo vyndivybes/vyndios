@@ -49,28 +49,30 @@ function GovernedOptimizerPage() {
   const [message, setMessage] = useState("No optimizer run started in this session.");
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
 
-  async function reloadOptimizerState() {
+  async function reloadOptimizerState(): Promise<boolean> {
     if (typeof window !== "undefined") {
       window.location.reload();
-      return;
+      return true;
     }
     await router.invalidate();
+    return false;
   }
 
   async function preparePacket() {
     if (packetBusy || busy) return;
     setPacketBusy(true);
     setPacketMessage("Building a governed advanced-planning packet from the latest complete IBPE snapshot…");
+    let hardReloadStarted = false;
     try {
       const response = await runAdvancedPlanningFromLatestIbpe();
       setPacketMessage(
         `Governed packet ${response.id} persisted from IBPE run ${response.parentIbpeRunId}. Reloading the optimizer against this exact packet…`,
       );
-      await reloadOptimizerState();
+      hardReloadStarted = await reloadOptimizerState();
     } catch (error) {
       setPacketMessage(error instanceof Error ? error.message : "Governed advanced-planning packet preparation failed.");
     } finally {
-      setPacketBusy(false);
+      if (!hardReloadStarted) setPacketBusy(false);
     }
   }
 
@@ -78,6 +80,7 @@ function GovernedOptimizerPage() {
     if (!state.packet || !state.readyForGovernedOptimization || busy || packetBusy) return;
     setBusy(true);
     setMessage("Running governed HiGHS optimization against the exact frozen packet…");
+    let hardReloadStarted = false;
     try {
       const response = await runAdvancedOptimizerFromPacket({
         data: {
@@ -91,7 +94,7 @@ function GovernedOptimizerPage() {
         setMessage(
           "The optimizer request completed without a browser execution receipt. Reloading persisted run evidence; no business action was taken.",
         );
-        await reloadOptimizerState();
+        hardReloadStarted = await reloadOptimizerState();
         return;
       }
 
@@ -110,11 +113,11 @@ function GovernedOptimizerPage() {
       setMessage(
         `Persisted ${response.optimizationRunId}. Mathematical status ${response.mathematicalStatus}; cash governance ${response.cashGovernanceStatus}; planning ${response.cashPlanningDisposition}; accepted=${response.accepted ? "yes" : "no"}.${fundingDependency}${response.firstInfeasibilityWitness ? ` ${response.firstInfeasibilityWitness}` : ""}`,
       );
-      await reloadOptimizerState();
+      hardReloadStarted = await reloadOptimizerState();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Governed optimizer execution failed.");
     } finally {
-      setBusy(false);
+      if (!hardReloadStarted) setBusy(false);
     }
   }
 
