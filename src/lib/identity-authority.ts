@@ -5,9 +5,7 @@ import { getSql } from "@/lib/db";
 
 const identityPrefix = z.enum(["AST", "EQP", "TOL", "SPR", "CON", "ITM"]);
 const traceabilityClass = z.enum(["A", "B", "C"]);
-
-const purchasedIdentitySchema = z.object({
-  movementId: z.string().trim().min(1).max(200),
+const identityFields = {
   traceabilityClass,
   internalPrefix: identityPrefix.optional(),
   manufacturer: z.string().trim().max(200).default(""),
@@ -18,25 +16,32 @@ const purchasedIdentitySchema = z.object({
   supplierSku: z.string().trim().max(200).default(""),
   supplierLot: z.string().trim().max(200).default(""),
   invoiceReference: z.string().trim().max(200).default(""),
-  grnReference: z.string().trim().max(200).default(""),
   warrantyReference: z.string().trim().max(240).default(""),
   calibrationReference: z.string().trim().max(240).default(""),
+} as const;
+
+const purchasedIdentitySchema = z.object({
+  movementId: z.string().trim().min(1).max(200),
+  ...identityFields,
+  grnReference: z.string().trim().max(200).default(""),
 });
 
 const goodsReceiptIdentitySchema = z.object({
   grnId: z.string().trim().min(1).max(120),
-  traceabilityClass,
-  internalPrefix: identityPrefix.optional(),
-  manufacturer: z.string().trim().max(200).default(""),
-  brand: z.string().trim().max(200).default(""),
-  oemModelNumber: z.string().trim().max(200).default(""),
-  oemPartNumber: z.string().trim().max(200).default(""),
-  oemSerialNumber: z.string().trim().max(240).default(""),
-  supplierSku: z.string().trim().max(200).default(""),
-  supplierLot: z.string().trim().max(200).default(""),
-  invoiceReference: z.string().trim().max(200).default(""),
-  warrantyReference: z.string().trim().max(240).default(""),
-  calibrationReference: z.string().trim().max(240).default(""),
+  ...identityFields,
+});
+
+const governedGoodsReceiptSchema = z.object({
+  id: z.string().trim().min(1).max(120),
+  purchaseOrderId: z.string().trim().min(1).max(120),
+  receivedOn: z.string().date(),
+  quantityReceived: z.number().positive().max(1_000_000_000),
+  quantityAccepted: z.number().min(0).max(1_000_000_000),
+  quantityRejected: z.number().min(0).max(1_000_000_000),
+  inspectionStatus: z.enum(["accepted", "quarantine", "rejected"]),
+  sourceReference: z.string().trim().min(1).max(500),
+  notes: z.string().trim().max(1000).default(""),
+  ...identityFields,
 });
 
 const componentIdentitySchema = z.object({
@@ -128,6 +133,59 @@ export const attachGoodsReceiptIdentity = createServerFn({ method: "POST" })
     };
   });
 
+/**
+ * Post GRN + inspection + external identity in one database statement. This is
+ * the receiving-screen authority so a failed identity write cannot orphan a GRN.
+ */
+export const postGoodsReceiptWithIdentity = createServerFn({ method: "POST" })
+  .validator(governedGoodsReceiptSchema)
+  .handler(async ({ data }) => {
+    const actor = await requireBusinessActor("edit");
+    const sql = await getSql();
+    const rows = await sql.query<{
+      grn_id: string;
+      identity_uid: string | null;
+      internal_reference: string;
+    }>(
+      `select * from post_vyndi_goods_receipt_with_identity(
+        $1,$2,$3::date,$4,$5,$6,$7,$8,$9,$10,$11,
+        $12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23
+      )`,
+      [
+        data.id,
+        data.purchaseOrderId,
+        data.receivedOn,
+        data.quantityReceived,
+        data.quantityAccepted,
+        data.quantityRejected,
+        data.inspectionStatus,
+        data.sourceReference,
+        data.notes,
+        actor.userId,
+        actor.role,
+        data.traceabilityClass,
+        data.internalPrefix ?? "",
+        data.manufacturer,
+        data.brand,
+        data.oemModelNumber,
+        data.oemPartNumber,
+        data.oemSerialNumber,
+        data.supplierSku,
+        data.supplierLot,
+        data.invoiceReference,
+        data.warrantyReference,
+        data.calibrationReference,
+      ],
+    );
+    const row = rows[0];
+    if (!row) throw new Error("Controlled goods receipt was not posted.");
+    return {
+      id: row.grn_id,
+      identityUid: row.identity_uid,
+      internalReference: row.internal_reference,
+    };
+  });
+
 /** Materialise the saved GRN identity after a quarantined receipt is accepted. */
 export const materialiseGoodsReceiptIdentity = createServerFn({ method: "POST" })
   .validator(z.object({ grnId: z.string().trim().min(1).max(120) }))
@@ -142,6 +200,36 @@ export const materialiseGoodsReceiptIdentity = createServerFn({ method: "POST" }
     return {
       identityUid: row?.identity_uid ?? null,
       internalReference: row?.internal_reference ?? "",
+    };
+  });
+
+/** Resolve quarantine and materialise its saved identity atomically when accepted. */
+export const resolveGoodsReceiptWithIdentity = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      id: z.string().trim().min(1).max(120),
+      resolution: z.enum(["accepted", "rejected"]),
+      resolvedOn: z.string().date(),
+      sourceReference: z.string().trim().min(1).max(500),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const actor = await requireBusinessActor("edit");
+    const sql = await getSql();
+    const rows = await sql.query<{
+      grn_id: string;
+      identity_uid: string | null;
+      internal_reference: string;
+    }>(
+      `select * from resolve_vyndi_goods_receipt_with_identity($1,$2,$3::date,$4,$5,$6)`,
+      [data.id, data.resolution, data.resolvedOn, data.sourceReference, actor.userId, actor.role],
+    );
+    const row = rows[0];
+    if (!row) throw new Error("Quarantine disposition was not recorded.");
+    return {
+      id: row.grn_id,
+      identityUid: row.identity_uid,
+      internalReference: row.internal_reference,
     };
   });
 
