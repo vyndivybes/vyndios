@@ -120,7 +120,7 @@ $$;
 create or replace view vyndi_model_identity_authority as
 select
   rules.family_code,
-  fam.business_model_name,
+  fam.display_name as business_model_name,
   rules.model_code,
   vyndi_identity_mmyy(rules.launch_month,rules.launch_year) as configured_launch_code,
   rules.launch_code_confirmed,
