@@ -442,11 +442,23 @@ async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
     planning_status:string;
     source_ref:string;
   }>(
+    `select work_centre_id,available_hours_per_month,efficiency,standard_hours_per_unit,payment_lag_months,planning_status,source_ref
+       from vyndi_capacity_standards
+      where planning_status <> 'retired'
+      order by sequence,work_centre_id`,
+  ).catch(async () => sql.query<{
+    work_centre_id:string;
+    available_hours_per_month:number|string;
+    efficiency:number|string;
+    standard_hours_per_unit:number|string;
+    planning_status:string;
+    source_ref:string;
+  }>(
     `select work_centre_id,available_hours_per_month,efficiency,standard_hours_per_unit,planning_status,source_ref
        from vyndi_capacity_standards
       where planning_status <> 'retired'
       order by sequence,work_centre_id`,
-  );
+  ));
   const capacity: CapacityPosition[] = [];
   for (const standard of capacityStandardRows) {
     const standardHours = Number(standard.standard_hours_per_unit);
@@ -462,6 +474,28 @@ async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
       });
     }
   }
+
+  const cashAuthorityRows = await sql.query<{
+    plan_month:number|string;
+    closing_cash_lakh:number|string;
+    source_reference:string|null;
+    verified:boolean;
+    updated_at:string|null;
+  }>(
+    `select c.plan_month,c.closing_cash_lakh,c.source_reference,c.verified,c.updated_at::text
+       from vyndi_cash_authority c
+       join vyndi_monthly_actuals a on a.plan_month=c.plan_month and a.closing_cash is not null
+      where c.verified=true
+        and c.updated_at is not null
+        and trim(coalesce(c.source_reference,''))<>''
+      order by c.plan_month desc,c.updated_at desc
+      limit 1`,
+  );
+  const cashAnchor = cashAuthorityRows[0];
+  const cashAnchorPeriod = cashAnchor ? Number(cashAnchor.plan_month) : 0;
+  const cashAnchorLakh = cashAnchor ? Number(cashAnchor.closing_cash_lakh) : Number(finance.openingCashLakh);
+  const cashAnchorSourceRef = cashAnchor?.source_reference?.trim() || `PLAN-${plan.id}-R${plan.revision}:opening-cash`;
+  if (!Number.isFinite(cashAnchorLakh)) throw new Error("Governed IBPE run blocked: canonical cash opening balance is invalid.");
 
   const cashFlows: CashFlow[] = [];
   for (const row of model) {
@@ -479,9 +513,11 @@ async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
 
   const input: RuntimeIbpeInput = {
     demand,bom,inventory,committedMaterialRequirements,reservations,receipts,capacity,cashFlows,
-    funding:{ openingBankCashLakh:finance.openingCashLakh,minimumOperatingReserveLakh:finance.operatingPlan.cashFloorLakh,restrictedCashLakh:0,fundraisingLeadMonths:3 },
+    funding:{ openingBankCashLakh:cashAnchorLakh,minimumOperatingReserveLakh:finance.operatingPlan.cashFloorLakh,restrictedCashLakh:0,fundraisingLeadMonths:3 },
     runtimeControls:{
       paymentLagBySku:Object.fromEntries(supplyParameterRows.map((row) => [row.sku, Number(row.payment_lag_months)])),
+      cashAnchorPeriod,
+      cashAnchorSourceRef,
     },
   };
   const validation: IbpeValidation = {
@@ -492,6 +528,12 @@ async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
     reservations:reservations.length,
     committedReceipts:receipts.length,
     cashFlows:cashFlows.length,
+    cashAuthorityMode:cashAnchor ? "verified-canonical-cash-anchor" : "approved-plan-opening-cash",
+    cashAuthoritySource:cashAnchor ? "vyndi_cash_authority" : "approved-plan",
+    cashAnchorPeriod,
+    cashAnchorLakh,
+    cashAnchorSourceRef,
+    cashDoubleCountGuard:cashAnchor ? `cash flows through M${cashAnchorPeriod} are not replayed after the verified closing-cash anchor` : "not-required",
     supplyPlanningParameters:supplyParameterRows.length,
     supplyPlanningDefaults:supplyParameterRows.filter((r) => r.planning_status === "planning-default").length,
     paymentLagParameters:supplyParameterRows.filter((r) => Number(r.payment_lag_months) > 0).length,
@@ -523,6 +565,7 @@ async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
     capacityAuthority:"vyndi_capacity_standards",
     capacitySummarySemantics:"unique-shortfall-months-stage-2",
     planningInputs:["vyndi_supply_planning_parameters","vyndi_capacity_standards","vyndi_procurement_prices"],
+    financeAuthorityInputs:["vyndi_cash_authority"],
     transactionInputs:["vyndi_sales_orders","vyndi_invoices","epr_bom_inventory_mappings","vyndi_inventory_available_to_promise","epr_inventory_reservations","vyndi_committed_procurement_requirements","vyndi_purchase_orders","vyndi_open_purchase_orders","vyndi_collections"],
   };
   return { input, validation };
