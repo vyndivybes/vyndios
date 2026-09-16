@@ -116,21 +116,19 @@ export const saveMonthlyActual = createServerFn({ method: "POST" })
     }
 
     const hasManualValue = [a.cogs,a.opex,a.closingCash,a.inventory,a.payables].some((value) => value != null);
-    if (hasManualValue && !a.sourceReference?.trim()) {
+    const evidenceSource = a.sourceReference?.trim() || "";
+    if (hasManualValue && !evidenceSource) {
       throw new Error("Manual management actuals require a bank/ledger/evidence source reference.");
     }
-    const source = [
-      `transaction-ledger:M${data.month}`,
-      a.sourceReference?.trim() || "",
-    ].filter(Boolean).join("; ");
 
     await sql.query(
       `select save_vyndi_monthly_actual($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
       [data.month,revenue,units,a.cogs ?? null,a.opex ?? null,a.closingCash ?? null,
-       a.inventory ?? null,receivables,a.payables ?? null,source,true,
+       a.inventory ?? null,receivables,a.payables ?? null,evidenceSource,true,
        actor.userId,actor.role],
     );
-    return { ok:true, month:data.month, revenue, units, receivables, verified:true, transactionDerived:true };
+    const transactionDerived = revenue !== 0 || units !== 0 || receivables !== 0;
+    return { ok:true, month:data.month, revenue, units, receivables, verified:true, transactionDerived };
   });
 
 export const clearMonthlyActual = createServerFn({ method: "POST" })
@@ -142,5 +140,5 @@ export const clearMonthlyActual = createServerFn({ method: "POST" })
       `select clear_vyndi_monthly_actual($1,$2,$3) as revision`,
       [data.month, actor.userId, actor.role],
     );
-    return { ok: true, month: data.month, revision: Number(rows[0]?.revision ?? 0), note:"Transaction-derived revenue, units and receivables remain authoritative." };
+    return { ok: true, month:data.month, revision: Number(rows[0]?.revision ?? 0), note:"Transaction-derived revenue, units and receivables remain authoritative." };
   });
