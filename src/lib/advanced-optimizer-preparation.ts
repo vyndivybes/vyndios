@@ -15,9 +15,10 @@ import {
 import {
   compileCashGuardrailsFromIbpe,
   type AdvancedCashGuardrail,
+  type AdvancedCashTimingControls,
 } from "./advanced-planning-cash-guardrails.ts";
 
-export const ADVANCED_OPTIMIZER_PREPARATION_VERSION = "VYNDI-OPTIMIZER-PREPARATION-0.1" as const;
+export const ADVANCED_OPTIMIZER_PREPARATION_VERSION = "VYNDI-OPTIMIZER-PREPARATION-0.2" as const;
 
 export type AdvancedOptimizerPreparationIssue = {
   severity: "error" | "warning";
@@ -32,6 +33,10 @@ export type AdvancedOptimizerPreparationEnvelope = {
   authority: AdvancedPlanningAuthorityAssessment;
   model: AdvancedPlanningConstraintModel;
   cashGuardrails: AdvancedCashGuardrail[];
+  cashTiming: Required<AdvancedCashTimingControls> & {
+    cashAnchorPeriod: number;
+    cashAnchorSourceRef?: string;
+  };
   readyForGovernedOptimization: boolean;
   issues: AdvancedOptimizerPreparationIssue[];
   evidence: {
@@ -42,6 +47,10 @@ export type AdvancedOptimizerPreparationEnvelope = {
     persistedRoutingRevisionIds: string[];
     persistedSupplierLaneRevisionIds: string[];
     cashSourceRef: string;
+    cashAnchorPeriod: number;
+    cashAnalysisStartPeriod: number;
+    cashAnchorSourceRef?: string;
+    paymentLagControlCount: number;
   };
 };
 
@@ -60,6 +69,7 @@ export type PrepareAdvancedOptimizerInput = {
 
 export type PrepareFrozenAdvancedOptimizerInput = {
   lineage: AdvancedPlanningSourceLineage;
+  input: RuntimeIbpeInput;
   result: IntegratedPlanningResult;
   model: AdvancedPlanningConstraintModel;
   authority: AdvancedPlanningAuthorityAssessment;
@@ -113,6 +123,30 @@ function appendLineageIssues(
   }
 }
 
+function sanitizePaymentLagBySku(value: Record<string, number> | undefined) {
+  return Object.fromEntries(
+    Object.entries(value ?? {})
+      .map(([sku, lag]) => [sku, Math.max(0, Math.ceil(Number(lag) || 0))] as const)
+      .sort(([left], [right]) => left.localeCompare(right)),
+  );
+}
+
+function buildCashTiming(input: RuntimeIbpeInput, horizon: number) {
+  const rawAnchor = Number(input.runtimeControls?.cashAnchorPeriod ?? 0);
+  const cashAnchorPeriod = Number.isFinite(rawAnchor)
+    ? Math.max(0, Math.min(horizon, Math.floor(rawAnchor)))
+    : 0;
+  const analysisStartPeriod = cashAnchorPeriod > 0
+    ? Math.min(horizon, cashAnchorPeriod + 1)
+    : 1;
+  return {
+    cashAnchorPeriod,
+    analysisStartPeriod,
+    paymentLagBySku: sanitizePaymentLagBySku(input.runtimeControls?.paymentLagBySku),
+    cashAnchorSourceRef: input.runtimeControls?.cashAnchorSourceRef?.trim() || undefined,
+  };
+}
+
 function buildEnvelope(
   source: PrepareFrozenAdvancedOptimizerInput,
   initialIssues: AdvancedOptimizerPreparationIssue[] = [],
@@ -130,8 +164,14 @@ function buildEnvelope(
     });
   }
 
+  const cashTiming = buildCashTiming(source.input, source.model.horizonPeriods);
   const cashSourceRef = `${source.lineage.sourceSnapshotId}:${source.lineage.sourceInputHash}:CASH`;
-  const cash = compileCashGuardrailsFromIbpe(source.result.cash ?? [], source.model.horizonPeriods, cashSourceRef);
+  const cash = compileCashGuardrailsFromIbpe(
+    source.result.cash ?? [],
+    source.model.horizonPeriods,
+    cashSourceRef,
+    cashTiming.analysisStartPeriod,
+  );
   for (const issue of cash.issues) {
     issues.push({ severity: issue.severity, code: `CASH_${issue.code}`, message: issue.message });
   }
@@ -152,6 +192,7 @@ function buildEnvelope(
     authority: source.authority,
     model: source.model,
     cashGuardrails: cash.valid ? cash.guardrails : [],
+    cashTiming,
     readyForGovernedOptimization,
     issues,
     evidence: {
@@ -162,6 +203,10 @@ function buildEnvelope(
       persistedRoutingRevisionIds: [...(source.authority.persistedRoutingRevisionIds ?? [])].sort(),
       persistedSupplierLaneRevisionIds: [...(source.authority.persistedSupplierLaneRevisionIds ?? [])].sort(),
       cashSourceRef,
+      cashAnchorPeriod: cashTiming.cashAnchorPeriod,
+      cashAnalysisStartPeriod: cashTiming.analysisStartPeriod,
+      cashAnchorSourceRef: cashTiming.cashAnchorSourceRef,
+      paymentLagControlCount: Object.keys(cashTiming.paymentLagBySku).length,
     },
   };
 }
@@ -195,6 +240,7 @@ export function prepareAdvancedOptimizerEnvelope(
   return buildEnvelope(
     {
       lineage: source.lineage,
+      input: source.input,
       result: source.result,
       model: built.model,
       authority: built.authority,
