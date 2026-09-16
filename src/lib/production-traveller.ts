@@ -5,15 +5,15 @@ import { getSql } from "@/lib/db";
 
 const raiseTravellerSchema = z.object({
   jobCardId: z.string().min(1).max(160),
-  serialNumber: z.string().trim().min(3).max(120),
   engineeringRevision: z.string().trim().min(1).max(120),
   supplier: z.string().trim().max(200).default(""),
 });
 
 /**
  * Raise a serial-controlled Production traveller from an existing released job card.
- * The client supplies only the job card and serial-specific fields. Model, family,
- * variant, BOM and Commercial-order provenance are derived and validated in SQL.
+ * The client never supplies a new production serial. Model, family, variant, BOM,
+ * Commercial-order provenance and the DOC 04 Rev 1.2 serial are derived and
+ * validated by the governed SQL authority.
  */
 export const createProductionTraveller = createServerFn({ method: "POST" })
   .validator(raiseTravellerSchema)
@@ -33,7 +33,7 @@ export const createProductionTraveller = createServerFn({ method: "POST" })
       [
         travellerId,
         data.jobCardId,
-        data.serialNumber.trim(),
+        "",
         data.engineeringRevision.trim(),
         data.supplier.trim(),
         actor.userId,
