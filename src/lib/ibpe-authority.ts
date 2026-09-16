@@ -442,23 +442,11 @@ async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
     planning_status:string;
     source_ref:string;
   }>(
-    `select work_centre_id,available_hours_per_month,efficiency,standard_hours_per_unit,payment_lag_months,planning_status,source_ref
-       from vyndi_capacity_standards
-      where planning_status <> 'retired'
-      order by sequence,work_centre_id`,
-  ).catch(async () => sql.query<{
-    work_centre_id:string;
-    available_hours_per_month:number|string;
-    efficiency:number|string;
-    standard_hours_per_unit:number|string;
-    planning_status:string;
-    source_ref:string;
-  }>(
     `select work_centre_id,available_hours_per_month,efficiency,standard_hours_per_unit,planning_status,source_ref
        from vyndi_capacity_standards
       where planning_status <> 'retired'
       order by sequence,work_centre_id`,
-  ));
+  );
   const capacity: CapacityPosition[] = [];
   for (const standard of capacityStandardRows) {
     const standardHours = Number(standard.standard_hours_per_unit);
