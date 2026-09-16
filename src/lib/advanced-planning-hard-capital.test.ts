@@ -57,23 +57,26 @@ function stagedEnvelope(): GovernedHardCapitalEnvelope {
 test("five-tranche ₹2 Cr plan becomes period-by-period hard procurement capital ceilings", () => {
   const compiled = compileGovernedHardCapitalConstraints(source, stagedEnvelope());
   assert.equal(compiled.valid, true);
-  const rhsByPeriod = new Map(compiled.constraints.map((row) => [Number(row.id.split("__").at(-1)), row.rhs]));
+  const ceilings = compiled.constraints.filter((row) => row.id.startsWith("CAPITAL_CUMULATIVE__"));
+  const rhsByPeriod = new Map(ceilings.map((row) => [Number(row.id.split("__").at(-1)), row.rhs]));
   assert.equal(rhsByPeriod.get(2), 15);
   assert.equal(rhsByPeriod.get(3), 50);
   assert.equal(rhsByPeriod.get(6), 85);
   assert.equal(rhsByPeriod.get(10), 135);
   assert.equal(rhsByPeriod.get(14), 200);
+  assert.equal(compiled.variables.length, 13);
   assert.ok(compiled.semantics.some((row) => row.includes("₹200L")));
 });
 
-test("supplier payment lag controls when an order begins consuming the hard capital envelope", () => {
+test("supplier payment lag controls when an order enters the sparse cumulative capital state", () => {
   const compiled = compileGovernedHardCapitalConstraints(source, stagedEnvelope());
-  const m2 = compiled.constraints.find((row) => row.id === "CAPITAL_CUMULATIVE__2");
+  const m2 = compiled.constraints.find((row) => row.id === "CAPITAL_FLOW__2");
   assert.ok(m2);
   assert.ok(m2.terms.some((term) => term.variableId === "PROC_LOTS__SUP_A_FRAME__1"));
   assert.ok(!m2.terms.some((term) => term.variableId === "PROC_LOTS__SUP_A_FRAME__2"));
-  const m3 = compiled.constraints.find((row) => row.id === "CAPITAL_CUMULATIVE__3");
+  const m3 = compiled.constraints.find((row) => row.id === "CAPITAL_FLOW__3");
   assert.ok(m3?.terms.some((term) => term.variableId === "PROC_LOTS__SUP_A_FRAME__2"));
+  assert.ok(m3?.terms.some((term) => term.variableId === "CAPITAL_SPEND__2" && term.coefficient === -1));
 });
 
 test("a pre-existing reserve deficit never creates impossible negative procurement capacity", () => {
@@ -97,7 +100,7 @@ test("optional standby capital is only available when it exists in governed cash
   assert.ok(compiled.semantics.some((row) => row.includes("₹225L")));
 });
 
-test("production-scale hard-capital indexing emits unique procurement terms without rescanning semantics", () => {
+test("production-scale hard-capital formulation keeps procurement coefficients linear in lane-period count", () => {
   const laneCount = 80;
   const largeSource = {
     horizonPeriods: 36,
@@ -135,8 +138,15 @@ test("production-scale hard-capital indexing emits unique procurement terms with
 
   const compiled = compileGovernedHardCapitalConstraints(largeSource, envelope);
   assert.equal(compiled.valid, true);
-  const finalConstraint = compiled.constraints.find((row) => row.id === "CAPITAL_CUMULATIVE__36");
-  assert.ok(finalConstraint);
-  assert.equal(finalConstraint.terms.length, laneCount * 35);
-  assert.equal(new Set(finalConstraint.terms.map((term) => term.variableId)).size, finalConstraint.terms.length);
+  assert.equal(compiled.variables.length, 35);
+  const flowConstraints = compiled.constraints.filter((row) => row.id.startsWith("CAPITAL_FLOW__"));
+  const ceilingConstraints = compiled.constraints.filter((row) => row.id.startsWith("CAPITAL_CUMULATIVE__"));
+  assert.equal(flowConstraints.length, 35);
+  assert.equal(ceilingConstraints.length, 35);
+  assert.ok(ceilingConstraints.every((row) => row.terms.length === 1));
+  const procurementTermCount = flowConstraints.reduce(
+    (sum, row) => sum + row.terms.filter((term) => term.variableId.startsWith("PROC_LOTS__")).length,
+    0,
+  );
+  assert.equal(procurementTermCount, laneCount * 35);
 });
