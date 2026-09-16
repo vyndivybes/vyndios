@@ -49,11 +49,45 @@ test("User Manual is a searchable Command reference page without global runtime 
   assert.match(workflow, /label: "Help & Reference"/);
   assert.match(workflow, /to: "\/command\/user-manual", label: "User Manual"/);
   assert.match(manual, /createFileRoute\("\/command\/user-manual"\)/);
-  assert.match(manual, /data-user-manual="vyndi-um-001-rev-1"/);
+  assert.match(manual, /data-user-manual="vyndi-um-001-rev-1-1"/);
   assert.match(manual, /User & Operator Manual/);
   assert.match(manual, /Search the manual/);
   assert.match(manual, /Print dossier/);
-  assert.match(manual, /VIBPE Co-Pilot 2\.0/);
+  assert.match(manual, /How to Operate VIBPE/);
   assert.doesNotMatch(manual, /MutationObserver/);
   assert.doesNotMatch(manual, /createTreeWalker/);
+});
+
+test("User Manual contains actionable procedures for every governed VIBPE stage", () => {
+  for (const title of [
+    "VIBPE 01 — Operating Workspace",
+    "VIBPE 02 — Planning Authority",
+    "VIBPE 03 — Governed Optimizer",
+    "VIBPE 04 — Outputs & Evidence",
+    "VIBPE 05 — Assurance",
+    "VIBPE 06 — Release Readiness",
+  ]) assert.match(manual, new RegExp(title.replace(/[—]/g, "—")));
+
+  for (const control of [
+    "1. Preview interpretation",
+    "2. Authorise proposal",
+    "3. Apply governed adapter",
+    "Approve current capacity standards",
+    "Create routing drafts from approved capacity",
+    "Approve routing",
+    "Build governed advanced-planning packet",
+    "Refresh governed advanced-planning packet",
+    "Run governed HiGHS optimization",
+    "Print governed report",
+    "Load complete register",
+    "Load capability register",
+    "Capture assurance snapshot",
+    "Release verdict",
+    "Closure gates",
+  ]) assert.match(manual, new RegExp(control.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+
+  assert.match(manual, /Operating Workspace — understand the current business condition/);
+  assert.match(manual, /Workspace → Authority → Optimizer → Outputs → Assurance → Release/);
+  assert.match(manual, /Recommendation is not approval|advisory evidence only/);
+  assert.match(manual, /Expected result \/ next gate/);
 });
