@@ -6,6 +6,7 @@ import { parseVibpeIntent, type VibpeScenarioParse } from "@/lib/vibpe-intent";
 import { retrieveVibpeKnowledgeEvidence, type VibpeKnowledgeEvidence } from "@/lib/vibpe-knowledge-retrieval";
 import { tryGovernanceDataAnswer } from "@/lib/vibpe-governance-queries";
 import { tryOperationalDataAnswer } from "@/lib/vibpe-operational-queries";
+import { tryVibpeTruthContractAnswer } from "@/lib/vibpe-truth-contract";
 import { explainVibpeHorizon } from "@/lib/vibpe-planning";
 import { vibpeBusinessOperatorContext } from "@/lib/vibpe-business-operator";
 import { getVibpeSession, updateVibpeSession } from "@/lib/vibpe-session";
@@ -326,6 +327,22 @@ export async function runVibpeCopilot2(
   } catch {
     // Operational lookup is supplementary to the governed IBPE packet. If a
     // view is temporarily unavailable, continue through normal VIBPE routing.
+  }
+
+  try {
+    const truthContractAnswer = await tryVibpeTruthContractAnswer(sql, question, governedBaseline);
+    if (truthContractAnswer) {
+      updateVibpeSession(sessionKey, { lastIntent: parsed.intent, lastQuestion: question });
+      return {
+        intent: parsed.intent,
+        answer: truthContractAnswer,
+        doctrine: vibpeBusinessOperatorContext(),
+        advisoryOnly: true,
+      };
+    }
+  } catch {
+    // Truth-contract routing is read-only and may not weaken or block the
+    // existing governed fallbacks when an optional read source is unavailable.
   }
 
   if (isKnowledgeQuestion(question)) {
