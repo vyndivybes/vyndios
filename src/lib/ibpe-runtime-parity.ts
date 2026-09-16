@@ -19,6 +19,10 @@ export const RUNTIME_IBPE_ENGINE_VERSION = "VYNDI-IBPE-1.3.0";
 export type RuntimeIbpeInput = IntegratedPlanningInput & {
   runtimeControls?: {
     paymentLagBySku?: Record<string, number>;
+    /** Latest verified canonical cash month. Zero means the approved-plan opening cash remains the baseline. */
+    cashAnchorPeriod?: number;
+    /** Evidence reference for the canonical cash balance used to rebase liquidity. */
+    cashAnchorSourceRef?: string;
   };
 };
 
@@ -28,6 +32,10 @@ export type RuntimeIbpeResult = IntegratedPlanningResult & {
     deferredProcurementBeyondHorizonLakh: number;
     capacityShortfallConstraintRows: number;
     capacityShortfallUniqueMonths: number;
+    cashAnchorApplied: boolean;
+    cashAnchorPeriod: number;
+    cashAnalysisStartPeriod: number;
+    cashAnchorSourceRef?: string;
   };
 };
 
@@ -84,24 +92,36 @@ function paymentLag(input: RuntimeIbpeInput, sku: string) {
   return Math.ceil(nonNegative(input.runtimeControls?.paymentLagBySku?.[sku]));
 }
 
+function governedCashAnchorPeriod(input: RuntimeIbpeInput, horizon: number) {
+  return Math.min(horizon, Math.floor(nonNegative(input.runtimeControls?.cashAnchorPeriod)));
+}
+
+function cashAnalysisStartPeriod(anchorPeriod: number, horizon: number) {
+  if (anchorPeriod <= 0) return 1;
+  return Math.min(horizon, anchorPeriod + 1);
+}
+
 function fundingOutlook(
   input: RuntimeIbpeInput,
   cash: IntegratedPlanningResult["cash"],
+  analysisStartPeriod: number,
 ): FundingOutlook {
-  const minimumBase = cash.reduce(
+  const futureCash = cash.filter((row) => row.period >= analysisStartPeriod);
+  const analyticalCash = futureCash.length ? futureCash : cash.slice(-1);
+  const minimumBase = analyticalCash.reduce(
     (minimum, row) => Math.min(minimum, row.freeLiquidityLakh),
     Number.POSITIVE_INFINITY,
   );
-  const minimumAfter = cash.reduce(
+  const minimumAfter = analyticalCash.reduce(
     (minimum, row) => Math.min(minimum, row.freeLiquidityAfterRecommendationsLakh),
     Number.POSITIVE_INFINITY,
   );
-  const firstBaseBreach = cash.find((row) => row.freeLiquidityLakh < 0)?.period ?? null;
-  const firstAfterBreach = cash.find((row) => row.freeLiquidityAfterRecommendationsLakh < 0)?.period ?? null;
+  const firstBaseBreach = analyticalCash.find((row) => row.freeLiquidityLakh < 0)?.period ?? null;
+  const firstAfterBreach = analyticalCash.find((row) => row.freeLiquidityAfterRecommendationsLakh < 0)?.period ?? null;
   const fundraisingLeadMonths = Math.ceil(nonNegative(input.funding.fundraisingLeadMonths));
   const fundingActionPeriod = firstAfterBreach === null
     ? null
-    : Math.max(1, firstAfterBreach - fundraisingLeadMonths);
+    : Math.max(analysisStartPeriod, firstAfterBreach - fundraisingLeadMonths);
 
   return {
     firstBaseLiquidityBreachPeriod: firstBaseBreach,
@@ -221,15 +241,24 @@ export function runRuntimeIbpe(
 
   const restrictedCash = nonNegative(input.funding.restrictedCashLakh);
   const minimumReserve = nonNegative(input.funding.minimumOperatingReserveLakh);
+  const cashAnchorPeriod = governedCashAnchorPeriod(input, horizon);
+  const analysisStartPeriod = cashAnalysisStartPeriod(cashAnchorPeriod, horizon);
   let baseCash = Number(input.funding.openingBankCashLakh) || 0;
   let plannedCash = baseCash;
 
   const cash = base.cash.map((row) => {
-    const incrementalProcurementLakh = procurementByPaymentPeriod.get(row.period) ?? 0;
-    baseCash += row.selectedInflowsLakh - row.selectedOutflowsLakh;
-    plannedCash += row.selectedInflowsLakh - row.selectedOutflowsLakh - incrementalProcurementLakh;
+    const afterCashAnchor = row.period > cashAnchorPeriod;
+    const selectedInflowsLakh = afterCashAnchor ? row.selectedInflowsLakh : 0;
+    const selectedOutflowsLakh = afterCashAnchor ? row.selectedOutflowsLakh : 0;
+    const incrementalProcurementLakh = afterCashAnchor
+      ? (procurementByPaymentPeriod.get(row.period) ?? 0)
+      : 0;
+    baseCash += selectedInflowsLakh - selectedOutflowsLakh;
+    plannedCash += selectedInflowsLakh - selectedOutflowsLakh - incrementalProcurementLakh;
     return {
       ...row,
+      selectedInflowsLakh: round(selectedInflowsLakh),
+      selectedOutflowsLakh: round(selectedOutflowsLakh),
       incrementalProcurementLakh: round(incrementalProcurementLakh),
       closingCashLakh: round(baseCash),
       freeLiquidityLakh: round(baseCash - restrictedCash - minimumReserve),
@@ -238,7 +267,7 @@ export function runRuntimeIbpe(
     };
   });
 
-  const funding = fundingOutlook(input, cash);
+  const funding = fundingOutlook(input, cash, analysisStartPeriod);
   const findings = rebuildFundingFinding(base, funding, nearTermRiskMonths);
   const decisions = rebuildDecisions(base, findings, funding);
   const findingCounts: Record<PlanningSeverity, number> = { critical: 0, high: 0, medium: 0, low: 0 };
@@ -266,6 +295,10 @@ export function runRuntimeIbpe(
       deferredProcurementBeyondHorizonLakh: round(deferredProcurementBeyondHorizonLakh),
       capacityShortfallConstraintRows: capacityShortfallRows.length,
       capacityShortfallUniqueMonths,
+      cashAnchorApplied: cashAnchorPeriod > 0,
+      cashAnchorPeriod,
+      cashAnalysisStartPeriod: analysisStartPeriod,
+      cashAnchorSourceRef: input.runtimeControls?.cashAnchorSourceRef,
     },
   };
 }
