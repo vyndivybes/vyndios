@@ -56,8 +56,16 @@ jobs:
       - name: EPR individual mutation authority gate
         run: node --test scripts/epr-individual-authority.test.mjs
 
+      - name: Deployment target regression gate
+        run: node --test scripts/deployment-target-regression.test.mjs
+
       - name: Generate route tree and typecheck
         run: npm run typecheck
+
+      - name: Vercel SSR build gate
+        env:
+          VERCEL: "1"
+        run: npm run build:dev
 
       - name: Client bundle invariant gate
         run: node scripts/check-client-bundle.mjs

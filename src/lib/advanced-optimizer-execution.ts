@@ -117,16 +117,16 @@ async function assertCurrentExecutionLineage(
 
 /**
  * Keep the expensive HiGHS JavaScript runtime and compiled WebAssembly module
- * outside the Worker's initial module graph. Ordinary VYNDI requests must not
- * pay solver startup/compilation cost; the solver is loaded only after a human
- * explicitly starts governed optimisation.
+ * outside the application's initial module graph. The deployment adapter is
+ * selected by Vite: Cloudflare receives the native Worker Wasm provider while
+ * Vercel receives the Node-compatible inlined-Wasm provider. Both are loaded
+ * only after a human explicitly starts governed optimisation.
  */
-async function createLazyPrecompiledHighsOptimizer() {
-  const [{ default: highsWasm }, { createPrecompiledHighsOptimizer }] = await Promise.all([
-    import("../generated/highs.wasm"),
-    import("./advanced-planning-highs-runtime.ts"),
-  ]);
-  return createPrecompiledHighsOptimizer(highsWasm);
+async function createLazyDeploymentHighsOptimizer() {
+  const { createDeploymentHighsOptimizer } = await import(
+    "@/lib/advanced-planning-highs-deployment-runtime"
+  );
+  return createDeploymentHighsOptimizer();
 }
 
 export const runAdvancedOptimizerFromPacket = createServerFn({ method: "POST" })
@@ -162,7 +162,7 @@ export const runAdvancedOptimizerFromPacket = createServerFn({ method: "POST" })
     const sql = await getSql();
     await assertCurrentExecutionLineage(sql, data.packetId, prepared.parentIbpeRunId);
 
-    const optimizer = await createLazyPrecompiledHighsOptimizer();
+    const optimizer = await createLazyDeploymentHighsOptimizer();
     const request = {
       requestId: data.requestId,
       maxRuntimeMs: effectiveMaxRuntimeMs,

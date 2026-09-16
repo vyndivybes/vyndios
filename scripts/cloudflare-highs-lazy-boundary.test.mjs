@@ -8,12 +8,17 @@ async function source(path) {
 
 test("Cloudflare cold-start path keeps HiGHS JS and Wasm behind the explicit optimizer execution boundary", async () => {
   const execution = await source("src/lib/advanced-optimizer-execution.ts");
+  const provider = await source("src/lib/advanced-planning-highs-deployment-runtime.ts");
 
-  assert.doesNotMatch(execution, /import\s+highsWasm\s+from\s+["']\.\.\/generated\/highs\.wasm["']/);
-  assert.doesNotMatch(execution, /import\s+\{\s*createPrecompiledHighsOptimizer\s*\}\s+from\s+["']\.\/advanced-planning-highs-runtime\.ts["']/);
+  assert.doesNotMatch(execution, /generated\/highs\.wasm/);
+  assert.doesNotMatch(execution, /advanced-planning-highs-runtime\.ts/);
+  assert.doesNotMatch(execution, /import\s+\{\s*createDeploymentHighsOptimizer\s*\}\s+from/);
 
-  assert.match(execution, /async function createLazyPrecompiledHighsOptimizer/);
-  assert.match(execution, /import\(["']\.\.\/generated\/highs\.wasm["']\)/);
-  assert.match(execution, /import\(["']\.\/advanced-planning-highs-runtime\.ts["']\)/);
-  assert.match(execution, /await createLazyPrecompiledHighsOptimizer\(\)/);
+  assert.match(execution, /async function createLazyDeploymentHighsOptimizer/);
+  assert.match(execution, /import\(\s*["']@\/lib\/advanced-planning-highs-deployment-runtime["']\s*\)/);
+  assert.match(execution, /await createLazyDeploymentHighsOptimizer\(\)/);
+
+  assert.match(provider, /import\(["']\.\.\/generated\/highs\.wasm["']\)/);
+  assert.match(provider, /import\(["']\.\/advanced-planning-highs-runtime\.ts["']\)/);
+  assert.match(provider, /createPrecompiledHighsOptimizer\(highsWasm\)/);
 });

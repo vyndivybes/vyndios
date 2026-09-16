@@ -6,6 +6,7 @@ import { cloudflare } from "@cloudflare/vite-plugin";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { nitro } from "nitro/vite";
 // @ts-expect-error JS plugin alongside the TS vite config
 import { grokPwaPlugin } from "./scripts/grok-pwa-plugin.mjs";
 // @ts-expect-error JS plugin alongside the TS vite config
@@ -33,9 +34,9 @@ function pgliteBootstrapPlugin(): Plugin {
     async configureServer(server) {
       if (!hasGlobbedMigrations(server.config.root)) return;
       const environment = server.environments.ssr;
-      // TanStack Start's SSR environment is supplied by the Cloudflare Vite
-      // plugin in deployed/local Worker mode. Lazy database initialisation in
-      // getSql() remains authoritative when no module runner is available.
+      // The active deployment adapter supplies the SSR environment. Lazy
+      // database initialisation in getSql() remains authoritative when no
+      // module runner is available.
       if (!isRunnableDevEnvironment(environment)) return;
       try {
         const mod = (await environment.runner.import("/src/lib/db.ts")) as {
@@ -131,45 +132,67 @@ function authPopupPlugin(): Plugin {
   };
 }
 
-export default defineConfig(() => ({
-  server: {
-    host: "0.0.0.0",
-    port: 8080,
-    strictPort: true,
-  },
-  preview: {
-    host: "127.0.0.1",
-    port: 8081,
-    strictPort: true,
-  },
-  resolve: {
-    tsconfigPaths: true,
-    // Force the governed optimizer onto the exact patched ESM loader prepared
-    // by scripts/with-app-env.mjs. This removes package-condition ambiguity that
-    // can otherwise make the Worker bundle select a CommonJS compatibility path
-    // and recreate createRequire(undefined) even though highs.mjs was patched.
-    alias: [
-      {
-        find: /^highs$/,
-        replacement: join(process.cwd(), "node_modules", "highs", "build", "highs.mjs"),
-      },
+export default defineConfig(() => {
+  const isVercel = Boolean(process.env.VERCEL);
+
+  return {
+    server: {
+      host: "0.0.0.0",
+      port: 8080,
+      strictPort: true,
+    },
+    preview: {
+      host: "127.0.0.1",
+      port: 8081,
+      strictPort: true,
+    },
+    resolve: {
+      tsconfigPaths: true,
+      alias: [
+        // Cloudflare needs the exact patched ESM loader prepared by
+        // scripts/with-app-env.mjs. Vercel must keep the package name intact so
+        // Nitro can externalize it and let Node resolve its sibling highs.wasm.
+        ...(!isVercel
+          ? [{
+              find: /^highs$/,
+              replacement: join(process.cwd(), "node_modules", "highs", "build", "highs.mjs"),
+            }]
+          : []),
+        {
+          find: /^@\/lib\/advanced-planning-highs-deployment-runtime$/,
+          replacement: join(
+            process.cwd(),
+            "src",
+            "lib",
+            isVercel
+              ? "advanced-planning-highs-vercel-runtime.ts"
+              : "advanced-planning-highs-deployment-runtime.ts",
+          ),
+        },
+      ],
+    },
+    // PGlite uses package-relative WASM/data assets. Keep it out of Vite's
+    // dependency pre-bundling during local development. Do not externalize it
+    // from SSR because Cloudflare Workers' Vite plugin rejects resolve.external
+    // for the Worker/SSR environment.
+    optimizeDeps: {
+      exclude: ["@electric-sql/pglite"],
+    },
+    ...(isVercel ? { ssr: { external: ["highs"] } } : {}),
+    plugins: [
+      // Vercel needs a routable Nitro server output. Cloudflare keeps its native
+      // Worker/Hyperdrive adapter everywhere else, including local Stage D.
+      ...(isVercel
+        ? []
+        : [cloudflare({ viteEnvironment: { name: "ssr" } })]),
+      pgliteBootstrapPlugin(),
+      authPopupPlugin(),
+      appEnvPlugin(),
+      grokPwaPlugin(),
+      tailwindcss(),
+      tanstackStart(),
+      ...(isVercel ? [nitro({ preset: "vercel", serverDir: "./server" })] : []),
+      viteReact(),
     ],
-  },
-  // PGlite uses package-relative WASM/data assets. Keep it out of Vite's
-  // dependency pre-bundling during local development. Do not externalize it
-  // from SSR because Cloudflare Workers' Vite plugin rejects resolve.external
-  // for the Worker/SSR environment.
-  optimizeDeps: {
-    exclude: ["@electric-sql/pglite"],
-  },
-  plugins: [
-    cloudflare({ viteEnvironment: { name: "ssr" } }),
-    pgliteBootstrapPlugin(),
-    authPopupPlugin(),
-    appEnvPlugin(),
-    grokPwaPlugin(),
-    tailwindcss(),
-    tanstackStart(),
-    viteReact(),
-  ],
-}));
+  };
+});

@@ -13,7 +13,8 @@ test("governed optimizer execution is edit-authorized, readiness-gated, cash-gov
   const execution = await source("src/lib/advanced-optimizer-execution.ts");
   assert.match(execution, /requireBusinessActor\("edit",\s*\{/);
   assert.match(execution, /readyForGovernedOptimization/);
-  assert.match(execution, /createPrecompiledHighsOptimizer/);
+  assert.match(execution, /createLazyDeploymentHighsOptimizer/);
+  assert.match(execution, /createDeploymentHighsOptimizer/);
   assert.match(execution, /runGovernedAdvancedOptimizer/);
   assert.match(execution, /applyCashGovernanceToOptimizationRun/);
   assert.match(execution, /persist_vyndi_advanced_optimization_run_v2/);
@@ -44,15 +45,28 @@ test("optimizer browser boundary returns a compact receipt and never dereference
   assert.doesNotMatch(route, /response\.result/);
 });
 
-test("live HiGHS Wasm is prepared from the pinned package and bundled as a relative server asset", async () => {
+test("Cloudflare live HiGHS Wasm is prepared from the pinned package and stays behind the deployment provider", async () => {
   const wrapper = await source("scripts/with-app-env.mjs");
   const execution = await source("src/lib/advanced-optimizer-execution.ts");
+  const provider = await source("src/lib/advanced-planning-highs-deployment-runtime.ts");
   const pkg = JSON.parse(await source("package.json"));
   assert.equal(pkg.dependencies.highs, "1.15.3");
   assert.match(wrapper, /node_modules[\s\S]*highs[\s\S]*build[\s\S]*highs\.wasm/);
   assert.match(wrapper, /src[\s\S]*generated[\s\S]*highs\.wasm/);
   assert.match(wrapper, /patchPinnedHighsEsmLoaderForCloudflare/);
-  assert.match(execution, /\.\.\/generated\/highs\.wasm/);
+  assert.match(execution, /advanced-planning-highs-deployment-runtime/);
+  assert.match(provider, /\.\.\/generated\/highs\.wasm/);
+  assert.match(provider, /createPrecompiledHighsOptimizer/);
+});
+
+test("Vercel keeps the pinned HiGHS package lazy and external to Nitro SSR bundling", async () => {
+  const vite = await source("vite.config.ts");
+  const runtime = await source("src/lib/advanced-planning-highs-vercel-runtime.ts");
+  assert.match(runtime, /import\("highs"\)/);
+  assert.doesNotMatch(runtime, /generated\/highs\.wasm/);
+  assert.match(vite, /isVercel \? \{ ssr: \{ external: \["highs"\] \} \} : \{\}/);
+  assert.match(vite, /\.\.\.\(!isVercel[\s\S]*find: \/\^highs\$\//);
+  assert.match(vite, /advanced-planning-highs-vercel-runtime\.ts/);
 });
 
 test("Worker bundle resolves the governed optimizer to the patched HiGHS ESM entry", async () => {
