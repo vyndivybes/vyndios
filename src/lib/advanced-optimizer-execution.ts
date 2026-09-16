@@ -180,6 +180,7 @@ export const runAdvancedOptimizerFromPacket = createServerFn({ method: "POST" })
       mathematicalRun,
       prepared.model,
       prepared.cashGuardrails,
+      prepared.cashTiming,
     );
 
     const optimizationStatus = governedRun.result?.status ?? "error";
@@ -217,6 +218,7 @@ export const runAdvancedOptimizerFromPacket = createServerFn({ method: "POST" })
           preparationVersion: prepared.version,
           lineage: prepared.lineage,
           evidence: prepared.evidence,
+          cashTiming: prepared.cashTiming,
         }),
         JSON.stringify(governedRun.governance),
         JSON.stringify(governedRun.baseline),
