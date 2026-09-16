@@ -167,7 +167,7 @@ test("Stage 2 order → production → quality → dispatch → invoice → rece
   assert.equal(collectionAgain.rows[0].id,"COL-STAGE2","same collection command must be idempotent");
   const m7=await db.query(`select receivables from vyndi_monthly_transaction_actuals where plan_month=7`);
   assert.equal(Number(m7.rows[0].receivables),1.5);
-  await assert.rejects(()=>db.query(`select post_vyndi_collection($1,$2,$3,$4,$5,$6,$7)`,["COL-OVER","INV-STAGE2",7,2,"BANK-OVER","test-user","finance"]),/exceeds open invoice receivable/);
+  await assert.rejects(()=>db.query(`select post_vyndi_collection($1,$2,$3,$4,$5,$6,$7)`,["COL-OVER","INV-STAGE2",7,2,"BANK-OVER","test-user","finance"]),/exceeds open gross invoice receivable/);
   await assert.rejects(()=>db.query(`select void_vyndi_invoice($1,$2,$3,$4)`,["INV-STAGE2","wrong order","test-user","finance"]),/Reverse posted collections before voiding invoice/);
 
   await db.query(`select reverse_vyndi_collection($1,$2,$3,$4)`,["COL-STAGE2","bank reversal","test-user","finance"]);
@@ -223,6 +223,9 @@ test("recommendation → PO approval → GRN/FIFO → three-way match → paymen
   const payableReport=await db.query(`select supplier_invoice_id,amount_open_inr,payable_class from vyndi_report_payables_aging where supplier_invoice_id='AP-P2P'`);
   assert.equal(payableReport.rows[0].supplier_invoice_id,'AP-P2P'); assert.equal(Number(payableReport.rows[0].amount_open_inr),590); assert.equal(payableReport.rows[0].payable_class,'OPEN');
   await assert.rejects(()=>db.query(`select approve_vyndi_supplier_invoice($1,$2,$3)`,['AP-P2P','ap-user-1','finance']),/different authorised user/);
+  await db.query(`select set_vyndi_supplier_invoice_itc_profile($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,[
+    'AP-P2P','33ABCDE1234F1Z5','8714',18,45,45,0,0,true,'ITC-EVIDENCE-P2P','GSTR2B-P2P','ap-user-1','finance',
+  ]);
   await db.query(`select approve_vyndi_supplier_invoice($1,$2,$3)`,['AP-P2P','ap-approver-2','finance']);
   await db.query(`select post_vyndi_supplier_payment($1,$2,$3::date,$4,$5,$6,$7)`,['PAY-P2P','AP-P2P','2026-03-04',590,'BANK-P2P','ap-user-1','finance']);
   const payable=await db.query(`select status,amount_open_inr from vyndi_accounts_payable where id='AP-P2P'`);
