@@ -3,11 +3,22 @@ import { authMiddleware } from "./auth/middleware.ts";
 import { requireBusinessActor } from "./business-actor.ts";
 import { getSql } from "./db.ts";
 import { loadPreparedAdvancedOptimizerEnvelope } from "./advanced-optimizer-authority.ts";
+import {
+  createHighsAdvancedPlanningOptimizer,
+  type HighsLegacyLike,
+  type HighsLegacySolutionLike,
+} from "./advanced-planning-highs-adapter.ts";
 import { runGovernedAdvancedOptimizer } from "./advanced-planning-optimizer.ts";
 import { applyCashGovernanceToOptimizationRun } from "./advanced-planning-cash-governance.ts";
 import { GOVERNED_HARD_CAPITAL_VERSION } from "./advanced-planning-hard-capital.ts";
 import { diagnoseAdvancedPlanningInfeasibility } from "./advanced-planning-infeasibility.ts";
 import { governedOptimizerRuntimeMs } from "./optimizer-resource-budget.ts";
+import {
+  VYNDI_BROWSER_SOLVER_OFFLOAD_VERSION,
+  verifyBrowserHighsRawSolution,
+  type BrowserHighsRawSolution,
+  type BrowserHighsSolveRequest,
+} from "./advanced-planning-browser-offload.ts";
 
 export type RunAdvancedOptimizerFromPacketInput = {
   packetId: string;
@@ -46,6 +57,11 @@ type LatestPacketRow = {
 type LatestIbpeRow = {
   id: string;
   source_sha: string;
+};
+
+type PersistBrowserSolveInput = RunAdvancedOptimizerFromPacketInput & {
+  offloadVersion: string;
+  rawSolution: BrowserHighsRawSolution;
 };
 
 function normalizeOptionalNumber(value: unknown) {
@@ -116,27 +132,101 @@ async function assertCurrentExecutionLineage(
   }
 }
 
-/**
- * Keep the expensive HiGHS JavaScript runtime and compiled WebAssembly module
- * outside the application's initial module graph. The deployment adapter is
- * selected by Vite: Cloudflare receives the native Worker Wasm provider while
- * Vercel receives the Node-compatible inlined-Wasm provider. Both are loaded
- * only after a human explicitly starts governed optimisation.
- */
-async function createLazyDeploymentHighsOptimizer() {
-  const { createDeploymentHighsOptimizer } = await import(
-    "@/lib/advanced-planning-highs-deployment-runtime"
-  );
-  return createDeploymentHighsOptimizer();
+function hardCapitalEnvelope(prepared: Awaited<ReturnType<typeof loadPreparedAdvancedOptimizerEnvelope>>) {
+  return {
+    version: GOVERNED_HARD_CAPITAL_VERSION,
+    sourceRef: prepared.evidence.cashSourceRef,
+    cashAnchorPeriod: prepared.cashTiming.cashAnchorPeriod,
+    analysisStartPeriod: prepared.cashTiming.analysisStartPeriod,
+    paymentLagBySku: prepared.cashTiming.paymentLagBySku,
+    guardrails: prepared.cashGuardrails.map((row) => ({
+      period: row.period,
+      cumulativeHeadroomLakh: row.cumulativeIncrementalProcurementHeadroomLakh,
+      sourceRef: row.sourceRef,
+    })),
+    fundingPlan: prepared.fundingPlan,
+  };
 }
 
-export const runAdvancedOptimizerFromPacket = createServerFn({ method: "POST" })
+function assertReady(prepared: Awaited<ReturnType<typeof loadPreparedAdvancedOptimizerEnvelope>>) {
+  if (prepared.readyForGovernedOptimization) return;
+  const reasons = prepared.issues
+    .filter((issue) => issue.severity === "error")
+    .map((issue) => `${issue.code}: ${issue.message}`)
+    .join(" ");
+  throw new Error(`Governed optimization blocked by preparation gate.${reasons ? ` ${reasons}` : ""}`);
+}
+
+function browserSolveRequest(
+  prepared: Awaited<ReturnType<typeof loadPreparedAdvancedOptimizerEnvelope>>,
+  data: RunAdvancedOptimizerFromPacketInput,
+): BrowserHighsSolveRequest {
+  const effectiveMaxRuntimeMs = governedOptimizerRuntimeMs(data.maxRuntimeMs);
+  if (!Number.isFinite(effectiveMaxRuntimeMs) || effectiveMaxRuntimeMs <= 0) {
+    throw new Error("Governed optimization maximum runtime must be a positive finite value.");
+  }
+  return {
+    requestId: data.requestId,
+    maxRuntimeMs: effectiveMaxRuntimeMs,
+    ...(data.mipGap === undefined ? {} : { mipGap: data.mipGap }),
+    hardCapitalEnvelope: hardCapitalEnvelope(prepared),
+  };
+}
+
+/**
+ * Server preparation remains authoritative. It verifies edit authority, the
+ * exact latest packet/IBPE/source lineage, readiness, cash timing and the hard
+ * capital envelope, then returns the immutable model for one browser Web Worker
+ * solve. No HiGHS runtime is instantiated on Cloudflare.
+ */
+export const prepareAdvancedOptimizerBrowserSolve = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: RunAdvancedOptimizerFromPacketInput) => ({
     packetId: String(input.packetId ?? "").trim().slice(0, 240),
     requestId: String(input.requestId ?? "").trim().slice(0, 240),
     maxRuntimeMs: normalizeOptionalNumber(input.maxRuntimeMs),
     mipGap: normalizeOptionalNumber(input.mipGap),
+  }))
+  .handler(async ({ data, context }) => {
+    await requireBusinessActor("edit", {
+      userId: context.userId,
+      email: context.userEmail,
+    });
+    if (!data.packetId) throw new Error("Governed optimization requires an exact advanced packet ID.");
+    if (!data.requestId) throw new Error("Governed optimization requires a request ID.");
+
+    const prepared = await loadPreparedAdvancedOptimizerEnvelope(data.packetId);
+    assertReady(prepared);
+    const sql = await getSql();
+    await assertCurrentExecutionLineage(sql, data.packetId, prepared.parentIbpeRunId);
+    const request = browserSolveRequest(prepared, data);
+
+    return {
+      packetId: prepared.packetId,
+      parentIbpeRunId: prepared.parentIbpeRunId,
+      preparationVersion: prepared.version,
+      model: prepared.model,
+      request,
+      offloadVersion: VYNDI_BROWSER_SOLVER_OFFLOAD_VERSION,
+    };
+  });
+
+/**
+ * Server persistence never trusts the browser's business interpretation. The
+ * submitted HiGHS primal is independently recompiled and checked against every
+ * governed model/hard-capital row. Only then is the standard optimizer contract
+ * replayed from that verified primal, cash governance applied, lineage rechecked
+ * and immutable evidence persisted.
+ */
+export const persistAdvancedOptimizerBrowserSolve = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: PersistBrowserSolveInput) => ({
+    packetId: String(input.packetId ?? "").trim().slice(0, 240),
+    requestId: String(input.requestId ?? "").trim().slice(0, 240),
+    maxRuntimeMs: normalizeOptionalNumber(input.maxRuntimeMs),
+    mipGap: normalizeOptionalNumber(input.mipGap),
+    offloadVersion: String(input.offloadVersion ?? "").trim().slice(0, 120),
+    rawSolution: input.rawSolution,
   }))
   .handler(async ({ data, context }): Promise<AdvancedOptimizerExecutionReceipt> => {
     const actor = await requireBusinessActor("edit", {
@@ -145,60 +235,59 @@ export const runAdvancedOptimizerFromPacket = createServerFn({ method: "POST" })
     });
     if (!data.packetId) throw new Error("Governed optimization requires an exact advanced packet ID.");
     if (!data.requestId) throw new Error("Governed optimization requires a request ID.");
-
-    const effectiveMaxRuntimeMs = governedOptimizerRuntimeMs(data.maxRuntimeMs);
-    if (!Number.isFinite(effectiveMaxRuntimeMs) || effectiveMaxRuntimeMs <= 0) {
-      throw new Error("Governed optimization maximum runtime must be a positive finite value.");
+    if (data.offloadVersion !== VYNDI_BROWSER_SOLVER_OFFLOAD_VERSION) {
+      throw new Error("Governed optimization rejected: browser solver offload contract version is stale.");
     }
 
     const prepared = await loadPreparedAdvancedOptimizerEnvelope(data.packetId);
-    if (!prepared.readyForGovernedOptimization) {
-      const reasons = prepared.issues
-        .filter((issue) => issue.severity === "error")
-        .map((issue) => `${issue.code}: ${issue.message}`)
-        .join(" ");
-      throw new Error(`Governed optimization blocked by preparation gate.${reasons ? ` ${reasons}` : ""}`);
-    }
-
+    assertReady(prepared);
     const sql = await getSql();
     await assertCurrentExecutionLineage(sql, data.packetId, prepared.parentIbpeRunId);
+    const request = browserSolveRequest(prepared, data);
 
-    const hardCapitalEnvelope = {
-      version: GOVERNED_HARD_CAPITAL_VERSION,
-      sourceRef: prepared.evidence.cashSourceRef,
-      cashAnchorPeriod: prepared.cashTiming.cashAnchorPeriod,
-      analysisStartPeriod: prepared.cashTiming.analysisStartPeriod,
-      paymentLagBySku: prepared.cashTiming.paymentLagBySku,
-      guardrails: prepared.cashGuardrails.map((row) => ({
-        period: row.period,
-        cumulativeHeadroomLakh: row.cumulativeIncrementalProcurementHeadroomLakh,
-        sourceRef: row.sourceRef,
-      })),
-      fundingPlan: prepared.fundingPlan,
-    };
+    const verification = verifyBrowserHighsRawSolution(prepared.model, request, data.rawSolution);
+    if (!verification.valid) {
+      throw new Error(
+        `Governed optimization rejected: browser solver result failed server verification. ${verification.issues.slice(0, 8).join(" | ")}`,
+      );
+    }
 
-    const optimizer = await createLazyDeploymentHighsOptimizer();
-    const request = {
-      requestId: data.requestId,
-      maxRuntimeMs: effectiveMaxRuntimeMs,
-      ...(data.mipGap === undefined ? {} : { mipGap: data.mipGap }),
-      hardCapitalEnvelope,
+    const browserReportedInfeasible = verification.reportedStatus === "infeasible" && !verification.primalValidated;
+    const replaySolution: HighsLegacySolutionLike = browserReportedInfeasible
+      ? {
+          Status: "Browser-reported infeasible without server primal certificate",
+          Columns: {},
+        }
+      : data.rawSolution as HighsLegacySolutionLike;
+    const replayRuntime: HighsLegacyLike = {
+      solve() {
+        return replaySolution;
+      },
     };
+    const optimizer = createHighsAdvancedPlanningOptimizer(replayRuntime);
     const mathematicalRun = await runGovernedAdvancedOptimizer(prepared.model, optimizer, request);
-    if (mathematicalRun.result?.status === "infeasible") {
+
+    if (browserReportedInfeasible && mathematicalRun.result) {
+      const diagnosis = diagnoseAdvancedPlanningInfeasibility(prepared.model);
+      mathematicalRun.result.diagnostics = [
+        ...mathematicalRun.result.diagnostics,
+        "BROWSER_REPORTED_INFEASIBLE_UNVERIFIED: no business action may rely on infeasibility without a server-verifiable primal/certificate.",
+        ...diagnosis.diagnostics,
+      ];
+    } else if (mathematicalRun.result?.status === "infeasible") {
       const diagnosis = diagnoseAdvancedPlanningInfeasibility(prepared.model);
       mathematicalRun.result.diagnostics = [
         ...mathematicalRun.result.diagnostics,
         ...diagnosis.diagnostics,
       ];
     }
+
     const governedRun = applyCashGovernanceToOptimizationRun(
       mathematicalRun,
       prepared.model,
       prepared.cashGuardrails,
       prepared.cashTiming,
     );
-
     const optimizationStatus = governedRun.result?.status ?? "error";
     const firstInfeasibilityWitness = governedRun.result?.diagnostics.find((line) =>
       line.startsWith("INFEASIBILITY_WITNESS "),
@@ -207,7 +296,7 @@ export const runAdvancedOptimizerFromPacket = createServerFn({ method: "POST" })
     const runId = `OPT-${crypto.randomUUID()}`;
 
     // Re-check immediately before persistence so a packet/IBPE refresh that
-    // occurs while HiGHS is solving cannot persist a newly superseded run.
+    // occurs while the browser is solving cannot persist a superseded run.
     await assertCurrentExecutionLineage(sql, data.packetId, prepared.parentIbpeRunId);
 
     const rows = await sql.query<{ id: string }>(
@@ -235,6 +324,15 @@ export const runAdvancedOptimizerFromPacket = createServerFn({ method: "POST" })
           lineage: prepared.lineage,
           evidence: prepared.evidence,
           cashTiming: prepared.cashTiming,
+          executionLocation: "browser-web-worker",
+          browserSolverEvidence: {
+            offloadVersion: data.offloadVersion,
+            reportedStatus: verification.reportedStatus,
+            primalValidated: verification.primalValidated,
+            expectedVariableCount: verification.expectedVariableCount,
+            constraintCount: verification.constraintCount,
+            reconstructedObjectiveValue: verification.reconstructedObjectiveValue,
+          },
         }),
         JSON.stringify(governedRun.governance),
         JSON.stringify(governedRun.baseline),
@@ -268,3 +366,34 @@ export const runAdvancedOptimizerFromPacket = createServerFn({ method: "POST" })
       issueCount: governedRun.issues.length,
     };
   });
+
+/**
+ * Human-initiated browser orchestration. The expensive HiGHS Wasm solve happens
+ * in a dedicated Web Worker, not inside the Cloudflare request. Cloudflare only
+ * prepares immutable governed inputs, verifies the returned primal and persists
+ * advisory evidence.
+ */
+export async function runAdvancedOptimizerFromPacket(args: {
+  data: RunAdvancedOptimizerFromPacketInput;
+}): Promise<AdvancedOptimizerExecutionReceipt> {
+  if (typeof window === "undefined" || typeof Worker === "undefined") {
+    throw new Error("Governed HiGHS execution requires a browser with Web Worker support.");
+  }
+
+  const prepared = await prepareAdvancedOptimizerBrowserSolve({ data: args.data });
+  const { solveAdvancedPlanningInBrowserWorker } = await import(
+    "./advanced-planning-highs-browser-client.ts"
+  );
+  const rawSolution = await solveAdvancedPlanningInBrowserWorker({
+    model: prepared.model,
+    request: prepared.request,
+  });
+
+  return persistAdvancedOptimizerBrowserSolve({
+    data: {
+      ...args.data,
+      offloadVersion: prepared.offloadVersion,
+      rawSolution,
+    },
+  });
+}
