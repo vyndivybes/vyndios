@@ -1,0 +1,111 @@
+# VYNDI Controlled Identity & Serial Authority
+
+**Controlled source:** VĀYÚ DOC 04 · Product, Component & Asset Identity Scheme · Rev 1.2 · 2026-09-16  
+**Implementation migration:** `migrations/0076_controlled_identity_serial_authority.sql`
+
+## 1. Finished VĀYÚ products
+
+New production identities use:
+
+`MODEL-MMYY-NNNN`
+
+Current controlled model codes:
+
+| Family | Code | Initial launch code | Example |
+| --- | --- | --- | --- |
+| Longitude | `LON` | `0926` | `LON-0926-0001` |
+| Latitude | `LAT` | `0926` | `LAT-0926-0001` |
+| Altitude | `ALT` | `0926` | `ALT-0926-0001` |
+
+`MMYY` is the approved model launch month/year, not the unit manufacture date. The launch code can be corrected through the governed configuration function **only before the first canonical serial is issued for that model**.
+
+The Production traveller server function no longer requires a client-entered serial. The database generator is the authority for new VYNDI production serials.
+
+## 2. VĀYÚ-controlled components and configurable options
+
+For components requiring individual serialization:
+
+`FAMILY-VARIANT-MMYY-NNNN`
+
+Examples include:
+
+- `HBR-400-0926-0001`
+- `STM-090-0926-0001`
+- `CRK-170-0926-0001`
+- `WST-C45-0926-0001`
+- `TYR-7035-0926-0001` when an individually serialized tyre is justified
+
+The visible code is deliberately short. The controlled Item Master remains authoritative for complete material, dimension, interface, supplier, model-compatibility, revision and approved-substitution detail.
+
+## 3. Purchased equipment, spares, tools, assets and ledger items
+
+Existing manufacturer/supplier identities are never replaced:
+
+- manufacturer / brand
+- OEM model number
+- OEM part number
+- OEM serial number
+- supplier SKU
+- supplier batch / lot
+- invoice / GRN
+- warranty reference
+- calibration reference
+
+VYNDI adds a separate internal reference for cross-ledger control:
+
+- `AST-NNNNNN` — capital / office asset
+- `EQP-NNNNNN` — production / test equipment
+- `TOL-NNNNNN` — tool
+- `SPR-NNNNNN` — purchased spare
+- `CON-NNNNNN` — consumable
+- `ITM-NNNNNN` — generic purchased item
+
+The system must never synthesize a fake OEM serial merely to fill a field.
+
+## 4. Traceability classes
+
+- **A — Individual serial:** safety-critical, high-value, calibrated, warranty-sensitive or configuration-critical unit.
+- **B — Lot/batch:** group traceability is sufficient.
+- **C — Quantity only:** low-risk consumable where neither individual nor lot traceability is required.
+
+## 5. Identity layers
+
+Every controlled record separates:
+
+1. **Item / Part / SKU** — what it is.
+2. **Revision** — which engineering configuration.
+3. **Individual serial** — which exact physical unit, when applicable.
+4. **Lot / batch** — which production or receipt group, when applicable.
+5. **Immutable VYNDI UUID** — database identity independent of all visible references.
+
+## 6. Genealogy
+
+`vyndi_identity_genealogy` stores effective-dated parent/child relationships and therefore supports both:
+
+- **as-built configuration**, and
+- **as-maintained configuration** after replacements, removals or upgrades.
+
+A bicycle keeps the same finished-product serial when a component is replaced; the genealogy changes instead.
+
+## 7. Legacy reconciliation
+
+Historical identities are not renumbered. Existing traveller serials are registered against an immutable identity UUID. Non-canonical historical formats are retained as aliases, including the former:
+
+- `VAYU-YYMMDD-XX-####`
+- `VYNDI-<MODEL/TIER>-<HASH>-<NNN>`
+
+`vyndi_identity_reconciliation_report` classifies each traveller as `CANONICAL`, `LEGACY_RETAINED`, `MISMATCH` or `UNREGISTERED`.
+
+## 8. Inventory reconciliation
+
+The identity extension is attached to the existing Master Inventory / canonical receiving authority; no duplicate stock ledger is introduced. `vyndi_inventory_identity_register` exposes the internal reference and preserved OEM/supplier identity together.
+
+## 9. Governance rules
+
+- New Production serials are generated server-side.
+- Visible identities use uniqueness controls.
+- Historical serials are immutable.
+- OEM identities are preserved verbatim.
+- Launch MMYY is configuration-controlled and freezes after first canonical issuance.
+- Serial namespaces stop rather than silently widen when their controlled sequence width is exhausted.
+- Identity corrections must be auditable and must not rewrite historical genealogy silently.
