@@ -3,10 +3,13 @@ import { z } from "zod";
 import { requireBusinessActor } from "@/lib/business-actor";
 import { getSql } from "@/lib/db";
 
+const identityPrefix = z.enum(["AST", "EQP", "TOL", "SPR", "CON", "ITM"]);
+const traceabilityClass = z.enum(["A", "B", "C"]);
+
 const purchasedIdentitySchema = z.object({
   movementId: z.string().trim().min(1).max(200),
-  traceabilityClass: z.enum(["A", "B", "C"]),
-  internalPrefix: z.enum(["AST", "EQP", "TOL", "SPR", "CON", "ITM"]).optional(),
+  traceabilityClass,
+  internalPrefix: identityPrefix.optional(),
   manufacturer: z.string().trim().max(200).default(""),
   brand: z.string().trim().max(200).default(""),
   oemModelNumber: z.string().trim().max(200).default(""),
@@ -16,6 +19,22 @@ const purchasedIdentitySchema = z.object({
   supplierLot: z.string().trim().max(200).default(""),
   invoiceReference: z.string().trim().max(200).default(""),
   grnReference: z.string().trim().max(200).default(""),
+  warrantyReference: z.string().trim().max(240).default(""),
+  calibrationReference: z.string().trim().max(240).default(""),
+});
+
+const goodsReceiptIdentitySchema = z.object({
+  grnId: z.string().trim().min(1).max(120),
+  traceabilityClass,
+  internalPrefix: identityPrefix.optional(),
+  manufacturer: z.string().trim().max(200).default(""),
+  brand: z.string().trim().max(200).default(""),
+  oemModelNumber: z.string().trim().max(200).default(""),
+  oemPartNumber: z.string().trim().max(200).default(""),
+  oemSerialNumber: z.string().trim().max(240).default(""),
+  supplierSku: z.string().trim().max(200).default(""),
+  supplierLot: z.string().trim().max(200).default(""),
+  invoiceReference: z.string().trim().max(200).default(""),
   warrantyReference: z.string().trim().max(240).default(""),
   calibrationReference: z.string().trim().max(240).default(""),
 });
@@ -69,6 +88,61 @@ export const registerPurchasedIdentity = createServerFn({ method: "POST" })
     const row = rows[0];
     if (!row) throw new Error("Purchased identity was not registered.");
     return { identityUid: row.identity_uid, internalReference: row.internal_reference };
+  });
+
+/**
+ * Capture external identity at GRN creation. Quarantine/rejection keeps the OEM
+ * identity on the GRN; accepted stock additionally receives a VYNDI internal ref.
+ */
+export const attachGoodsReceiptIdentity = createServerFn({ method: "POST" })
+  .validator(goodsReceiptIdentitySchema)
+  .handler(async ({ data }) => {
+    const actor = await requireBusinessActor("edit");
+    const sql = await getSql();
+    const rows = await sql.query<{ identity_uid: string | null; internal_reference: string }>(
+      `select * from attach_vyndi_goods_receipt_identity(
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15
+      )`,
+      [
+        data.grnId,
+        data.traceabilityClass,
+        data.internalPrefix ?? "",
+        data.manufacturer,
+        data.brand,
+        data.oemModelNumber,
+        data.oemPartNumber,
+        data.oemSerialNumber,
+        data.supplierSku,
+        data.supplierLot,
+        data.invoiceReference,
+        data.warrantyReference,
+        data.calibrationReference,
+        actor.userId,
+        actor.role,
+      ],
+    );
+    const row = rows[0];
+    return {
+      identityUid: row?.identity_uid ?? null,
+      internalReference: row?.internal_reference ?? "",
+    };
+  });
+
+/** Materialise the saved GRN identity after a quarantined receipt is accepted. */
+export const materialiseGoodsReceiptIdentity = createServerFn({ method: "POST" })
+  .validator(z.object({ grnId: z.string().trim().min(1).max(120) }))
+  .handler(async ({ data }) => {
+    const actor = await requireBusinessActor("edit");
+    const sql = await getSql();
+    const rows = await sql.query<{ identity_uid: string | null; internal_reference: string }>(
+      `select * from materialise_vyndi_goods_receipt_identity($1,$2)`,
+      [data.grnId, actor.userId],
+    );
+    const row = rows[0];
+    return {
+      identityUid: row?.identity_uid ?? null,
+      internalReference: row?.internal_reference ?? "",
+    };
   });
 
 /** Generate a controlled VAYU component identity from family + variant + release MMYY. */
