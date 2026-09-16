@@ -57,6 +57,26 @@ function input(): RuntimeIbpeInput {
       restrictedCashLakh: 0,
       fundraisingLeadMonths: 3,
     },
+    runtimeControls: {
+      paymentLagBySku: { "FRAME-CARBON-M": 1 },
+    },
+  };
+}
+
+function anchoredInput(): RuntimeIbpeInput {
+  return {
+    ...input(),
+    funding: {
+      openingBankCashLakh: 5,
+      minimumOperatingReserveLakh: 15,
+      restrictedCashLakh: 0,
+      fundraisingLeadMonths: 3,
+    },
+    runtimeControls: {
+      paymentLagBySku: { "FRAME-CARBON-M": 1 },
+      cashAnchorPeriod: 1,
+      cashAnchorSourceRef: "transaction-ledger:M1; BANK-EVIDENCE-001",
+    },
   };
 }
 
@@ -132,6 +152,7 @@ function prepare(overrides: Partial<Parameters<typeof prepareAdvancedOptimizerEn
 test("complete exact governed evidence produces a solver-ready preparation envelope", () => {
   const prepared = prepare();
   assert.equal(prepared.readyForGovernedOptimization, true);
+  assert.equal(prepared.version, "VYNDI-OPTIMIZER-PREPARATION-0.2");
   assert.equal(prepared.lineage.sourceSnapshotId, lineage.sourceSnapshotId);
   assert.equal(prepared.evidence.sourceInputHash, lineage.sourceInputHash);
   assert.equal(prepared.authority.capacityAuthority, "approved-frozen-evidence");
@@ -140,7 +161,23 @@ test("complete exact governed evidence produces a solver-ready preparation envel
   assert.equal(prepared.authority.supplierLaneAuthority, "approved-persisted");
   assert.equal(prepared.model.supplierLanes.length, 1);
   assert.equal(prepared.cashGuardrails.length, 36);
+  assert.equal(prepared.cashTiming.analysisStartPeriod, 1);
+  assert.deepEqual(prepared.cashTiming.paymentLagBySku, { "FRAME-CARBON-M": 1 });
   assert.ok(prepared.cashGuardrails.every((row) => row.sourceRef.includes(lineage.sourceSnapshotId)));
+});
+
+test("canonical cash anchor advances optimizer cash analysis to the next governed period", () => {
+  const anchoredResult = result();
+  anchoredResult.cash[0].freeLiquidityLakh = -10;
+  const prepared = prepare({ input: anchoredInput(), result: anchoredResult });
+  assert.equal(prepared.readyForGovernedOptimization, true);
+  assert.equal(prepared.cashTiming.cashAnchorPeriod, 1);
+  assert.equal(prepared.cashTiming.analysisStartPeriod, 2);
+  assert.equal(prepared.cashGuardrails.length, 35);
+  assert.equal(prepared.cashGuardrails[0]?.period, 2);
+  assert.equal(prepared.evidence.cashAnchorSourceRef, "transaction-ledger:M1; BANK-EVIDENCE-001");
+  assert.equal(prepared.evidence.paymentLagControlCount, 1);
+  assert.ok(!prepared.issues.some((row) => row.code === "CASH_BASELINE_RESERVE_BREACH" && row.message.includes("period 1")));
 });
 
 test("capacity-derived routing is never upgraded into governed optimizer readiness", () => {
@@ -183,6 +220,7 @@ test("frozen model and authority can prepare optimization without re-reading mut
   const original = prepare();
   const frozen = prepareFrozenAdvancedOptimizerEnvelope({
     lineage,
+    input: input(),
     result: result(),
     model: original.model,
     authority: original.authority,
@@ -192,12 +230,14 @@ test("frozen model and authority can prepare optimization without re-reading mut
   assert.strictEqual(frozen.model, original.model);
   assert.deepEqual(frozen.evidence.persistedRoutingRevisionIds, ["ROUTE-CARBON-R1"]);
   assert.deepEqual(frozen.evidence.persistedSupplierLaneRevisionIds, ["SUP-A:FRAME-CARBON-M:R1"]);
+  assert.deepEqual(frozen.cashTiming.paymentLagBySku, { "FRAME-CARBON-M": 1 });
 });
 
 test("frozen capacity evidence must show approval at packet creation", () => {
   const original = prepare();
   const frozen = prepareFrozenAdvancedOptimizerEnvelope({
     lineage,
+    input: input(),
     result: result(),
     model: original.model,
     authority: { ...original.authority, capacityAuthority: "not-approved" },
