@@ -52,13 +52,6 @@ function constraintId(prefix: string, ...parts: Array<string | number>) {
   return [prefix, ...parts.map((part) => clean(String(part)))].join("__");
 }
 
-function addTerm(terms: MathTerm[], variableIdValue: string, coefficient: number) {
-  if (!Number.isFinite(coefficient) || Math.abs(coefficient) <= 1e-12) return;
-  const existing = terms.find((row) => row.variableId === variableIdValue);
-  if (existing) existing.coefficient += coefficient;
-  else terms.push({ variableId: variableIdValue, coefficient });
-}
-
 function nonNegativeInteger(value: unknown) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? Math.max(0, Math.ceil(parsed)) : 0;
@@ -142,37 +135,48 @@ export function compileGovernedHardCapitalConstraints(
     fundingByPeriod.set(row.period, (fundingByPeriod.get(row.period) ?? 0) + row.amountLakh);
   }
 
+  // Index every payable procurement variable once by its governed payment period.
+  // The previous implementation rescanned every lane/order pair for every cash
+  // period and deduplicated terms with Array.find(), producing quadratic CPU
+  // growth on the production 36-month / multi-SKU model. That is unsafe on
+  // Cloudflare's request CPU budget and can surface as Worker error 1102.
+  const paymentTermsByPeriod = new Map<number, MathTerm[]>();
+  for (const lane of approvedLanes) {
+    const paymentLag = nonNegativeInteger(envelope.paymentLagBySku[lane.sku]);
+    for (let orderPeriod = 1; orderPeriod <= horizon; orderPeriod += 1) {
+      const receiptPeriod = orderPeriod + lane.leadTimePeriods;
+      if (receiptPeriod > horizon) continue;
+      const contractualPaymentPeriod = orderPeriod + paymentLag;
+      const paymentPeriod = Math.max(envelope.analysisStartPeriod, contractualPaymentPeriod);
+      if (paymentPeriod > horizon) continue;
+      const coefficient = lane.orderMultiple * lane.landedUnitCostLakh;
+      if (!Number.isFinite(coefficient) || Math.abs(coefficient) <= 1e-12) continue;
+      const rows = paymentTermsByPeriod.get(paymentPeriod) ?? [];
+      rows.push({ variableId: variableId("PROC_LOTS", lane.id, orderPeriod), coefficient });
+      paymentTermsByPeriod.set(paymentPeriod, rows);
+    }
+  }
+
+  // Build cumulative ceilings incrementally. Each procurement variable is
+  // indexed once and copied only into the cumulative constraints that actually
+  // require it; there is no repeated lane/order rescan and no linear term lookup.
+  const cumulativeTerms: MathTerm[] = [];
+  let approvedFundingThroughPeriod = envelope.fundingPlan
+    .filter((row) => row.period < envelope.analysisStartPeriod)
+    .reduce((sum, row) => sum + row.amountLakh, 0);
+
   for (let period = envelope.analysisStartPeriod; period <= horizon; period += 1) {
+    approvedFundingThroughPeriod += fundingByPeriod.get(period) ?? 0;
+    cumulativeTerms.push(...(paymentTermsByPeriod.get(period) ?? []));
+    if (!cumulativeTerms.length) continue;
+
     const guardrail = guardrailByPeriod.get(period)!;
-    const terms: MathTerm[] = [];
-
-    for (const lane of approvedLanes) {
-      const paymentLag = nonNegativeInteger(envelope.paymentLagBySku[lane.sku]);
-      for (let orderPeriod = 1; orderPeriod <= horizon; orderPeriod += 1) {
-        const receiptPeriod = orderPeriod + lane.leadTimePeriods;
-        if (receiptPeriod > horizon) continue;
-        const contractualPaymentPeriod = orderPeriod + paymentLag;
-        const paymentPeriod = Math.max(envelope.analysisStartPeriod, contractualPaymentPeriod);
-        if (paymentPeriod > period || paymentPeriod > horizon) continue;
-        addTerm(
-          terms,
-          variableId("PROC_LOTS", lane.id, orderPeriod),
-          lane.orderMultiple * lane.landedUnitCostLakh,
-        );
-      }
-    }
-
-    if (!terms.length) continue;
     const hardHeadroom = Math.max(0, guardrail.cumulativeHeadroomLakh);
-    let approvedFundingThroughPeriod = 0;
-    for (const [fundingPeriod, amount] of fundingByPeriod) {
-      if (fundingPeriod <= period) approvedFundingThroughPeriod += amount;
-    }
     constraints.push({
       id: constraintId("CAPITAL_CUMULATIVE", period),
       sense: "le",
       rhs: hardHeadroom,
-      terms,
+      terms: cumulativeTerms.slice(),
       semantic: `hard governed capital ceiling M${period}: cumulative optimizer procurement cash must stay within ₹${hardHeadroom}L reserve-preserving IBPE headroom; approved-plan funding scheduled through M${period}=₹${approvedFundingThroughPeriod}L`,
     });
   }

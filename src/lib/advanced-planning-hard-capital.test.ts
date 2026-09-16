@@ -96,3 +96,47 @@ test("optional standby capital is only available when it exists in governed cash
   assert.equal(compiled.constraints.find((row) => row.id === "CAPITAL_CUMULATIVE__9")?.rhs, 110);
   assert.ok(compiled.semantics.some((row) => row.includes("₹225L")));
 });
+
+test("production-scale hard-capital indexing emits unique procurement terms without rescanning semantics", () => {
+  const laneCount = 80;
+  const largeSource = {
+    horizonPeriods: 36,
+    supplierLanes: Array.from({ length: laneCount }, (_, index) => ({
+      id: `SUP-${index}:SKU-${index}`,
+      supplierId: `SUP-${index}`,
+      sku: `SKU-${index}`,
+      approved: true,
+      leadTimePeriods: 1,
+      moq: 1,
+      orderMultiple: 1,
+      landedUnitCostLakh: 0.01,
+      reliability: 1,
+    })),
+  } as AdvancedPlanningConstraintModel;
+  const envelope: GovernedHardCapitalEnvelope = {
+    version: GOVERNED_HARD_CAPITAL_VERSION,
+    sourceRef: "IBPE-PROD:HASH:CASH",
+    cashAnchorPeriod: 1,
+    analysisStartPeriod: 2,
+    paymentLagBySku: Object.fromEntries(Array.from({ length: laneCount }, (_, index) => [`SKU-${index}`, 1])),
+    guardrails: Array.from({ length: 35 }, (_, index) => ({
+      period: index + 2,
+      cumulativeHeadroomLakh: 1_000,
+      sourceRef: "IBPE-PROD:HASH:CASH",
+    })),
+    fundingPlan: [
+      { period: 1, amountLakh: 15, sourceRef: "PLAN:T1" },
+      { period: 3, amountLakh: 35, sourceRef: "PLAN:T2" },
+      { period: 6, amountLakh: 35, sourceRef: "PLAN:T3" },
+      { period: 10, amountLakh: 50, sourceRef: "PLAN:T4" },
+      { period: 14, amountLakh: 65, sourceRef: "PLAN:T5" },
+    ],
+  };
+
+  const compiled = compileGovernedHardCapitalConstraints(largeSource, envelope);
+  assert.equal(compiled.valid, true);
+  const finalConstraint = compiled.constraints.find((row) => row.id === "CAPITAL_CUMULATIVE__36");
+  assert.ok(finalConstraint);
+  assert.equal(finalConstraint.terms.length, laneCount * 35);
+  assert.equal(new Set(finalConstraint.terms.map((term) => term.variableId)).size, finalConstraint.terms.length);
+});
