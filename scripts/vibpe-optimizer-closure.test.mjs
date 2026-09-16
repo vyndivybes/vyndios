@@ -9,15 +9,27 @@ async function source(path) {
   return readFile(new URL(`../${path}`, import.meta.url), "utf8");
 }
 
-test("governed optimizer execution is edit-authorized, readiness-gated, cash-governed and persisted through v2", async () => {
+test("governed optimizer is edit-authorized, browser-offloaded, server-verified, cash-governed and persisted through v2", async () => {
   const execution = await source("src/lib/advanced-optimizer-execution.ts");
+  const verifier = await source("src/lib/advanced-planning-browser-offload.ts");
+  const browserWorker = await source("src/lib/advanced-planning-highs-browser-worker.ts");
   assert.match(execution, /requireBusinessActor\("edit",\s*\{/);
   assert.match(execution, /readyForGovernedOptimization/);
-  assert.match(execution, /createLazyDeploymentHighsOptimizer/);
-  assert.match(execution, /createDeploymentHighsOptimizer/);
+  assert.match(execution, /prepareAdvancedOptimizerBrowserSolve/);
+  assert.match(execution, /persistAdvancedOptimizerBrowserSolve/);
+  assert.match(execution, /solveAdvancedPlanningInBrowserWorker/);
+  assert.match(execution, /verifyBrowserHighsRawSolution/);
   assert.match(execution, /runGovernedAdvancedOptimizer/);
   assert.match(execution, /applyCashGovernanceToOptimizationRun/);
   assert.match(execution, /persist_vyndi_advanced_optimization_run_v2/);
+  assert.match(execution, /executionLocation: "browser-web-worker"/);
+  assert.doesNotMatch(execution, /createLazyDeploymentHighsOptimizer/);
+  assert.doesNotMatch(execution, /createDeploymentHighsOptimizer/);
+  assert.match(verifier, /compileAdvancedPlanningMathematicalModel/);
+  assert.match(verifier, /compileGovernedHardCapitalConstraints/);
+  assert.match(verifier, /CONSTRAINT_EQ/);
+  assert.match(verifier, /INTEGRALITY/);
+  assert.match(browserWorker, /highs\.solve\(lp/);
 });
 
 test("optimizer browser boundary returns a compact receipt and never dereferences an absent result payload", async () => {
@@ -45,18 +57,22 @@ test("optimizer browser boundary returns a compact receipt and never dereference
   assert.doesNotMatch(route, /response\.result/);
 });
 
-test("Cloudflare live HiGHS Wasm is prepared from the pinned package and stays behind the deployment provider", async () => {
+test("browser Web Worker loads pinned HiGHS Wasm and Cloudflare never owns the expensive solve", async () => {
   const wrapper = await source("scripts/with-app-env.mjs");
   const execution = await source("src/lib/advanced-optimizer-execution.ts");
-  const provider = await source("src/lib/advanced-planning-highs-deployment-runtime.ts");
+  const browserWorker = await source("src/lib/advanced-planning-highs-browser-worker.ts");
+  const browserClient = await source("src/lib/advanced-planning-highs-browser-client.ts");
   const pkg = JSON.parse(await source("package.json"));
   assert.equal(pkg.dependencies.highs, "1.15.3");
   assert.match(wrapper, /node_modules[\s\S]*highs[\s\S]*build[\s\S]*highs\.wasm/);
   assert.match(wrapper, /src[\s\S]*generated[\s\S]*highs\.wasm/);
   assert.match(wrapper, /patchPinnedHighsEsmLoaderForCloudflare/);
-  assert.match(execution, /advanced-planning-highs-deployment-runtime/);
-  assert.match(provider, /\.\.\/generated\/highs\.wasm/);
-  assert.match(provider, /createPrecompiledHighsOptimizer/);
+  assert.match(browserClient, /new Worker\(/);
+  assert.match(browserClient, /advanced-planning-highs-browser-worker\.ts/);
+  assert.match(browserWorker, /new URL\("\.\.\/generated\/highs\.wasm", import\.meta\.url\)/);
+  assert.match(browserWorker, /loadHighs\(options\)/);
+  assert.match(browserWorker, /highs\.solve\(lp/);
+  assert.doesNotMatch(execution, /advanced-planning-highs-deployment-runtime/);
 });
 
 test("Vercel keeps the pinned HiGHS package lazy and external to Nitro SSR bundling", async () => {
@@ -69,16 +85,16 @@ test("Vercel keeps the pinned HiGHS package lazy and external to Nitro SSR bundl
   assert.match(vite, /advanced-planning-highs-vercel-runtime\.ts/);
 });
 
-test("Worker bundle resolves the governed optimizer to the patched HiGHS ESM entry", async () => {
+test("browser and Worker bundles resolve the governed optimizer to the patched HiGHS ESM entry", async () => {
   const vite = await source("vite.config.ts");
-  const runtime = await source("src/lib/advanced-planning-highs-runtime.ts");
-  assert.match(runtime, /import loadHighs from "highs"/);
+  const browserWorker = await source("src/lib/advanced-planning-highs-browser-worker.ts");
+  assert.match(browserWorker, /import loadHighs from "highs"/);
   assert.match(vite, /find:\s*\/\^highs\$\//);
   assert.match(vite, /node_modules[\s\S]*highs[\s\S]*build[\s\S]*highs\.mjs/);
   assert.doesNotMatch(vite, /highs\.js"/);
 });
 
-test("HiGHS runtime instantiates the bundled Wasm module directly without filesystem fallback", async () => {
+test("legacy Worker HiGHS runtime still instantiates the bundled Wasm module without filesystem fallback", async () => {
   const runtime = await source("src/lib/advanced-planning-highs-runtime.ts");
   assert.match(runtime, /const instantiateWasm/);
   assert.match(runtime, /new WebAssembly\.Instance\(wasmModule, imports\)/);
