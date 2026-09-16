@@ -150,6 +150,82 @@ begin
 end;
 $$;
 
+-- One database statement owns GRN creation plus external-identity capture. If
+-- either half fails, the whole operation rolls back; no orphan GRN is left for
+-- an operator to repair manually.
+create or replace function post_vyndi_goods_receipt_with_identity(
+  p_id text,
+  p_purchase_order_id text,
+  p_received_on date,
+  p_quantity_received numeric,
+  p_quantity_accepted numeric,
+  p_quantity_rejected numeric,
+  p_inspection_status text,
+  p_source_reference text,
+  p_notes text,
+  p_actor_user_id text,
+  p_actor_role text,
+  p_traceability_class text,
+  p_internal_prefix text,
+  p_manufacturer text,
+  p_brand text,
+  p_oem_model_number text,
+  p_oem_part_number text,
+  p_oem_serial_number text,
+  p_supplier_sku text,
+  p_supplier_lot text,
+  p_invoice_reference text,
+  p_warranty_reference text,
+  p_calibration_reference text
+) returns table (grn_id text,identity_uid uuid,internal_reference text)
+language plpgsql
+as $$
+declare
+  v_grn text;
+  bound record;
+begin
+  v_grn:=post_vyndi_goods_receipt(
+    p_id,p_purchase_order_id,p_received_on,p_quantity_received,p_quantity_accepted,p_quantity_rejected,
+    p_inspection_status,p_source_reference,p_notes,p_actor_user_id,p_actor_role
+  );
+
+  select * into bound from attach_vyndi_goods_receipt_identity(
+    v_grn,p_traceability_class,p_internal_prefix,p_manufacturer,p_brand,p_oem_model_number,
+    p_oem_part_number,p_oem_serial_number,p_supplier_sku,p_supplier_lot,p_invoice_reference,
+    p_warranty_reference,p_calibration_reference,p_actor_user_id,p_actor_role
+  );
+
+  return query select v_grn,bound.identity_uid,bound.internal_reference;
+end;
+$$;
+
+create or replace function resolve_vyndi_goods_receipt_with_identity(
+  p_id text,
+  p_resolution text,
+  p_resolved_on date,
+  p_source_reference text,
+  p_actor_user_id text,
+  p_actor_role text
+) returns table (grn_id text,identity_uid uuid,internal_reference text)
+language plpgsql
+as $$
+declare
+  bound record;
+begin
+  perform resolve_vyndi_goods_receipt(
+    p_id,p_resolution,p_resolved_on,p_source_reference,p_actor_user_id,p_actor_role
+  );
+
+  if lower(trim(p_resolution))='accepted' then
+    select * into bound from materialise_vyndi_goods_receipt_identity(p_id,p_actor_user_id);
+  else
+    bound:=null;
+  end if;
+
+  return query select upper(trim(p_id)),bound.identity_uid,bound.internal_reference;
+end;
+$$;
+
 create or replace view vyndi_goods_receipt_identity_register as
 select
   r.id as grn_id,
@@ -179,3 +255,5 @@ join vyndi_purchase_orders p on p.id=r.purchase_order_id;
 
 comment on function attach_vyndi_goods_receipt_identity(text,text,text,text,text,text,text,text,text,text,text,text,text,text,text) is
   'Captures manufacturer/OEM/supplier identity verbatim on the GRN and materialises a separate VYNDI internal reference only when accepted stock exists.';
+comment on function post_vyndi_goods_receipt_with_identity(text,text,date,numeric,numeric,numeric,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text) is
+  'Atomically posts a GRN and captures DOC 04 Rev 1.2 purchased-item identity. Accepted stock receives a separate VYNDI internal reference; quarantined/rejected stock retains external identity on the GRN.';
