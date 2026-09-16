@@ -1,4 +1,4 @@
-import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
+import { createRootRoute, HeadContent, Outlet, Scripts, useRouterState } from "@tanstack/react-router";
 import { Analytics } from "@vercel/analytics/react";
 import {
   VAYU_LEGAL_NAME,
@@ -52,6 +52,29 @@ function PreviewBridgeBoundary() {
   );
 }
 
+function PageLoadingStatusBar() {
+  const isPending = useRouterState({ select: (state) => state.status === "pending" });
+
+  return (
+    <div
+      data-page-loading-status="route-transition"
+      role="status"
+      aria-live="polite"
+      aria-label={isPending ? "Loading view" : "View ready"}
+      className={`pointer-events-none fixed inset-x-0 top-0 z-[250] transition-opacity duration-150 ${
+        isPending ? "opacity-100" : "opacity-0"
+      }`}
+    >
+      <div className="h-1 w-full overflow-hidden bg-accent/20">
+        <div className="h-full w-2/3 bg-accent motion-safe:animate-pulse" />
+      </div>
+      <div className="absolute right-3 top-2 rounded-full border border-border bg-bg-elevated/95 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-accent shadow-lg">
+        Loading view…
+      </div>
+    </div>
+  );
+}
+
 function PrintBrandHeader() {
   return (
     <header className="vyndi-print-brand" aria-hidden="true">
@@ -81,6 +104,7 @@ function Root() {
     <html lang="en" className="antialiased" suppressHydrationWarning>
       <head><HeadContent /></head>
       <body className="bg-bg text-fg">
+        <PageLoadingStatusBar />
         <PreviewBridgeBoundary />
         <PrintBrandHeader />
         <Outlet />

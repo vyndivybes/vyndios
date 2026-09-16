@@ -18,6 +18,14 @@ const manufacturingSource = fs.readFileSync(
   new URL("../src/routes/command/manufacturing.tsx", import.meta.url),
   "utf8",
 );
+const actualsSource = fs.readFileSync(
+  new URL("../src/routes/command/actuals.tsx", import.meta.url),
+  "utf8",
+);
+const rootSource = fs.readFileSync(
+  new URL("../src/routes/__root.tsx", import.meta.url),
+  "utf8",
+);
 
 test("Master Inventory stock health uses a full-view responsive register", () => {
   assert.ok(inventorySource.includes('data-full-view-table="master-inventory-stock-health"'));
@@ -113,4 +121,23 @@ test("Manufacturing full-view register preserves every governed control field", 
   assert.ok(manufacturingSource.includes("MANUFACTURING_STATUS_LABELS"));
   assert.ok(manufacturingSource.includes("c.requirement"));
   assert.ok(manufacturingSource.includes("c.note"));
+});
+
+test("Finance actuals use full-view responsive registers without inner horizontal scroll", () => {
+  assert.ok(actualsSource.includes('data-full-view-table="monthly-actual-reconciliation"'));
+  assert.ok(actualsSource.includes('data-full-view-table="rolling-forecast-basis"'));
+  assert.ok(!actualsSource.includes("overflow-x-auto"));
+  assert.ok(!actualsSource.includes("min-w-[1450px]"));
+  assert.ok(!actualsSource.includes("min-w-[850px]"));
+  assert.ok(actualsSource.includes("lg:grid"));
+  assert.ok(actualsSource.includes("lg:hidden"));
+  assert.ok(actualsSource.includes("md:grid"));
+  assert.ok(actualsSource.includes("md:hidden"));
+});
+
+test("App root exposes a connected page-loading status bar for route transitions", () => {
+  assert.ok(rootSource.includes("useRouterState"));
+  assert.ok(rootSource.includes('state.status === "pending"'));
+  assert.ok(rootSource.includes('data-page-loading-status="route-transition"'));
+  assert.ok(rootSource.includes("Loading view…"));
 });

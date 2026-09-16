@@ -23,7 +23,7 @@ test("reconcile normalization removes duplicate transaction-ledger prefixes", ()
 });
 
 test("actuals UI renders and submits management evidence instead of hiding system provenance", () => {
-  assert.match(actualsRoute, /value=\{extractManagementEvidence\(a\.sourceReference\)\}/);
-  assert.match(actualsRoute, /sourceReference:extractManagementEvidence\(actual\.sourceReference\)/);
+  assert.match(actualsRoute, /value=\{extractManagementEvidence\((?:a|actual)\.sourceReference\)\}/);
+  assert.match(actualsRoute, /sourceReference:\s*extractManagementEvidence\(actual\.sourceReference\)/);
   assert.doesNotMatch(actualsRoute, /sourceReference\?\.startsWith\("transaction-ledger:"\)\?"":/);
 });
