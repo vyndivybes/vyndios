@@ -107,7 +107,7 @@ export const DEFAULT_FINANCE_ASSUMPTIONS: FinanceAssumptions = {
   equipmentLedger: DEFAULT_EQUIPMENT_LEDGER,
   equipmentLedgerCategories: DEFAULT_EQUIPMENT_LEDGER_CATEGORIES,
   peopleOfficeLedger: DEFAULT_PEOPLE_OFFICE_LEDGER,
-  peopleOfficeUseItemized: false,
+  peopleOfficeUseItemized: true,
 };
 
 function effectiveCogs(line: ProductLineAssumption, assumptions: FinanceAssumptions) {
@@ -145,8 +145,12 @@ function legacyOpexFor(month: number, scenario: ScenarioId, plan: OperatingPlan)
 }
 
 function coreOpexFor(month: number, scenario: ScenarioId, plan: OperatingPlan, assumptions: FinanceAssumptions) {
-  if (!assumptions.peopleOfficeUseItemized) return legacyOpexFor(month, scenario, plan);
-  return peopleOfficeExpenseForMonth(assumptions.peopleOfficeLedger ?? DEFAULT_PEOPLE_OFFICE_LEDGER, month);
+  const itemized = assumptions.peopleOfficeLedger ?? DEFAULT_PEOPLE_OFFICE_LEDGER;
+  const hasGovernedItemizedCost = itemized.some((item) =>
+    Math.max(0, item.quantity) * Math.max(0, item.monthlyUnitCostLakh) > 0 || Math.max(0, item.oneTimeCostLakh) > 0,
+  );
+  if (assumptions.peopleOfficeUseItemized === false || !hasGovernedItemizedCost) return legacyOpexFor(month, scenario, plan);
+  return peopleOfficeExpenseForMonth(itemized, month);
 }
 
 function fundingFor(month: number, scenario: ScenarioId, drawStandby: boolean, plan: OperatingPlan) {
