@@ -1,7 +1,7 @@
 # VYNDI Controlled Identity & Serial Authority
 
 **Controlled source:** VĀYÚ DOC 04 · Product, Component & Asset Identity Scheme · Rev 1.2 · 2026-09-16  
-**Implementation migrations:** `migrations/0076_controlled_identity_serial_authority.sql` and `migrations/0077_require_confirmed_launch_identity.sql`
+**Implementation migrations:** `migrations/0076_controlled_identity_serial_authority.sql`, `migrations/0077_require_confirmed_launch_identity.sql`, and `migrations/0078_goods_receipt_identity_capture.sql`
 
 ## 1. Finished VĀYÚ products
 
@@ -66,6 +66,17 @@ VYNDI adds a separate internal reference for cross-ledger control:
 
 The system must never synthesize a fake OEM serial merely to fill a field.
 
+### Receiving / GRN workflow
+
+The `/command/receiving` form is the operational capture point for purchased identity. It records the GRN and the supplied external identity in one atomic database operation. Operators can record traceability class, VYNDI internal class, manufacturer, brand, OEM model, OEM part number, OEM serial, supplier SKU, supplier lot/batch, invoice reference, warranty reference and calibration reference.
+
+- **Accepted receipt:** external identity is stored and a separate VYNDI internal reference is materialised against the accepted inventory movement.
+- **Quarantine:** external identity remains attached to the GRN, but no inventory identity is issued while the material is outside stock.
+- **Quarantine later accepted:** the saved external identity is carried forward automatically and the VYNDI internal reference is materialised at acceptance.
+- **Rejected receipt:** external identity remains as receiving/audit evidence; it is never presented as accepted inventory.
+
+The receipt and identity register shows the VYNDI reference alongside the retained OEM serial or supplier lot so operators do not confuse one namespace with the other.
+
 ## 4. Traceability classes
 
 - **A — Individual serial:** safety-critical, high-value, calibrated, warranty-sensitive or configuration-critical unit.
@@ -102,7 +113,7 @@ Historical identities are not renumbered. Existing traveller serials are registe
 
 ## 8. Inventory reconciliation
 
-The identity extension is attached to the existing Master Inventory / canonical receiving authority; no duplicate stock ledger is introduced. `vyndi_inventory_identity_register` exposes the internal reference and preserved OEM/supplier identity together.
+The identity extension is attached to the existing Master Inventory / canonical receiving authority; no duplicate stock ledger is introduced. `vyndi_inventory_identity_register` exposes the internal reference and preserved OEM/supplier identity together. `vyndi_goods_receipt_identity_register` provides the receiving-side view, including quarantined and rejected identity evidence that is not yet part of stock.
 
 ## 9. Governance rules
 
@@ -113,4 +124,6 @@ The identity extension is attached to the existing Master Inventory / canonical 
 - OEM identities are preserved verbatim.
 - Launch MMYY freezes after first canonical issuance.
 - Serial namespaces stop rather than silently widen when their controlled sequence width is exhausted.
+- GRN + external identity capture is atomic.
+- Quarantine cannot create accepted-stock identity before disposition.
 - Identity corrections must be auditable and must not rewrite historical genealogy silently.
