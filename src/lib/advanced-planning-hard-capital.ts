@@ -1,7 +1,7 @@
 import type { AdvancedPlanningConstraintModel } from "./advanced-planning-constraints.ts";
-import type { MathConstraint, MathTerm } from "./advanced-planning-math-model.ts";
+import type { MathConstraint, MathTerm, MathVariable } from "./advanced-planning-math-model.ts";
 
-export const GOVERNED_HARD_CAPITAL_VERSION = "VYNDI-HARD-CAPITAL-0.1" as const;
+export const GOVERNED_HARD_CAPITAL_VERSION = "VYNDI-HARD-CAPITAL-0.2" as const;
 
 export type GovernedFundingPlanRow = {
   period: number;
@@ -35,6 +35,7 @@ export type GovernedHardCapitalIssue = {
 
 export type GovernedHardCapitalCompileResult = {
   valid: boolean;
+  variables: MathVariable[];
   constraints: MathConstraint[];
   issues: GovernedHardCapitalIssue[];
   semantics: string[];
@@ -62,6 +63,7 @@ export function compileGovernedHardCapitalConstraints(
   envelope: GovernedHardCapitalEnvelope,
 ): GovernedHardCapitalCompileResult {
   const issues: GovernedHardCapitalIssue[] = [];
+  const variables: MathVariable[] = [];
   const constraints: MathConstraint[] = [];
   const horizon = source.horizonPeriods;
 
@@ -126,7 +128,7 @@ export function compileGovernedHardCapitalConstraints(
   }
 
   if (issues.some((row) => row.severity === "error")) {
-    return { valid: false, constraints: [], issues, semantics: [] };
+    return { valid: false, variables: [], constraints: [], issues, semantics: [] };
   }
 
   const approvedLanes = source.supplierLanes.filter((lane) => lane.approved);
@@ -135,11 +137,10 @@ export function compileGovernedHardCapitalConstraints(
     fundingByPeriod.set(row.period, (fundingByPeriod.get(row.period) ?? 0) + row.amountLakh);
   }
 
-  // Index every payable procurement variable once by its governed payment period.
-  // The previous implementation rescanned every lane/order pair for every cash
-  // period and deduplicated terms with Array.find(), producing quadratic CPU
-  // growth on the production 36-month / multi-SKU model. That is unsafe on
-  // Cloudflare's request CPU budget and can surface as Worker error 1102.
+  // Index each governed procurement payment exactly once. The cumulative state
+  // formulation below means each procurement variable appears in one flow row,
+  // not in every future cumulative ceiling. This preserves the exact prefix-sum
+  // capital semantics while materially shrinking the LP passed to HiGHS.
   const paymentTermsByPeriod = new Map<number, MathTerm[]>();
   for (const lane of approvedLanes) {
     const paymentLag = nonNegativeInteger(envelope.paymentLagBySku[lane.sku]);
@@ -157,36 +158,53 @@ export function compileGovernedHardCapitalConstraints(
     }
   }
 
-  // Build cumulative ceilings incrementally. Each procurement variable is
-  // indexed once and copied only into the cumulative constraints that actually
-  // require it; there is no repeated lane/order rescan and no linear term lookup.
-  const cumulativeTerms: MathTerm[] = [];
-  let approvedFundingThroughPeriod = envelope.fundingPlan
-    .filter((row) => row.period < envelope.analysisStartPeriod)
-    .reduce((sum, row) => sum + row.amountLakh, 0);
-
-  for (let period = envelope.analysisStartPeriod; period <= horizon; period += 1) {
-    approvedFundingThroughPeriod += fundingByPeriod.get(period) ?? 0;
-    cumulativeTerms.push(...(paymentTermsByPeriod.get(period) ?? []));
-    if (!cumulativeTerms.length) continue;
-
-    const guardrail = guardrailByPeriod.get(period)!;
-    const hardHeadroom = Math.max(0, guardrail.cumulativeHeadroomLakh);
-    constraints.push({
-      id: constraintId("CAPITAL_CUMULATIVE", period),
-      sense: "le",
-      rhs: hardHeadroom,
-      terms: cumulativeTerms.slice(),
-      semantic: `hard governed capital ceiling M${period}: cumulative optimizer procurement cash must stay within ₹${hardHeadroom}L reserve-preserving IBPE headroom; approved-plan funding scheduled through M${period}=₹${approvedFundingThroughPeriod}L`,
-    });
-  }
-
-  if (!constraints.length && approvedLanes.length) {
+  if (!paymentTermsByPeriod.size && approvedLanes.length) {
     issues.push({
       severity: "warning",
       code: "HARD_CAPITAL_NO_PROCUREMENT_TERMS",
       message: "No payable optimizer procurement variables fall inside the governed cash-analysis horizon.",
     });
+  }
+
+  let approvedFundingThroughPeriod = envelope.fundingPlan
+    .filter((row) => row.period < envelope.analysisStartPeriod)
+    .reduce((sum, row) => sum + row.amountLakh, 0);
+  let previousSpendVariable: string | null = null;
+
+  for (let period = envelope.analysisStartPeriod; period <= horizon; period += 1) {
+    approvedFundingThroughPeriod += fundingByPeriod.get(period) ?? 0;
+    const spendVariable = variableId("CAPITAL_SPEND", period);
+    const guardrail = guardrailByPeriod.get(period)!;
+    const hardHeadroom = Math.max(0, guardrail.cumulativeHeadroomLakh);
+
+    variables.push({
+      id: spendVariable,
+      type: "continuous",
+      lowerBound: 0,
+      objectiveCoefficient: 0,
+      semantic: `cumulative governed optimizer procurement cash through M${period}`,
+    });
+
+    const flowTerms: MathTerm[] = [{ variableId: spendVariable, coefficient: 1 }];
+    if (previousSpendVariable) flowTerms.push({ variableId: previousSpendVariable, coefficient: -1 });
+    for (const payment of paymentTermsByPeriod.get(period) ?? []) {
+      flowTerms.push({ variableId: payment.variableId, coefficient: -payment.coefficient });
+    }
+    constraints.push({
+      id: constraintId("CAPITAL_FLOW", period),
+      sense: "eq",
+      rhs: 0,
+      terms: flowTerms,
+      semantic: `cumulative capital state transition M${period}`,
+    });
+    constraints.push({
+      id: constraintId("CAPITAL_CUMULATIVE", period),
+      sense: "le",
+      rhs: hardHeadroom,
+      terms: [{ variableId: spendVariable, coefficient: 1 }],
+      semantic: `hard governed capital ceiling M${period}: cumulative optimizer procurement cash must stay within ₹${hardHeadroom}L reserve-preserving IBPE headroom; approved-plan funding scheduled through M${period}=₹${approvedFundingThroughPeriod}L`,
+    });
+    previousSpendVariable = spendVariable;
   }
 
   const totalApprovedFunding = envelope.fundingPlan.reduce((sum, row) => sum + row.amountLakh, 0);
@@ -196,13 +214,14 @@ export function compileGovernedHardCapitalConstraints(
 
   return {
     valid: true,
+    variables,
     constraints,
     issues,
     semantics: [
       `Hard capital control is derived from governed IBPE free-liquidity headroom and therefore includes the approved staged funding plan, operating inflows/outflows and reserve policy before optimizer procurement is allowed.`,
       `Approved-plan funding evidence totals ₹${totalApprovedFunding}L across the 36-month input; ₹${forwardApprovedFunding}L falls in or after forward cash analysis starts at M${envelope.analysisStartPeriod}.`,
       `The canonical cash anchor at M${envelope.cashAnchorPeriod} supersedes plan cash history at or before the anchor; no historical tranche is re-added after the verified cash balance.`,
-      "Procurement cash is hard-constrained in HiGHS at the governed supplier payment period; post-solve cash governance independently revalidates the same solution.",
+      "Procurement cash is hard-constrained in HiGHS at the governed supplier payment period; cumulative spend is represented by sparse period-to-period state equations and post-solve cash governance independently revalidates the same solution.",
     ],
   };
 }

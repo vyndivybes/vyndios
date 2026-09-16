@@ -19,10 +19,12 @@ test("Cloudflare optimizer execution is time-bounded and never auto-retries a he
   assert.doesNotMatch(route, /Retrying once safely/);
 });
 
-test("hard-capital compilation indexes payable procurement once instead of quadratic term lookup", async () => {
+test("hard-capital compilation stays sparse across the 36-month solver horizon", async () => {
   const hardCapital = await source("src/lib/advanced-planning-hard-capital.ts");
   assert.match(hardCapital, /paymentTermsByPeriod/);
-  assert.match(hardCapital, /cumulativeTerms\.push/);
+  assert.match(hardCapital, /CAPITAL_SPEND/);
+  assert.match(hardCapital, /CAPITAL_FLOW/);
+  assert.doesNotMatch(hardCapital, /cumulativeTerms\.slice/);
   assert.doesNotMatch(hardCapital, /terms\.find\(/);
-  assert.match(hardCapital, /Worker error 1102/);
+  assert.match(hardCapital, /each procurement variable appears in one flow row/i);
 });
