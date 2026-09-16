@@ -24,6 +24,8 @@ jobs:
         run: npm ci
       - name: Governed optimizer closure contract
         run: node --test scripts/vibpe-optimizer-closure.test.mjs
+      - name: Optimizer cash timing authority
+        run: node --test scripts/optimizer-cash-timing-authority.test.mjs
       - name: Infeasibility witness diagnostics
         run: node --experimental-strip-types --test src/lib/advanced-planning-infeasibility.test.ts
       - name: Cloudflare lazy HiGHS startup boundary
