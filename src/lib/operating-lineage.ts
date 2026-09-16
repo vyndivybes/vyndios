@@ -29,6 +29,15 @@ export type OperatingLineageRow = {
   travellerCount: number;
   travellerIds: string;
   travellerStatuses: string;
+  qualityInspectionCount: number;
+  qualityInspectionIds: string;
+  qualityInspectionEvidenceRefs: string;
+  qualityReleaseCount: number;
+  qualityReleaseIds: string;
+  qualityReleaseStatuses: string;
+  qualityReleaseEvidenceRefs: string;
+  openNcrCount: number;
+  openCapaCount: number;
   shipmentCount: number;
   shipmentIds: string;
   invoiceCount: number;
@@ -44,8 +53,8 @@ const number = (value: unknown) => Number(value ?? 0);
 /**
  * Read-only business-object genealogy across the canonical transactional chain.
  * No stage is inferred as complete unless a persisted record exists.
- * Quality is intentionally not joined here because the current Quality module does
- * not persist order/job-card-linked inspection evidence.
+ * Quality inspection, NCR/CAPA and serialized release evidence are projected from
+ * their canonical persisted authorities before downstream dispatch and Finance.
  */
 export const getOperatingLineage = createServerFn({ method: "GET" })
   .middleware([optionalAuthMiddleware])
@@ -83,6 +92,15 @@ export const getOperatingLineage = createServerFn({ method: "GET" })
         coalesce(tr.traveller_count,0)::int as traveller_count,
         coalesce(tr.traveller_ids,'') as traveller_ids,
         coalesce(tr.traveller_statuses,'') as traveller_statuses,
+        coalesce(qi.inspection_count,0)::int as quality_inspection_count,
+        coalesce(qi.inspection_ids,'') as quality_inspection_ids,
+        coalesce(qi.inspection_evidence_refs,'') as quality_inspection_evidence_refs,
+        coalesce(qr.release_count,0)::int as quality_release_count,
+        coalesce(qr.release_ids,'') as quality_release_ids,
+        coalesce(qr.release_statuses,'') as quality_release_statuses,
+        coalesce(qr.release_evidence_refs,'') as quality_release_evidence_refs,
+        coalesce(qx.open_ncr_count,0)::int as open_ncr_count,
+        coalesce(qx.open_capa_count,0)::int as open_capa_count,
         coalesce(sh.shipment_count,0)::int as shipment_count,
         coalesce(sh.shipment_ids,'') as shipment_ids,
         coalesce(inv.invoice_count,0)::int as invoice_count,
@@ -132,6 +150,47 @@ export const getOperatingLineage = createServerFn({ method: "GET" })
         from epr_travellers t
         where t.job_card_id=c.id
       ) tr on true
+      left join lateral (
+        select
+          count(*)::int as inspection_count,
+          string_agg(i.id, ', ' order by i.recorded_at,i.id) as inspection_ids,
+          string_agg(i.evidence_ref, ', ' order by i.recorded_at,i.id) as inspection_evidence_refs
+        from vyndi_quality_inspections i
+        where i.job_card_id=c.id
+           or (
+             i.traveller_id is not null
+             and exists (
+               select 1
+                 from epr_travellers tq
+                where tq.id=i.traveller_id and tq.job_card_id=c.id
+             )
+           )
+      ) qi on true
+      left join lateral (
+        select
+          count(*)::int as release_count,
+          string_agg(r.id, ', ' order by r.decided_at,r.id) as release_ids,
+          string_agg(r.decision, ', ' order by r.decided_at,r.id) as release_statuses,
+          string_agg(r.evidence_ref, ', ' order by r.decided_at,r.id) as release_evidence_refs
+        from vyndi_quality_releases r
+        where r.job_card_id=c.id and r.superseded_at is null
+      ) qr on true
+      left join lateral (
+        select
+          count(distinct n.id) filter (where n.status not in ('closed','rejected'))::int as open_ncr_count,
+          count(distinct cp.id) filter (where cp.status not in ('closed','rejected'))::int as open_capa_count
+        from vyndi_quality_ncrs n
+        left join vyndi_quality_capas cp on cp.ncr_id=n.id
+        where n.job_card_id=c.id
+           or (
+             n.traveller_id is not null
+             and exists (
+               select 1
+                 from epr_travellers tn
+                where tn.id=n.traveller_id and tn.job_card_id=c.id
+             )
+           )
+      ) qx on true
       left join lateral (
         select
           count(*) filter (where s.status='posted')::int as shipment_count,
@@ -185,6 +244,15 @@ export const getOperatingLineage = createServerFn({ method: "GET" })
       travellerCount: number(row.traveller_count),
       travellerIds: text(row.traveller_ids),
       travellerStatuses: text(row.traveller_statuses),
+      qualityInspectionCount: number(row.quality_inspection_count),
+      qualityInspectionIds: text(row.quality_inspection_ids),
+      qualityInspectionEvidenceRefs: text(row.quality_inspection_evidence_refs),
+      qualityReleaseCount: number(row.quality_release_count),
+      qualityReleaseIds: text(row.quality_release_ids),
+      qualityReleaseStatuses: text(row.quality_release_statuses),
+      qualityReleaseEvidenceRefs: text(row.quality_release_evidence_refs),
+      openNcrCount: number(row.open_ncr_count),
+      openCapaCount: number(row.open_capa_count),
       shipmentCount: number(row.shipment_count),
       shipmentIds: text(row.shipment_ids),
       invoiceCount: number(row.invoice_count),
