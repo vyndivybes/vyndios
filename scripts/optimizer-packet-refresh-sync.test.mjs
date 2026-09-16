@@ -17,6 +17,21 @@ test("governed packet refresh reloads optimizer route state before another execu
   assert.match(route, /Reloading the optimizer against this exact packet/i);
 });
 
+test("optimizer control and execution agree on deterministic latest packet ordering", async () => {
+  const control = await source("src/lib/advanced-optimizer-control.ts");
+  const execution = await source("src/lib/advanced-optimizer-execution.ts");
+  assert.match(
+    control,
+    /from vyndi_advanced_planning_packets[\s\S]*?order by created_at desc,id desc[\s\S]*?limit 1/,
+    "optimizer control must use the same deterministic latest-packet tie-breaker as execution",
+  );
+  assert.match(
+    execution,
+    /from vyndi_advanced_planning_packets[\s\S]*?order by created_at desc,id desc[\s\S]*?limit 1/,
+    "optimizer execution lineage guard must retain deterministic latest-packet selection",
+  );
+});
+
 test("optimizer execution cannot crash on transient undefined loader data", async () => {
   const route = await source("src/routes/command/ibpe-operating-workspace_.optimizer.tsx");
   assert.match(

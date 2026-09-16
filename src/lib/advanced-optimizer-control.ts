@@ -44,7 +44,7 @@ export const getAdvancedOptimizerControlState = createServerFn({ method: "GET" }
       `select id,parent_ibpe_run_id,packet_version,advanced_model_version,created_at::text
          from vyndi_advanced_planning_packets
         where status='complete'
-        order by created_at desc
+        order by created_at desc,id desc
         limit 1`,
     );
     const packet = packets[0] ?? null;
@@ -76,7 +76,7 @@ export const getAdvancedOptimizerControlState = createServerFn({ method: "GET" }
               objective_value,created_at::text
          from vyndi_advanced_optimization_runs
         where parent_advanced_packet_id=$1 and status='complete'
-        order by created_at desc
+        order by created_at desc,id desc
         limit 1`,
       [packet.id],
     );
