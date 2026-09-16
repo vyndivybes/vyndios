@@ -33,6 +33,14 @@ export type AdvancedOptimizerControlState = {
   packet: LatestPacketRow | null;
   readyForGovernedOptimization: boolean;
   issues: Array<{ severity: string; code: string; message: string }>;
+  capitalEnvelope: {
+    enforced: true;
+    approvedFundingPlanLakh: number;
+    forwardFundingPlanLakh: number;
+    fundingPlanRowCount: number;
+    cashAnchorPeriod: number;
+    cashAnalysisStartPeriod: number;
+  } | null;
   recentRun: LatestRunRow | null;
 };
 
@@ -59,6 +67,7 @@ export const getAdvancedOptimizerControlState = createServerFn({ method: "GET" }
             message: "No complete governed advanced-planning packet is available yet.",
           },
         ],
+        capitalEnvelope: null,
         recentRun: null,
       };
     }
@@ -91,6 +100,14 @@ export const getAdvancedOptimizerControlState = createServerFn({ method: "GET" }
           code: issue.code,
           message: issue.message,
         })),
+        capitalEnvelope: {
+          enforced: true,
+          approvedFundingPlanLakh: prepared.evidence.approvedFundingPlanLakh,
+          forwardFundingPlanLakh: prepared.evidence.forwardFundingPlanLakh,
+          fundingPlanRowCount: prepared.evidence.fundingPlanRowCount,
+          cashAnchorPeriod: prepared.evidence.cashAnchorPeriod,
+          cashAnalysisStartPeriod: prepared.evidence.cashAnalysisStartPeriod,
+        },
         recentRun: recentRuns[0] ?? null,
       };
     } catch (error) {
@@ -104,6 +121,7 @@ export const getAdvancedOptimizerControlState = createServerFn({ method: "GET" }
             message: error instanceof Error ? error.message : "Governed optimizer preparation failed.",
           },
         ],
+        capitalEnvelope: null,
         recentRun: recentRuns[0] ?? null,
       };
     }
