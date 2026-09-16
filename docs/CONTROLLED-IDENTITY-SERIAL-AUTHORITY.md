@@ -1,7 +1,7 @@
 # VYNDI Controlled Identity & Serial Authority
 
 **Controlled source:** VĀYÚ DOC 04 · Product, Component & Asset Identity Scheme · Rev 1.2 · 2026-09-16  
-**Implementation migration:** `migrations/0076_controlled_identity_serial_authority.sql`
+**Implementation migrations:** `migrations/0076_controlled_identity_serial_authority.sql` and `migrations/0077_require_confirmed_launch_identity.sql`
 
 ## 1. Finished VĀYÚ products
 
@@ -11,15 +11,17 @@ New production identities use:
 
 Current controlled model codes:
 
-| Family | Code | Initial launch code | Example |
-| --- | --- | --- | --- |
-| Longitude | `LON` | `0926` | `LON-0926-0001` |
-| Latitude | `LAT` | `0926` | `LAT-0926-0001` |
-| Altitude | `ALT` | `0926` | `ALT-0926-0001` |
+| Family | Code | Format example |
+| --- | --- | --- |
+| Longitude | `LON` | `LON-0926-0001` |
+| Latitude | `LAT` | `LAT-0926-0001` |
+| Altitude | `ALT` | `ALT-0926-0001` |
 
-`MMYY` is the approved model launch month/year, not the unit manufacture date. The launch code can be corrected through the governed configuration function **only before the first canonical serial is issued for that model**.
+The `0926` values above are **format examples only**. They do not declare September 2026 to be the official launch month for any model.
 
-The Production traveller server function no longer requires a client-entered serial. The database generator is the authority for new VYNDI production serials.
+`MMYY` is the formally authorised model launch month/year, not the unit manufacture date. VYNDI blocks new canonical product serial issuance until an authorised user records the official launch MMYY for that model. Once the first canonical serial has been issued, the launch code is frozen and cannot be silently changed.
+
+The Production traveller server function no longer requires a client-entered serial. After official launch MMYY authorisation, the database generator is the authority for new VYNDI production serials.
 
 ## 2. VĀYÚ-controlled components and configurable options
 
@@ -34,6 +36,8 @@ Examples include:
 - `CRK-170-0926-0001`
 - `WST-C45-0926-0001`
 - `TYR-7035-0926-0001` when an individually serialized tyre is justified
+
+For component examples, MMYY denotes the controlled release month/year of the approved component or variant family, not necessarily the manufacture date of the individual physical unit.
 
 The visible code is deliberately short. The controlled Item Master remains authoritative for complete material, dimension, interface, supplier, model-compatibility, revision and approved-substitution detail.
 
@@ -103,9 +107,10 @@ The identity extension is attached to the existing Master Inventory / canonical 
 ## 9. Governance rules
 
 - New Production serials are generated server-side.
+- A model's official launch MMYY must be explicitly authorised before canonical serial issuance is enabled.
 - Visible identities use uniqueness controls.
 - Historical serials are immutable.
 - OEM identities are preserved verbatim.
-- Launch MMYY is configuration-controlled and freezes after first canonical issuance.
+- Launch MMYY freezes after first canonical issuance.
 - Serial namespaces stop rather than silently widen when their controlled sequence width is exhausted.
 - Identity corrections must be auditable and must not rewrite historical genealogy silently.
