@@ -6,10 +6,11 @@ import type {
 import {
   evaluateProcurementCashGuardrails,
   type AdvancedCashGuardrail,
+  type AdvancedCashTimingControls,
   type ProcurementCashGuardrailResult,
 } from "./advanced-planning-cash-guardrails.ts";
 
-export const ADVANCED_CASH_GOVERNANCE_VERSION = "VYNDI-ADVANCED-CASH-GOVERNANCE-0.4" as const;
+export const ADVANCED_CASH_GOVERNANCE_VERSION = "VYNDI-ADVANCED-CASH-GOVERNANCE-0.5" as const;
 
 export type CashPlanningDisposition =
   | "execution-ready"
@@ -103,6 +104,7 @@ export function applyCashGovernanceToOptimizationRun(
   run: GovernedAdvancedOptimizationRun,
   model: AdvancedPlanningConstraintModel,
   guardrails: AdvancedCashGuardrail[],
+  timing: AdvancedCashTimingControls = {},
 ): CashGovernedAdvancedOptimizationRun {
   const issues = [...run.issues];
   const procurement = run.result?.solution?.procurement;
@@ -154,11 +156,18 @@ export function applyCashGovernanceToOptimizationRun(
     };
   }
 
-  if (guardrails.length !== model.horizonPeriods) {
+  const analysisStartPeriod = Math.max(
+    1,
+    Math.min(model.horizonPeriods, Math.floor(timing.analysisStartPeriod ?? guardrails[0]?.period ?? 1)),
+  );
+  const expectedPeriods = model.horizonPeriods - analysisStartPeriod + 1;
+  const exactCoverage = guardrails.length === expectedPeriods
+    && guardrails.every((row, index) => row.period === analysisStartPeriod + index);
+  if (!exactCoverage) {
     issues.push(cashIssue(
       "error",
       "CASH_GOVERNANCE_INCOMPLETE_HORIZON",
-      `Cash governance requires ${model.horizonPeriods} governed periods; received ${guardrails.length}.`,
+      `Cash governance requires continuous governed periods M${analysisStartPeriod}–M${model.horizonPeriods}; received ${guardrails.length} period(s).`,
     ));
     return {
       ...run,
@@ -173,7 +182,10 @@ export function applyCashGovernanceToOptimizationRun(
     };
   }
 
-  const result = evaluateProcurementCashGuardrails(procurement, model.supplierLanes, guardrails);
+  const result = evaluateProcurementCashGuardrails(procurement, model.supplierLanes, guardrails, {
+    analysisStartPeriod,
+    paymentLagBySku: timing.paymentLagBySku,
+  });
   const fundingRequirement = result.status === "infeasible"
     ? deriveFundingRequirement(result, model)
     : undefined;

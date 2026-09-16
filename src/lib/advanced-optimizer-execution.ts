@@ -5,6 +5,7 @@ import { getSql } from "./db.ts";
 import { loadPreparedAdvancedOptimizerEnvelope } from "./advanced-optimizer-authority.ts";
 import { runGovernedAdvancedOptimizer } from "./advanced-planning-optimizer.ts";
 import { applyCashGovernanceToOptimizationRun } from "./advanced-planning-cash-governance.ts";
+import { GOVERNED_HARD_CAPITAL_VERSION } from "./advanced-planning-hard-capital.ts";
 import { diagnoseAdvancedPlanningInfeasibility } from "./advanced-planning-infeasibility.ts";
 import { governedOptimizerRuntimeMs } from "./optimizer-resource-budget.ts";
 
@@ -162,11 +163,26 @@ export const runAdvancedOptimizerFromPacket = createServerFn({ method: "POST" })
     const sql = await getSql();
     await assertCurrentExecutionLineage(sql, data.packetId, prepared.parentIbpeRunId);
 
+    const hardCapitalEnvelope = {
+      version: GOVERNED_HARD_CAPITAL_VERSION,
+      sourceRef: prepared.evidence.cashSourceRef,
+      cashAnchorPeriod: prepared.cashTiming.cashAnchorPeriod,
+      analysisStartPeriod: prepared.cashTiming.analysisStartPeriod,
+      paymentLagBySku: prepared.cashTiming.paymentLagBySku,
+      guardrails: prepared.cashGuardrails.map((row) => ({
+        period: row.period,
+        cumulativeHeadroomLakh: row.cumulativeIncrementalProcurementHeadroomLakh,
+        sourceRef: row.sourceRef,
+      })),
+      fundingPlan: prepared.fundingPlan,
+    };
+
     const optimizer = await createLazyDeploymentHighsOptimizer();
     const request = {
       requestId: data.requestId,
       maxRuntimeMs: effectiveMaxRuntimeMs,
       ...(data.mipGap === undefined ? {} : { mipGap: data.mipGap }),
+      hardCapitalEnvelope,
     };
     const mathematicalRun = await runGovernedAdvancedOptimizer(prepared.model, optimizer, request);
     if (mathematicalRun.result?.status === "infeasible") {
@@ -180,6 +196,7 @@ export const runAdvancedOptimizerFromPacket = createServerFn({ method: "POST" })
       mathematicalRun,
       prepared.model,
       prepared.cashGuardrails,
+      prepared.cashTiming,
     );
 
     const optimizationStatus = governedRun.result?.status ?? "error";
@@ -217,6 +234,7 @@ export const runAdvancedOptimizerFromPacket = createServerFn({ method: "POST" })
           preparationVersion: prepared.version,
           lineage: prepared.lineage,
           evidence: prepared.evidence,
+          cashTiming: prepared.cashTiming,
         }),
         JSON.stringify(governedRun.governance),
         JSON.stringify(governedRun.baseline),

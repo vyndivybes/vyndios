@@ -9,6 +9,11 @@ export type AdvancedCashGuardrail = {
   sourceRef: string;
 };
 
+export type AdvancedCashTimingControls = {
+  analysisStartPeriod?: number;
+  paymentLagBySku?: Record<string, number>;
+};
+
 export type AdvancedCashGuardrailCompilation = {
   valid: boolean;
   guardrails: AdvancedCashGuardrail[];
@@ -35,6 +40,7 @@ export type ProcurementCashGuardrailResult = {
   status: "feasible" | "infeasible" | "indeterminate";
   periods: ProcurementCashPeriodResult[];
   totalProposedProcurementLakh: number;
+  deferredProcurementBeyondHorizonLakh: number;
   firstBaselineBreachPeriod?: number;
   firstProposedBreachPeriod?: number;
   issues: Array<{
@@ -51,16 +57,25 @@ function round(value: number) {
   return Number(value.toFixed(6));
 }
 
+function nonNegativeInteger(value: unknown) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.max(0, Math.ceil(parsed)) : 0;
+}
+
 export function compileCashGuardrailsFromIbpe(
   cashRows: CashPlanRow[],
   horizonPeriods: number,
   sourceRef: string,
+  analysisStartPeriod = 1,
 ): AdvancedCashGuardrailCompilation {
   const issues: AdvancedCashGuardrailCompilation["issues"] = [];
   const byPeriod = new Map<number, CashPlanRow>();
 
   if (!Number.isInteger(horizonPeriods) || horizonPeriods < 1) {
     issues.push({ severity: "error", code: "INVALID_HORIZON", message: "Cash guardrail horizon must be a positive integer." });
+  }
+  if (!Number.isInteger(analysisStartPeriod) || analysisStartPeriod < 1 || analysisStartPeriod > horizonPeriods) {
+    issues.push({ severity: "error", code: "INVALID_ANALYSIS_START", period: analysisStartPeriod, message: "Cash guardrail analysis start must fall inside the planning horizon." });
   }
   if (!sourceRef.trim()) {
     issues.push({ severity: "error", code: "SOURCE_REF_REQUIRED", message: "Cash guardrails require governed IBPE source evidence." });
@@ -83,25 +98,27 @@ export function compileCashGuardrailsFromIbpe(
   }
 
   const guardrails: AdvancedCashGuardrail[] = [];
-  for (let period = 1; period <= horizonPeriods; period += 1) {
-    const row = byPeriod.get(period);
-    if (!row) {
-      issues.push({ severity: "error", code: "MISSING_CASH_PERIOD", period, message: `IBPE cash authority has no base free-liquidity row for period ${period}.` });
-      continue;
-    }
-    guardrails.push({
-      period,
-      baselineFreeLiquidityLakh: round(row.freeLiquidityLakh),
-      cumulativeIncrementalProcurementHeadroomLakh: round(row.freeLiquidityLakh),
-      sourceRef,
-    });
-    if (row.freeLiquidityLakh < 0) {
-      issues.push({
-        severity: "warning",
-        code: "BASELINE_RESERVE_BREACH",
+  if (Number.isInteger(analysisStartPeriod) && analysisStartPeriod >= 1 && analysisStartPeriod <= horizonPeriods) {
+    for (let period = analysisStartPeriod; period <= horizonPeriods; period += 1) {
+      const row = byPeriod.get(period);
+      if (!row) {
+        issues.push({ severity: "error", code: "MISSING_CASH_PERIOD", period, message: `IBPE cash authority has no base free-liquidity row for period ${period}.` });
+        continue;
+      }
+      guardrails.push({
         period,
-        message: `Base IBPE free liquidity is already below reserve by ₹${round(Math.abs(row.freeLiquidityLakh))}L in period ${period}.`,
+        baselineFreeLiquidityLakh: round(row.freeLiquidityLakh),
+        cumulativeIncrementalProcurementHeadroomLakh: round(row.freeLiquidityLakh),
+        sourceRef,
       });
+      if (row.freeLiquidityLakh < 0) {
+        issues.push({
+          severity: "warning",
+          code: "BASELINE_RESERVE_BREACH",
+          period,
+          message: `Base IBPE free liquidity is already below reserve by ₹${round(Math.abs(row.freeLiquidityLakh))}L in period ${period}.`,
+        });
+      }
     }
   }
 
@@ -111,8 +128,8 @@ export function compileCashGuardrailsFromIbpe(
     issues,
     assumptions: [
       "Headroom is derived from IBPE base free liquidity before analytical replenishment recommendations, preserving Finance/IBPE as cash authority.",
+      `Cash periods before M${analysisStartPeriod} are excluded from forward optimizer cash testing because they are at or before the governed canonical cash anchor.`,
       "The guardrail is cumulative: proposed incremental procurement paid in or before a period must not exceed that period's reserve-preserving free-liquidity headroom.",
-      "Until governed supplier payment timing is modelled, proposed procurement cash is conservatively recognized in the solver order period, matching current IBPE recommendation timing.",
     ],
   };
 }
@@ -121,12 +138,19 @@ export function evaluateProcurementCashGuardrails(
   decisions: AdvancedProcurementDecision[],
   supplierLanes: SupplierLane[],
   guardrails: AdvancedCashGuardrail[],
+  timing: AdvancedCashTimingControls = {},
 ): ProcurementCashGuardrailResult {
   const issues: ProcurementCashGuardrailResult["issues"] = [];
   const laneById = new Map(supplierLanes.map((lane) => [lane.id, lane]));
   const guardrailByPeriod = new Map(guardrails.map((row) => [row.period, row]));
   const horizon = guardrails.reduce((max, row) => Math.max(max, row.period), 0);
+  const firstGuardrailPeriod = guardrails.reduce((min, row) => Math.min(min, row.period), Number.POSITIVE_INFINITY);
+  const analysisStartPeriod = Number.isFinite(firstGuardrailPeriod)
+    ? Math.max(1, Math.min(horizon, Math.floor(timing.analysisStartPeriod ?? firstGuardrailPeriod)))
+    : Math.max(1, Math.floor(timing.analysisStartPeriod ?? 1));
   const spendByPeriod = new Map<number, number>();
+  let totalProposedProcurementLakh = 0;
+  let deferredProcurementBeyondHorizonLakh = 0;
   let indeterminate = false;
 
   for (const [index, decision] of decisions.entries()) {
@@ -153,7 +177,15 @@ export function evaluateProcurementCashGuardrails(
     }
 
     const spend = decision.quantity * lane.landedUnitCostLakh;
-    spendByPeriod.set(decision.orderPeriod, (spendByPeriod.get(decision.orderPeriod) ?? 0) + spend);
+    totalProposedProcurementLakh += spend;
+    const paymentLagPeriods = nonNegativeInteger(timing.paymentLagBySku?.[decision.sku]);
+    const contractualPaymentPeriod = decision.orderPeriod + paymentLagPeriods;
+    const paymentPeriod = Math.max(analysisStartPeriod, contractualPaymentPeriod);
+    if (paymentPeriod > horizon) {
+      deferredProcurementBeyondHorizonLakh += spend;
+      continue;
+    }
+    spendByPeriod.set(paymentPeriod, (spendByPeriod.get(paymentPeriod) ?? 0) + spend);
   }
 
   const periods: ProcurementCashPeriodResult[] = [];
@@ -161,7 +193,7 @@ export function evaluateProcurementCashGuardrails(
   let firstBaselineBreachPeriod: number | undefined;
   let firstProposedBreachPeriod: number | undefined;
 
-  for (let period = 1; period <= horizon; period += 1) {
+  for (let period = analysisStartPeriod; period <= horizon; period += 1) {
     const guardrail = guardrailByPeriod.get(period);
     if (!guardrail) {
       indeterminate = true;
@@ -185,18 +217,19 @@ export function evaluateProcurementCashGuardrails(
     });
   }
 
-  const totalProposedProcurementLakh = [...spendByPeriod.values()].reduce((sum, value) => sum + value, 0);
   const infeasible = firstBaselineBreachPeriod !== undefined || firstProposedBreachPeriod !== undefined;
   return {
     status: indeterminate ? "indeterminate" : infeasible ? "infeasible" : "feasible",
     periods,
     totalProposedProcurementLakh: round(totalProposedProcurementLakh),
+    deferredProcurementBeyondHorizonLakh: round(deferredProcurementBeyondHorizonLakh),
     firstBaselineBreachPeriod,
     firstProposedBreachPeriod,
     issues,
     assumptions: [
       "Only proposed incremental procurement is tested here; existing governed cash flows remain embedded in the IBPE base free-liquidity headroom.",
-      "Procurement cash is valued using governed supplier-lane landed unit cost and recognized in the order period until payment-term timing authority is implemented.",
+      "Procurement cash is valued using governed supplier-lane landed unit cost and timed with the exact payment-lag controls frozen in the governed parent IBPE input.",
+      `Payments falling before forward analysis starts at M${analysisStartPeriod} are conservatively carried into M${analysisStartPeriod}; payments beyond the horizon are reported separately as deferred exposure.`,
       "This calculation is advisory and cannot authorize funding, a purchase order or a reserve-policy override.",
     ],
   };

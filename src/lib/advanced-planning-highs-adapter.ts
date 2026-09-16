@@ -5,6 +5,10 @@ import {
   type MathConstraint,
   type MathTerm,
 } from "./advanced-planning-math-model.ts";
+import {
+  compileGovernedHardCapitalConstraints,
+  type GovernedHardCapitalEnvelope,
+} from "./advanced-planning-hard-capital.ts";
 import type {
   AdvancedBindingConstraint,
   AdvancedOptimizationRequest,
@@ -12,7 +16,7 @@ import type {
   AdvancedPlanningOptimizer,
 } from "./advanced-planning-optimizer.ts";
 
-export const VYNDI_HIGHS_ADAPTER_VERSION = "VYNDI-HIGHS-ADAPTER-0.1" as const;
+export const VYNDI_HIGHS_ADAPTER_VERSION = "VYNDI-HIGHS-ADAPTER-0.2" as const;
 const EPSILON = 1e-7;
 
 export type HighsColumnLike = { Primal: number; [key: string]: unknown };
@@ -25,6 +29,10 @@ export type HighsLegacySolutionLike = {
 };
 export type HighsLegacyLike = {
   solve(problem: string, options?: Record<string, unknown>): HighsLegacySolutionLike;
+};
+
+type AdvancedOptimizationRequestWithCapital = AdvancedOptimizationRequest & {
+  hardCapitalEnvelope?: GovernedHardCapitalEnvelope;
 };
 
 function finite(value: number) {
@@ -56,14 +64,17 @@ function constraintOperator(row: MathConstraint) {
   return "=";
 }
 
-export function encodeAdvancedMathModelToCplexLp(model: AdvancedPlanningMathematicalModel) {
+export function encodeAdvancedMathModelToCplexLp(
+  model: AdvancedPlanningMathematicalModel,
+  extraConstraints: MathConstraint[] = [],
+) {
   const lines: string[] = ["Minimize"];
   const objectiveTerms = model.variables
     .filter((row) => Math.abs(row.objectiveCoefficient) > 1e-12)
     .map((row) => ({ variableId: row.id, coefficient: row.objectiveCoefficient }));
   lines.push(` obj: ${expressionText(objectiveTerms)}`);
   lines.push("Subject To");
-  for (const row of model.constraints) {
+  for (const row of [...model.constraints, ...extraConstraints]) {
     lines.push(` ${row.id}: ${expressionText(row.terms)} ${constraintOperator(row)} ${normalizeNumber(row.rhs)}`);
   }
   lines.push("Bounds");
@@ -126,13 +137,18 @@ function constraintEntityType(idValue: string): AdvancedBindingConstraint["entit
   if (idValue.startsWith("MATERIAL_")) return "material";
   if (idValue.startsWith("RESOURCE_")) return "resource";
   if (idValue.startsWith("SUP_")) return "supplier_lane";
+  if (idValue.startsWith("CAPITAL_")) return "cash";
   return "other";
 }
 
-function bindingConstraints(math: AdvancedPlanningMathematicalModel, solution: HighsLegacySolutionLike) {
+function bindingConstraints(
+  math: AdvancedPlanningMathematicalModel,
+  solution: HighsLegacySolutionLike,
+  extraConstraints: MathConstraint[] = [],
+) {
   const byName = new Map((solution.Rows ?? []).map((row) => [row.Name, row]));
   const result: AdvancedBindingConstraint[] = [];
-  for (const constraint of math.constraints) {
+  for (const constraint of [...math.constraints, ...extraConstraints]) {
     const row = byName.get(constraint.id);
     if (!row || !finite(row.Primal)) continue;
     const slack = constraint.sense === "le"
@@ -239,7 +255,18 @@ export function createHighsAdvancedPlanningOptimizer(highs: HighsLegacyLike): Ad
         };
       }
       const math = compiled.model;
-      const lp = encodeAdvancedMathModelToCplexLp(math);
+      const extendedRequest = request as AdvancedOptimizationRequestWithCapital;
+      const hardCapital = extendedRequest.hardCapitalEnvelope
+        ? compileGovernedHardCapitalConstraints(source, extendedRequest.hardCapitalEnvelope)
+        : { valid: true, constraints: [], issues: [], semantics: [] };
+      if (!hardCapital.valid) {
+        return {
+          status: "error",
+          bindingConstraints: [],
+          diagnostics: hardCapital.issues.map((issue) => `${issue.code}: ${issue.message}`),
+        };
+      }
+      const lp = encodeAdvancedMathModelToCplexLp(math, hardCapital.constraints);
       const highsSolution = highs.solve(lp, {
         output_flag: false,
         log_to_console: false,
@@ -253,9 +280,15 @@ export function createHighsAdvancedPlanningOptimizer(highs: HighsLegacyLike): Ad
       const diagnostics = [
         `HiGHS status: ${highsSolution.Status}`,
         ...compiled.issues.map((issue) => `${issue.code}: ${issue.message}`),
+        ...hardCapital.issues.map((issue) => `${issue.code}: ${issue.message}`),
+        ...hardCapital.semantics,
       ];
       if (status !== "optimal" && status !== "feasible") {
-        return { status, bindingConstraints: bindingConstraints(math, highsSolution), diagnostics };
+        return {
+          status,
+          bindingConstraints: bindingConstraints(math, highsSolution, hardCapital.constraints),
+          diagnostics,
+        };
       }
       const contributions = objectiveContributions(math, highsSolution);
       const objectiveValue = contributions.reduce((sum, row) => sum + row.weightedValue, 0);
@@ -267,7 +300,7 @@ export function createHighsAdvancedPlanningOptimizer(highs: HighsLegacyLike): Ad
         objectiveValue,
         objectiveContributions: contributions,
         solution: reconstructSolution(source, highsSolution),
-        bindingConstraints: bindingConstraints(math, highsSolution),
+        bindingConstraints: bindingConstraints(math, highsSolution, hardCapital.constraints),
         diagnostics,
       };
     },

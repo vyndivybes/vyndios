@@ -40,6 +40,7 @@ test("proposed procurement is checked cumulatively against governed cash headroo
   ], [lane], compiled.guardrails);
   assert.equal(result.status, "feasible");
   assert.equal(result.totalProposedProcurementLakh, 6);
+  assert.equal(result.deferredProcurementBeyondHorizonLakh, 0);
   assert.equal(result.periods[0].cumulativeProcurementSpendLakh, 3);
   assert.equal(result.periods[1].cumulativeProcurementSpendLakh, 6);
   assert.equal(result.periods[2].headroomAfterProposedProcurementLakh, 1);
@@ -63,6 +64,32 @@ test("baseline reserve breach is preserved even with zero incremental procuremen
   assert.equal(compiled.valid, true);
   assert.equal(result.status, "infeasible");
   assert.equal(result.firstBaselineBreachPeriod, 2);
+});
+
+test("canonical closing-cash anchor excludes the anchored period from forward optimizer cash testing", () => {
+  const anchored = cash.map((row) => ({ ...row }));
+  anchored[0].freeLiquidityLakh = -10;
+  const compiled = compileCashGuardrailsFromIbpe(anchored, 3, "IBPE-RUN-ANCHOR:CASH", 2);
+  const result = evaluateProcurementCashGuardrails([], [lane], compiled.guardrails, { analysisStartPeriod: 2 });
+  assert.equal(compiled.valid, true);
+  assert.deepEqual(compiled.guardrails.map((row) => row.period), [2, 3]);
+  assert.equal(result.status, "feasible");
+  assert.equal(result.firstBaselineBreachPeriod, undefined);
+});
+
+test("governed supplier payment lag times procurement cash after the anchor and reports beyond-horizon exposure", () => {
+  const compiled = compileCashGuardrailsFromIbpe(cash, 3, "IBPE-RUN-LAG:CASH", 2);
+  const result = evaluateProcurementCashGuardrails([
+    { laneId: lane.id, supplierId: lane.supplierId, sku: lane.sku, orderPeriod: 1, receiptPeriod: 2, quantity: 2 },
+    { laneId: lane.id, supplierId: lane.supplierId, sku: lane.sku, orderPeriod: 3, receiptPeriod: 3, quantity: 2 },
+  ], [lane], compiled.guardrails, {
+    analysisStartPeriod: 2,
+    paymentLagBySku: { [lane.sku]: 1 },
+  });
+  assert.equal(result.totalProposedProcurementLakh, 6);
+  assert.equal(result.periods[0].period, 2);
+  assert.equal(result.periods[0].periodProcurementSpendLakh, 3);
+  assert.equal(result.deferredProcurementBeyondHorizonLakh, 3);
 });
 
 test("missing cash authority or supplier lane stays indeterminate", () => {

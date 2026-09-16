@@ -17,6 +17,14 @@ const lineage = {
   approvedPlanRevision: 1,
 };
 
+const fiveTrancheFunding = [
+  { id: "plan-funding-1", businessKey: "funding-M1", period: 1, direction: "inflow" as const, amountLakh: 15, truth: "plan" as const, category: "funding", sourceRef: "PLAN-1-R1:T1" },
+  { id: "plan-funding-3", businessKey: "funding-M3", period: 3, direction: "inflow" as const, amountLakh: 35, truth: "plan" as const, category: "funding", sourceRef: "PLAN-1-R1:T2" },
+  { id: "plan-funding-6", businessKey: "funding-M6", period: 6, direction: "inflow" as const, amountLakh: 35, truth: "plan" as const, category: "funding", sourceRef: "PLAN-1-R1:T3" },
+  { id: "plan-funding-10", businessKey: "funding-M10", period: 10, direction: "inflow" as const, amountLakh: 50, truth: "plan" as const, category: "funding", sourceRef: "PLAN-1-R1:T4" },
+  { id: "plan-funding-14", businessKey: "funding-M14", period: 14, direction: "inflow" as const, amountLakh: 65, truth: "plan" as const, category: "funding", sourceRef: "PLAN-1-R1:T5" },
+];
+
 function input(): RuntimeIbpeInput {
   return {
     demand: [{
@@ -50,12 +58,32 @@ function input(): RuntimeIbpeInput {
     reservations: [],
     committedMaterialRequirements: [],
     capacity: [],
-    cashFlows: [],
+    cashFlows: fiveTrancheFunding,
     funding: {
       openingBankCashLakh: 20,
       minimumOperatingReserveLakh: 2,
       restrictedCashLakh: 0,
       fundraisingLeadMonths: 3,
+    },
+    runtimeControls: {
+      paymentLagBySku: { "FRAME-CARBON-M": 1 },
+    },
+  };
+}
+
+function anchoredInput(): RuntimeIbpeInput {
+  return {
+    ...input(),
+    funding: {
+      openingBankCashLakh: 5,
+      minimumOperatingReserveLakh: 15,
+      restrictedCashLakh: 0,
+      fundraisingLeadMonths: 3,
+    },
+    runtimeControls: {
+      paymentLagBySku: { "FRAME-CARBON-M": 1 },
+      cashAnchorPeriod: 1,
+      cashAnchorSourceRef: "transaction-ledger:M1; BANK-EVIDENCE-001",
     },
   };
 }
@@ -132,6 +160,7 @@ function prepare(overrides: Partial<Parameters<typeof prepareAdvancedOptimizerEn
 test("complete exact governed evidence produces a solver-ready preparation envelope", () => {
   const prepared = prepare();
   assert.equal(prepared.readyForGovernedOptimization, true);
+  assert.equal(prepared.version, "VYNDI-OPTIMIZER-PREPARATION-0.3");
   assert.equal(prepared.lineage.sourceSnapshotId, lineage.sourceSnapshotId);
   assert.equal(prepared.evidence.sourceInputHash, lineage.sourceInputHash);
   assert.equal(prepared.authority.capacityAuthority, "approved-frozen-evidence");
@@ -140,7 +169,41 @@ test("complete exact governed evidence produces a solver-ready preparation envel
   assert.equal(prepared.authority.supplierLaneAuthority, "approved-persisted");
   assert.equal(prepared.model.supplierLanes.length, 1);
   assert.equal(prepared.cashGuardrails.length, 36);
+  assert.equal(prepared.cashTiming.analysisStartPeriod, 1);
+  assert.deepEqual(prepared.cashTiming.paymentLagBySku, { "FRAME-CARBON-M": 1 });
+  assert.equal(prepared.evidence.approvedFundingPlanLakh, 200);
+  assert.equal(prepared.evidence.forwardFundingPlanLakh, 200);
+  assert.equal(prepared.evidence.fundingPlanRowCount, 5);
+  assert.deepEqual(prepared.fundingPlan.map((row) => [row.period, row.amountLakh]), [[1, 15], [3, 35], [6, 35], [10, 50], [14, 65]]);
   assert.ok(prepared.cashGuardrails.every((row) => row.sourceRef.includes(lineage.sourceSnapshotId)));
+});
+
+test("canonical cash anchor advances optimizer cash analysis to the next governed period without re-adding historical T1", () => {
+  const anchoredResult = result();
+  anchoredResult.cash[0].freeLiquidityLakh = -10;
+  const prepared = prepare({ input: anchoredInput(), result: anchoredResult });
+  assert.equal(prepared.readyForGovernedOptimization, true);
+  assert.equal(prepared.cashTiming.cashAnchorPeriod, 1);
+  assert.equal(prepared.cashTiming.analysisStartPeriod, 2);
+  assert.equal(prepared.cashGuardrails.length, 35);
+  assert.equal(prepared.cashGuardrails[0]?.period, 2);
+  assert.equal(prepared.evidence.cashAnchorSourceRef, "transaction-ledger:M1; BANK-EVIDENCE-001");
+  assert.equal(prepared.evidence.paymentLagControlCount, 1);
+  assert.equal(prepared.evidence.approvedFundingPlanLakh, 200);
+  assert.equal(prepared.evidence.forwardFundingPlanLakh, 185);
+  assert.ok(!prepared.issues.some((row) => row.code === "CASH_BASELINE_RESERVE_BREACH" && row.message.includes("period 1")));
+});
+
+test("standby funding appears only when the governed parent IBPE input contains it", () => {
+  const withStandby = input();
+  withStandby.cashFlows = [
+    ...(withStandby.cashFlows ?? []),
+    { id: "plan-funding-9", businessKey: "funding-M9", period: 9, direction: "inflow", amountLakh: 25, truth: "plan", category: "funding", sourceRef: "PLAN-1-R1:STBY" },
+  ];
+  const prepared = prepare({ input: withStandby });
+  assert.equal(prepared.evidence.approvedFundingPlanLakh, 225);
+  assert.equal(prepared.evidence.fundingPlanRowCount, 6);
+  assert.ok(prepared.fundingPlan.some((row) => row.period === 9 && row.amountLakh === 25));
 });
 
 test("capacity-derived routing is never upgraded into governed optimizer readiness", () => {
@@ -183,6 +246,7 @@ test("frozen model and authority can prepare optimization without re-reading mut
   const original = prepare();
   const frozen = prepareFrozenAdvancedOptimizerEnvelope({
     lineage,
+    input: input(),
     result: result(),
     model: original.model,
     authority: original.authority,
@@ -192,12 +256,15 @@ test("frozen model and authority can prepare optimization without re-reading mut
   assert.strictEqual(frozen.model, original.model);
   assert.deepEqual(frozen.evidence.persistedRoutingRevisionIds, ["ROUTE-CARBON-R1"]);
   assert.deepEqual(frozen.evidence.persistedSupplierLaneRevisionIds, ["SUP-A:FRAME-CARBON-M:R1"]);
+  assert.deepEqual(frozen.cashTiming.paymentLagBySku, { "FRAME-CARBON-M": 1 });
+  assert.equal(frozen.evidence.approvedFundingPlanLakh, 200);
 });
 
 test("frozen capacity evidence must show approval at packet creation", () => {
   const original = prepare();
   const frozen = prepareFrozenAdvancedOptimizerEnvelope({
     lineage,
+    input: input(),
     result: result(),
     model: original.model,
     authority: { ...original.authority, capacityAuthority: "not-approved" },

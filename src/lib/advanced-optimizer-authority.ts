@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireBusinessActor } from "./business-actor.ts";
 import { getSql } from "./db.ts";
 import type { IntegratedPlanningResult } from "./integrated-business-planning-engine.ts";
+import type { RuntimeIbpeInput } from "./ibpe-runtime-parity.ts";
 import type { AdvancedPlanningConstraintModel } from "./advanced-planning-constraints.ts";
 import type { AdvancedPlanningSourceLineage } from "./advanced-planning-decision-packet.ts";
 import type { AdvancedPlanningAuthorityAssessment } from "./advanced-planning-ibpe-bridge.ts";
@@ -28,6 +29,7 @@ type ParentIbpeRunRow = {
   approved_plan_id: string;
   approved_plan_revision: number | string;
   snapshot_at: string;
+  input_json: RuntimeIbpeInput;
   result_json: IntegratedPlanningResult;
 };
 
@@ -188,7 +190,7 @@ export async function loadPreparedAdvancedOptimizerEnvelope(packetId: string) {
 
   const parentRows = await sql.query<ParentIbpeRunRow>(
     `select id,engine_version,source_sha,input_hash,approved_plan_id,approved_plan_revision,
-            snapshot_at::text,result_json
+            snapshot_at::text,input_json,result_json
        from vyndi_ibpe_runs
       where id=$1 and status='complete'
       limit 1`,
@@ -209,6 +211,7 @@ export async function loadPreparedAdvancedOptimizerEnvelope(packetId: string) {
       approvedPlanId: lineage.approvedPlanId,
       approvedPlanRevision: lineage.approvedPlanRevision,
     },
+    input: parent.input_json,
     result: parent.result_json,
     model: packet.model_json,
     authority: packet.authority_json,
