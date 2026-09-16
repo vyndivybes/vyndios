@@ -9,6 +9,7 @@ import { postDispatch, reverseDispatch } from "@/lib/dispatch-authority";
 const id = z.string().trim().min(1).max(120);
 const sourceReference = z.string().trim().min(1).max(500);
 const month = z.number().int().min(1).max(36);
+const optionalText = z.string().trim().max(1000).optional();
 
 export type ShipmentRecord = {
   id: string;
@@ -26,6 +27,18 @@ export type InvoiceRecord = {
   units: number;
   aspLakh: number;
   amountLakh: number;
+  grossAmountLakh: number;
+  taxableValueInr: number;
+  gstInr: number;
+  taxRatePct: number;
+  taxMode: "pending" | "cgst_sgst" | "igst" | "zero_rated" | "exempt";
+  taxProfileStatus: "pending" | "complete";
+  recipientName: string;
+  recipientGstin: string;
+  placeOfSupplyCode: string;
+  hsnSac: string;
+  eInvoiceRequired: boolean;
+  irn: string;
   status: "issued" | "void";
   sourceReference: string;
 };
@@ -36,6 +49,13 @@ export type CollectionRecord = {
   amountLakh: number;
   status: "posted" | "reversed";
   sourceReference: string;
+};
+export type TaxRegistrationRecord = {
+  legalName: string;
+  tradeName: string;
+  gstin: string;
+  stateCode: string;
+  eInvoiceApplicable: boolean;
 };
 
 async function requireView() {
@@ -50,15 +70,38 @@ export const listShipmentRevenueLedger = createServerFn({ method: "GET" }).handl
     `select id,sales_order_id,plan_month,units,status,source_reference from vyndi_shipments order by plan_month,id`,
   );
   const invoices = await sql.query<Record<string, unknown>>(
-    `select id,shipment_id,sales_order_id,plan_month,units,asp_lakh,amount_lakh,status,source_reference from vyndi_invoices order by plan_month,id`,
+    `select id,shipment_id,sales_order_id,plan_month,units,asp_lakh,amount_lakh,status,source_reference,
+      taxable_value_inr,gst_inr,gross_amount_inr,tax_rate_pct,tax_mode,tax_profile_status,
+      recipient_name,recipient_gstin,place_of_supply_code,hsn_sac,e_invoice_required,irn
+      from vyndi_invoices order by plan_month,id`,
   );
   const collections = await sql.query<Record<string, unknown>>(
     `select id,invoice_id,plan_month,amount_lakh,status,source_reference from vyndi_collections order by plan_month,id`,
   );
+  const registration = await sql.query<Record<string, unknown>>(
+    `select legal_name,trade_name,gstin,state_code,e_invoice_applicable from epr_finance_tax_registration where id='PRIMARY'`,
+  );
+  const taxRow = registration[0];
   return {
     shipments: shipments.map((r) => ({ id:String(r.id),salesOrderId:String(r.sales_order_id),planMonth:Number(r.plan_month),units:Number(r.units),status:r.status as ShipmentRecord["status"],sourceReference:String(r.source_reference) })),
-    invoices: invoices.map((r) => ({ id:String(r.id),shipmentId:String(r.shipment_id),salesOrderId:String(r.sales_order_id),planMonth:Number(r.plan_month),units:Number(r.units),aspLakh:Number(r.asp_lakh),amountLakh:Number(r.amount_lakh),status:r.status as InvoiceRecord["status"],sourceReference:String(r.source_reference) })),
+    invoices: invoices.map((r) => {
+      const amountLakh = Number(r.amount_lakh);
+      const grossAmountInr = Number(r.gross_amount_inr ?? 0);
+      return {
+        id:String(r.id),shipmentId:String(r.shipment_id),salesOrderId:String(r.sales_order_id),planMonth:Number(r.plan_month),units:Number(r.units),
+        aspLakh:Number(r.asp_lakh),amountLakh,grossAmountLakh:grossAmountInr>0?grossAmountInr/100000:amountLakh,
+        taxableValueInr:Number(r.taxable_value_inr ?? amountLakh*100000),gstInr:Number(r.gst_inr ?? 0),taxRatePct:Number(r.tax_rate_pct ?? 0),
+        taxMode:String(r.tax_mode ?? "pending") as InvoiceRecord["taxMode"],taxProfileStatus:String(r.tax_profile_status ?? "pending") as InvoiceRecord["taxProfileStatus"],
+        recipientName:String(r.recipient_name ?? ""),recipientGstin:String(r.recipient_gstin ?? ""),placeOfSupplyCode:String(r.place_of_supply_code ?? ""),
+        hsnSac:String(r.hsn_sac ?? ""),eInvoiceRequired:Boolean(r.e_invoice_required),irn:String(r.irn ?? ""),
+        status:r.status as InvoiceRecord["status"],sourceReference:String(r.source_reference),
+      };
+    }),
     collections: collections.map((r) => ({ id:String(r.id),invoiceId:String(r.invoice_id),planMonth:Number(r.plan_month),amountLakh:Number(r.amount_lakh),status:r.status as CollectionRecord["status"],sourceReference:String(r.source_reference) })),
+    taxRegistration: taxRow ? {
+      legalName:String(taxRow.legal_name),tradeName:String(taxRow.trade_name ?? ""),gstin:String(taxRow.gstin),stateCode:String(taxRow.state_code),
+      eInvoiceApplicable:Boolean(taxRow.e_invoice_applicable),
+    } satisfies TaxRegistrationRecord : null,
   };
 });
 
@@ -68,13 +111,42 @@ export const postShipment = postDispatch;
 export const reverseShipment = reverseDispatch;
 
 export const issueInvoice = createServerFn({ method: "POST" })
-  .validator(z.object({ id, shipmentId:id, sourceReference }))
+  .validator(z.object({
+    id,
+    shipmentId:id,
+    sourceReference,
+    recipientName:z.string().trim().min(2).max(250),
+    recipientGstin:z.string().trim().toUpperCase().max(15).optional(),
+    recipientAddress:z.string().trim().min(5).max(1000),
+    deliveryAddress:z.string().trim().min(5).max(1000),
+    placeOfSupplyCode:z.string().trim().regex(/^[0-9]{2}$/),
+    hsnSac:z.string().trim().min(2).max(20),
+    itemDescription:z.string().trim().min(2).max(500),
+    unitCode:z.string().trim().min(1).max(20).default("NOS"),
+    taxRatePct:z.number().finite().min(0).max(100),
+    taxMode:z.enum(["cgst_sgst","igst","zero_rated","exempt"]),
+    reverseCharge:z.boolean().default(false),
+    eInvoiceRequired:z.boolean().default(false),
+    irn:optionalText,
+    irnAckNumber:optionalText,
+    irnAckAt:optionalText,
+    taxEvidenceReference:sourceReference,
+  }))
   .handler(async ({ data }) => {
     const actor = await requireBusinessActor("edit");
+    if (data.eInvoiceRequired && (!data.irn || !data.irnAckNumber || !data.irnAckAt)) {
+      throw new Error("IRN, acknowledgement number and acknowledgement timestamp are required for an e-invoice.");
+    }
     const sql = await getSql();
-    const rows = await sql.query<{ invoice_id:string; amount_lakh:number|string }>(`select * from issue_vyndi_invoice($1,$2,$3,$4,$5)`,[data.id,data.shipmentId,data.sourceReference,actor.userId,actor.role]);
-    if (!rows[0]) throw new Error("Invoice issue did not return a controlled record.");
-    return { id:rows[0].invoice_id, amountLakh:Number(rows[0].amount_lakh) };
+    const rows = await sql.query<{ invoice_id:string; amount_lakh:number|string; gross_amount_inr:number|string }>(
+      `select * from issue_vyndi_tax_invoice($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18::timestamptz,$19,$20,$21)`,
+      [data.id,data.shipmentId,data.sourceReference,data.recipientName,data.recipientGstin ?? null,
+       data.recipientAddress,data.deliveryAddress,data.placeOfSupplyCode,data.hsnSac,data.itemDescription,data.unitCode,
+       data.taxRatePct,data.taxMode,data.reverseCharge,data.eInvoiceRequired,data.irn || null,data.irnAckNumber || null,
+       data.irnAckAt || null,data.taxEvidenceReference,actor.userId,actor.role],
+    );
+    if (!rows[0]) throw new Error("Tax invoice issue did not return a controlled record.");
+    return { id:rows[0].invoice_id, amountLakh:Number(rows[0].amount_lakh), grossAmountInr:Number(rows[0].gross_amount_inr) };
   });
 
 export const voidInvoice = createServerFn({ method: "POST" })

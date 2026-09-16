@@ -51,11 +51,13 @@ export const getAccountingWorkbench = createServerFn({ method: "GET" }).handler(
         from epr_job_cost_snapshots order by captured_at desc limit 250`),
     sql.query<SqlRow>(`
       select id,period,direction,source_type,source_id,taxable_value_inr,gst_inr,eligible_itc,evidence_reference,
-             created_at::text as created_at
+             document_date::text as document_date,document_number,counterparty_gstin,place_of_supply_code,hsn_sac,
+             tax_rate_pct,cgst_inr,sgst_inr,igst_inr,cess_inr,irn,status,created_at::text as created_at
         from epr_finance_gst_ledger order by period desc,created_at desc limit 500`),
     sql.query<SqlRow>(`
       select id,bank_account_ref,statement_date::text as statement_date,amount_inr,reference,matched_journal_id,
-             matched_at::text as matched_at,imported_at::text as imported_at
+             matched_by,match_reference,matched_at::text as matched_at,unmatched_by,unmatched_at::text as unmatched_at,
+             unmatch_reason,imported_at::text as imported_at
         from epr_finance_bank_statement_lines order by statement_date desc,imported_at desc limit 500`),
     sql.query<SqlRow>(`
       select asset_id,description,capitalization_date::text as capitalization_date,acquisition_cost_inr,useful_life_months,
@@ -73,28 +75,11 @@ export const getAccountingWorkbench = createServerFn({ method: "GET" }).handler(
         from epr_finance_posting_exceptions order by resolved asc,
           case severity when 'critical' then 1 when 'high' then 2 when 'medium' then 3 else 4 end,created_at desc`),
   ]);
-  return {
-    summary: summary[0] ?? {},
-    trialBalance,
-    generalLedger,
-    journals,
-    jobCosts,
-    gst,
-    bank,
-    assets,
-    payroll,
-    exceptions,
-  };
+  return { summary: summary[0] ?? {}, trialBalance, generalLedger, journals, jobCosts, gst, bank, assets, payroll, exceptions };
 });
 
 export const importBankStatementLine = createServerFn({ method: "POST" })
-  .validator(z.object({
-    id,
-    bankAccountRef: id,
-    statementDate: z.string().date(),
-    amountInr: money.refine((value) => value !== 0, "Bank statement amount cannot be zero."),
-    reference,
-  }))
+  .validator(z.object({ id, bankAccountRef: id, statementDate: z.string().date(), amountInr: money.refine((value) => value !== 0, "Bank statement amount cannot be zero."), reference }))
   .handler(async ({ data }) => {
     await requireEdit();
     const sql = await getSql();
@@ -110,31 +95,64 @@ export const importBankStatementLine = createServerFn({ method: "POST" })
   });
 
 export const matchBankStatementLine = createServerFn({ method: "POST" })
-  .validator(z.object({ statementLineId: id, journalId: id }))
+  .validator(z.object({ statementLineId: id, journalId: id, matchReference: z.string().trim().max(500).optional() }))
   .handler(async ({ data }) => {
-    await requireEdit();
+    const actor = await requireEdit();
     const sql = await getSql();
     const [statement] = await sql.query<{ amount_inr: number | string; matched_journal_id: string | null }>(
-      `select amount_inr,matched_journal_id from epr_finance_bank_statement_lines where id=$1 for update`,
-      [data.statementLineId],
+      `select amount_inr,matched_journal_id from epr_finance_bank_statement_lines where id=$1 for update`, [data.statementLineId],
     );
     if (!statement) throw new Error("Bank statement line not found.");
     if (statement.matched_journal_id) throw new Error("Bank statement line is already reconciled.");
+    const [used] = await sql.query<{ id: string }>(
+      `select id from epr_finance_bank_statement_lines where matched_journal_id=$1 and id<>$2 limit 1`, [data.journalId, data.statementLineId],
+    );
+    if (used) throw new Error(`Journal ${data.journalId} is already matched to bank statement line ${used.id}.`);
     const [journal] = await sql.query<{ bank_delta: number | string }>(
       `select coalesce(sum(debit_inr-credit_inr),0) as bank_delta
          from epr_finance_journal_lines l join epr_finance_journals j on j.id=l.journal_id
-        where j.id=$1 and j.status='posted' and l.account_code='1000'`,
-      [data.journalId],
+        where j.id=$1 and j.status='posted' and l.account_code='1000'`, [data.journalId],
     );
     const bankDelta = Number(journal?.bank_delta ?? 0);
+    if (bankDelta === 0) throw new Error("Selected journal has no posted Bank account movement.");
     if (Math.abs(bankDelta - Number(statement.amount_inr)) > 0.01) {
       throw new Error(`Bank amount does not reconcile to journal bank movement. Statement ${Number(statement.amount_inr).toFixed(2)}, journal ${bankDelta.toFixed(2)}.`);
     }
     await sql.query(
-      `update epr_finance_bank_statement_lines set matched_journal_id=$2,matched_at=now() where id=$1`,
-      [data.statementLineId, data.journalId],
+      `update epr_finance_bank_statement_lines
+          set matched_journal_id=$2,matched_at=now(),matched_by=$3,match_reference=$4,
+              unmatched_by=null,unmatched_at=null,unmatch_reason=null
+        where id=$1`,
+      [data.statementLineId, data.journalId, actor.userId, data.matchReference ?? null],
+    );
+    await sql.query(
+      `insert into epr_finance_bank_match_audit(statement_line_id,journal_id,action,reason,actor_user_id)
+       values($1,$2,'matched',$3,$4)`,
+      [data.statementLineId, data.journalId, data.matchReference ?? null, actor.userId],
     );
     return { ok: true, statementLineId: data.statementLineId, journalId: data.journalId };
+  });
+
+export const unmatchBankStatementLine = createServerFn({ method: "POST" })
+  .validator(z.object({ statementLineId: id, reason: reference }))
+  .handler(async ({ data }) => {
+    const actor = await requireEdit();
+    const sql = await getSql();
+    const [statement] = await sql.query<{ matched_journal_id: string | null }>(
+      `select matched_journal_id from epr_finance_bank_statement_lines where id=$1 for update`, [data.statementLineId],
+    );
+    if (!statement?.matched_journal_id) throw new Error("Bank statement line is not currently matched.");
+    const journalId = statement.matched_journal_id;
+    await sql.query(
+      `update epr_finance_bank_statement_lines
+          set matched_journal_id=null,matched_at=null,unmatched_by=$2,unmatched_at=now(),unmatch_reason=$3
+        where id=$1`, [data.statementLineId, actor.userId, data.reason],
+    );
+    await sql.query(
+      `insert into epr_finance_bank_match_audit(statement_line_id,journal_id,action,reason,actor_user_id)
+       values($1,$2,'unmatched',$3,$4)`, [data.statementLineId, journalId, data.reason, actor.userId],
+    );
+    return { ok: true, statementLineId: data.statementLineId };
   });
 
 export const saveFixedAsset = createServerFn({ method: "POST" })
@@ -152,9 +170,7 @@ export const saveFixedAsset = createServerFn({ method: "POST" })
   }))
   .handler(async ({ data }) => {
     await requireEdit();
-    if (data.accumulatedDepreciationInr > data.acquisitionCostInr) {
-      throw new Error("Accumulated depreciation cannot exceed acquisition cost.");
-    }
+    if (data.accumulatedDepreciationInr > data.acquisitionCostInr) throw new Error("Accumulated depreciation cannot exceed acquisition cost.");
     const sql = await getSql();
     await sql.query(
       `insert into epr_finance_fixed_assets
@@ -206,8 +222,7 @@ export const resolveFinancePostingException = createServerFn({ method: "POST" })
     await requireEdit();
     const sql = await getSql();
     await sql.query(
-      `update epr_finance_posting_exceptions set resolved=true,resolved_reference=$2,resolved_at=now()
-        where id=$1 and resolved=false`,
+      `update epr_finance_posting_exceptions set resolved=true,resolved_reference=$2,resolved_at=now() where id=$1 and resolved=false`,
       [data.id, data.reference],
     );
     return { ok: true, id: data.id };
