@@ -32,6 +32,7 @@ test("every deploy-time migration executes from an empty database in production 
   const migrations = pendingMigrations(files, []);
   assert.ok(migrations.some(({ path }) => path === "0039_erp_suite_report_views.sql"));
   assert.ok(migrations.some(({ path }) => path === "0001_auth.sql"));
+  assert.ok(migrations.some(({ path }) => path === "0072_verified_management_actuals.sql"));
   assert.ok(!migrations.some(({ path }) => path.startsWith("auth/")));
 
   for (const { name, path } of migrations) {
@@ -117,4 +118,18 @@ test("every deploy-time migration executes from an empty database in production 
     await db.query(statement);
   }
   assert.equal(operationalAuditSchemaQueries.length, 14);
+
+  // Management cash with explicit bank/ledger evidence must become verified
+  // canonical cash even when transaction revenue/units/receivables are zero.
+  await db.query(
+    `select save_vyndi_monthly_actual($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+    [1,null,null,null,null,5,null,null,null,"founder-bank-balance:500000",true,"test-user","admin"],
+  );
+  const canonicalCash = await db.query(
+    `select closing_cash_lakh,source_reference,verified from vyndi_cash_authority where plan_month=1`,
+  );
+  assert.equal(canonicalCash.rows.length, 1);
+  assert.equal(Number(canonicalCash.rows[0].closing_cash_lakh), 5);
+  assert.equal(canonicalCash.rows[0].verified, true);
+  assert.match(String(canonicalCash.rows[0].source_reference), /founder-bank-balance:500000/);
 });
