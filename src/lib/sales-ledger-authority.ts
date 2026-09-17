@@ -11,7 +11,62 @@ const optionalText = z.string().trim().max(1000).optional();
 const actorInput = (context: { userId?: string | null; userEmail?: string | null }) =>
   context.userId ? { userId: context.userId, email: context.userEmail ?? undefined } : undefined;
 
-export type SalesLedgerRow = Record<string, unknown>;
+export type SalesLedgerRow = {
+  invoice_id: string;
+  issued_on: string;
+  plan_month: number;
+  sale_type: "bicycle" | "spare_component";
+  channel: string;
+  customer_name: string;
+  customer_gstin: string;
+  sales_order_id: string;
+  shipment_id: string;
+  spare_sale_id: string;
+  item_reference: string;
+  item_description: string;
+  quantity: number;
+  unit_code: string;
+  vyndi_identity: string;
+  oem_part_number: string;
+  oem_serial_number: string;
+  supplier_lot: string;
+  allocation_identity_refs: string;
+  taxable_value_inr: number;
+  gst_inr: number;
+  gross_amount_inr: number;
+  collected_inr: number;
+  balance_inr: number;
+  payment_status: string;
+  credit_terms_days: number | null;
+  due_on: string;
+  aging_bucket: string;
+  fifo_cogs_inr: number | null;
+  gross_margin_inr: number | null;
+  invoice_status: string;
+  source_reference: string;
+};
+
+export type SpareSaleRow = {
+  id: string;
+  plan_month: number;
+  sku: string;
+  item_name: string;
+  unit: string;
+  quantity: number;
+  unit_price_inr: number;
+  channel: string;
+  traceability_class: "A" | "B" | "C";
+  selected_identity_uid: string;
+  allocated_identity_refs: string;
+  fifo_cost_inr: number;
+  status: "dispatched" | "reversed";
+  source_reference: string;
+  dispatch_on: string;
+  posted_at: string;
+  invoice_id: string;
+  invoice_status: string;
+};
+
 export type SpareInventoryOption = {
   id: string;
   sku: string;
@@ -23,6 +78,7 @@ export type SpareInventoryOption = {
   physicalQuantity: number;
   reservedQuantity: number;
 };
+
 export type SpareIdentityOption = {
   identityUid: string;
   visibleId: string;
@@ -35,12 +91,74 @@ export type SpareIdentityOption = {
   supplierLot: string;
 };
 
+const nullableNumber = (value: unknown) => (value == null ? null : Number(value));
+
+function toSalesLedgerRow(row: Record<string, unknown>): SalesLedgerRow {
+  return {
+    invoice_id: String(row.invoice_id),
+    issued_on: String(row.issued_on ?? ""),
+    plan_month: Number(row.plan_month),
+    sale_type: String(row.sale_type) as SalesLedgerRow["sale_type"],
+    channel: String(row.channel ?? ""),
+    customer_name: String(row.customer_name ?? ""),
+    customer_gstin: String(row.customer_gstin ?? ""),
+    sales_order_id: String(row.sales_order_id ?? ""),
+    shipment_id: String(row.shipment_id ?? ""),
+    spare_sale_id: String(row.spare_sale_id ?? ""),
+    item_reference: String(row.item_reference ?? ""),
+    item_description: String(row.item_description ?? ""),
+    quantity: Number(row.quantity ?? 0),
+    unit_code: String(row.unit_code ?? ""),
+    vyndi_identity: String(row.vyndi_identity ?? ""),
+    oem_part_number: String(row.oem_part_number ?? ""),
+    oem_serial_number: String(row.oem_serial_number ?? ""),
+    supplier_lot: String(row.supplier_lot ?? ""),
+    allocation_identity_refs: JSON.stringify(row.allocation_identity_refs ?? []),
+    taxable_value_inr: Number(row.taxable_value_inr ?? 0),
+    gst_inr: Number(row.gst_inr ?? 0),
+    gross_amount_inr: Number(row.gross_amount_inr ?? 0),
+    collected_inr: Number(row.collected_inr ?? 0),
+    balance_inr: Number(row.balance_inr ?? 0),
+    payment_status: String(row.payment_status ?? ""),
+    credit_terms_days: nullableNumber(row.credit_terms_days),
+    due_on: String(row.due_on ?? ""),
+    aging_bucket: String(row.aging_bucket ?? ""),
+    fifo_cogs_inr: nullableNumber(row.fifo_cogs_inr),
+    gross_margin_inr: nullableNumber(row.gross_margin_inr),
+    invoice_status: String(row.invoice_status ?? ""),
+    source_reference: String(row.source_reference ?? ""),
+  };
+}
+
+function toSpareSaleRow(row: Record<string, unknown>): SpareSaleRow {
+  return {
+    id: String(row.id),
+    plan_month: Number(row.plan_month),
+    sku: String(row.sku),
+    item_name: String(row.item_name),
+    unit: String(row.unit),
+    quantity: Number(row.quantity),
+    unit_price_inr: Number(row.unit_price_inr),
+    channel: String(row.channel),
+    traceability_class: String(row.traceability_class ?? "C") as SpareSaleRow["traceability_class"],
+    selected_identity_uid: String(row.selected_identity_uid ?? ""),
+    allocated_identity_refs: JSON.stringify(row.allocated_identity_refs ?? []),
+    fifo_cost_inr: Number(row.fifo_cost_inr ?? 0),
+    status: String(row.status) as SpareSaleRow["status"],
+    source_reference: String(row.source_reference ?? ""),
+    dispatch_on: String(row.dispatch_on ?? ""),
+    posted_at: String(row.posted_at ?? ""),
+    invoice_id: String(row.invoice_id ?? ""),
+    invoice_status: String(row.invoice_status ?? ""),
+  };
+}
+
 export const getSalesLedgerWorkspace = createServerFn({ method: "GET" })
   .middleware([optionalAuthMiddleware])
   .handler(async ({ context }) => {
     await requireBusinessActor("view", actorInput(context));
     const sql = await getSql();
-    const [ledger, spareSales, inventory, identities, summary] = await Promise.all([
+    const [ledger, spareSales, inventory, identities] = await Promise.all([
       sql.query<Record<string, unknown>>(
         `select * from vyndi_report_sales_ledger order by issued_on desc,invoice_id desc`,
       ),
@@ -71,23 +189,11 @@ export const getSalesLedgerWorkspace = createServerFn({ method: "GET" })
           where status='active' and part_sku<>''
           order by part_sku,visible_id`,
       ),
-      sql.query<Record<string, unknown>>(
-        `select sale_type,
-                count(*) filter(where invoice_status='issued')::int as invoice_count,
-                coalesce(sum(taxable_value_inr) filter(where invoice_status='issued'),0) as taxable_sales_inr,
-                coalesce(sum(gst_inr) filter(where invoice_status='issued'),0) as output_gst_inr,
-                coalesce(sum(gross_amount_inr) filter(where invoice_status='issued'),0) as gross_sales_inr,
-                coalesce(sum(collected_inr) filter(where invoice_status='issued'),0) as collected_inr,
-                coalesce(sum(balance_inr) filter(where invoice_status='issued'),0) as open_receivable_inr
-           from vyndi_report_sales_ledger
-          group by sale_type
-          order by sale_type`,
-      ),
     ]);
 
     return {
-      ledger,
-      spareSales,
+      ledger: ledger.map(toSalesLedgerRow),
+      spareSales: spareSales.map(toSpareSaleRow),
       inventory: inventory.map((row) => ({
         id: String(row.id),
         sku: String(row.sku),
@@ -110,7 +216,6 @@ export const getSalesLedgerWorkspace = createServerFn({ method: "GET" })
         oemSerialNumber: String(row.oem_serial_number ?? ""),
         supplierLot: String(row.supplier_lot ?? ""),
       })) satisfies SpareIdentityOption[],
-      summary,
     };
   });
 
