@@ -80,6 +80,7 @@ export const FINANCE_TABS: readonly WorkspaceLink[] = [
   { to: "/command/cash", label: "Cash" },
   { to: "/command/payables", label: "Payables" },
   { to: "/command/receivables", label: "Receivables" },
+  { to: "/command/sales-ledger", label: "Sales Ledger" },
   { to: "/command/balance-sheet", label: "Balance Sheet" },
 ];
 
@@ -261,7 +262,7 @@ export const WORKFLOW_STAGES: readonly WorkflowStage[] = [
     routes: [OPERATIONS_HOME],
     owner: "operations",
   },
-  { id: "invoice", label: "Invoice", shortLabel: "Invoice", to: "/command/receivables", routes: [], owner: "finance" },
+  { id: "invoice", label: "Invoice", shortLabel: "Invoice", to: "/command/receivables", routes: ["/command/sales-ledger"], owner: "finance" },
   { id: "collection", label: "Collection", shortLabel: "Collect", to: "/command/receivables", routes: ["/command/receivables"], owner: "finance" },
 ];
 
@@ -342,6 +343,7 @@ export const WORKFLOW_VISIBLE_ROUTES = new Set<string>([
   "/command/production",
   "/command/quality",
   "/command/receivables",
+  "/command/sales-ledger",
 ]);
 
 export function activeWorkflowStage(pathname: string): string | null {
