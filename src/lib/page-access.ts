@@ -43,6 +43,14 @@ const ACCOUNTING_PAGE: PageMeta = {
   maturity: "keep",
   group: "Operate",
 };
+const SALES_LEDGER_ROUTE = "/command/sales-ledger";
+const SALES_LEDGER_PAGE: PageMeta = {
+  mode: "operate",
+  domain: "finance",
+  owner: "finance",
+  maturity: "keep",
+  group: "Operate",
+};
 
 /**
  * Phase E source of truth for VINDY role access.
@@ -165,6 +173,7 @@ export function canAccessRoute(role: CommandRole | null, route: string): boolean
   if (route === PEOPLE_OFFICE_ROUTE) return canAccessPage(role, PEOPLE_OFFICE_PAGE);
   if (route === ACCOUNTING_ROUTE || route.startsWith(`${ACCOUNTING_ROUTE}/`))
     return canAccessPage(role, ACCOUNTING_PAGE);
+  if (route === SALES_LEDGER_ROUTE) return canAccessPage(role, SALES_LEDGER_PAGE);
 
   // Nested pages such as /command/inventory-ledgers/stock are real router
   // routes, but their navigation metadata belongs to the registered parent.

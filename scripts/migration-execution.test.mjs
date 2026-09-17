@@ -33,6 +33,8 @@ test("every deploy-time migration executes from an empty database in production 
   assert.ok(migrations.some(({ path }) => path === "0039_erp_suite_report_views.sql"));
   assert.ok(migrations.some(({ path }) => path === "0001_auth.sql"));
   assert.ok(migrations.some(({ path }) => path === "0072_verified_management_actuals.sql"));
+  assert.ok(migrations.some(({ path }) => path === "0081_sales_ledger_spare_components.sql"));
+  assert.ok(migrations.some(({ path }) => path === "0082_spare_sales_identity_fifo_fix.sql"));
   assert.ok(!migrations.some(({ path }) => path.startsWith("auth/")));
 
   for (const { name, path } of migrations) {
@@ -65,7 +67,10 @@ test("every deploy-time migration executes from an empty database in production 
   const reportViews = await db.query(
     "select table_name from information_schema.views where table_schema='public' and table_name like 'vyndi_report_%' order by table_name",
   );
-  assert.equal(reportViews.rows.length, 14);
+  assert.equal(reportViews.rows.length, 16);
+  const reportViewNames = reportViews.rows.map(({ table_name }) => String(table_name));
+  assert.ok(reportViewNames.includes("vyndi_report_sales_ledger"));
+  assert.ok(reportViewNames.includes("vyndi_report_sales_summary"));
 
   const modelEvidenceColumn = await db.query(
     "select column_name from information_schema.columns where table_schema='public' and table_name='vyndi_advanced_planning_packets' and column_name='model_json'",
