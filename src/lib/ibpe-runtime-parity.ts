@@ -36,6 +36,8 @@ export type RuntimeIbpeResult = IntegratedPlanningResult & {
     cashAnchorPeriod: number;
     cashAnalysisStartPeriod: number;
     cashAnchorSourceRef?: string;
+    leadTimeAuthorityNormalized: true;
+    provisionalLeadTimeAssumptionSkus: number;
   };
 };
 
@@ -99,6 +101,59 @@ function governedCashAnchorPeriod(input: RuntimeIbpeInput, horizon: number) {
 function cashAnalysisStartPeriod(anchorPeriod: number, horizon: number) {
   if (anchorPeriod <= 0) return 1;
   return Math.min(horizon, anchorPeriod + 1);
+}
+
+/**
+ * Workbook-v5 seeded lead times are planning assumptions, not supplier-contract
+ * truth. They remain valid for analytical ordering dates, but they must not be
+ * surfaced as authoritative supplier lead-time breaches until supplier evidence
+ * replaces the planning-default source.
+ */
+function provisionalLeadTimeSkuSet(input: RuntimeIbpeInput) {
+  return new Set(
+    input.inventory
+      .filter((row) => /(?:WORKBOOK-V5|PLANNING-DEFAULT)/i.test(row.sourceRef ?? ""))
+      .map((row) => row.sku.toUpperCase()),
+  );
+}
+
+function normalizeLeadTimeAuthority(
+  input: RuntimeIbpeInput,
+  base: IntegratedPlanningResult,
+) {
+  const provisionalSkus = provisionalLeadTimeSkuSet(input);
+  if (provisionalSkus.size === 0) {
+    return { supply: base.supply, findings: base.findings, provisionalSkus };
+  }
+
+  const supply = base.supply.map((row) =>
+    provisionalSkus.has(row.sku.toUpperCase()) && row.recommendationIsLate
+      ? { ...row, recommendationIsLate: false }
+      : row,
+  );
+
+  const findings = base.findings.map((finding) => {
+    if (finding.domain !== "procurement" || finding.title !== "Purchase recommendation is inside supplier lead time") {
+      return finding;
+    }
+    const sku = finding.evidence.find((item) => item.entityId)?.entityId;
+    if (!sku || !provisionalSkus.has(sku.toUpperCase())) return finding;
+
+    return {
+      ...finding,
+      severity: "medium" as const,
+      title: "Purchase timing depends on provisional lead-time assumption",
+      problem: `${sku} uses a planning-default lead-time assumption that places the recommendation inside the modeled ordering fence; supplier lead-time evidence is not yet authoritative.`,
+      businessImpact: "The analytical ordering date remains useful for planning, but the condition must not be represented as an approved supplier expedite risk.",
+      recommendedAction: "Obtain approved supplier lead-time evidence or an approved supplier-lane revision before treating this timing condition as an authoritative procurement exception.",
+      evidence: finding.evidence.map((item) => ({
+        ...item,
+        label: item.entityId === sku ? `${sku} · provisional lead-time assumption` : item.label,
+      })),
+    };
+  });
+
+  return { supply, findings, provisionalSkus };
 }
 
 function fundingOutlook(
@@ -219,7 +274,13 @@ export function runRuntimeIbpe(
 ): RuntimeIbpeResult {
   const horizon = Math.max(1, Math.round(Number(options.horizonMonths ?? 36)));
   const nearTermRiskMonths = Math.max(0, Math.round(Number(options.nearTermRiskMonths ?? 3)));
-  const base = runIntegratedBusinessPlanningEngine(input, { ...options, horizonMonths: horizon });
+  const rawBase = runIntegratedBusinessPlanningEngine(input, { ...options, horizonMonths: horizon });
+  const leadTimeAuthority = normalizeLeadTimeAuthority(input, rawBase);
+  const base: IntegratedPlanningResult = {
+    ...rawBase,
+    supply: leadTimeAuthority.supply,
+    findings: leadTimeAuthority.findings,
+  };
 
   const procurementByPaymentPeriod = new Map<number, number>();
   let deferredProcurementBeyondHorizonLakh = 0;
@@ -299,6 +360,8 @@ export function runRuntimeIbpe(
       cashAnchorPeriod,
       cashAnalysisStartPeriod: analysisStartPeriod,
       cashAnchorSourceRef: input.runtimeControls?.cashAnchorSourceRef,
+      leadTimeAuthorityNormalized: true,
+      provisionalLeadTimeAssumptionSkus: leadTimeAuthority.provisionalSkus.size,
     },
   };
 }
