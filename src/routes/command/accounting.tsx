@@ -1,12 +1,11 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { BookOpenCheck, Boxes, FileCheck2, Landmark, ReceiptText, Scale, WalletCards } from "lucide-react";
+import { BookOpenCheck, Boxes, Landmark, ReceiptText, Scale, WalletCards } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Kpi, Panel } from "@/components/kpi";
 import {
   getAccountingWorkbench,
   importBankStatementLine,
   matchBankStatementLine,
-  saveFixedAsset,
   savePayrollControl,
 } from "@/lib/finance/accounting-authority";
 import { CORE_CHART_OF_ACCOUNTS } from "@/lib/finance/general-ledger";
@@ -30,8 +29,7 @@ function AccountingWorkbench() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [bankDraft, setBankDraft] = useState({ id: "", bankAccountRef: "BANK-01", statementDate: today(), amountInr: 0, reference: "" });
-  const [assetDraft, setAssetDraft] = useState({ assetId: "", description: "", capitalizationDate: today(), acquisitionCostInr: 0, usefulLifeMonths: 60, accumulatedDepreciationInr: 0, location: "", custodian: "", sourceReference: "", status: "active" as "active" | "idle" | "disposed" });
-  const [payrollDraft, setPayrollDraft] = useState({ payrollId: "", period: month(), grossPayInr: 0, deductionsInr: 0, employerCostInr: 0, statutoryPayableInr: 0, paymentReference: "", returnEvidenceReference: "" });
+  const [payrollDraft, setPayrollDraft] = useState({ payrollId: "", sourceExpenditureId: "", period: month(), grossPayInr: 0, deductionsInr: 0, employerCostInr: 0, statutoryPayableInr: 0, paymentReference: "", returnEvidenceReference: "" });
 
   const summary = data.summary as Record<string, unknown>;
   const openExceptions = data.exceptions.filter((row) => !row.resolved);
@@ -187,35 +185,33 @@ function AccountingWorkbench() {
         </div>
       </Panel>
 
-      <Panel title="Fixed Asset Register" kicker="Capitalization and depreciation evidence">
-        <form onSubmit={(event) => { event.preventDefault(); void run(() => saveFixedAsset({ data: assetDraft }), `${assetDraft.assetId} saved.`); }} className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <Field label="Asset ID"><input className="control mt-1.5" value={assetDraft.assetId} onChange={(e) => setAssetDraft({ ...assetDraft, assetId: e.target.value })} /></Field>
-          <Field label="Description"><input className="control mt-1.5" value={assetDraft.description} onChange={(e) => setAssetDraft({ ...assetDraft, description: e.target.value })} /></Field>
-          <Field label="Capitalization date"><input className="control mt-1.5" type="date" value={assetDraft.capitalizationDate} onChange={(e) => setAssetDraft({ ...assetDraft, capitalizationDate: e.target.value })} /></Field>
-          <Field label="Acquisition cost"><input className="control mt-1.5" type="number" min="0" step="0.01" value={assetDraft.acquisitionCostInr} onChange={(e) => setAssetDraft({ ...assetDraft, acquisitionCostInr: Number(e.target.value) })} /></Field>
-          <Field label="Useful life · months"><input className="control mt-1.5" type="number" min="1" value={assetDraft.usefulLifeMonths} onChange={(e) => setAssetDraft({ ...assetDraft, usefulLifeMonths: Number(e.target.value) })} /></Field>
-          <Field label="Accumulated depreciation"><input className="control mt-1.5" type="number" min="0" step="0.01" value={assetDraft.accumulatedDepreciationInr} onChange={(e) => setAssetDraft({ ...assetDraft, accumulatedDepreciationInr: Number(e.target.value) })} /></Field>
-          <Field label="Location"><input className="control mt-1.5" value={assetDraft.location} onChange={(e) => setAssetDraft({ ...assetDraft, location: e.target.value })} /></Field>
-          <Field label="Custodian"><input className="control mt-1.5" value={assetDraft.custodian} onChange={(e) => setAssetDraft({ ...assetDraft, custodian: e.target.value })} /></Field>
-          <Field label="Source evidence"><input className="control mt-1.5" value={assetDraft.sourceReference} onChange={(e) => setAssetDraft({ ...assetDraft, sourceReference: e.target.value })} /></Field>
-          <div className="flex items-end"><button disabled={busy || !assetDraft.assetId || !assetDraft.description || !assetDraft.sourceReference} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-40"><FileCheck2 className="size-4" />Save asset</button></div>
-        </form>
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{data.assets.map((row) => <article key={text(row, "asset_id")} className="rounded-xl border border-border p-4 text-sm"><p className="font-mono text-xs text-accent">{text(row, "asset_id")}</p><p className="mt-1 font-semibold">{text(row, "description")}</p><p className="mt-2 text-muted">Cost {money(row.acquisition_cost_inr)} · Acc. dep. {money(row.accumulated_depreciation_inr)}</p></article>)}</div>
+      <Panel title="Fixed Asset Register" kicker="Derived from governed capital expenditure">
+        <div className="rounded-xl border border-border bg-surface/60 p-4 text-sm leading-6 text-muted">
+          New fixed assets are created only when an approved People &amp; Office actual expenditure capitalizes to account 1500.
+          This register is read-only for financial source truth; it no longer permits a second manual asset-creation path.
+          <div className="mt-3"><Link to="/command/accounting/people-office-payments" className="font-semibold text-accent">Open People &amp; Office Actual Spend →</Link></div>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{data.assets.map((row) => <article key={text(row, "asset_id")} className="rounded-xl border border-border p-4 text-sm"><p className="font-mono text-xs text-accent">{text(row, "asset_id")}</p><p className="mt-1 font-semibold">{text(row, "description")}</p><p className="mt-2 text-muted">Cost {money(row.acquisition_cost_inr)} · Acc. dep. {money(row.accumulated_depreciation_inr)}</p><p className="mt-2 text-xs text-muted break-words">Authority: {text(row, "source_expenditure_id") || "Legacy pre-consolidation record"} · Evidence: {text(row, "source_reference") || "Missing"}</p></article>)}</div>
       </Panel>
 
-      <Panel title="Payroll / Statutory Control" kicker="Payment and return evidence">
-        <form onSubmit={(event) => { event.preventDefault(); void run(() => savePayrollControl({ data: payrollDraft }), `${payrollDraft.payrollId} saved.`); }} className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <Panel title="Payroll / Statutory Control" kicker="Linked compliance evidence · no parallel cash truth">
+        <div className="mb-4 rounded-xl border border-border bg-surface/60 p-4 text-sm leading-6 text-muted">
+          Each new payroll control must link to an approved People &amp; Office payroll expenditure. Employer cost must equal the governed obligation, and any payment evidence must match an actual governed bank/UTR payment. The control records statutory evidence only; it does not post cash.
+        </div>
+        <form onSubmit={(event) => { event.preventDefault(); void run(() => savePayrollControl({ data: payrollDraft }), `${payrollDraft.payrollId} linked payroll control saved.`); }} className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <Field label="Payroll ID"><input className="control mt-1.5" value={payrollDraft.payrollId} onChange={(e) => setPayrollDraft({ ...payrollDraft, payrollId: e.target.value })} /></Field>
+          <Field label="Governed payroll expenditure ID"><input className="control mt-1.5" value={payrollDraft.sourceExpenditureId} onChange={(e) => setPayrollDraft({ ...payrollDraft, sourceExpenditureId: e.target.value })} placeholder="People & Office actual expenditure ID" /></Field>
           <Field label="Period"><input className="control mt-1.5" type="month" value={payrollDraft.period} onChange={(e) => setPayrollDraft({ ...payrollDraft, period: e.target.value })} /></Field>
           <Field label="Gross pay"><input className="control mt-1.5" type="number" min="0" step="0.01" value={payrollDraft.grossPayInr} onChange={(e) => setPayrollDraft({ ...payrollDraft, grossPayInr: Number(e.target.value) })} /></Field>
           <Field label="Deductions"><input className="control mt-1.5" type="number" min="0" step="0.01" value={payrollDraft.deductionsInr} onChange={(e) => setPayrollDraft({ ...payrollDraft, deductionsInr: Number(e.target.value) })} /></Field>
-          <Field label="Employer cost"><input className="control mt-1.5" type="number" min="0" step="0.01" value={payrollDraft.employerCostInr} onChange={(e) => setPayrollDraft({ ...payrollDraft, employerCostInr: Number(e.target.value) })} /></Field>
+          <Field label="Employer cost · must equal governed obligation"><input className="control mt-1.5" type="number" min="0" step="0.01" value={payrollDraft.employerCostInr} onChange={(e) => setPayrollDraft({ ...payrollDraft, employerCostInr: Number(e.target.value) })} /></Field>
           <Field label="Statutory/TDS payable"><input className="control mt-1.5" type="number" min="0" step="0.01" value={payrollDraft.statutoryPayableInr} onChange={(e) => setPayrollDraft({ ...payrollDraft, statutoryPayableInr: Number(e.target.value) })} /></Field>
-          <Field label="Payment evidence"><input className="control mt-1.5" value={payrollDraft.paymentReference} onChange={(e) => setPayrollDraft({ ...payrollDraft, paymentReference: e.target.value })} /></Field>
+          <Field label="Governed payment evidence · if paid"><input className="control mt-1.5" value={payrollDraft.paymentReference} onChange={(e) => setPayrollDraft({ ...payrollDraft, paymentReference: e.target.value })} placeholder="Must match People & Office bank / UTR evidence" /></Field>
           <Field label="Return evidence"><input className="control mt-1.5" value={payrollDraft.returnEvidenceReference} onChange={(e) => setPayrollDraft({ ...payrollDraft, returnEvidenceReference: e.target.value })} /></Field>
-          <div className="flex items-end"><button disabled={busy || !payrollDraft.payrollId} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-40"><WalletCards className="size-4" />Save payroll control</button></div>
+          <div className="flex items-end"><button disabled={busy || !payrollDraft.payrollId || !payrollDraft.sourceExpenditureId} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-40"><WalletCards className="size-4" />Save linked control</button></div>
         </form>
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{data.payroll.map((row) => <article key={text(row, "payroll_id")} className="rounded-xl border border-border p-4 text-sm"><p className="font-mono text-xs text-accent">{text(row, "payroll_id")} · {text(row, "period")}</p><p className="mt-2 text-muted">Gross {money(row.gross_pay_inr)} · statutory {money(row.statutory_payable_inr)}</p><p className="mt-1 text-xs text-muted break-words">Payment: {text(row, "payment_reference") || "Missing"} · Return: {text(row, "return_evidence_reference") || "Missing"}</p></article>)}</div>
+        <div className="mt-3"><Link to="/command/accounting/people-office-payments" className="text-xs font-semibold text-accent">Open governed payroll expenditure/payment source →</Link></div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{data.payroll.map((row) => <article key={text(row, "payroll_id")} className="rounded-xl border border-border p-4 text-sm"><p className="font-mono text-xs text-accent">{text(row, "payroll_id")} · {text(row, "period")}</p><p className="mt-2 text-muted">Gross {money(row.gross_pay_inr)} · employer cost {money(row.employer_cost_inr)} · statutory {money(row.statutory_payable_inr)}</p><p className="mt-1 text-xs text-muted break-words">Authority: {text(row, "source_expenditure_id") || "Legacy pre-consolidation record"}</p><p className="mt-1 text-xs text-muted break-words">Payment: {text(row, "payment_reference") || "Missing"} · Return: {text(row, "return_evidence_reference") || "Missing"}</p></article>)}</div>
       </Panel>
 
       <Panel title="Posting Exceptions" kicker="No silent accounting gaps">
