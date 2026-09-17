@@ -133,7 +133,7 @@ test("UI/server authorities expose explicit month, evidence uniqueness and three
   assert.match(migration,/cash_evidence_reference/);
   assert.match(migration,/apply_vyndi_verified_cash_movement/);
   assert.match(migration,/supplier-payment-reversal/);
-  assert.match(migration,/Statement closing balance/);
+  assert.match(migration,/statement closing balance/i);
   assert.match(migration,/canonical closing-cash evidence/);
   assert.match(paymentAuthority,/paymentPlanMonth: z\.number\(\)\.int\(\)\.min\(1\)\.max\(36\)/);
   assert.match(paymentAuthority,/requireActor\("approve"\)/);
