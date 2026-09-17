@@ -1,6 +1,7 @@
 -- Governed People & Office actual expenditure -> obligation -> payment -> cash authority chain.
 -- Planning/approved budget records remain upstream intent. Only an approved actual expenditure
 -- creates an accounting obligation; only an evidenced payment moves Bank and canonical cash.
+-- Accrual month and payment/cash month are explicit and intentionally separate.
 
 create table if not exists vyndi_people_office_actual_expenditures (
   id text primary key,
@@ -35,6 +36,7 @@ create index if not exists vyndi_people_office_actual_source_idx
 create table if not exists vyndi_people_office_actual_payments (
   id text primary key,
   expenditure_id text not null references vyndi_people_office_actual_expenditures(id) on delete restrict,
+  plan_month integer not null check (plan_month between 1 and 36),
   paid_on date not null,
   amount_inr numeric(18,2) not null check (amount_inr > 0),
   evidence_reference text not null unique,
@@ -45,7 +47,7 @@ create table if not exists vyndi_people_office_actual_payments (
   created_at timestamptz not null default now()
 );
 create index if not exists vyndi_people_office_actual_payment_idx
-  on vyndi_people_office_actual_payments(expenditure_id,paid_on,created_at);
+  on vyndi_people_office_actual_payments(expenditure_id,plan_month,paid_on,created_at);
 
 -- Reusable bridge for a verified bank movement whose governed plan month is known explicitly.
 -- This does not infer a plan month from a calendar date.
@@ -137,7 +139,7 @@ begin
     raise exception 'Actual expenditure amount must be positive.';
   end if;
   if p_plan_month not between 1 and 36 then
-    raise exception 'Actual expenditure plan month must be between 1 and 36.';
+    raise exception 'Actual expenditure accrual plan month must be between 1 and 36.';
   end if;
 
   if p_source_type='cost_item' then
@@ -176,7 +178,7 @@ begin
     id,entity_type,entity_id,action,actor_user_id,actor_role,source_reference,payload_json)
   values(
     'AUD-'||p_id||'-DRAFT','people_office_actual_expenditure',p_id,'draft_created',p_actor_user_id,p_actor_role,
-    p_source_reference,jsonb_build_object('sourceType',p_source_type,'sourceId',p_source_id,'planMonth',p_plan_month,
+    p_source_reference,jsonb_build_object('sourceType',p_source_type,'sourceId',p_source_id,'accrualPlanMonth',p_plan_month,
       'amountInr',round(p_amount_inr,2),'debitAccount',v_debit,'liabilityAccount',v_liability));
   return p_id;
 end;
@@ -255,7 +257,7 @@ begin
     id,entity_type,entity_id,action,actor_user_id,actor_role,source_reference,payload_json)
   values(
     'AUD-'||p_id||'-APPROVED','people_office_actual_expenditure',p_id,'approved_and_accrued',p_actor_user_id,p_actor_role,
-    v_row.source_reference,jsonb_build_object('journalId',v_journal,'amountInr',v_row.amount_inr,
+    v_row.source_reference,jsonb_build_object('journalId',v_journal,'accrualPlanMonth',v_row.plan_month,'amountInr',v_row.amount_inr,
       'debitAccount',v_row.debit_account_code,'liabilityAccount',v_row.liability_account_code,'cashMoved',false));
   return p_id;
 end;
@@ -264,6 +266,7 @@ $$;
 create or replace function post_vyndi_people_office_actual_payment(
   p_id text,
   p_expenditure_id text,
+  p_payment_plan_month integer,
   p_paid_on date,
   p_amount_inr numeric,
   p_evidence_reference text,
@@ -287,6 +290,9 @@ declare
   v_revision integer;
   v_status text;
 begin
+  if p_payment_plan_month not between 1 and 36 then
+    raise exception 'Payment cash plan month must be between 1 and 36.';
+  end if;
   if trim(coalesce(p_evidence_reference,''))='' then
     raise exception 'Payment evidence reference is required.';
   end if;
@@ -327,7 +333,7 @@ begin
 
   select c.new_closing_cash_lakh,c.actual_revision into v_cash,v_revision
     from apply_vyndi_verified_cash_movement(
-      v_row.plan_month,
+      p_payment_plan_month,
       -round(p_amount_inr,2)/100000.0,
       'people-office-payment:'||p_id||'; '||trim(p_evidence_reference),
       p_actor_user_id,
@@ -337,9 +343,9 @@ begin
   v_status:=case when round(v_paid+p_amount_inr,2)>=v_row.amount_inr then 'paid' else 'part_paid' end;
 
   insert into vyndi_people_office_actual_payments(
-    id,expenditure_id,paid_on,amount_inr,evidence_reference,journal_id,actual_revision,new_closing_cash_lakh,created_by)
+    id,expenditure_id,plan_month,paid_on,amount_inr,evidence_reference,journal_id,actual_revision,new_closing_cash_lakh,created_by)
   values(
-    p_id,p_expenditure_id,p_paid_on,round(p_amount_inr,2),trim(p_evidence_reference),v_journal,v_revision,v_cash,p_actor_user_id);
+    p_id,p_expenditure_id,p_payment_plan_month,p_paid_on,round(p_amount_inr,2),trim(p_evidence_reference),v_journal,v_revision,v_cash,p_actor_user_id);
 
   update vyndi_people_office_actual_expenditures
      set lifecycle_status=v_status,updated_at=now()
@@ -349,8 +355,9 @@ begin
     id,entity_type,entity_id,action,actor_user_id,actor_role,source_reference,payload_json)
   values(
     'AUD-'||p_id,'people_office_actual_payment',p_id,'posted',p_actor_user_id,p_actor_role,trim(p_evidence_reference),
-    jsonb_build_object('expenditureId',p_expenditure_id,'planMonth',v_row.plan_month,'amountInr',round(p_amount_inr,2),
-      'journalId',v_journal,'bankAccount','1000','newClosingCashLakh',v_cash,'actualRevision',v_revision,'status',v_status));
+    jsonb_build_object('expenditureId',p_expenditure_id,'accrualPlanMonth',v_row.plan_month,'paymentPlanMonth',p_payment_plan_month,
+      'amountInr',round(p_amount_inr,2),'journalId',v_journal,'bankAccount','1000',
+      'newClosingCashLakh',v_cash,'actualRevision',v_revision,'status',v_status));
 
   return query select p_id,v_journal,v_cash,v_revision,v_status;
 end;
@@ -363,16 +370,17 @@ select e.id,e.source_type,e.source_id,e.source_label,e.source_category,e.plan_mo
        e.approved_by,e.approved_at,e.created_at,e.updated_at,
        coalesce(p.amount_paid_inr,0)::numeric(18,2) as amount_paid_inr,
        greatest(e.amount_inr-coalesce(p.amount_paid_inr,0),0)::numeric(18,2) as amount_open_inr,
-       p.last_paid_on
+       p.last_paid_on,p.last_payment_plan_month
   from vyndi_people_office_actual_expenditures e
   left join (
-    select expenditure_id,sum(amount_inr) as amount_paid_inr,max(paid_on) as last_paid_on
+    select expenditure_id,sum(amount_inr) as amount_paid_inr,max(paid_on) as last_paid_on,
+           max(plan_month) as last_payment_plan_month
       from vyndi_people_office_actual_payments group by expenditure_id
   ) p on p.expenditure_id=e.id;
 
 comment on table vyndi_people_office_actual_expenditures is
   'Actual People & Office obligations. Approved planning records do not create accounting entries until an actual expenditure is separately submitted and approved.';
 comment on table vyndi_people_office_actual_payments is
-  'Append-only evidenced bank payments against approved People & Office actual obligations. Each payment posts GL and revises verified canonical cash for its explicit plan month.';
+  'Append-only evidenced bank payments against approved People & Office actual obligations. Each payment carries its own explicit cash plan month, posts GL, and revises verified canonical cash.';
 comment on function apply_vyndi_verified_cash_movement(integer,numeric,text,text,text) is
   'Reusable verified monthly cash bridge for bank movements with an explicit governed plan month; never infers month from calendar date.';
