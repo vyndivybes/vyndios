@@ -51,8 +51,8 @@ export const DEFAULT_APPROVED_OPERATING_PLAN: OperatingPlan = {
   demandScale: 1,
   monthlyDemandOverrides: {},
   fundingTimingOffsetMonths: 0,
-  cashFloorLakh: 15,
-  note: "Initial approved rolling operating plan. Baseline commercial launch is Month 14.",
+  cashFloorLakh: 3,
+  note: "Initial approved rolling operating plan. Startup operating reserve is ₹3L; the ₹15L Foundation tranche is deployable working capital, not a fully restricted reserve. Baseline commercial launch is Month 14.",
 };
 
 const BASE_DEMAND_RAMP = [
@@ -142,8 +142,6 @@ export function unitsForPlanMonth(
   month: number,
   scenario: PlanningScenarioId = "base",
 ) {
-  // Monthly overrides belong to the base plan. Scenario timing shifts the base
-  // month forward while scenario demand factors still apply consistently.
   const sourceMonth = month - scenarioDelayMonths(scenario);
   if (sourceMonth < 1 || sourceMonth > 36) return 0;
 
