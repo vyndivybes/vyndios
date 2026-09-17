@@ -51,7 +51,7 @@ export const listPeopleOfficeActualSpend = createServerFn({ method: "GET" }).han
                 plan_month,incurred_on desc,created_at desc
     `),
     sql.query<SqlRow>(`
-      select p.*,e.source_label,e.description,e.plan_month,e.liability_account_code
+      select p.*,e.source_label,e.description,e.plan_month as accrual_plan_month,e.liability_account_code
         from vyndi_people_office_actual_payments p
         join vyndi_people_office_actual_expenditures e on e.id=p.expenditure_id
        order by p.paid_on desc,p.created_at desc,p.id desc
@@ -132,6 +132,7 @@ export const postPeopleOfficeActualPayment = createServerFn({ method: "POST" })
   .validator(
     z.object({
       expenditureId: identifier,
+      paymentPlanMonth: z.number().int().min(1).max(36),
       paidOn: z.string().date(),
       amountInr: money,
       evidenceReference: reference,
@@ -148,8 +149,17 @@ export const postPeopleOfficeActualPayment = createServerFn({ method: "POST" })
       actual_revision: number | string;
       expenditure_status: string;
     }>(
-      `select * from post_vyndi_people_office_actual_payment($1,$2,$3::date,$4,$5,$6,$7)`,
-      [id, data.expenditureId, data.paidOn, data.amountInr, data.evidenceReference, actor.userId, actor.role],
+      `select * from post_vyndi_people_office_actual_payment($1,$2,$3,$4::date,$5,$6,$7,$8)`,
+      [
+        id,
+        data.expenditureId,
+        data.paymentPlanMonth,
+        data.paidOn,
+        data.amountInr,
+        data.evidenceReference,
+        actor.userId,
+        actor.role,
+      ],
     );
     const posted = rows[0];
     if (!posted) throw new Error("People & Office payment did not return a posted transaction.");
@@ -157,6 +167,7 @@ export const postPeopleOfficeActualPayment = createServerFn({ method: "POST" })
       ok: true,
       paymentId: posted.payment_id,
       journalId: posted.journal_id,
+      paymentPlanMonth: data.paymentPlanMonth,
       newClosingCashLakh: Number(posted.new_closing_cash_lakh),
       actualRevision: Number(posted.actual_revision),
       expenditureStatus: posted.expenditure_status,
