@@ -162,15 +162,31 @@ test("Stage 2 order → production → quality → dispatch → invoice → rece
   const m6=await db.query(`select revenue,units,receivables from vyndi_monthly_transaction_actuals where plan_month=6`);
   assert.equal(Number(m6.rows[0].revenue),2.5); assert.equal(Number(m6.rows[0].units),2); assert.equal(Number(m6.rows[0].receivables),2.5);
 
+  const cashBaseline=await db.query(
+    `select save_vyndi_monthly_actual($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) as revision`,
+    [7,null,null,null,null,5,null,null,null,"STAGE2-CASH-BASELINE",true,"test-user","finance"],
+  );
+  assert.ok(Number(cashBaseline.rows[0].revision)>=1);
+  const beforeCollectionCash=await db.query(`select closing_cash from vyndi_monthly_actuals where plan_month=7 and verified=true`);
+  assert.equal(Number(beforeCollectionCash.rows[0].closing_cash),5);
+
   await db.query(`select post_vyndi_collection($1,$2,$3,$4,$5,$6,$7)`,["COL-STAGE2","INV-STAGE2",7,1,"BANK-001","test-user","finance"]);
   const collectionAgain=await db.query(`select post_vyndi_collection($1,$2,$3,$4,$5,$6,$7) as id`,["COL-STAGE2","INV-STAGE2",7,1,"BANK-001","test-user","finance"]);
   assert.equal(collectionAgain.rows[0].id,"COL-STAGE2","same collection command must be idempotent");
   const m7=await db.query(`select receivables from vyndi_monthly_transaction_actuals where plan_month=7`);
   assert.equal(Number(m7.rows[0].receivables),1.5);
+  const collectionCash=await db.query(`select cash_actual_revision,new_closing_cash_lakh from vyndi_collections where id='COL-STAGE2'`);
+  assert.ok(Number(collectionCash.rows[0].cash_actual_revision)>=1); assert.equal(Number(collectionCash.rows[0].new_closing_cash_lakh),6);
+  const afterCollectionCash=await db.query(`select closing_cash,receivables from vyndi_monthly_actuals where plan_month=7 and verified=true`);
+  assert.equal(Number(afterCollectionCash.rows[0].closing_cash),6); assert.equal(Number(afterCollectionCash.rows[0].receivables),1.5);
   await assert.rejects(()=>db.query(`select post_vyndi_collection($1,$2,$3,$4,$5,$6,$7)`,["COL-OVER","INV-STAGE2",7,2,"BANK-OVER","test-user","finance"]),/exceeds open gross invoice receivable/);
   await assert.rejects(()=>db.query(`select void_vyndi_invoice($1,$2,$3,$4)`,["INV-STAGE2","wrong order","test-user","finance"]),/Reverse posted collections before voiding invoice/);
 
   await db.query(`select reverse_vyndi_collection($1,$2,$3,$4)`,["COL-STAGE2","bank reversal","test-user","finance"]);
+  const reversedCash=await db.query(`select cash_reversal_revision,reversed_closing_cash_lakh from vyndi_collections where id='COL-STAGE2'`);
+  assert.ok(Number(reversedCash.rows[0].cash_reversal_revision)>=1); assert.equal(Number(reversedCash.rows[0].reversed_closing_cash_lakh),5);
+  const afterCollectionReversalCash=await db.query(`select closing_cash,receivables from vyndi_monthly_actuals where plan_month=7 and verified=true`);
+  assert.equal(Number(afterCollectionReversalCash.rows[0].closing_cash),5); assert.equal(Number(afterCollectionReversalCash.rows[0].receivables),2.5);
   await db.query(`select void_vyndi_invoice($1,$2,$3,$4)`,["INV-STAGE2","credit and reissue","test-user","finance"]);
   const afterVoid=await db.query(`select revenue,units,receivables from vyndi_monthly_transaction_actuals where plan_month=6`);
   assert.equal(Number(afterVoid.rows[0].revenue),0); assert.equal(Number(afterVoid.rows[0].units),0); assert.equal(Number(afterVoid.rows[0].receivables),0);
