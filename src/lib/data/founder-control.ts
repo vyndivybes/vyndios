@@ -1,7 +1,7 @@
 import { FOUNDER_ACTIONS } from "@/lib/data/founder-command";
 
 export const FOUNDER_CONTROL_THRESHOLDS = {
-  cashFloorLakh: 15,
+  cashFloorLakh: 3,
   evidenceFreshnessDays: 30,
   criticalActionDays: 7,
 } as const;
