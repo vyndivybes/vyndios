@@ -8,13 +8,18 @@ const migration = read("migrations/0063_live_finance_posting.sql");
 const cashReceiptMigration = read("migrations/0066_cash_funding_receipts.sql");
 const peopleOfficeActualMigration = read("migrations/0079_people_office_actual_spend.sql");
 const salesCreditMigration = read("migrations/0080_sales_credit_to_cash.sql");
+const salesLedgerMigration = read("migrations/0081_sales_ledger_spare_components.sql");
+const spareIdentityMigration = read("migrations/0082_spare_sales_identity_fifo_fix.sql");
 const authority = read("src/lib/finance/accounting-authority.ts");
 const cashFundingAuthority = read("src/lib/cash-funding-authority.ts");
 const peopleOfficeActualAuthority = read("src/lib/finance/people-office-actual-spend-authority.ts");
 const shipmentAuthority = read("src/lib/shipment-authority.ts");
+const salesLedgerAuthority = read("src/lib/sales-ledger-authority.ts");
 const cashRoute = read("src/routes/command/cash.tsx");
 const peopleOfficeActualRoute = read("src/routes/command/accounting/people-office-payments.tsx");
 const receivablesRoute = read("src/routes/command/receivables.tsx");
+const salesLedgerRoute = read("src/routes/command/sales-ledger.tsx");
+const workflow = read("src/lib/operating-workflow.ts");
 const rootRoute = read("src/routes/__root.tsx");
 const workbench = read("src/routes/command/accounting.tsx");
 const access = read("src/lib/page-access.ts");
@@ -143,6 +148,50 @@ test("customer collection posts explicit cash month into verified canonical cash
   assert.match(receivablesRoute, /Collection cash month · actual receipt month/);
   assert.match(receivablesRoute, /Dr 1000 Bank \/ Cr 1100 Trade Receivable/);
   assert.match(receivablesRoute, /Canonical cash/);
+});
+
+test("actual Sales Ledger is a standalone Finance view and excludes forecasts and leads", () => {
+  assert.match(salesLedgerMigration, /create or replace view vyndi_report_sales_ledger/);
+  assert.match(salesLedgerMigration, /sale_type in \('bicycle','spare_component'\)/);
+  assert.match(salesLedgerMigration, /Actual invoiced Sales Ledger across bicycles and spare\/components/);
+  assert.match(salesLedgerRoute, /createFileRoute\("\/command\/sales-ledger"\)/);
+  assert.match(salesLedgerRoute, /Actual Sales Ledger/);
+  assert.match(salesLedgerRoute, /Actual invoices only/);
+  assert.match(workflow, /to: "\/command\/sales-ledger", label: "Sales Ledger"/);
+  assert.match(salesLedgerAuthority, /vyndi_report_sales_ledger/);
+});
+
+test("spare and component sales reuse canonical Master Inventory FIFO and preserve controlled identity evidence", () => {
+  assert.match(salesLedgerMigration, /create table if not exists vyndi_spare_sales/);
+  assert.match(salesLedgerMigration, /post_vyndi_spare_sale_dispatch/);
+  assert.match(salesLedgerMigration, /post_vyndi_inventory_issue/);
+  assert.match(salesLedgerMigration, /spare_dispatch_cogs/);
+  assert.match(salesLedgerMigration, /'accountCode','5000','debitInr'/);
+  assert.match(salesLedgerMigration, /'accountCode','1200','creditInr'/);
+  assert.match(salesLedgerMigration, /FIFO authority was not bypassed/);
+  assert.match(salesLedgerMigration, /allocated_identity_refs/);
+  assert.match(spareIdentityMigration, /array_agg\(q\.identity_uid/);
+  assert.match(salesLedgerAuthority, /master_inventory_items/);
+  assert.match(salesLedgerAuthority, /vyndi_inventory_available_to_promise/);
+  assert.match(salesLedgerRoute, /Serial selection cannot bypass FIFO/);
+});
+
+test("spare invoices share GST, receivable and credit controls instead of creating a parallel accounting path", () => {
+  assert.match(salesLedgerMigration, /issue_vyndi_spare_credit_tax_invoice/);
+  assert.match(salesLedgerMigration, /tax_profile_status/);
+  assert.match(salesLedgerMigration, /credit_profile_status/);
+  assert.match(salesLedgerMigration, /'controlled','spare_component'/);
+  assert.match(salesLedgerAuthority, /issueSpareSaleInvoice/);
+  assert.match(salesLedgerRoute, /Spare tax invoice/);
+  assert.match(salesLedgerRoute, /Trade Receivable/);
+  assert.match(salesLedgerRoute, /to="\/command\/receivables"/);
+});
+
+test("aftermarket revenue reaches VIBPE financial actuals without corrupting bicycle unit actuals", () => {
+  assert.match(salesLedgerMigration, /sum\(amount_lakh\)::numeric\(18,4\) revenue/);
+  assert.match(salesLedgerMigration, /sum\(units\) filter\(where sale_type='bicycle'\)/);
+  assert.match(salesLedgerMigration, /Revenue\/AR include all issued sale types; units count bicycles only/);
+  assert.match(salesLedgerRoute, /Spare quantities do not enter bicycle unit actuals/);
 });
 
 test("route loading feedback keeps the top bar and adds a Vayu cursor halo", () => {
