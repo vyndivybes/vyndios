@@ -243,7 +243,18 @@ test("recommendation → PO approval → GRN/FIFO → three-way match → paymen
     'AP-P2P','33ABCDE1234F1Z5','8714',18,45,45,0,0,true,'ITC-EVIDENCE-P2P','GSTR2B-P2P','ap-user-1','finance',
   ]);
   await db.query(`select approve_vyndi_supplier_invoice($1,$2,$3)`,['AP-P2P','ap-approver-2','finance']);
-  await db.query(`select post_vyndi_supplier_payment($1,$2,$3::date,$4,$5,$6,$7)`,['PAY-P2P','AP-P2P','2026-03-04',590,'BANK-P2P','ap-user-1','finance']);
+  const supplierCashBaseline=await db.query(
+    `select save_vyndi_monthly_actual($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) as revision`,
+    [4,null,null,null,null,5,null,null,null,'P2P-CASH-BASELINE-M4',true,'cash-controller','finance'],
+  );
+  assert.ok(Number(supplierCashBaseline.rows[0].revision)>=1);
+  const supplierPayment=await db.query(
+    `select * from post_vyndi_supplier_payment($1,$2,$3,$4::date,$5,$6,$7,$8)`,
+    ['PAY-P2P','AP-P2P',4,'2026-03-04',590,'BANK-P2P','ap-user-1','finance'],
+  );
+  assert.equal(Number(supplierPayment.rows[0].new_closing_cash_lakh),4.9941);
+  const supplierPaymentState=await db.query(`select plan_month,cash_actual_revision,status from vyndi_supplier_payments where id='PAY-P2P'`);
+  assert.equal(Number(supplierPaymentState.rows[0].plan_month),4); assert.ok(Number(supplierPaymentState.rows[0].cash_actual_revision)>=1); assert.equal(supplierPaymentState.rows[0].status,'posted');
   const payable=await db.query(`select status,amount_open_inr from vyndi_accounts_payable where id='AP-P2P'`);
   assert.equal(payable.rows[0].status,'paid'); assert.equal(Number(payable.rows[0].amount_open_inr),0);
   const paidReport=await db.query(`select count(*)::int as count from vyndi_report_payables_aging where supplier_invoice_id='AP-P2P'`);
