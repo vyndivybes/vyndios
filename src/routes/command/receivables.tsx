@@ -52,6 +52,8 @@ function Receivables() {
     irnAckNumber: "",
     irnAckAt: "",
     taxEvidenceReference: "",
+    creditTermsDays: 0,
+    creditTermsReference: "",
   });
   const [collection, setCollection] = useState({ id: "", invoiceId: "", planMonth: 1, amountLakh: 0, sourceReference: "" });
 
@@ -72,7 +74,7 @@ function Receivables() {
   const invoiceReady = Boolean(
     data.taxRegistration && invoice.id && invoice.shipmentId && invoice.sourceReference && invoice.recipientName &&
     invoice.recipientAddress && invoice.deliveryAddress && invoice.placeOfSupplyCode && invoice.hsnSac &&
-    invoice.itemDescription && invoice.taxMode && invoice.taxEvidenceReference &&
+    invoice.itemDescription && invoice.taxMode && invoice.taxEvidenceReference && invoice.creditTermsReference &&
     (!invoice.eInvoiceRequired || (invoice.irn && invoice.irnAckNumber && invoice.irnAckAt)),
   );
 
@@ -83,8 +85,8 @@ function Receivables() {
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-green">Finance · order to cash</p>
           <h1 className="mt-2 font-display text-4xl text-accent">Accounts Receivable</h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
-            Revenue and receivables arise from posted shipments and controlled tax invoices. Gross receivables include output GST;
-            collections reduce that governed balance with bank evidence.
+            A confirmed order does not create revenue or cash. Dispatch releases inventory/COGS; the controlled tax invoice creates the gross customer receivable;
+            only an evidenced collection moves Bank and verified canonical cash for VIBPE.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -96,11 +98,16 @@ function Receivables() {
           </Link>
         </div>
       </header>
+
+      <div className="rounded-xl border border-border bg-surface p-4 text-sm leading-6 text-muted">
+        <span className="font-semibold text-fg">Controlled credit path:</span> Confirmed order → Dispatch → Tax invoice → <span className="font-mono text-xs">Dr 1100 Trade Receivable</span> / <span className="font-mono text-xs">Cr 4000 Revenue + Cr 2100 Output GST</span> → Due-date ageing → Bank/UTR collection → <span className="font-mono text-xs">Dr 1000 Bank / Cr 1100 Trade Receivable</span> → Canonical cash → VIBPE.
+      </div>
+
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi label="Open gross receivables" value={moneyLakh(outstanding)} hint={`${activeInvoices.length} active invoices`} tone={outstanding ? "warn" : "ok"} />
         <Kpi label="Uninvoiced shipments" value={String(uninvoiced.length)} hint="Dispatch posted, invoice pending" tone={uninvoiced.length ? "warn" : "ok"} />
         <Kpi label="Collections posted" value={moneyLakh(postedCollections.reduce((sum, row) => sum + row.amountLakh, 0))} hint={`${postedCollections.length} bank receipts`} />
-        <Kpi label="Invoice register" value={String(data.invoices.length)} hint="Tax-controlled issued and voided records" />
+        <Kpi label="Invoice register" value={String(data.invoices.length)} hint="Tax + credit controlled records" />
       </div>
       {!data.taxRegistration ? (
         <div className="rounded-xl border border-warn/40 bg-surface p-4 text-sm text-muted">
@@ -114,7 +121,7 @@ function Receivables() {
       {message ? <div role="status" className="rounded-lg border border-border bg-surface px-4 py-3 text-sm text-muted">{message}</div> : null}
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <Panel title="Issue controlled tax invoice" kicker="Posted shipment → tax evidence → AR / revenue / GST">
+        <Panel title="Issue controlled tax invoice" kicker="Posted shipment → tax + credit evidence → AR / revenue / GST">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Posted shipment">
               <select className="control mt-1.5" value={invoice.shipmentId} onChange={(e) => setInvoice({ ...invoice, shipmentId: e.target.value })}>
@@ -141,6 +148,8 @@ function Receivables() {
               </select>
             </Field>
             <Field label="GST rate · %"><input className="control mt-1.5" type="number" min="0" max="100" step="0.01" disabled={["zero_rated", "exempt"].includes(invoice.taxMode)} value={invoice.taxRatePct} onChange={(e) => setInvoice({ ...invoice, taxRatePct: Number(e.target.value) })} /></Field>
+            <Field label="Credit terms · days (0 = due immediately)"><input className="control mt-1.5" type="number" min="0" max="365" value={invoice.creditTermsDays} onChange={(e) => setInvoice({ ...invoice, creditTermsDays: Number(e.target.value) })} /></Field>
+            <Field label="Credit terms evidence"><input className="control mt-1.5" value={invoice.creditTermsReference} onChange={(e) => setInvoice({ ...invoice, creditTermsReference: e.target.value })} placeholder="PO / quotation / agreed terms reference" /></Field>
             <label className="flex min-h-11 items-center gap-2 rounded-lg border border-border px-3 text-xs text-muted"><input type="checkbox" checked={invoice.reverseCharge} onChange={(e) => setInvoice({ ...invoice, reverseCharge: e.target.checked })} />Reverse charge indicated</label>
             <label className="flex min-h-11 items-center gap-2 rounded-lg border border-border px-3 text-xs text-muted"><input type="checkbox" disabled={!data.taxRegistration?.eInvoiceApplicable} checked={invoice.eInvoiceRequired} onChange={(e) => setInvoice({ ...invoice, eInvoiceRequired: e.target.checked })} />This document requires e-invoice / IRN</label>
             {invoice.eInvoiceRequired ? <>
@@ -157,7 +166,7 @@ function Receivables() {
             onClick={() => {
               const taxMode = invoice.taxMode;
               if (!taxMode) return;
-              void run(() => issueInvoice({ data: { ...invoice, taxMode } }), `${invoice.id.toUpperCase()} issued with controlled tax profile.`);
+              void run(() => issueInvoice({ data: { ...invoice, taxMode } }), `${invoice.id.toUpperCase()} issued with controlled tax and credit profile.`);
             }}
             className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-40"
           >
@@ -165,7 +174,7 @@ function Receivables() {
           </button>
         </Panel>
 
-        <Panel title="Post collection" kicker="Gross invoice receivable → bank receipt">
+        <Panel title="Post collection" kicker="Gross invoice receivable → Bank 1000 → canonical cash / VIBPE">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Open invoice">
               <select
@@ -174,7 +183,7 @@ function Receivables() {
                 onChange={(e) => {
                   const selectedId = e.target.value;
                   const row = activeInvoices.find((item) => item.id === selectedId);
-                  setCollection({ ...collection, invoiceId: selectedId, planMonth: row?.planMonth ?? collection.planMonth, amountLakh: row ? Math.max(row.grossAmountLakh - (collectedByInvoice.get(selectedId) ?? 0), 0) : 0 });
+                  setCollection({ ...collection, invoiceId: selectedId, amountLakh: row ? Math.max(row.grossAmountLakh - (collectedByInvoice.get(selectedId) ?? 0), 0) : 0 });
                 }}
               >
                 <option value="">Select invoice</option>
@@ -184,25 +193,26 @@ function Receivables() {
               </select>
             </Field>
             <Field label="Collection ID"><input className="control mt-1.5 uppercase" value={collection.id} onChange={(e) => setCollection({ ...collection, id: e.target.value })} placeholder="COL-2026-001" /></Field>
-            <Field label="Plan month"><input className="control mt-1.5" type="number" min="1" max="36" value={collection.planMonth} onChange={(e) => setCollection({ ...collection, planMonth: Number(e.target.value) })} /></Field>
+            <Field label="Collection cash month · actual receipt month"><input className="control mt-1.5" type="number" min="1" max="36" value={collection.planMonth} onChange={(e) => setCollection({ ...collection, planMonth: Number(e.target.value) })} /></Field>
             <Field label="Amount · ₹ lakh"><input className="control mt-1.5" type="number" min="0.01" step="0.01" value={collection.amountLakh} onChange={(e) => setCollection({ ...collection, amountLakh: Number(e.target.value) })} /></Field>
-            <Field label="Bank reference"><input className="control mt-1.5" value={collection.sourceReference} onChange={(e) => setCollection({ ...collection, sourceReference: e.target.value })} placeholder="UTR / statement evidence" /></Field>
+            <Field label="Bank / UTR evidence"><input className="control mt-1.5" value={collection.sourceReference} onChange={(e) => setCollection({ ...collection, sourceReference: e.target.value })} placeholder="UTR / statement evidence" /></Field>
           </div>
-          <button type="button" disabled={busy || !collection.id || !collection.invoiceId || !collection.sourceReference || collection.amountLakh <= 0} onClick={() => void run(() => postCollection({ data: collection }), `${collection.id.toUpperCase()} posted against ${collection.invoiceId}.`)} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-40">
+          <p className="mt-3 text-xs leading-5 text-muted">The cash month is explicit and is not inferred from the invoice month or collection date. Posting creates Dr Bank / Cr Trade Receivable and revises verified canonical cash in that selected month.</p>
+          <button type="button" disabled={busy || !collection.id || !collection.invoiceId || !collection.sourceReference || collection.amountLakh <= 0} onClick={() => void run(() => postCollection({ data: collection }), `${collection.id.toUpperCase()} posted to Bank, Trade Receivable and canonical cash.`)} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-40">
             <Banknote className="size-4" />Post collection
           </button>
         </Panel>
       </div>
 
-      <Panel title="Receivable register" kicker="Shipment → tax invoice → gross collection">
+      <Panel title="Receivable register" kicker="Shipment → tax invoice → credit due date → gross collection">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1180px] text-sm">
+          <table className="w-full min-w-[1420px] text-sm">
             <thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle">
               <tr>
                 <th className="px-3 py-3 text-left">Invoice</th><th className="px-3 py-3 text-left">Order / shipment</th>
-                <th className="px-3 py-3 text-right">Taxable</th><th className="px-3 py-3 text-right">GST</th><th className="px-3 py-3 text-right">Gross</th>
+                <th className="px-3 py-3 text-right">Taxable</th><th className="px-3 py-3 text-right">GST</th><th className="px-3 py-3 text-right">Gross AR</th>
                 <th className="px-3 py-3 text-right">Collected</th><th className="px-3 py-3 text-right">Open</th>
-                <th className="px-3 py-3 text-left">Tax control</th><th className="px-3 py-3 text-left">Status</th><th className="px-3 py-3 text-left">Evidence</th>
+                <th className="px-3 py-3 text-left">Credit / due</th><th className="px-3 py-3 text-left">Tax control</th><th className="px-3 py-3 text-left">Status</th><th className="px-3 py-3 text-left">Evidence</th>
               </tr>
             </thead>
             <tbody>
@@ -217,6 +227,9 @@ function Receivables() {
                     <td className="px-3 py-3 text-right font-semibold tabular-nums">{moneyLakh(row.grossAmountLakh)}</td>
                     <td className="px-3 py-3 text-right tabular-nums text-ok">{moneyLakh(collected)}</td>
                     <td className="px-3 py-3 text-right font-semibold tabular-nums">{moneyLakh(Math.max(row.grossAmountLakh - collected, 0))}</td>
+                    <td className="px-3 py-3 text-xs">
+                      {row.creditProfileStatus === "controlled" ? <><span className="font-semibold text-fg">{row.creditTermsDays} days · due {row.dueOn}</span><span className="block text-muted">{row.creditTermsReference}</span></> : <span className="font-semibold text-warn">Legacy · terms not inferred</span>}
+                    </td>
                     <td className="px-3 py-3 text-xs"><span className={row.taxProfileStatus === "complete" ? "text-ok" : "text-danger"}>{row.taxProfileStatus}</span><span className="block text-muted">{row.taxMode} · {row.taxRatePct}%{row.eInvoiceRequired ? ` · IRN ${row.irn || "missing"}` : ""}</span></td>
                     <td className={row.status === "issued" ? "px-3 py-3 text-xs font-semibold uppercase text-ok" : "px-3 py-3 text-xs font-semibold uppercase text-muted"}>{row.status}</td>
                     <td className="px-3 py-3 text-xs text-muted">{row.sourceReference}</td>
@@ -226,6 +239,30 @@ function Receivables() {
             </tbody>
           </table>
           {data.invoices.length === 0 ? <p className="py-8 text-center text-sm text-muted">No invoices have been issued.</p> : null}
+        </div>
+      </Panel>
+
+      <Panel title="Collection & cash lineage" kicker="Bank evidence → AR settlement → verified cash revision">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[980px] text-sm">
+            <thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle">
+              <tr><th className="px-3 py-3 text-left">Collection</th><th className="px-3 py-3 text-left">Invoice</th><th className="px-3 py-3 text-left">Cash month</th><th className="px-3 py-3 text-right">Amount</th><th className="px-3 py-3 text-left">Bank evidence</th><th className="px-3 py-3 text-left">Canonical cash</th><th className="px-3 py-3 text-left">Status</th></tr>
+            </thead>
+            <tbody>
+              {data.collections.map((row) => (
+                <tr key={row.id} className="border-t border-border/70">
+                  <td className="px-3 py-3 font-mono text-xs">{row.id}</td>
+                  <td className="px-3 py-3 font-mono text-xs">{row.invoiceId}</td>
+                  <td className="px-3 py-3">M{row.planMonth}</td>
+                  <td className="px-3 py-3 text-right font-semibold tabular-nums">{moneyLakh(row.amountLakh)}</td>
+                  <td className="px-3 py-3 text-xs text-muted">{row.sourceReference}</td>
+                  <td className="px-3 py-3 text-xs">{row.cashActualRevision ? `R${row.cashActualRevision} · ${moneyLakh(row.newClosingCashLakh ?? 0)}` : "Legacy · no automatic cash revision"}</td>
+                  <td className={row.status === "posted" ? "px-3 py-3 text-xs font-semibold uppercase text-ok" : "px-3 py-3 text-xs font-semibold uppercase text-muted"}>{row.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {data.collections.length === 0 ? <p className="py-8 text-center text-sm text-muted">No collections have been posted.</p> : null}
         </div>
       </Panel>
     </main>
