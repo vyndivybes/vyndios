@@ -10,6 +10,7 @@ const peopleOfficeActualMigration = read("migrations/0079_people_office_actual_s
 const salesCreditMigration = read("migrations/0080_sales_credit_to_cash.sql");
 const salesLedgerMigration = read("migrations/0081_sales_ledger_spare_components.sql");
 const spareIdentityMigration = read("migrations/0082_spare_sales_identity_fifo_fix.sql");
+const accountingSourceAuthorityMigration = read("migrations/0084_accounting_source_authority.sql");
 const authority = read("src/lib/finance/accounting-authority.ts");
 const cashFundingAuthority = read("src/lib/cash-funding-authority.ts");
 const peopleOfficeActualAuthority = read("src/lib/finance/people-office-actual-spend-authority.ts");
@@ -46,11 +47,25 @@ test("live accounting migration covers canonical transaction chain", () => {
 test("accounting workbench is finance-controlled and exposes reconciliation", () => {
   assert.match(authority, /permissionRoute = "\/command\/finance-control"/);
   assert.match(authority, /matchBankStatementLine/);
-  assert.match(authority, /saveFixedAsset/);
+  assert.doesNotMatch(authority, /export const saveFixedAsset/);
   assert.match(authority, /savePayrollControl/);
+  assert.match(authority, /save_vyndi_linked_payroll_control/);
   assert.match(access, /ACCOUNTING_ROUTE = "\/command\/accounting"/);
   assert.match(access, /domain: "finance"/);
   assert.match(access, /owner: "finance"/);
+});
+
+test("asset and payroll controls cannot create parallel accounting truth", () => {
+  assert.match(accountingSourceAuthorityMigration, /manual asset creation is disabled/);
+  assert.match(accountingSourceAuthorityMigration, /source_expenditure_id/);
+  assert.match(accountingSourceAuthorityMigration, /source_category='payroll'/);
+  assert.match(accountingSourceAuthorityMigration, /Payroll employer cost must equal governed payroll obligation amount/);
+  assert.match(accountingSourceAuthorityMigration, /Payroll payment evidence must match a governed People & Office payment/);
+  assert.match(accountingSourceAuthorityMigration, /save_vyndi_linked_payroll_control/);
+  assert.doesNotMatch(workbench, /Save asset/);
+  assert.match(workbench, /read-only for financial source truth/);
+  assert.match(workbench, /Governed payroll expenditure ID/);
+  assert.match(workbench, /does not post cash/);
 });
 
 test("Finance Control links to the accounting workbench", () => {
