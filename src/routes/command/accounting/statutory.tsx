@@ -3,17 +3,23 @@ import { BadgeCheck, BookLock, Landmark, ReceiptText, ShieldCheck } from "lucide
 import { useState, type ReactNode } from "react";
 import { Kpi, Panel } from "@/components/kpi";
 import {
-  approveBankReconciliation,
   approveCaEvidencePack,
   captureCaEvidencePack,
-  closeBankReconciliation,
   getStatutoryFinanceControl,
   saveTaxRegistration,
   setFinancePeriodStatus,
 } from "@/lib/finance/statutory-authority";
+import {
+  approveCashReconciliation,
+  getCashReconciliationTruth,
+  prepareCashReconciliation,
+} from "@/lib/finance/cash-reconciliation-authority";
 
 export const Route = createFileRoute("/command/accounting/statutory")({
-  loader: () => getStatutoryFinanceControl(),
+  loader: async () => {
+    const [base, cashTruth] = await Promise.all([getStatutoryFinanceControl(), getCashReconciliationTruth()]);
+    return { ...base, cashTruth };
+  },
   component: StatutoryFinanceControl,
 });
 
@@ -36,7 +42,7 @@ function StatutoryFinanceControl() {
     aatoInr: num(registration, "aato_inr"), eInvoiceApplicable: Boolean(registration?.e_invoice_applicable),
     effectiveFrom: text(registration, "effective_from") || today(), sourceReference: text(registration, "source_reference"),
   });
-  const [bank, setBank] = useState({ id: "", bankAccountRef: "BANK-01", period: currentPeriod(), openingBalanceInr: 0, closingBalanceInr: 0, evidenceReference: "" });
+  const [bank, setBank] = useState({ id: "", bankAccountRef: "BANK-01", period: currentPeriod(), planMonth: 1, openingBalanceInr: 0, closingBalanceInr: 0, evidenceReference: "" });
   const [close, setClose] = useState({ period: currentPeriod(), status: "soft_closed" as "open" | "soft_closed" | "hard_closed", evidenceReference: "" });
   const [pack, setPack] = useState({ id: "", period: currentPeriod(), evidenceReference: "" });
 
@@ -96,17 +102,19 @@ function StatutoryFinanceControl() {
         <div className="overflow-x-auto"><table className="w-full min-w-[980px] text-sm"><thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle"><tr><th className="px-3 py-3 text-left">Period</th><th className="px-3 py-3 text-right">Output taxable</th><th className="px-3 py-3 text-right">Output GST</th><th className="px-3 py-3 text-right">Eligible input GST</th><th className="px-3 py-3 text-right">Ineligible input GST</th><th className="px-3 py-3 text-right">Unverified ITC</th><th className="px-3 py-3 text-right">Net GST</th></tr></thead><tbody>{data.gstSummary.map((row)=><tr key={text(row,"period")} className="border-t border-border/70"><td className="px-3 py-3 font-mono text-xs">{text(row,"period")}</td><td className="px-3 py-3 text-right">{money(row.output_taxable_inr)}</td><td className="px-3 py-3 text-right">{money(row.output_gst_inr)}</td><td className="px-3 py-3 text-right">{money(row.eligible_input_gst_inr)}</td><td className="px-3 py-3 text-right">{money(row.ineligible_input_gst_inr)}</td><td className="px-3 py-3 text-right">{String(row.unverified_input_itc_count ?? 0)}</td><td className="px-3 py-3 text-right font-semibold">{money(row.net_gst_payable_inr)}</td></tr>)}</tbody></table>{!data.gstSummary.length ? <Empty>No GST ledger activity yet.</Empty> : null}</div>
       </Panel>
 
-      <Panel title="Bank Reconciliation Close" kicker="Statement ↔ Bank GL, then approval">
-        <form onSubmit={(event)=>{event.preventDefault();void run(()=>closeBankReconciliation({data:bank}),`${bank.period} bank reconciliation prepared.`);}} className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+      <Panel title="Bank Reconciliation Close" kicker="Statement ↔ Bank GL ↔ canonical cash / VIBPE">
+        <form onSubmit={(event)=>{event.preventDefault();void run(()=>prepareCashReconciliation({data:bank}),`${bank.period} bank reconciliation prepared for M${bank.planMonth}.`);}} className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
           <Field label="Session ID"><input className="control mt-1.5" value={bank.id} onChange={(e)=>setBank({...bank,id:e.target.value})} placeholder="BANKREC-2026-09"/></Field>
           <Field label="Bank account"><input className="control mt-1.5" value={bank.bankAccountRef} onChange={(e)=>setBank({...bank,bankAccountRef:e.target.value})}/></Field>
-          <Field label="Period"><input className="control mt-1.5" type="month" value={bank.period} onChange={(e)=>setBank({...bank,period:e.target.value})}/></Field>
+          <Field label="Finance period"><input className="control mt-1.5" type="month" value={bank.period} onChange={(e)=>setBank({...bank,period:e.target.value})}/></Field>
+          <Field label="VIBPE cash month · M1–M36"><input className="control mt-1.5" type="number" min="1" max="36" step="1" value={bank.planMonth} onChange={(e)=>setBank({...bank,planMonth:Number(e.target.value)})}/></Field>
           <Field label="Opening balance"><input className="control mt-1.5" type="number" step="0.01" value={bank.openingBalanceInr} onChange={(e)=>setBank({...bank,openingBalanceInr:Number(e.target.value)})}/></Field>
           <Field label="Closing balance"><input className="control mt-1.5" type="number" step="0.01" value={bank.closingBalanceInr} onChange={(e)=>setBank({...bank,closingBalanceInr:Number(e.target.value)})}/></Field>
           <Field label="Statement evidence"><input className="control mt-1.5" value={bank.evidenceReference} onChange={(e)=>setBank({...bank,evidenceReference:e.target.value})}/></Field>
-          <div className="flex items-end"><button disabled={busy || !bank.id || !bank.bankAccountRef || !bank.period || !bank.evidenceReference} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-40"><Landmark className="size-4"/>Prepare reconciliation</button></div>
+          <div className="flex items-end"><button disabled={busy || !bank.id || !bank.bankAccountRef || !bank.period || bank.planMonth<1 || bank.planMonth>36 || !bank.evidenceReference} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-40"><Landmark className="size-4"/>Prepare reconciliation</button></div>
         </form>
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{data.bankSessions.map((row)=><article key={text(row,"id")} className="rounded-xl border border-border p-4 text-sm"><p className="font-mono text-xs text-accent">{text(row,"id")} · {text(row,"period")}</p><p className="mt-2 text-muted">Statement {money(row.statement_movement_inr)} · Book {money(row.book_movement_inr)} · Difference {money(row.difference_inr)}</p><p className="mt-1 text-xs text-muted">{text(row,"approved_by") ? "Approved" : "Prepared · approval pending"}</p>{!text(row,"approved_by") ? <button type="button" disabled={busy} onClick={()=>{const ref=window.prompt("Approval evidence reference",text(row,"evidence_reference"))?.trim();if(ref)void run(()=>approveBankReconciliation({data:{id:text(row,"id"),evidenceReference:ref}}),`${text(row,"id")} approved.`);}} className="mt-3 text-xs font-semibold text-accent">Approve reconciliation</button>:null}</article>)}</div>
+        <p className="mt-3 text-xs leading-5 text-muted">The M-number is explicit governance data. VYNDI does not convert the calendar finance period into M1–M36 automatically.</p>
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{data.cashTruth.map((row)=><article key={text(row,"id")} className="rounded-xl border border-border p-4 text-sm"><p className="font-mono text-xs text-accent">{text(row,"id")} · {text(row,"period")} · {row.plan_month ? `M${String(row.plan_month)}` : "legacy mapping absent"}</p><p className="mt-2 text-muted">Statement close {money(row.closing_balance_inr)} · Bank GL close {row.book_closing_balance_inr == null ? "not captured" : money(row.book_closing_balance_inr)}</p><p className="mt-1 text-muted">Canonical cash {row.canonical_closing_cash_inr == null ? "not verified" : money(row.canonical_closing_cash_inr)}</p><p className="mt-1 text-xs text-muted">Statement↔GL Δ {row.statement_gl_difference_inr == null ? "—" : money(row.statement_gl_difference_inr)} · Statement↔VIBPE Δ {row.statement_canonical_difference_inr == null ? "—" : money(row.statement_canonical_difference_inr)}</p><p className="mt-1 text-xs text-muted">{text(row,"approved_by") ? "Approved · three-way cash truth checked" : "Prepared · approval pending"}</p>{!text(row,"approved_by") ? <button type="button" disabled={busy} onClick={()=>{const ref=window.prompt("Approval evidence reference",text(row,"evidence_reference"))?.trim();if(ref)void run(()=>approveCashReconciliation({data:{id:text(row,"id"),evidenceReference:ref}}),`${text(row,"id")} approved against Bank and canonical cash.`);}} className="mt-3 text-xs font-semibold text-accent">Approve reconciliation</button>:null}</article>)}</div>
       </Panel>
 
       <Panel title="Accounting Period Close" kicker="Open → soft close → hard lock">
@@ -116,6 +124,7 @@ function StatutoryFinanceControl() {
           <Field label="Close / reopen evidence"><input className="control mt-1.5" value={close.evidenceReference} onChange={(e)=>setClose({...close,evidenceReference:e.target.value})}/></Field>
           <div className="flex items-end"><button disabled={busy || !close.period || !close.evidenceReference} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-40"><BookLock className="size-4"/>Apply period control</button></div>
         </form>
+        <p className="mt-3 text-xs leading-5 text-muted">Hard close is database-blocked unless exactly one approved reconciliation exists and Statement closing = Bank 1000 closing = verified canonical VIBPE cash for its explicit M-number.</p>
         <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-4">{data.closures.map((row)=><div key={text(row,"period")} className="rounded-lg border border-border p-3 text-sm"><span className="font-mono text-xs text-accent">{text(row,"period")}</span><p className="mt-1 font-semibold">{text(row,"status")}</p><p className="mt-1 text-xs text-muted break-words">{text(row,"evidence_reference")}</p></div>)}</div>
       </Panel>
 
