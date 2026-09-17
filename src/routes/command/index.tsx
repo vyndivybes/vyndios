@@ -1,9 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo } from "react";
 import { Kpi, Panel } from "@/components/kpi";
 import { getCommandRole } from "@/lib/command-access";
 import { FOUNDER_GATES, FOUNDER_STATUS_LABELS, resolveFounderActions } from "@/lib/data/founder-command";
-import { buildModel, minCash } from "@/lib/finance/model";
+import { listCanonicalCashAuthority } from "@/lib/finance-governance-authority";
 import { lakh } from "@/lib/format";
 import { getOperatingLineage } from "@/lib/operating-lineage";
 import { canAccessRoute } from "@/lib/page-access";
@@ -12,12 +11,13 @@ import { useVeloxis } from "@/lib/store";
 
 export const Route = createFileRoute("/command/")({
   loader: async () => {
-    const [role, lineage, inbox] = await Promise.all([
+    const [role, lineage, inbox, cashAuthority] = await Promise.all([
       getCommandRole(),
       getOperatingLineage(),
       getDecisionInboxData(),
+      listCanonicalCashAuthority(),
     ]);
-    return { role, lineage, inbox };
+    return { role, lineage, inbox, cashAuthority };
   },
   component: CommandCentre,
 });
@@ -26,15 +26,19 @@ const PRIORITY_RANK = { critical: 0, high: 1, normal: 2 } as const;
 const text = (row: Record<string, unknown>, key: string) => String(row[key] ?? "");
 
 function CommandCentre() {
-  const { role, lineage, inbox } = Route.useLoaderData();
+  const { role, lineage, inbox, cashAuthority } = Route.useLoaderData();
   const accessible = (to: string) => canAccessRoute(role, to);
-  const scenario = useVeloxis((s) => s.scenario);
-  const drawStandby = useVeloxis((s) => s.drawStandby);
   const actionProgress = useVeloxis((s) => s.actions);
   const founderActions = resolveFounderActions(actionProgress);
-  const rows = useMemo(() => buildModel(scenario, drawStandby), [scenario, drawStandby]);
-  const trough = minCash(rows);
-  const cashTone = trough.cash < 0 ? "danger" : trough.cash < 15 ? "warn" : "ok";
+
+  const canonicalCashRows = (cashAuthority ?? []) as Record<string, unknown>[];
+  const latestCash = canonicalCashRows
+    .filter((row) => row.closing_cash_lakh != null && row.verified !== false)
+    .sort((a, b) => Number(a.plan_month ?? 0) - Number(b.plan_month ?? 0))
+    .at(-1);
+  const currentCash = latestCash ? Number(latestCash.closing_cash_lakh) : 0;
+  const currentCashMonth = latestCash ? Number(latestCash.plan_month) : null;
+  const cashTone = currentCash < 0 ? "danger" : currentCash < 3 ? "warn" : "ok";
 
   const actionItems = (inbox.items ?? []) as Record<string, unknown>[];
   const shortageLines = lineage.reduce((sum, row) => sum + row.shortageLines, 0);
@@ -84,7 +88,7 @@ function CommandCentre() {
         <Kpi label="Needs action" value={String(actionItems.length)} hint="Governed Action Inbox" tone={actionItems.length ? "warn" : "ok"} />
         <Kpi label="Orders in flow" value={String(lineage.length)} hint={`${currentJobCards}/${lineage.length} current Job Cards`} tone={lineage.length && currentJobCards === lineage.length ? "ok" : "warn"} />
         <Kpi label="Live shortage lines" value={String(shortageLines)} hint={`${linkedPos} linked PO records`} tone={shortageLines ? "danger" : "ok"} />
-        <Kpi label="Cash trough" value={lakh(trough.cash)} hint={`M${trough.m} · ${scenario}`} tone={cashTone} />
+        <Kpi label="Canonical cash" value={lakh(currentCash)} hint={currentCashMonth ? `M${currentCashMonth} · verified cash authority` : "No verified cash actual"} tone={cashTone} />
       </div>
 
       <Panel title="Today’s control room" kicker="Four canonical places to understand → decide → act">
