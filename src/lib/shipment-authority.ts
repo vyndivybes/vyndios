@@ -39,6 +39,10 @@ export type InvoiceRecord = {
   hsnSac: string;
   eInvoiceRequired: boolean;
   irn: string;
+  creditTermsDays: number | null;
+  dueOn: string;
+  creditTermsReference: string;
+  creditProfileStatus: "legacy_unclassified" | "controlled";
   status: "issued" | "void";
   sourceReference: string;
 };
@@ -49,6 +53,10 @@ export type CollectionRecord = {
   amountLakh: number;
   status: "posted" | "reversed";
   sourceReference: string;
+  cashActualRevision: number | null;
+  newClosingCashLakh: number | null;
+  cashReversalRevision: number | null;
+  reversedClosingCashLakh: number | null;
 };
 export type TaxRegistrationRecord = {
   legalName: string;
@@ -72,11 +80,14 @@ export const listShipmentRevenueLedger = createServerFn({ method: "GET" }).handl
   const invoices = await sql.query<Record<string, unknown>>(
     `select id,shipment_id,sales_order_id,plan_month,units,asp_lakh,amount_lakh,status,source_reference,
       taxable_value_inr,gst_inr,gross_amount_inr,tax_rate_pct,tax_mode,tax_profile_status,
-      recipient_name,recipient_gstin,place_of_supply_code,hsn_sac,e_invoice_required,irn
+      recipient_name,recipient_gstin,place_of_supply_code,hsn_sac,e_invoice_required,irn,
+      credit_terms_days,due_on,credit_terms_reference,credit_profile_status
       from vyndi_invoices order by plan_month,id`,
   );
   const collections = await sql.query<Record<string, unknown>>(
-    `select id,invoice_id,plan_month,amount_lakh,status,source_reference from vyndi_collections order by plan_month,id`,
+    `select id,invoice_id,plan_month,amount_lakh,status,source_reference,
+      cash_actual_revision,new_closing_cash_lakh,cash_reversal_revision,reversed_closing_cash_lakh
+      from vyndi_collections order by plan_month,id`,
   );
   const registration = await sql.query<Record<string, unknown>>(
     `select legal_name,trade_name,gstin,state_code,e_invoice_applicable from epr_finance_tax_registration where id='PRIMARY'`,
@@ -94,10 +105,19 @@ export const listShipmentRevenueLedger = createServerFn({ method: "GET" }).handl
         taxMode:String(r.tax_mode ?? "pending") as InvoiceRecord["taxMode"],taxProfileStatus:String(r.tax_profile_status ?? "pending") as InvoiceRecord["taxProfileStatus"],
         recipientName:String(r.recipient_name ?? ""),recipientGstin:String(r.recipient_gstin ?? ""),placeOfSupplyCode:String(r.place_of_supply_code ?? ""),
         hsnSac:String(r.hsn_sac ?? ""),eInvoiceRequired:Boolean(r.e_invoice_required),irn:String(r.irn ?? ""),
+        creditTermsDays:r.credit_terms_days == null ? null : Number(r.credit_terms_days),dueOn:String(r.due_on ?? ""),
+        creditTermsReference:String(r.credit_terms_reference ?? ""),creditProfileStatus:String(r.credit_profile_status ?? "legacy_unclassified") as InvoiceRecord["creditProfileStatus"],
         status:r.status as InvoiceRecord["status"],sourceReference:String(r.source_reference),
       };
     }),
-    collections: collections.map((r) => ({ id:String(r.id),invoiceId:String(r.invoice_id),planMonth:Number(r.plan_month),amountLakh:Number(r.amount_lakh),status:r.status as CollectionRecord["status"],sourceReference:String(r.source_reference) })),
+    collections: collections.map((r) => ({
+      id:String(r.id),invoiceId:String(r.invoice_id),planMonth:Number(r.plan_month),amountLakh:Number(r.amount_lakh),
+      status:r.status as CollectionRecord["status"],sourceReference:String(r.source_reference),
+      cashActualRevision:r.cash_actual_revision == null ? null : Number(r.cash_actual_revision),
+      newClosingCashLakh:r.new_closing_cash_lakh == null ? null : Number(r.new_closing_cash_lakh),
+      cashReversalRevision:r.cash_reversal_revision == null ? null : Number(r.cash_reversal_revision),
+      reversedClosingCashLakh:r.reversed_closing_cash_lakh == null ? null : Number(r.reversed_closing_cash_lakh),
+    })),
     taxRegistration: taxRow ? {
       legalName:String(taxRow.legal_name),tradeName:String(taxRow.trade_name ?? ""),gstin:String(taxRow.gstin),stateCode:String(taxRow.state_code),
       eInvoiceApplicable:Boolean(taxRow.e_invoice_applicable),
@@ -131,6 +151,8 @@ export const issueInvoice = createServerFn({ method: "POST" })
     irnAckNumber:optionalText,
     irnAckAt:optionalText,
     taxEvidenceReference:sourceReference,
+    creditTermsDays:z.number().int().min(0).max(365),
+    creditTermsReference:sourceReference,
   }))
   .handler(async ({ data }) => {
     const actor = await requireBusinessActor("edit");
@@ -138,15 +160,20 @@ export const issueInvoice = createServerFn({ method: "POST" })
       throw new Error("IRN, acknowledgement number and acknowledgement timestamp are required for an e-invoice.");
     }
     const sql = await getSql();
-    const rows = await sql.query<{ invoice_id:string; amount_lakh:number|string; gross_amount_inr:number|string }>(
-      `select * from issue_vyndi_tax_invoice($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18::timestamptz,$19,$20,$21)`,
+    const rows = await sql.query<{ invoice_id:string; amount_lakh:number|string; gross_amount_inr:number|string; due_on:string }>(
+      `select * from issue_vyndi_credit_tax_invoice($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18::timestamptz,$19,$20,$21,$22,$23)`,
       [data.id,data.shipmentId,data.sourceReference,data.recipientName,data.recipientGstin ?? null,
        data.recipientAddress,data.deliveryAddress,data.placeOfSupplyCode,data.hsnSac,data.itemDescription,data.unitCode,
        data.taxRatePct,data.taxMode,data.reverseCharge,data.eInvoiceRequired,data.irn || null,data.irnAckNumber || null,
-       data.irnAckAt || null,data.taxEvidenceReference,actor.userId,actor.role],
+       data.irnAckAt || null,data.taxEvidenceReference,data.creditTermsDays,data.creditTermsReference,actor.userId,actor.role],
     );
     if (!rows[0]) throw new Error("Tax invoice issue did not return a controlled record.");
-    return { id:rows[0].invoice_id, amountLakh:Number(rows[0].amount_lakh), grossAmountInr:Number(rows[0].gross_amount_inr) };
+    return {
+      id:rows[0].invoice_id,
+      amountLakh:Number(rows[0].amount_lakh),
+      grossAmountInr:Number(rows[0].gross_amount_inr),
+      dueOn:rows[0].due_on,
+    };
   });
 
 export const voidInvoice = createServerFn({ method: "POST" })
