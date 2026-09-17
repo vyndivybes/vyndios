@@ -23,6 +23,20 @@ export const CASH_ACCOUNTING_CLASSIFICATIONS = [
   "other",
 ] as const;
 
+export type CashFundingReceiptRow = {
+  id: string;
+  plan_month: number | string;
+  received_on: string;
+  amount_lakh: number | string;
+  funding_source: string;
+  accounting_classification: string;
+  evidence_reference: string;
+  notes: string;
+  verified: boolean;
+  created_by: string;
+  created_at: string;
+};
+
 const fundingReceiptSchema = z.object({
   planMonth: z.number().int().min(1).max(36),
   receivedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -41,7 +55,7 @@ async function requireView() {
 export const listCashFundingReceipts = createServerFn({ method: "GET" }).handler(async () => {
   await requireView();
   const sql = await getSql();
-  return sql.query<Record<string, unknown>>(`
+  return sql.query<CashFundingReceiptRow>(`
     select id,plan_month,received_on::text,amount_lakh,funding_source,
            accounting_classification,evidence_reference,notes,verified,
            created_by,created_at::text
