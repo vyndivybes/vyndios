@@ -35,6 +35,7 @@ jobs:
           scripts/issued-material-fulfillment.test.mjs
           scripts/operating-lineage-quality.test.mjs
           scripts/production-batch-release.test.mjs
+          scripts/startup-cash-authority-regression.test.mjs
           scripts/traceability-search.test.mjs
           scripts/pre-r3-authority-remediation.test.mjs
           scripts/security-boundary-regression.test.mjs
