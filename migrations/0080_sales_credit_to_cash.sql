@@ -293,14 +293,15 @@ begin
 end;
 $$;
 
+-- Preserve the original report column contracts; append the new credit-control fields at the end.
 create or replace view vyndi_report_receivables_aging as
 select
   i.id as invoice_id,
   i.sales_order_id,
   i.plan_month,
   (case when i.gross_amount_inr>0 then i.gross_amount_inr/100000.0 else i.amount_lakh end)::numeric(18,4) as invoiced_lakh,
-  coalesce(col.collected_lakh, 0)::numeric(18,4) as collected_lakh,
-  greatest((case when i.gross_amount_inr>0 then i.gross_amount_inr/100000.0 else i.amount_lakh end)-coalesce(col.collected_lakh,0),0)::numeric(18,4) as open_lakh,
+  coalesce(col.collected_lakh, 0) as collected_lakh,
+  greatest((case when i.gross_amount_inr>0 then i.gross_amount_inr/100000.0 else i.amount_lakh end)-coalesce(col.collected_lakh,0),0) as open_lakh,
   i.issued_at::date as issued_on,
   (current_date - i.issued_at::date) as age_days,
   case
