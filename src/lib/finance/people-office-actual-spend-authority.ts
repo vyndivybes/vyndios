@@ -6,7 +6,7 @@ import { getSql, type SqlRow } from "@/lib/db";
 import { canPerform } from "@/lib/page-access";
 import { getRouteMeta } from "@/lib/page-metadata";
 
-const ROUTE = "/command/accounting/people-office-payments";
+const PERMISSION_ROUTE = "/command/accounting";
 const identifier = z.string().trim().min(1).max(160);
 const reference = z.string().trim().min(3).max(500);
 const money = z.number().finite().positive().max(1_000_000_000_000);
@@ -15,7 +15,7 @@ export const PEOPLE_OFFICE_ACTUAL_SOURCE_TYPES = ["cost_item", "asset"] as const
 
 async function requireView() {
   const role = await getCommandRole();
-  if (!role || !canPerform(role, "view", getRouteMeta(ROUTE))) {
+  if (!role || !canPerform(role, "view", getRouteMeta(PERMISSION_ROUTE))) {
     throw new Error("People & Office actual expenditure view permission denied.");
   }
   return role;
@@ -23,7 +23,7 @@ async function requireView() {
 
 async function requireActor(permission: "edit" | "approve") {
   const actor = await requireBusinessActor(permission);
-  if (!canPerform(actor.role, permission, getRouteMeta(ROUTE))) {
+  if (!canPerform(actor.role, permission, getRouteMeta(PERMISSION_ROUTE))) {
     throw new Error(`People & Office actual expenditure ${permission} permission denied.`);
   }
   return actor;
