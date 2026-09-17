@@ -60,12 +60,12 @@ export const getAccountingWorkbench = createServerFn({ method: "GET" }).handler(
              unmatch_reason,imported_at::text as imported_at
         from epr_finance_bank_statement_lines order by statement_date desc,imported_at desc limit 500`),
     sql.query<SqlRow>(`
-      select asset_id,description,capitalization_date::text as capitalization_date,acquisition_cost_inr,useful_life_months,
+      select asset_id,source_expenditure_id,description,capitalization_date::text as capitalization_date,acquisition_cost_inr,useful_life_months,
              accumulated_depreciation_inr,location,custodian,source_reference,status,
              disposal_date::text as disposal_date,disposal_reference
         from epr_finance_fixed_assets order by capitalization_date desc,asset_id`),
     sql.query<SqlRow>(`
-      select payroll_id,period,gross_pay_inr,deductions_inr,employer_cost_inr,statutory_payable_inr,
+      select payroll_id,source_expenditure_id,period,gross_pay_inr,deductions_inr,employer_cost_inr,statutory_payable_inr,
              payment_reference,return_evidence_reference,approved_by,approved_at::text as approved_at,
              created_at::text as created_at
         from epr_finance_payroll_controls order by period desc,payroll_id`),
@@ -155,42 +155,11 @@ export const unmatchBankStatementLine = createServerFn({ method: "POST" })
     return { ok: true, statementLineId: data.statementLineId };
   });
 
-export const saveFixedAsset = createServerFn({ method: "POST" })
-  .validator(z.object({
-    assetId: id,
-    description: z.string().trim().min(2).max(300),
-    capitalizationDate: z.string().date(),
-    acquisitionCostInr: z.number().finite().min(0).max(1_000_000_000_000),
-    usefulLifeMonths: z.number().int().min(1).max(1200),
-    accumulatedDepreciationInr: z.number().finite().min(0).max(1_000_000_000_000).default(0),
-    location: z.string().trim().max(200).optional(),
-    custodian: z.string().trim().max(200).optional(),
-    sourceReference: reference,
-    status: z.enum(["active", "idle", "disposed"]).default("active"),
-  }))
-  .handler(async ({ data }) => {
-    await requireEdit();
-    if (data.accumulatedDepreciationInr > data.acquisitionCostInr) throw new Error("Accumulated depreciation cannot exceed acquisition cost.");
-    const sql = await getSql();
-    await sql.query(
-      `insert into epr_finance_fixed_assets
-        (asset_id,description,capitalization_date,acquisition_cost_inr,useful_life_months,
-         accumulated_depreciation_inr,location,custodian,source_reference,status)
-       values($1,$2,$3::date,$4,$5,$6,$7,$8,$9,$10)
-       on conflict (asset_id) do update set description=excluded.description,capitalization_date=excluded.capitalization_date,
-         acquisition_cost_inr=excluded.acquisition_cost_inr,useful_life_months=excluded.useful_life_months,
-         accumulated_depreciation_inr=excluded.accumulated_depreciation_inr,location=excluded.location,
-         custodian=excluded.custodian,source_reference=excluded.source_reference,status=excluded.status,updated_at=now()`,
-      [data.assetId, data.description, data.capitalizationDate, data.acquisitionCostInr, data.usefulLifeMonths,
-       data.accumulatedDepreciationInr, data.location ?? null, data.custodian ?? null, data.sourceReference, data.status],
-    );
-    return { ok: true, assetId: data.assetId };
-  });
-
 export const savePayrollControl = createServerFn({ method: "POST" })
   .validator(z.object({
     payrollId: id,
-    period: z.string().regex(/^\d{4}-\d{2}$/),
+    sourceExpenditureId: id,
+    period: z.string().regex(/^\\d{4}-\\d{2}$/),
     grossPayInr: z.number().finite().min(0).max(1_000_000_000_000),
     deductionsInr: z.number().finite().min(0).max(1_000_000_000_000),
     employerCostInr: z.number().finite().min(0).max(1_000_000_000_000),
@@ -201,19 +170,25 @@ export const savePayrollControl = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const actor = await requireEdit();
     const sql = await getSql();
-    await sql.query(
-      `insert into epr_finance_payroll_controls
-        (payroll_id,period,gross_pay_inr,deductions_inr,employer_cost_inr,statutory_payable_inr,
-         payment_reference,return_evidence_reference,approved_by,approved_at)
-       values($1,$2,$3,$4,$5,$6,$7,$8,$9,now())
-       on conflict (payroll_id) do update set period=excluded.period,gross_pay_inr=excluded.gross_pay_inr,
-         deductions_inr=excluded.deductions_inr,employer_cost_inr=excluded.employer_cost_inr,
-         statutory_payable_inr=excluded.statutory_payable_inr,payment_reference=excluded.payment_reference,
-         return_evidence_reference=excluded.return_evidence_reference,approved_by=excluded.approved_by,approved_at=now()`,
-      [data.payrollId, data.period, data.grossPayInr, data.deductionsInr, data.employerCostInr,
-       data.statutoryPayableInr, data.paymentReference ?? null, data.returnEvidenceReference ?? null, actor.userId],
+    const [row] = await sql.query<{ payroll_id: string }>(
+      `select save_vyndi_linked_payroll_control(
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11
+      ) as payroll_id`,
+      [
+        data.payrollId,
+        data.sourceExpenditureId,
+        data.period,
+        data.grossPayInr,
+        data.deductionsInr,
+        data.employerCostInr,
+        data.statutoryPayableInr,
+        data.paymentReference ?? null,
+        data.returnEvidenceReference ?? null,
+        actor.userId,
+        actor.role,
+      ],
     );
-    return { ok: true, payrollId: data.payrollId };
+    return { ok: true, payrollId: row?.payroll_id ?? data.payrollId };
   });
 
 export const resolveFinancePostingException = createServerFn({ method: "POST" })
