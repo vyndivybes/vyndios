@@ -65,11 +65,44 @@ function PageLoadingStatusBar() {
         isPending ? "opacity-100" : "opacity-0"
       }`}
     >
-      <div className="h-1 w-full overflow-hidden bg-accent/20">
-        <div className="h-full w-2/3 bg-accent motion-safe:animate-pulse" />
+      <div className="h-1 w-full overflow-hidden bg-accent/15 shadow-lg">
+        <div className="h-full w-full origin-left bg-gradient-to-r from-transparent via-accent to-transparent motion-safe:animate-pulse" />
       </div>
-      <div className="absolute right-3 top-2 rounded-full border border-border bg-bg-elevated/95 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-accent shadow-lg">
+      <div className="absolute right-3 top-2 rounded-full border border-accent/30 bg-bg-elevated/90 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-accent shadow-xl backdrop-blur-md">
         Loading view…
+      </div>
+    </div>
+  );
+}
+
+function CursorLoadingHalo() {
+  const isPending = useRouterState({ select: (state) => state.status === "pending" });
+  const [pointer, setPointer] = useState({ x: 24, y: 72, seen: false });
+
+  useEffect(() => {
+    if (!isPending) return;
+    const move = (event: PointerEvent) => {
+      setPointer({ x: event.clientX, y: event.clientY, seen: true });
+    };
+    window.addEventListener("pointermove", move, { passive: true });
+    return () => window.removeEventListener("pointermove", move);
+  }, [isPending]);
+
+  if (!isPending) return null;
+
+  return (
+    <div
+      data-page-loading-cursor-halo="vayu"
+      aria-hidden="true"
+      className="pointer-events-none fixed left-0 top-0 z-[260] h-12 w-12 transition-opacity duration-150"
+      style={{
+        transform: `translate3d(${pointer.x + (pointer.seen ? 16 : 0)}px, ${pointer.y + (pointer.seen ? 16 : 0)}px, 0)`,
+      }}
+    >
+      <div className="absolute inset-0 rounded-full border border-accent/20 bg-bg-elevated/70 shadow-xl backdrop-blur-md" />
+      <div className="absolute inset-[3px] rounded-full border-2 border-accent/25 border-r-accent border-t-accent motion-safe:animate-spin motion-reduce:border-accent/60" />
+      <div className="absolute inset-[8px] grid place-items-center rounded-full border border-border/70 bg-bg/90 shadow-inner">
+        <img src={VAYU_LOGO_PATH} alt="" className="h-6 w-6 object-contain" />
       </div>
     </div>
   );
@@ -105,6 +138,7 @@ function Root() {
       <head><HeadContent /></head>
       <body className="bg-bg text-fg">
         <PageLoadingStatusBar />
+        <CursorLoadingHalo />
         <PreviewBridgeBoundary />
         <PrintBrandHeader />
         <Outlet />
