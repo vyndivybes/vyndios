@@ -7,11 +7,14 @@ const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), "
 const migration = read("migrations/0063_live_finance_posting.sql");
 const cashReceiptMigration = read("migrations/0066_cash_funding_receipts.sql");
 const peopleOfficeActualMigration = read("migrations/0079_people_office_actual_spend.sql");
+const salesCreditMigration = read("migrations/0080_sales_credit_to_cash.sql");
 const authority = read("src/lib/finance/accounting-authority.ts");
 const cashFundingAuthority = read("src/lib/cash-funding-authority.ts");
 const peopleOfficeActualAuthority = read("src/lib/finance/people-office-actual-spend-authority.ts");
+const shipmentAuthority = read("src/lib/shipment-authority.ts");
 const cashRoute = read("src/routes/command/cash.tsx");
 const peopleOfficeActualRoute = read("src/routes/command/accounting/people-office-payments.tsx");
+const receivablesRoute = read("src/routes/command/receivables.tsx");
 const rootRoute = read("src/routes/__root.tsx");
 const workbench = read("src/routes/command/accounting.tsx");
 const access = read("src/lib/page-access.ts");
@@ -104,6 +107,42 @@ test("People and Office payment requires unique evidence and posts Bank plus ver
   assert.match(peopleOfficeActualAuthority, /evidenceReference: reference/);
   assert.match(peopleOfficeActualRoute, /Bank \/ UTR evidence/);
   assert.match(peopleOfficeActualRoute, /does not infer a plan month from the payment date/);
+});
+
+test("sales invoices carry evidenced credit terms without inventing legacy history", () => {
+  assert.match(salesCreditMigration, /credit_profile_status text not null default 'legacy_unclassified'/);
+  assert.match(salesCreditMigration, /issue_vyndi_credit_tax_invoice/);
+  assert.match(salesCreditMigration, /Credit terms evidence\/reference is required/);
+  assert.match(salesCreditMigration, /v_due:=current_date\+p_credit_terms_days/);
+  assert.match(salesCreditMigration, /credit_profile_status='controlled'/);
+  assert.match(salesCreditMigration, /LEGACY_NO_TERMS/);
+  assert.match(shipmentAuthority, /creditTermsDays:z\.number\(\)\.int\(\)\.min\(0\)\.max\(365\)/);
+  assert.match(shipmentAuthority, /creditTermsReference:sourceReference/);
+  assert.match(receivablesRoute, /Credit terms · days/);
+  assert.match(receivablesRoute, /Legacy · terms not inferred/);
+});
+
+test("gross customer receivable includes GST while revenue remains taxable value", () => {
+  assert.match(salesCreditMigration, /sum\(amount_lakh\).*revenue/s);
+  assert.match(salesCreditMigration, /gross_amount_inr>0 then i\.gross_amount_inr\/100000\.0 else i\.amount_lakh/);
+  assert.match(salesCreditMigration, /gross trade receivables/);
+  assert.match(receivablesRoute, /Gross AR/);
+});
+
+test("customer collection posts explicit cash month into verified canonical cash and reverses symmetrically", () => {
+  assert.match(salesCreditMigration, /Collection cash plan month must be between 1 and 36/);
+  assert.match(salesCreditMigration, /Collection bank evidence\/reference has already been used/);
+  assert.match(salesCreditMigration, /'customer-collection:'\|\|p_id/);
+  assert.match(salesCreditMigration, /apply_vyndi_verified_cash_movement/);
+  assert.match(salesCreditMigration, /cash_actual_revision=v_revision/);
+  assert.match(salesCreditMigration, /'customer-collection-reversal:'\|\|p_id/);
+  assert.match(salesCreditMigration, /-v_row\.amount_lakh/);
+  assert.match(salesCreditMigration, /cash_reversal_revision=v_cash_revision/);
+  assert.match(salesCreditMigration, /v_actual\.cogs/);
+  assert.match(salesCreditMigration, /\n    null,\n    v_actual\.payables/);
+  assert.match(receivablesRoute, /Collection cash month · actual receipt month/);
+  assert.match(receivablesRoute, /Dr 1000 Bank \/ Cr 1100 Trade Receivable/);
+  assert.match(receivablesRoute, /Canonical cash/);
 });
 
 test("route loading feedback keeps the top bar and adds a Vayu cursor halo", () => {
