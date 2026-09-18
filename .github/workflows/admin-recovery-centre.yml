@@ -29,5 +29,23 @@ jobs:
       - name: Recovery control regression
         run: npm run test:admin:recovery
 
+      - name: Parse zero-cost PowerShell recovery helpers
+        shell: pwsh
+        run: |
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path "scripts/vyndi-zero-cost-backup.ps1"),
+            [ref]$null,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count) { $errors | Format-List | Out-String | Write-Error; exit 1 }
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path "scripts/vyndi-zero-cost-restore.ps1"),
+            [ref]$null,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count) { $errors | Format-List | Out-String | Write-Error; exit 1 }
+
       - name: Type and production build compatibility
         run: npm run build
