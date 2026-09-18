@@ -213,6 +213,31 @@ test("monthly actual recovery creates a new governed revision without restoring 
   assert.equal(actual.rows[0].verified,true);
 });
 
+test("compare-only recovery returns canonical evidence without creating a restore path",async(t)=>{
+  const database=await db();t.after(()=>database.close());
+  await saveOrder(database,{units:1,reason:"compare baseline"});
+  await database.query(
+    `insert into epr_production_job_cards(
+      id,sales_order_id,product_id,product_label,units,bom_tier,due_month,status,
+      production_owner,created_by,sales_order_revision,updated_by
+    ) values(
+      'JC-REC-COMPARE','REC-SO-1','aluminium','Compare-only job card',1,'core',6,'released',
+      'operations','ADMIN-MAKER',1,'ADMIN-MAKER'
+    )`,
+  );
+  const rows=await database.query(
+    `select vyndi_recovery_compare_snapshot('production_job_card','JC-REC-COMPARE') as snapshot`,
+  );
+  assert.equal(rows.rows[0].snapshot.id,"JC-REC-COMPARE");
+  assert.equal(rows.rows[0].snapshot.status,"released");
+  assert.equal(rows.rows[0].snapshot.sales_order_id,"REC-SO-1");
+
+  await assert.rejects(
+    ()=>database.query(`select vyndi_recovery_compare_snapshot('unsupported','X')`),
+    /Unsupported compare-only recovery entity type/i,
+  );
+});
+
 test("external-backup selective recovery requires registered checkpoint evidence",async(t)=>{
   const database=await db();t.after(()=>database.close());
   await saveOrder(database,{units:1});
@@ -308,7 +333,13 @@ test("recovery evidence is append-only and UI preserves the canonical authority 
   assert.match(authority,/externalBackupState/);
   assert.match(authority,/purchase_order/);
   assert.match(authority,/compare_only/);
+  assert.match(authority,/previewVindyCompareOnlyRecovery/);
+  assert.match(migration,/vyndi_recovery_compare_snapshot/);
+  assert.match(migration,/production_job_card/);
+  assert.match(migration,/inventory_identity/);
   assert.match(route,/Production rows are never blindly overwritten/);
+  assert.match(route,/Load \/ compare evidence/);
+  assert.match(route,/never exposes an Execute Restore button/);
   assert.match(route,/COMPARE \/ CORRECTIVE/);
   assert.match(route,/No pg_dump evidence registered/);
   assert.match(workflow,/\/command\/recovery/);
