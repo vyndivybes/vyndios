@@ -113,7 +113,7 @@ const selectiveRecoverySupport:RecoverySupportRow[]=[
     label:"Sales Order",
     mode:"executable",
     canonicalRoute:"/command/sales",
-    authorityNote:"Revisioned recovery replays through save_vyndi_sales_order and creates a new canonical revision.",
+    authorityNote:"Revisioned recovery replays through save_vyndi_sales_order and creates a new canonical revision only before irreversible downstream Production, Procurement, Dispatch or Invoice evidence exists.",
   },
   {
     entityType:"monthly_actual",
