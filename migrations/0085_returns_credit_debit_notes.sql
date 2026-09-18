@@ -563,7 +563,7 @@ begin
     from vyndi_collections where invoice_id=p_invoice_id and status='posted';
 
   if p_amount_lakh<=0 or v_collected+p_amount_lakh>greatest(v_invoice_gross-v_credit_lakh,0)+0.000001 then
-    raise exception 'Collection exceeds open gross receivable after customer credit notes.';
+    raise exception 'Collection exceeds open gross invoice receivable after customer credit notes.';
   end if;
 
   insert into vyndi_collections(id,invoice_id,plan_month,amount_lakh,source_reference,posted_by)
