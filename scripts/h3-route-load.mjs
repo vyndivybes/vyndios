@@ -106,13 +106,23 @@ try{
   }
 
   const run=await runConcurrent(tasks,concurrency,async({route})=>{
-    const response=await context.request.get(`${baseUrl}${route}`,{timeout:60_000});
-    const body=await response.text();
-    assert.ok(response.ok(),`${route} returned HTTP ${response.status()}`);
-    assert.doesNotMatch(response.url(),/\/login(?:\?|$)|\/command-login/,`${route} redirected to login under load`);
-    assert.ok(body.trim().length>100,`${route} returned an unexpectedly small body`);
-    assert.doesNotMatch(body,/Internal Server Error|Something went wrong|Cannot read properties of undefined/i,`${route} returned fatal error content`);
-    return {status:response.status()};
+    const loadPage=await context.newPage();
+    const pageErrors=[];
+    loadPage.on("pageerror",(error)=>pageErrors.push(String(error?.message || error)));
+    try{
+      const response=await loadPage.goto(`${baseUrl}${route}`,{waitUntil:"domcontentloaded",timeout:60_000});
+      const status=response?.status() ?? null;
+      assert.ok(response?.ok(),`${route} returned HTTP ${status ?? "none"}`);
+      await loadPage.locator("body").waitFor({state:"visible",timeout:30_000});
+      await loadPage.waitForFunction(()=>(document.body?.innerText || "").trim().length>40,undefined,{timeout:30_000});
+      const body=(await loadPage.locator("body").innerText()).trim();
+      assert.doesNotMatch(loadPage.url(),/\/login(?:\?|$)|\/command-login/,`${route} lost authenticated access under load`);
+      assert.doesNotMatch(body,/Internal Server Error|Something went wrong|Cannot read properties of undefined/i,`${route} rendered fatal error content`);
+      assert.deepEqual(pageErrors,[],`${route} emitted browser errors: ${pageErrors.join(" | ")}`);
+      return {status};
+    }finally{
+      await loadPage.close().catch(()=>{});
+    }
   });
 
   evidence.summary=run.summary;
