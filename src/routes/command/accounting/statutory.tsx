@@ -70,6 +70,7 @@ function StatutoryFinanceControl() {
           <Link to="/command/accounting" className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted hover:border-accent hover:text-accent">Accounting</Link>
           <Link to="/command/accounting/input-tax" className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted hover:border-accent hover:text-accent">Input GST / ITC</Link>
           <Link to="/command/receivables" className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted hover:border-accent hover:text-accent">Receivables</Link>
+          <Link to="/command/inventory-stocktake" className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted hover:border-accent hover:text-accent">Inventory Stocktake</Link>
         </div>
       </header>
 
@@ -117,6 +118,21 @@ function StatutoryFinanceControl() {
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{data.cashTruth.map((row)=><article key={text(row,"id")} className="rounded-xl border border-border p-4 text-sm"><p className="font-mono text-xs text-accent">{text(row,"id")} · {text(row,"period")} · {row.plan_month ? `M${String(row.plan_month)}` : "legacy mapping absent"}</p><p className="mt-2 text-muted">Statement close {money(row.closing_balance_inr)} · Bank GL close {row.book_closing_balance_inr == null ? "not captured" : money(row.book_closing_balance_inr)}</p><p className="mt-1 text-muted">Canonical cash {row.canonical_closing_cash_inr == null ? "not verified" : money(row.canonical_closing_cash_inr)}</p><p className="mt-1 text-xs text-muted">Statement↔GL Δ {row.statement_gl_difference_inr == null ? "—" : money(row.statement_gl_difference_inr)} · Statement↔VIBPE Δ {row.statement_canonical_difference_inr == null ? "—" : money(row.statement_canonical_difference_inr)}</p><p className="mt-1 text-xs text-muted">{text(row,"approved_by") ? "Approved · three-way cash truth checked" : "Prepared · approval pending"}</p>{!text(row,"approved_by") ? <button type="button" disabled={busy} onClick={()=>{const ref=window.prompt("Approval evidence reference",text(row,"evidence_reference"))?.trim();if(ref)void run(()=>approveCashReconciliation({data:{id:text(row,"id"),evidenceReference:ref}}),`${text(row,"id")} approved against Bank and canonical cash.`);}} className="mt-3 text-xs font-semibold text-accent">Approve reconciliation</button>:null}</article>)}</div>
       </Panel>
 
+      <Panel title="Inventory Stocktake Evidence" kicker="Physical count → maker/checker → FIFO/accounting adjustment">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <p className="max-w-3xl text-xs leading-5 text-muted">Hard close requires one posted stocktake for the selected finance period and no draft, submitted or approved stocktake still open.</p>
+          <Link to="/command/inventory-stocktake" className="shrink-0 text-xs font-semibold text-accent">Open stocktake control</Link>
+        </div>
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+          {data.stocktakes.map((row)=><div key={text(row,"id")} className="rounded-lg border border-border p-3 text-sm">
+            <div className="flex items-center justify-between gap-2"><span className="font-mono text-xs text-accent">{text(row,"period")}</span><span className="text-xs font-semibold uppercase">{text(row,"status")}</span></div>
+            <p className="mt-2 text-xs text-muted">Variance lines {String(row.variance_line_count ?? 0)} · gain {money(row.gain_value_inr)} · loss {money(row.loss_value_inr)}</p>
+            <p className="mt-1 text-[11px] text-subtle break-words">{text(row,"finance_journal_id") || text(row,"evidence_reference")}</p>
+          </div>)}
+          {!data.stocktakes.length ? <Empty>No controlled stocktake has been captured yet.</Empty> : null}
+        </div>
+      </Panel>
+
       <Panel title="Accounting Period Close" kicker="Open → soft close → hard lock">
         <form onSubmit={(event)=>{event.preventDefault();void run(()=>setFinancePeriodStatus({data:close}),`${close.period} set to ${close.status}.`);}} className="grid gap-3 md:grid-cols-4">
           <Field label="Period"><input className="control mt-1.5" type="month" value={close.period} onChange={(e)=>setClose({...close,period:e.target.value})}/></Field>
@@ -124,7 +140,7 @@ function StatutoryFinanceControl() {
           <Field label="Close / reopen evidence"><input className="control mt-1.5" value={close.evidenceReference} onChange={(e)=>setClose({...close,evidenceReference:e.target.value})}/></Field>
           <div className="flex items-end"><button disabled={busy || !close.period || !close.evidenceReference} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-40"><BookLock className="size-4"/>Apply period control</button></div>
         </form>
-        <p className="mt-3 text-xs leading-5 text-muted">Hard close is database-blocked unless exactly one approved reconciliation exists and Statement closing = Bank 1000 closing = verified canonical VIBPE cash for its explicit M-number.</p>
+        <p className="mt-3 text-xs leading-5 text-muted">Hard close is database-blocked unless bank/cash reconciliation, GST/statutory evidence, trial balance and the controlled period stocktake are blocker-free. The period needs one posted stocktake and no open stocktake session.</p>
         <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-4">{data.closures.map((row)=><div key={text(row,"period")} className="rounded-lg border border-border p-3 text-sm"><span className="font-mono text-xs text-accent">{text(row,"period")}</span><p className="mt-1 font-semibold">{text(row,"status")}</p><p className="mt-1 text-xs text-muted break-words">{text(row,"evidence_reference")}</p></div>)}</div>
       </Panel>
 
