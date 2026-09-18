@@ -182,7 +182,13 @@ test("recovery evidence is append-only and UI preserves the canonical authority 
   assert.doesNotMatch(migration,/insert\s+into\s+epr_inventory_ledger/i);
   assert.doesNotMatch(migration,/insert\s+into\s+epr_finance_journal/i);
   assert.match(authority,/role\s*!==\s*"admin"/);
+  assert.match(authority,/runtimeSourceSha/);
+  assert.match(authority,/externalBackupState/);
+  assert.match(authority,/purchase_order/);
+  assert.match(authority,/compare_only/);
   assert.match(route,/Production rows are never blindly overwritten/);
+  assert.match(route,/COMPARE \/ CORRECTIVE/);
+  assert.match(route,/No pg_dump evidence registered/);
   assert.match(workflow,/\/command\/recovery/);
   assert.match(metadata,/["']\/command\/recovery["'][\s\S]{0,300}adminOnly: true/);
 });
