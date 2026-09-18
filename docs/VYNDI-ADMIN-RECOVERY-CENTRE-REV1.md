@@ -68,6 +68,17 @@ A selective recovery:
 
 It never runs raw `UPDATE` / `DELETE` against the owning business table.
 
+### Sales Order downstream guard
+
+Sales Order replay is allowed only while the recovery can still be reconciled through the Commercial authority without rewriting downstream execution. Execution fails closed when:
+
+- linked Production is already `in_progress` or `complete`;
+- a linked Purchase Order has progressed beyond `draft` / `cancelled`;
+- Dispatch / Shipment evidence exists; or
+- Customer Invoice evidence exists.
+
+At that point the Recovery Centre remains an evidence/compare surface and the operator must use the owning Production, Procurement, Dispatch or Finance correction/reversal authority. Recovered Sales Order payloads are also validated for controlled status, product, channel, units, ASP, model tier, variant and configuration before canonical replay.
+
 For inventory, procurement execution, production/quality genealogy, invoices, collections, payments and statutory postings, V1 continues to use their owning reversal/correction processes. Generic row replacement is prohibited because it could break FIFO, serial/lot identity, journal, tax or genealogy lineage.
 
 ## External-backup selective recovery
