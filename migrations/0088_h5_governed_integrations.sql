@@ -63,6 +63,7 @@ create table if not exists vyndi_integration_delivery_attempts (
   id text primary key,
   outbox_id text not null references vyndi_integration_outbox(id) on delete restrict,
   attempt_no integer not null check (attempt_no > 0),
+  replay_count integer not null default 0 check (replay_count >= 0),
   success boolean not null,
   http_status integer,
   response_reference text not null default '',
@@ -72,8 +73,6 @@ create table if not exists vyndi_integration_delivery_attempts (
   unique(outbox_id,attempt_no,replay_count)
 );
 
-alter table vyndi_integration_delivery_attempts
-  add column if not exists replay_count integer not null default 0 check (replay_count >= 0);
 
 create table if not exists vyndi_integration_replay_requests (
   id text primary key,
