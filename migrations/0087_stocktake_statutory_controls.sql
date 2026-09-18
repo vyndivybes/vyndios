@@ -363,7 +363,7 @@ begin
 
   -- Use the same SKU/unit transaction locks as canonical receipts/issues.
   for l in
-    select sku,unit from epr_inventory_stocktake_lines where stocktake_id=p_stocktake_id order by sku,unit
+    select stl.sku,stl.unit from epr_inventory_stocktake_lines stl where stl.stocktake_id=p_stocktake_id order by stl.sku,stl.unit
   loop
     perform pg_advisory_xact_lock(hashtext(l.sku||'|'||vyndi_canonical_unit(l.unit))::bigint);
   end loop;
@@ -372,7 +372,7 @@ begin
   if v_stale>0 then raise exception 'Stock moved after the snapshot on % line(s); posting is blocked.',v_stale; end if;
 
   for l in
-    select * from epr_inventory_stocktake_lines where stocktake_id=p_stocktake_id order by sku,unit
+    select stl.* from epr_inventory_stocktake_lines stl where stl.stocktake_id=p_stocktake_id order by stl.sku,stl.unit
   loop
     v_delta:=round(coalesce(l.counted_quantity,0)-l.expected_quantity,4);
     if abs(v_delta)<=0.0001 then continue; end if;
