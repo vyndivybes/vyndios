@@ -29,7 +29,7 @@ function RecoveryCentre() {
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const [message,setMessage]=useState("");
-  const [preview,setPreview]=useState<unknown>(null);
+  const [preview,setPreview]=useState("");
   const [checkpoint,setCheckpoint]=useState({
     id:id("BKP"),
     checkpointType:"pg_dump" as "neon_history"|"neon_branch"|"pg_dump"|"managed_snapshot",
@@ -82,7 +82,7 @@ function RecoveryCentre() {
 
   async function previewSelective(){
     try{
-      setBusy(true);setError("");setPreview(null);
+      setBusy(true);setError("");setPreview("");
       let recoverySnapshot:Record<string,unknown>|null=null;
       if(selective.sourceKind==="external_backup"){
         const parsed=JSON.parse(selective.recoveryJson);
@@ -96,7 +96,7 @@ function RecoveryCentre() {
         sourceRevision:selective.sourceKind==="revision_history"?Number(selective.sourceRevision):null,
         recoverySnapshot,
       }});
-      setPreview(result);
+      setPreview(JSON.stringify(result,null,2));
     }catch(err){
       setError(err instanceof Error?err.message:"Unable to preview selective recovery.");
     }finally{setBusy(false);}
@@ -124,7 +124,7 @@ function RecoveryCentre() {
       "Selective recovery request created. A different Admin must approve it before execution.",
     );
     setSelective(current=>({...current,id:id("REC"),reason:"",evidenceReference:""}));
-    setPreview(null);
+    setPreview("");
   }
 
   async function registerCheckpoint(){
@@ -281,7 +281,7 @@ function RecoveryCentre() {
           <button type="button" disabled={busy||!selective.entityId.trim()} onClick={()=>void previewSelective()} className="rounded-xl border border-slate-400 bg-white px-4 py-2.5 text-sm font-semibold disabled:opacity-40">Preview impact</button>
           <button type="button" disabled={busy||!preview||selective.reason.trim().length<8||!selective.evidenceReference.trim()} onClick={()=>void submitSelective()} className="rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-slate-950 disabled:opacity-40">Raise selective recovery</button>
         </div>
-        {preview&&<pre className="mt-4 max-h-[420px] overflow-auto rounded-xl bg-slate-950 p-4 text-xs leading-5 text-slate-100">{JSON.stringify(preview,null,2)}</pre>}
+        {preview&&<pre className="mt-4 max-h-[420px] overflow-auto rounded-xl bg-slate-950 p-4 text-xs leading-5 text-slate-100">{preview}</pre>}
       </section>
 
       <section className={card}>
