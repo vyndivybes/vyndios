@@ -201,10 +201,12 @@ function RecoveryCentre() {
       {message&&<p role="status" className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm font-semibold text-emerald-900">{message}</p>}
       {error&&<p role="alert" className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm font-semibold text-red-800">{error}</p>}
 
-      <section className="grid gap-4 md:grid-cols-5">
+      <section className="grid gap-4 md:grid-cols-3 xl:grid-cols-7">
         <div className={card}><p className="text-xs font-bold uppercase text-slate-500">Recovery RPO</p><p className="mt-2 text-2xl font-semibold">≤ {data?.policy.rpoHours??24}h</p></div>
         <div className={card}><p className="text-xs font-bold uppercase text-slate-500">Recovery RTO</p><p className="mt-2 text-2xl font-semibold">≤ {data?.policy.rtoMinutes??60}m</p></div>
-        <div className={card}><p className="text-xs font-bold uppercase text-slate-500">Checkpoints</p><p className="mt-2 text-2xl font-semibold">{data?.summary.checkpoint_count??0}</p></div>
+        <div className={card}><p className="text-xs font-bold uppercase text-slate-500">Runtime DB</p><p className="mt-2 text-lg font-semibold">{data?.runtime.databaseHealth==="ok"?"GREEN":"Loading…"}</p></div>
+        <div className={card}><p className="text-xs font-bold uppercase text-slate-500">Release SHA</p><p className="mt-2 break-all font-mono text-xs font-semibold">{data?.runtime.sourceSha||"Loading…"}</p></div>
+        <div className={card}><p className="text-xs font-bold uppercase text-slate-500">External backup</p><p className={`mt-2 text-lg font-semibold ${data?.backupStatus.externalBackupState==="registered"?"text-emerald-700":"text-red-700"}`}>{data?.backupStatus.externalBackupState==="registered"?"REGISTERED":"MISSING"}</p><p className="mt-1 text-xs text-slate-500">{data?.backupStatus.latestExternalBackupAt?when(data.backupStatus.latestExternalBackupAt):"No pg_dump evidence registered"}</p></div>
         <div className={card}><p className="text-xs font-bold uppercase text-slate-500">Pending approvals</p><p className="mt-2 text-2xl font-semibold">{data?.summary.pending_requests??0}</p></div>
         <div className={card}><p className="text-xs font-bold uppercase text-slate-500">Latest checkpoint</p><p className="mt-2 text-sm font-semibold">{latest?when(latest.captured_at):"None registered"}</p></div>
       </section>
@@ -213,9 +215,24 @@ function RecoveryCentre() {
         <h2 className="font-semibold text-amber-950">Recovery safety boundary</h2>
         <p className="mt-2 text-sm leading-6 text-amber-900">
           Full database restore is performed outside the application into a new database/branch. This Admin page governs the request,
-          checker approval, validation evidence and cutover record; it never rewrites the live database in place. Selective execution is
-          currently enabled only for Sales Orders and Monthly Actuals because those domains have revisioned canonical writers.
+          checker approval, validation evidence and cutover record; it never rewrites the live database in place. Executable selective
+          recovery is enabled only where VYNDI has a revisioned canonical writer; all other domains remain compare/corrective-action-only
+          so FIFO, serial/lot, finance, tax and genealogy lineage cannot be bypassed.
         </p>
+      </section>
+
+      <section className={card}>
+        <p className="text-xs font-bold uppercase tracking-wide text-orange-600">Selective recovery support</p>
+        <h2 className="mt-1 text-xl font-semibold">Executable vs compare / corrective-action-only</h2>
+        <p className="mt-1 text-xs leading-5 text-slate-600">
+          The matrix is intentionally fail-closed. “Compare / corrective” means inspect recovery evidence and then use the owning business authority shown below; Recovery Centre will not perform a raw row replacement.
+        </p>
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[980px] text-sm">
+            <thead><tr className="border-b text-left text-xs uppercase text-slate-500"><th className="py-2 pr-4">Entity</th><th className="pr-4">Mode</th><th className="pr-4">Owning route</th><th>Authority boundary</th></tr></thead>
+            <tbody>{(data?.policy.selectiveRecoverySupport??[]).map(row=><tr key={row.entityType} className="border-b border-slate-100 align-top"><td className="py-3 pr-4 font-semibold">{row.label}</td><td className="pr-4"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${row.mode==="executable"?"bg-emerald-100 text-emerald-800":"bg-slate-100 text-slate-700"}`}>{row.mode==="executable"?"EXECUTABLE":"COMPARE / CORRECTIVE"}</span></td><td className="pr-4 font-mono text-xs">{row.canonicalRoute}</td><td className="text-xs leading-5 text-slate-600">{row.authorityNote}</td></tr>)}</tbody>
+          </table>
+        </div>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-2">
