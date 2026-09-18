@@ -1186,7 +1186,7 @@ with notes as (
     from vyndi_supplier_returns where status='posted' group by supplier_invoice_id
 ),
 payments as (
-  select supplier_invoice_id,sum(amount_inr)::numeric(18,2) as paid_inr
+  select supplier_invoice_id,sum(amount_inr) as paid_inr
     from vyndi_supplier_payments where status='posted' group by supplier_invoice_id
 ),
 refunds as (
@@ -1200,7 +1200,7 @@ select i.id,i.purchase_order_id,p.supplier_id,s.name as supplier_name,i.invoice_
        i.invoice_on,i.due_on,i.quantity_invoiced,i.amount_ex_gst_inr,i.gst_inr,
        (i.amount_ex_gst_inr+i.gst_inr) as invoice_total_inr,
        coalesce(pay.paid_inr,0) as amount_paid_inr,
-       greatest(i.amount_ex_gst_inr+i.gst_inr-coalesce(n.debit_note_inr,0)-coalesce(pay.paid_inr,0),0)::numeric(18,2) as amount_open_inr,
+       greatest(i.amount_ex_gst_inr+i.gst_inr-coalesce(n.debit_note_inr,0)-coalesce(pay.paid_inr,0),0) as amount_open_inr,
        i.status,i.match_message,i.source_reference,
        coalesce(n.debit_note_inr,0)::numeric(18,2) as debit_note_inr,
        greatest(i.amount_ex_gst_inr+i.gst_inr-coalesce(n.debit_note_inr,0),0)::numeric(18,2) as net_invoice_total_inr,
