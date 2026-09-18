@@ -26,7 +26,7 @@ async function requireAdmin(userId: string, email?: string | null) {
   return { userId, role, bootstrapAdmin: isBootstrapAdminEmail(email) };
 }
 
-type AccessUserRow = {
+export type AccessUserRow = {
   id: string;
   name: string | null;
   email: string | null;
@@ -35,7 +35,7 @@ type AccessUserRow = {
   active_sessions: number;
 };
 
-type PendingRoleChangeRow = {
+export type PendingRoleChangeRow = {
   id: string;
   target_user_id: string;
   target_name: string | null;
