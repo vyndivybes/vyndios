@@ -6,6 +6,9 @@ import {
   approveSupplierInvoice,
   getPayablesData,
   postSupplierInvoice,
+  postSupplierRefund,
+  postSupplierReturnDebitNote,
+  reverseSupplierRefund,
 } from "@/lib/procure-to-pay-authority";
 import {
   getSupplierPaymentHistory,
@@ -44,6 +47,16 @@ function Payables() {
     quantityInvoiced: 1,
     amountExGstInr: 0,
     gstInr: 0,
+    sourceReference: "",
+  });
+  const returnableInvoices = data.payables.filter((row) => ["approved","part_paid","paid"].includes(text(row, "status")));
+  const [supplierReturn, setSupplierReturn] = useState({
+    supplierInvoiceId: text(returnableInvoices[0] ?? {}, "id"),
+    goodsReceiptId: "",
+    planMonth: 1,
+    returnedOn: today(),
+    quantity: 1,
+    debitNoteReference: "",
     sourceReference: "",
   });
   const open = data.payables.filter(
@@ -133,6 +146,51 @@ function Payables() {
     );
   }
 
+  async function createSupplierReturn() {
+    const id = `RTV-${crypto.randomUUID()}`;
+    await run(
+      () => postSupplierReturnDebitNote({ data: {
+        id,
+        supplierInvoiceId:supplierReturn.supplierInvoiceId,
+        goodsReceiptId:supplierReturn.goodsReceiptId,
+        planMonth:supplierReturn.planMonth,
+        returnedOn:supplierReturn.returnedOn,
+        quantity:supplierReturn.quantity,
+        debitNoteReference:supplierReturn.debitNoteReference,
+        sourceReference:supplierReturn.sourceReference,
+      } }),
+      `${id} posted. FIFO stock, debit note, ITC/AP and any supplier recoverable were governed in one transaction.`,
+    );
+  }
+
+  async function receiveSupplierRefund(row: Record<string, unknown>) {
+    const amountRaw = window.prompt("Supplier refund amount · INR", text(row, "recoverable_open_inr"))?.trim();
+    if (!amountRaw) return;
+    const monthRaw = window.prompt("Canonical cash month · M1–M36", "1")?.trim();
+    if (!monthRaw) return;
+    const paymentPlanMonth = Number(monthRaw.replace(/^M/i, ""));
+    if (!Number.isInteger(paymentPlanMonth) || paymentPlanMonth < 1 || paymentPlanMonth > 36) {
+      setMessage("Supplier refund cash month must be M1–M36; it is never inferred from the receipt date.");
+      return;
+    }
+    const evidenceReference = window.prompt("Unique bank / UTR supplier-refund evidence")?.trim();
+    if (!evidenceReference) return;
+    const id = `SUP-REF-${crypto.randomUUID()}`;
+    await run(
+      () => postSupplierRefund({ data: { id, supplierReturnId:text(row, "id"), paymentPlanMonth, receivedOn:today(), amountInr:Number(amountRaw), evidenceReference } }),
+      `${id} received into Bank and verified canonical cash.`,
+    );
+  }
+
+  async function reverseSupplierRefundEntry(row: Record<string, unknown>) {
+    const reason = window.prompt("Supplier refund reversal evidence / reason")?.trim();
+    if (!reason) return;
+    await run(
+      () => reverseSupplierRefund({ data: { id:text(row, "id"), reversedOn:today(), reason } }),
+      `${text(row, "id")} supplier refund reversed through Bank and canonical cash.`,
+    );
+  }
+
   return (
     <main className="mx-auto max-w-7xl space-y-6">
       <header className="flex flex-col gap-4 border-b border-border pb-6 lg:flex-row lg:items-end lg:justify-between">
@@ -187,14 +245,16 @@ function Payables() {
         {data.payables.length === 0 ? <div className="rounded-xl border border-dashed border-border p-6 text-sm text-muted">No supplier invoices have been recorded.</div> : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1150px] text-sm">
-              <thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle"><tr><th className="px-3 py-3 text-left">Invoice / supplier</th><th className="px-3 py-3 text-left">PO</th><th className="px-3 py-3 text-right">Invoice</th><th className="px-3 py-3 text-right">Paid</th><th className="px-3 py-3 text-right">Open</th><th className="px-3 py-3 text-left">Due</th><th className="px-3 py-3 text-left">Match</th><th className="px-3 py-3 text-left">Status</th><th className="px-3 py-3 text-left">Action</th></tr></thead>
+              <thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle"><tr><th className="px-3 py-3 text-left">Invoice / supplier</th><th className="px-3 py-3 text-left">PO</th><th className="px-3 py-3 text-right">Invoice</th><th className="px-3 py-3 text-right">Debit notes</th><th className="px-3 py-3 text-right">Paid</th><th className="px-3 py-3 text-right">Open</th><th className="px-3 py-3 text-right">Recoverable</th><th className="px-3 py-3 text-left">Due</th><th className="px-3 py-3 text-left">Match</th><th className="px-3 py-3 text-left">Status</th><th className="px-3 py-3 text-left">Action</th></tr></thead>
               <tbody>{data.payables.map((row) => { const status = text(row, "status"); return (
                 <tr key={text(row, "id")} className="border-t border-border/70">
                   <td className="px-3 py-3"><span className="font-mono text-xs">{text(row, "invoice_number")}</span><span className="block text-xs text-muted">{text(row, "supplier_name")}</span></td>
                   <td className="px-3 py-3 font-mono text-xs">{text(row, "purchase_order_id")}</td>
                   <td className="px-3 py-3 text-right tabular-nums">{money(row.invoice_total_inr)}</td>
+                  <td className="px-3 py-3 text-right tabular-nums">{money(row.debit_note_inr)}</td>
                   <td className="px-3 py-3 text-right tabular-nums">{money(row.amount_paid_inr)}</td>
                   <td className="px-3 py-3 text-right font-semibold tabular-nums">{money(row.amount_open_inr)}</td>
+                  <td className="px-3 py-3 text-right font-semibold tabular-nums">{money(row.supplier_recoverable_inr)}</td>
                   <td className="px-3 py-3">{text(row, "due_on")}</td>
                   <td className="max-w-xs px-3 py-3 text-xs leading-5 text-muted">{text(row, "match_message")}</td>
                   <td className={cn("px-3 py-3 text-xs font-semibold uppercase", status === "blocked" ? "text-danger" : status === "paid" ? "text-ok" : "text-warn")}>{status.replaceAll("_", " ")}</td>
@@ -207,6 +267,30 @@ function Payables() {
             </table>
           </div>
         )}
+      </Panel>
+
+      <Panel title="Supplier return / debit note" kicker="Accepted GRN → FIFO return → AP / recoverable → ITC correction">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <Field label="Approved supplier invoice"><select className="control mt-1.5" value={supplierReturn.supplierInvoiceId} onChange={(e) => setSupplierReturn({ ...supplierReturn, supplierInvoiceId:e.target.value, goodsReceiptId:"" })}><option value="">Select invoice</option>{returnableInvoices.map((row) => <option key={text(row, "id")} value={text(row, "id")}>{text(row, "invoice_number")} · {text(row, "supplier_name")} · {text(row, "purchase_order_id")}</option>)}</select></Field>
+          <Field label="Accepted GRN on same PO"><select className="control mt-1.5" value={supplierReturn.goodsReceiptId} onChange={(e) => setSupplierReturn({ ...supplierReturn, goodsReceiptId:e.target.value })}><option value="">Select GRN</option>{data.receipts.filter((r) => text(r, "purchase_order_id") === text(returnableInvoices.find((i) => text(i, "id") === supplierReturn.supplierInvoiceId) ?? {}, "purchase_order_id")).map((row) => <option key={text(row, "id")} value={text(row, "id")}>{text(row, "id")} · {text(row, "sku")} · accepted {text(row, "quantity_accepted")}</option>)}</select></Field>
+          <Field label="Return plan month"><input className="control mt-1.5" type="number" min="1" max="36" value={supplierReturn.planMonth} onChange={(e) => setSupplierReturn({ ...supplierReturn, planMonth:Number(e.target.value) })} /></Field>
+          <Field label="Returned on"><input className="control mt-1.5" type="date" value={supplierReturn.returnedOn} onChange={(e) => setSupplierReturn({ ...supplierReturn, returnedOn:e.target.value })} /></Field>
+          <Field label="Quantity"><input className="control mt-1.5" type="number" min="0.01" step="0.01" value={supplierReturn.quantity} onChange={(e) => setSupplierReturn({ ...supplierReturn, quantity:Number(e.target.value) })} /></Field>
+          <Field label="Supplier debit-note reference"><input className="control mt-1.5" value={supplierReturn.debitNoteReference} onChange={(e) => setSupplierReturn({ ...supplierReturn, debitNoteReference:e.target.value })} /></Field>
+          <Field label="Return / transport / approval evidence"><input className="control mt-1.5" value={supplierReturn.sourceReference} onChange={(e) => setSupplierReturn({ ...supplierReturn, sourceReference:e.target.value })} /></Field>
+        </div>
+        <button type="button" disabled={busy || !supplierReturn.supplierInvoiceId || !supplierReturn.goodsReceiptId || supplierReturn.quantity<=0 || !supplierReturn.debitNoteReference || !supplierReturn.sourceReference} onClick={() => void createSupplierReturn()} className="mt-4 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-40">Post supplier return + debit note</button>
+        <p className="mt-2 text-xs leading-5 text-muted">The return fails closed unless FIFO proves the issued stock came exclusively from the selected GRN. Debit note offsets AP first; any excess becomes Supplier Recoverable rather than a negative payable.</p>
+      </Panel>
+
+      <Panel title="Supplier return / recovery register" kicker="Debit note → supplier recoverable → bank refund">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {data.supplierReturns.map((row) => <article key={text(row, "id")} className="rounded-xl border border-border p-4 text-sm"><p className="font-mono text-xs text-accent">{text(row, "id")} · {text(row, "debit_note_reference")}</p><p className="mt-1 font-semibold">{text(row, "invoice_number")} · GRN {text(row, "goods_receipt_id")}</p><p className="mt-2 text-muted">Return {text(row, "quantity")} {text(row, "unit")} · gross {money(row.gross_amount_inr)}</p><p className="mt-1 text-xs text-muted">AP offset {money(row.ap_offset_inr)} · recoverable {money(row.recoverable_inr)} · received {money(row.refunded_inr)}</p>{number(row, "recoverable_open_inr")>0 ? <button type="button" disabled={busy} onClick={() => void receiveSupplierRefund(row)} className="mt-3 text-xs font-semibold text-accent">Post supplier refund</button> : <p className="mt-3 text-xs text-green">No open supplier recovery.</p>}</article>)}
+          {!data.supplierReturns.length ? <p className="text-sm text-muted">No supplier returns / debit notes recorded.</p> : null}
+        </div>
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {data.supplierRefunds.map((row) => <article key={text(row, "id")} className="rounded-xl border border-border p-4 text-sm"><p className="font-mono text-xs text-accent">{text(row, "id")} · {text(row, "debit_note_reference")}</p><p className="mt-2 text-muted">M{text(row, "plan_month")} · {money(row.amount_inr)} · {text(row, "status")}</p><p className="mt-1 text-xs text-muted break-words">{text(row, "evidence_reference")}</p>{text(row, "status")==="posted" ? <button type="button" disabled={busy} onClick={() => void reverseSupplierRefundEntry(row)} className="mt-3 text-xs font-semibold text-warn">Reverse supplier refund</button> : <p className="mt-3 text-xs text-muted">{text(row, "reversal_reason")}</p>}</article>)}
+        </div>
       </Panel>
 
       <Panel title="Supplier Payment Register" kicker="Bank evidence · explicit cash month · reversible audit trail">
