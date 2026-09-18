@@ -1,0 +1,143 @@
+name: H3 Performance Load Qualification Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  performance-qualification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: vyndi_h3
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d vyndi_h3"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vyndi_h3
+      VYNDI_ALLOW_DB_MIGRATIONS: "1"
+      VITE_AUTH_ENABLED: "true"
+      BETTER_AUTH_URL: http://127.0.0.1:8081
+      STAGE_D_BASE_URL: http://127.0.0.1:8081
+      STAGE_D_USER_EMAIL: h3-performance@vyndi.test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate disposable H3 runtime credentials
+        shell: bash
+        run: |
+          auth_secret="$(openssl rand -hex 32)"
+          user_password="H3-$(openssl rand -hex 16)"
+          echo "::add-mask::$auth_secret"
+          echo "::add-mask::$user_password"
+          echo "BETTER_AUTH_SECRET=$auth_secret" >> "$GITHUB_ENV"
+          echo "STAGE_D_USER_PASSWORD=$user_password" >> "$GITHUB_ENV"
+
+      - name: Configure isolated PostgreSQL qualification capacity
+        run: |
+          container_id="$(docker ps --filter ancestor=postgres:16-alpine --format '{{.ID}}' | head -n 1)"
+          test -n "$container_id"
+          docker exec "$container_id" psql -U postgres -d vyndi_h3 -v ON_ERROR_STOP=1 -c "ALTER SYSTEM SET max_connections = '250';"
+          docker restart "$container_id" >/dev/null
+          for attempt in $(seq 1 30); do
+            docker exec "$container_id" pg_isready -U postgres -d vyndi_h3 >/dev/null 2>&1 && break
+            sleep 1
+          done
+          configured="$(docker exec "$container_id" psql -U postgres -d vyndi_h3 -Atc 'show max_connections')"
+          test "$configured" = "250"
+
+      - name: Migrate isolated H3 database
+        run: npm run db:migrate
+
+      - name: H3 PostgreSQL concurrency qualification
+        run: node scripts/h3-db-performance.mjs
+
+      - name: H3 governed optimizer performance qualification
+        run: node --experimental-strip-types scripts/h3-optimizer-performance.mjs
+
+      - name: Configure isolated H3 application runtime
+        run: |
+          node -e 'const fs=require("node:fs"); const path="wrangler.jsonc"; const config=JSON.parse(fs.readFileSync(path,"utf8")); delete config.hyperdrive; fs.writeFileSync(path, JSON.stringify(config,null,2)+"\n");'
+          printf '%s\n' \
+            "VITE_AUTH_ENABLED=${VITE_AUTH_ENABLED}" \
+            "BETTER_AUTH_URL=${BETTER_AUTH_URL}" \
+            "BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}" \
+            "DATABASE_URL=${DATABASE_URL}" \
+            "VYNDI_ALLOW_DB_MIGRATIONS=${VYNDI_ALLOW_DB_MIGRATIONS}" \
+            > .dev.vars
+
+      - name: Verify H3 production bundle builds
+        run: npm run build
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Start isolated H3 VYNDI preview
+        run: |
+          npm run preview:restart || { cat .grok/preview.log || true; exit 1; }
+          curl -fsS --max-time 5 http://127.0.0.1:8081/api/runtime/health >/dev/null
+
+      - name: Seed disposable H3 identity
+        run: node scripts/stage-d-seed-user.mjs
+
+      - name: H3 authenticated route load qualification
+        env:
+          VYNDI_TEST_BASE_URL: ${{ env.STAGE_D_BASE_URL }}
+          VYNDI_TEST_EMAIL: ${{ env.STAGE_D_USER_EMAIL }}
+          VYNDI_TEST_PASSWORD: ${{ env.STAGE_D_USER_PASSWORD }}
+          H3_ROUTE_CONCURRENCY: "8"
+          H3_ROUTE_SAMPLES: "4"
+        run: node scripts/h3-route-load.mjs
+
+      - name: H1 SLO regression after H3 load
+        env:
+          VYNDI_TEST_BASE_URL: ${{ env.STAGE_D_BASE_URL }}
+          VYNDI_TEST_EMAIL: ${{ env.STAGE_D_USER_EMAIL }}
+          VYNDI_TEST_PASSWORD: ${{ env.STAGE_D_USER_PASSWORD }}
+          VYNDI_SLO_SAMPLE_COUNT: "1"
+        run: npm run observe:slo
+
+      - name: Golden Order after H3 load
+        run: npm run test:golden-order:core
+
+      - name: Upload H3 performance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: h3-performance-evidence
+          path: .grok/evidence/h3-performance/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Print H3 server log on failure
+        if: failure()
+        run: cat .grok/preview.log || true
+
+      - name: Stop H3 preview
+        if: always()
+        run: npm run preview:stop || true
