@@ -138,7 +138,7 @@ function StatutoryFinanceControl() {
           <Field label="Close / reopen evidence"><input className="control mt-1.5" value={close.evidenceReference} onChange={(e)=>setClose({...close,evidenceReference:e.target.value})}/></Field>
           <div className="flex items-end"><button disabled={busy || !close.period || !close.evidenceReference} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-40"><BookLock className="size-4"/>Apply period control</button></div>
         </form>
-        <p className="mt-3 text-xs leading-5 text-muted">Hard close is database-blocked unless bank/cash reconciliation, GST/statutory evidence, trial balance and the controlled period stocktake are blocker-free. The period needs one posted stocktake and no open stocktake session.</p>
+        <p className="mt-3 text-xs leading-5 text-muted">Hard close is database-blocked unless Statement closing = Bank 1000 closing = verified canonical VIBPE cash for its explicit M-number, GST/statutory evidence and trial balance are blocker-free, and the period has one posted stocktake with no open stocktake session.</p>
         <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-4">{data.closures.map((row)=><div key={text(row,"period")} className="rounded-lg border border-border p-3 text-sm"><span className="font-mono text-xs text-accent">{text(row,"period")}</span><p className="mt-1 font-semibold">{text(row,"status")}</p><p className="mt-1 text-xs text-muted break-words">{text(row,"evidence_reference")}</p></div>)}</div>
       </Panel>
 
