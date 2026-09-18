@@ -88,7 +88,7 @@ export type RecoveryCentreWorkspace = {
     executed_requests:number;
   };
   runtime:{
-    sourceSha:string;
+    sourceSha:string|null;
     databaseHealth:"ok";
   };
   backupStatus:{
