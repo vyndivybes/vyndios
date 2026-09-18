@@ -96,6 +96,16 @@ export type SpareIdentityOption = {
   supplierLot: string;
 };
 
+export type SalesLedgerWorkspaceData = {
+  ledger: SalesLedgerRow[];
+  spareSales: SpareSaleRow[];
+  inventory: SpareInventoryOption[];
+  identities: SpareIdentityOption[];
+  customerReturns: Record<string, unknown>[];
+  customerCreditNotes: Record<string, unknown>[];
+  customerRefunds: Record<string, unknown>[];
+};
+
 const nullableNumber = (value: unknown) => (value == null ? null : Number(value));
 
 function toSalesLedgerRow(row: Record<string, unknown>): SalesLedgerRow {
@@ -259,7 +269,7 @@ export const getSalesLedgerWorkspace = createServerFn({ method: "GET" })
       customerReturns,
       customerCreditNotes,
       customerRefunds,
-    };
+    } satisfies SalesLedgerWorkspaceData;
   });
 
 export const postSpareSaleDispatch = createServerFn({ method: "POST" })
