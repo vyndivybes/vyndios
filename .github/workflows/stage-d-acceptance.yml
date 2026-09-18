@@ -134,6 +134,14 @@ jobs:
       - name: Protected-route responsive browser acceptance
         run: node scripts/stage-d-browser-acceptance.mjs
 
+      - name: H1 read-only observability SLO evidence
+        env:
+          VYNDI_TEST_BASE_URL: ${{ env.STAGE_D_BASE_URL }}
+          VYNDI_TEST_EMAIL: ${{ env.STAGE_D_USER_EMAIL }}
+          VYNDI_TEST_PASSWORD: ${{ env.STAGE_D_USER_PASSWORD }}
+          VYNDI_SLO_SAMPLE_COUNT: "1"
+        run: npm run observe:slo
+
       - name: Print server log on failure
         if: failure()
         run: cat .grok/preview.log || true
