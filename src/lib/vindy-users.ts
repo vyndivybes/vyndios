@@ -41,8 +41,8 @@ export const listVindyUsers = createServerFn({ method: "GET" })
       role_updated_at: string | null;
       active_sessions: number;
     }>`
-      select u.id, u.name, u.email, r.role, u."createdAt" as created_at,
-             r.updated_at as role_updated_at,
+      select u.id, u.name, u.email, r.role, u."createdAt"::text as created_at,
+             r.updated_at::text as role_updated_at,
              coalesce(s.active_sessions,0)::int as active_sessions
       from "user" u
       left join vindy_user_roles r on r.user_id = u.id
@@ -205,7 +205,7 @@ export const createVindyUser = createServerFn({ method: "POST" })
       role: string;
       created_at: string;
     }>`
-      select u.id, u.name, u.email, r.role, u."createdAt" as created_at
+      select u.id, u.name, u.email, r.role, u."createdAt"::text as created_at
       from "user" u join vindy_user_roles r on r.user_id = u.id
       where u.id = ${userId} limit 1
     `;
