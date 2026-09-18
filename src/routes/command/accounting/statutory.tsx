@@ -70,7 +70,6 @@ function StatutoryFinanceControl() {
           <Link to="/command/accounting" className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted hover:border-accent hover:text-accent">Accounting</Link>
           <Link to="/command/accounting/input-tax" className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted hover:border-accent hover:text-accent">Input GST / ITC</Link>
           <Link to="/command/receivables" className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted hover:border-accent hover:text-accent">Receivables</Link>
-          <Link to="/command/inventory-stocktake" className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted hover:border-accent hover:text-accent">Inventory Stocktake</Link>
         </div>
       </header>
 
@@ -121,7 +120,6 @@ function StatutoryFinanceControl() {
       <Panel title="Inventory Stocktake Evidence" kicker="Physical count → maker/checker → FIFO/accounting adjustment">
         <div className="mb-3 flex items-center justify-between gap-3">
           <p className="max-w-3xl text-xs leading-5 text-muted">Hard close requires one posted stocktake for the selected finance period and no draft, submitted or approved stocktake still open.</p>
-          <Link to="/command/inventory-stocktake" className="shrink-0 text-xs font-semibold text-accent">Open stocktake control</Link>
         </div>
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
           {data.stocktakes.map((row)=><div key={text(row,"id")} className="rounded-lg border border-border p-3 text-sm">
