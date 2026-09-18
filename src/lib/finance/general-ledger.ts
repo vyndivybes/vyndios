@@ -13,6 +13,7 @@ export const CORE_CHART_OF_ACCOUNTS: LedgerAccount[] = [
   { code: "1210", name: "Work in Progress", type: "asset" },
   { code: "1220", name: "Finished Goods", type: "asset" },
   { code: "1300", name: "Input GST / Tax Credit", type: "asset" },
+  { code: "1400", name: "Supplier Recoverables / Advances", type: "asset" },
   { code: "1500", name: "Fixed Assets", type: "asset" },
   { code: "1590", name: "Accumulated Depreciation", type: "asset" },
   { code: "2000", name: "Trade Payables", type: "liability" },
