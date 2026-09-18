@@ -97,7 +97,7 @@ try {
   await login.getByLabel(/Authorised Email/i).fill(email);
   await login.getByLabel(/^Password$/i).fill(password);
   await login.getByRole("button", { name: /Authorize · Enter Command/i }).click();
-  await login.waitForURL(/\/command(?:\/|$)/, { timeout: 45_000 });
+  await login.waitForURL(/\/command(?:\/|$)/, { timeout: 45_000, waitUntil: "domcontentloaded" });
   report.login = { durationMs: Date.now() - loginStarted, ok: true };
   await login.close();
 
