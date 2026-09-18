@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getSql } from "@/lib/db";
-import { emitOperationalEvent } from "@/lib/observability/server";
-import { runtimeSourceSha } from "./release-marker";
+import { emitOperationalEvent, runtimeSourceSha } from "@/lib/observability/server";
 
 export const Route = createFileRoute("/api/runtime/health")({
   server: {
