@@ -1,0 +1,168 @@
+name: H2 Backup Restore Recovery Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recovery-drill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: vyndi_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d vyndi_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      H2_SOURCE_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vyndi_ci
+      H2_RESTORED_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vyndi_restore
+      VYNDI_ALLOW_DB_MIGRATIONS: "1"
+      VITE_AUTH_ENABLED: "true"
+      BETTER_AUTH_URL: http://127.0.0.1:8081
+      BETTER_AUTH_SECRET: h2-recovery-ci-better-auth-secret-2026-not-production
+      STAGE_D_BASE_URL: http://127.0.0.1:8081
+      STAGE_D_USER_EMAIL: h2-recovery@vyndi.test
+      STAGE_D_USER_PASSWORD: h2-recovery-ci-password-2026
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Migrate isolated source database
+        env:
+          DATABASE_URL: ${{ env.H2_SOURCE_DATABASE_URL }}
+        run: npm run db:migrate
+
+      - name: Seed governed source recovery markers
+        env:
+          DATABASE_URL: ${{ env.H2_SOURCE_DATABASE_URL }}
+          H2_MODE: seed
+        run: node scripts/h2-recovery-drill.mjs
+
+      - name: Create custom-format backup and restore to isolated database
+        shell: bash
+        run: |
+          set -euo pipefail
+          container_id="$(docker ps --filter ancestor=postgres:16-alpine --format '{{.ID}}' | head -n 1)"
+          test -n "$container_id"
+
+          backup_started="$(date +%s)"
+          docker exec "$container_id" pg_dump -U postgres -Fc -d vyndi_ci -f /tmp/vyndi-h2.dump
+          backup_finished="$(date +%s)"
+          backup_bytes="$(docker exec "$container_id" stat -c '%s' /tmp/vyndi-h2.dump)"
+
+          docker exec "$container_id" dropdb --if-exists -U postgres vyndi_restore
+          docker exec "$container_id" createdb -U postgres vyndi_restore
+          restore_started="$(date +%s)"
+          docker exec "$container_id" pg_restore -U postgres --no-owner --no-privileges -d vyndi_restore /tmp/vyndi-h2.dump
+          restore_finished="$(date +%s)"
+
+          echo "H2_BACKUP_SECONDS=$((backup_finished-backup_started))" >> "$GITHUB_ENV"
+          echo "H2_RESTORE_SECONDS=$((restore_finished-restore_started))" >> "$GITHUB_ENV"
+          echo "H2_BACKUP_BYTES=$backup_bytes" >> "$GITHUB_ENV"
+          test "$backup_bytes" -gt 0
+
+      - name: Forward-migrate restored database
+        env:
+          DATABASE_URL: ${{ env.H2_RESTORED_DATABASE_URL }}
+        run: npm run db:migrate
+
+      - name: Verify restored lineage and governed post-restore write
+        env:
+          H2_MODE: verify
+          H2_EVIDENCE_PATH: .grok/evidence/h2-recovery/evidence.json
+        run: node scripts/h2-recovery-drill.mjs
+
+      - name: Golden Order regression after restore
+        run: npm run test:golden-order:core
+
+      - name: Configure restored VYNDI runtime
+        run: |
+          node -e 'const fs=require("node:fs"); const path="wrangler.jsonc"; const config=JSON.parse(fs.readFileSync(path,"utf8")); delete config.hyperdrive; fs.writeFileSync(path, JSON.stringify(config,null,2)+"\n");'
+          printf '%s\n' \
+            "VITE_AUTH_ENABLED=${VITE_AUTH_ENABLED}" \
+            "BETTER_AUTH_URL=${BETTER_AUTH_URL}" \
+            "BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}" \
+            "DATABASE_URL=${H2_RESTORED_DATABASE_URL}" \
+            "VYNDI_ALLOW_DB_MIGRATIONS=${VYNDI_ALLOW_DB_MIGRATIONS}" \
+            > .dev.vars
+
+      - name: Verify restored production bundle builds
+        env:
+          DATABASE_URL: ${{ env.H2_RESTORED_DATABASE_URL }}
+        run: npm run build
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Start VYNDI against restored database
+        env:
+          DATABASE_URL: ${{ env.H2_RESTORED_DATABASE_URL }}
+        run: |
+          npm run preview:restart || { cat .grok/preview.log || true; exit 1; }
+          curl -fsS --max-time 5 http://127.0.0.1:8081/api/runtime/health >/dev/null
+
+      - name: Seed disposable recovery-validation identity
+        env:
+          DATABASE_URL: ${{ env.H2_RESTORED_DATABASE_URL }}
+        run: node scripts/stage-d-seed-user.mjs
+
+      - name: Protected-route acceptance against restored database
+        env:
+          DATABASE_URL: ${{ env.H2_RESTORED_DATABASE_URL }}
+        run: node scripts/stage-d-browser-acceptance.mjs
+
+      - name: H1 health and SLO evidence against restored database
+        env:
+          VYNDI_TEST_BASE_URL: ${{ env.STAGE_D_BASE_URL }}
+          VYNDI_TEST_EMAIL: ${{ env.STAGE_D_USER_EMAIL }}
+          VYNDI_TEST_PASSWORD: ${{ env.STAGE_D_USER_PASSWORD }}
+          VYNDI_SLO_SAMPLE_COUNT: "1"
+        run: npm run observe:slo
+
+      - name: Upload H2 evidence metadata
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: h2-recovery-evidence
+          path: .grok/evidence/h2-recovery/evidence.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Print restored server log on failure
+        if: failure()
+        run: cat .grok/preview.log || true
+
+      - name: Stop restored acceptance server
+        if: always()
+        run: npm run preview:stop || true
+
+      - name: Destroy disposable backup file
+        if: always()
+        shell: bash
+        run: |
+          container_id="$(docker ps --filter ancestor=postgres:16-alpine --format '{{.ID}}' | head -n 1)"
+          if [ -n "$container_id" ]; then docker exec "$container_id" rm -f /tmp/vyndi-h2.dump || true; fi
