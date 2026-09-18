@@ -9,6 +9,7 @@ import {
 } from "@/lib/ibpe-scenario-lab";
 import type { IntegratedPlanningResult } from "@/lib/integrated-business-planning-engine";
 import { VIBPE_COPILOT_NAME } from "@/lib/ibpe-brand";
+import { observeOperation } from "@/lib/observability/server";
 import { RUNTIME_IBPE_ENGINE_VERSION } from "@/lib/ibpe-runtime-parity";
 import { runVibpeCopilot2 } from "@/lib/vibpe-copilot-2";
 import { retrieveVibpeKnowledgeEvidence, type VibpeKnowledgeEvidence } from "@/lib/vibpe-knowledge-retrieval";
@@ -491,7 +492,7 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
     question: sanitizeQuestion(input.question),
     scenario: input.scenario,
   }))
-  .handler(async ({ data }): Promise<IbpeCopilotResponse> => {
+  .handler(async ({ data }): Promise<IbpeCopilotResponse> => observeOperation({ component: "vibpe", operation: "copilot-query", route: "/command/ibpe-operating-workspace" }, async () => {
     const actor = await requireBusinessActor("view");
     if (!data.question) return { ok: false, error: "Ask a question first.", advisoryOnly: true };
 
@@ -698,4 +699,4 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
       scenarioId,
       advisoryOnly: true,
     };
-  });
+  }));
