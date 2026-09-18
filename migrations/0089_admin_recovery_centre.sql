@@ -511,6 +511,51 @@ begin
 end;
 $$;
 
+create or replace function vyndi_recovery_compare_snapshot(
+  p_entity_type text,
+  p_entity_id text
+) returns jsonb
+language plpgsql stable as $
+declare v jsonb;
+begin
+  if trim(coalesce(p_entity_id,''))='' then
+    raise exception 'Compare entity id is required.';
+  end if;
+
+  if p_entity_type='purchase_order' then
+    select to_jsonb(t) into v from vyndi_purchase_orders t where t.id=p_entity_id;
+  elsif p_entity_type='grn_receipt' then
+    select to_jsonb(t) into v from vyndi_goods_receipts t where t.id=p_entity_id;
+  elsif p_entity_type='production_job_card' then
+    select to_jsonb(t) into v from epr_production_job_cards t where t.id=p_entity_id;
+  elsif p_entity_type='inventory_identity' then
+    select to_jsonb(t) into v
+      from vyndi_identity_registry t
+     where t.identity_uid::text=p_entity_id or t.visible_id=p_entity_id
+     order by case when t.visible_id=p_entity_id then 0 else 1 end
+     limit 1;
+  elsif p_entity_type='invoice' then
+    select to_jsonb(t) into v from vyndi_invoices t where t.id=p_entity_id;
+  elsif p_entity_type='supplier_payment' then
+    select to_jsonb(t) into v from vyndi_supplier_payments t where t.id=p_entity_id;
+  elsif p_entity_type='quality_record' then
+    select jsonb_build_object('recordType','inspection','record',to_jsonb(t))
+      into v from vyndi_quality_inspections t where t.id=p_entity_id;
+    if v is null then
+      select jsonb_build_object('recordType','release','record',to_jsonb(t))
+        into v from vyndi_quality_releases t where t.id=p_entity_id;
+    end if;
+  else
+    raise exception 'Unsupported compare-only recovery entity type.';
+  end if;
+
+  if v is null then
+    raise exception 'Canonical compare record was not found.';
+  end if;
+  return v;
+end;
+$;
+
 create or replace view vyndi_recovery_control_summary as
 select
   (select max(captured_at) from vyndi_recovery_checkpoints) as latest_checkpoint_at,
