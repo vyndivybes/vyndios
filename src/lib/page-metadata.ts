@@ -412,6 +412,15 @@ export const routeRegistry: Record<string, RouteMeta> = {
     "keep",
     "Operate",
   ),
+  "/command/inventory-stocktake": meta(
+    "/command/inventory-stocktake",
+    "Inventory Stocktake",
+    "operate",
+    "inventory",
+    "operations",
+    "keep",
+    "Operate",
+  ),
   "/command/inventory-master": meta(
     "/command/inventory-master",
     "Inventory Master",
@@ -785,6 +794,13 @@ export const routeOwnership: Record<string, RouteOwnership> = {
     source: "operational",
     mutability: "editable",
     notes: "Canonical server-backed item, MSL, demand-plan, receipt and health workspace.",
+  },
+  "/command/inventory-stocktake": {
+    canonicalRoute: "/command/inventory-stocktake",
+    source: "operational",
+    mutability: "editable",
+    notes:
+      "Controlled physical-count snapshot, evidence, maker/checker variance approval, FIFO adjustment and accounting linkage.",
   },
   "/command/inventory-master": {
     canonicalRoute: "/command/inventory",
