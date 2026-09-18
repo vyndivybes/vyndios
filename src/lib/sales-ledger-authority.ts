@@ -96,14 +96,63 @@ export type SpareIdentityOption = {
   supplierLot: string;
 };
 
+export type CustomerReturnRow = {
+  id: string;
+  invoice_id: string;
+  plan_month: number;
+  returned_on: string;
+  quantity: number;
+  disposition: string;
+  reason: string;
+  source_reference: string;
+  sale_type: string;
+  identity_uid: string;
+  restored_cogs_inr: number;
+  credit_note_id: string;
+  credit_note_gross_inr: number;
+};
+
+export type CustomerCreditNoteRow = {
+  id: string;
+  customer_return_id: string;
+  invoice_id: string;
+  plan_month: number;
+  credit_on: string;
+  quantity: number;
+  taxable_value_inr: number;
+  gst_inr: number;
+  gross_amount_inr: number;
+  source_reference: string;
+  refunded_inr: number;
+  credit_open_inr: number;
+};
+
+export type CustomerRefundRow = {
+  id: string;
+  credit_note_id: string;
+  plan_month: number;
+  refunded_on: string;
+  amount_inr: number;
+  evidence_reference: string;
+  journal_id: string;
+  cash_actual_revision: number;
+  new_closing_cash_lakh: number;
+  status: string;
+  revision: number;
+  reversal_reason: string;
+  created_by: string;
+  created_at: string;
+  invoice_id: string;
+};
+
 export type SalesLedgerWorkspaceData = {
   ledger: SalesLedgerRow[];
   spareSales: SpareSaleRow[];
   inventory: SpareInventoryOption[];
   identities: SpareIdentityOption[];
-  customerReturns: Record<string, unknown>[];
-  customerCreditNotes: Record<string, unknown>[];
-  customerRefunds: Record<string, unknown>[];
+  customerReturns: CustomerReturnRow[];
+  customerCreditNotes: CustomerCreditNoteRow[];
+  customerRefunds: CustomerRefundRow[];
 };
 
 const nullableNumber = (value: unknown) => (value == null ? null : Number(value));
@@ -266,9 +315,52 @@ export const getSalesLedgerWorkspace = createServerFn({ method: "GET" })
         oemSerialNumber: String(row.oem_serial_number ?? ""),
         supplierLot: String(row.supplier_lot ?? ""),
       })) satisfies SpareIdentityOption[],
-      customerReturns,
-      customerCreditNotes,
-      customerRefunds,
+      customerReturns: customerReturns.map((row) => ({
+        id: String(row.id),
+        invoice_id: String(row.invoice_id),
+        plan_month: Number(row.plan_month ?? 0),
+        returned_on: String(row.returned_on ?? ""),
+        quantity: Number(row.quantity ?? 0),
+        disposition: String(row.disposition ?? ""),
+        reason: String(row.reason ?? ""),
+        source_reference: String(row.source_reference ?? ""),
+        sale_type: String(row.sale_type ?? ""),
+        identity_uid: String(row.identity_uid ?? ""),
+        restored_cogs_inr: Number(row.restored_cogs_inr ?? 0),
+        credit_note_id: String(row.credit_note_id ?? ""),
+        credit_note_gross_inr: Number(row.credit_note_gross_inr ?? 0),
+      })) satisfies CustomerReturnRow[],
+      customerCreditNotes: customerCreditNotes.map((row) => ({
+        id: String(row.id),
+        customer_return_id: String(row.customer_return_id),
+        invoice_id: String(row.invoice_id),
+        plan_month: Number(row.plan_month ?? 0),
+        credit_on: String(row.credit_on ?? ""),
+        quantity: Number(row.quantity ?? 0),
+        taxable_value_inr: Number(row.taxable_value_inr ?? 0),
+        gst_inr: Number(row.gst_inr ?? 0),
+        gross_amount_inr: Number(row.gross_amount_inr ?? 0),
+        source_reference: String(row.source_reference ?? ""),
+        refunded_inr: Number(row.refunded_inr ?? 0),
+        credit_open_inr: Number(row.credit_open_inr ?? 0),
+      })) satisfies CustomerCreditNoteRow[],
+      customerRefunds: customerRefunds.map((row) => ({
+        id: String(row.id),
+        credit_note_id: String(row.credit_note_id),
+        plan_month: Number(row.plan_month ?? 0),
+        refunded_on: String(row.refunded_on ?? ""),
+        amount_inr: Number(row.amount_inr ?? 0),
+        evidence_reference: String(row.evidence_reference ?? ""),
+        journal_id: String(row.journal_id ?? ""),
+        cash_actual_revision: Number(row.cash_actual_revision ?? 0),
+        new_closing_cash_lakh: Number(row.new_closing_cash_lakh ?? 0),
+        status: String(row.status ?? ""),
+        revision: Number(row.revision ?? 0),
+        reversal_reason: String(row.reversal_reason ?? ""),
+        created_by: String(row.created_by ?? ""),
+        created_at: String(row.created_at ?? ""),
+        invoice_id: String(row.invoice_id ?? ""),
+      })) satisfies CustomerRefundRow[],
     } satisfies SalesLedgerWorkspaceData;
   });
 
