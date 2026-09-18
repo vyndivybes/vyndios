@@ -96,6 +96,7 @@ export const GOVERNANCE_TABS: readonly WorkspaceLink[] = [
 export const ADMIN_TABS: readonly WorkspaceLink[] = [
   { to: ADMIN_HOME, label: "Users & Roles" },
   { to: "/command/master-data", label: "Master Data" },
+  { to: "/command/recovery", label: "Backup & Recovery" },
 ];
 
 /** @deprecated Prefer FINANCE_TABS + GOVERNANCE_TABS. */
