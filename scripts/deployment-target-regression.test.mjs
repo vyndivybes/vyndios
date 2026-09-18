@@ -6,6 +6,7 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf
 const vite = read("vite.config.ts");
 const pkg = JSON.parse(read("package.json"));
 const releaseMarker = read("src/routes/api/runtime/release-marker.ts");
+const observability = read("src/lib/observability/server.ts");
 const productionSmoke = read("scripts/vyndi-production-playwright-smoke.mjs");
 
 test("VYNDI keeps explicit Cloudflare and Vercel deployment adapters", () => {
@@ -26,7 +27,8 @@ test("Vercel adapter is not replaced by an unconditional Cloudflare-only build",
 });
 
 test("release marker exposes the runtime source SHA and production smoke validates it exactly", () => {
-  assert.match(releaseMarker, /VYNDI_SOURCE_SHA/);
+  assert.match(releaseMarker, /runtimeSourceSha/);
+  assert.match(observability, /VYNDI_SOURCE_SHA/);
   assert.match(releaseMarker, /sourceSha/);
   assert.match(productionSmoke, /JSON\.parse\(markerText\)/);
   assert.match(productionSmoke, /markerJson\?\.sourceSha/);
