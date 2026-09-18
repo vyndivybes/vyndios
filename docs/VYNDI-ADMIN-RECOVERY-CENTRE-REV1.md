@@ -54,6 +54,8 @@ The Admin surface also exposes a fail-closed support matrix for domains that are
 
 These types are deliberately not raw-restored from backup because doing so could bypass FIFO, serial/lot identity, finance journals, tax evidence or production/quality genealogy.
 
+For these compare-only types, Admin can use **Compare-only recovery evidence** to fetch the current canonical record by exact ID/visible identity and optionally place it beside a snapshot extracted from an isolated restored database. The result identifies the owning canonical route and correction authority. It is intentionally read-only and provides no generic restore/execution control.
+
 A selective recovery:
 
 1. loads a historical revision or an externally recovered snapshot;
