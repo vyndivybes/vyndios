@@ -19,6 +19,7 @@ import { resolvePostgresTransport } from "../postgres-runtime";
 import { AUTH_TRUSTED_ORIGINS, resolveAuthBaseURL, resolveAuthSecret } from "./runtime-config";
 import { excessActiveSessionTokens } from "./session-concurrency";
 import { VYNDI_SESSION_POLICY } from "./session-policy";
+import { emitOperationalEvent } from "../observability/server";
 
 void ensureDbReady();
 
@@ -232,24 +233,56 @@ export const auth = betterAuth({
 
 /** Run the public Better Auth endpoint with credential-safe failure context. */
 export async function handleAuthRequest(request: Request): Promise<Response> {
+  const started = Date.now();
+  const route = new URL(request.url).pathname;
   try {
     const response = await auth.handler(request);
-    if (response.status >= 500) {
+    const failure = response.status >= 500;
+    if (failure) {
       console.error("[auth] Better Auth endpoint failed", {
         ...authFailureDetails(request),
         responseStatus: response.status,
       });
     }
+    emitOperationalEvent({
+      component: "auth",
+      operation: "endpoint",
+      route,
+      outcome: failure ? "failure" : "success",
+      durationMs: Date.now() - started,
+      statusCode: response.status,
+      failureCategory: failure ? "auth-endpoint" : undefined,
+    });
     return response;
   } catch (error) {
-    console.error("[auth] Better Auth endpoint threw", authFailureDetails(request, error));
+    const details = authFailureDetails(request, error);
+    console.error("[auth] Better Auth endpoint threw", details);
+    emitOperationalEvent({
+      component: "auth",
+      operation: "endpoint",
+      route,
+      outcome: "failure",
+      durationMs: Date.now() - started,
+      failureCategory: details.failureCategory,
+      errorName: details.errorName,
+    });
     throw error;
   }
 }
 
 /** Record a server-side session lookup failure without logging cookie/token values. */
 export function logSessionLookupFailure(request: Request, error: unknown): void {
-  console.error("[auth] Better Auth getSession failed", authFailureDetails(request, error));
+  const details = authFailureDetails(request, error);
+  console.error("[auth] Better Auth getSession failed", details);
+  emitOperationalEvent({
+    component: "auth",
+    operation: "session-lookup",
+    route: new URL(request.url).pathname,
+    outcome: "failure",
+    durationMs: 0,
+    failureCategory: details.failureCategory,
+    errorName: details.errorName,
+  });
 }
 
 export function readSessionToken(): string | null {
