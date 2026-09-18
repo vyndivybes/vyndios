@@ -8,6 +8,10 @@ import { runtimeSourceSha } from "@/lib/observability/server";
 const reference = z.string().trim().min(3).max(500);
 const requestId = z.string().trim().min(3).max(160);
 const entityType = z.enum(["sales_order","monthly_actual"]);
+const compareOnlyEntityType = z.enum([
+  "purchase_order","grn_receipt","production_job_card","inventory_identity",
+  "invoice","supplier_payment","quality_record",
+]);
 const sourceKind = z.enum(["revision_history","external_backup"]);
 const checkpointType = z.enum(["neon_history","neon_branch","pg_dump","managed_snapshot"]);
 
@@ -291,6 +295,46 @@ export const previewVindySelectiveRecovery = createServerFn({method:"POST"})
       destructiveOverwrite:false,
       willCreateNewRevision:true,
       canonicalWriter:data.entityType==="sales_order" ? "save_vyndi_sales_order" : "save_vyndi_monthly_actual",
+    };
+  });
+
+export const previewVindyCompareOnlyRecovery = createServerFn({method:"POST"})
+  .validator(z.object({
+    entityType:compareOnlyEntityType,
+    entityId:z.string().trim().min(1).max(160),
+    recoverySnapshotJson:z.string().trim().max(30000).nullable().optional(),
+  }))
+  .middleware([authMiddleware])
+  .handler(async({data,context})=>{
+    await requireAdmin(context.userId,context.userEmail);
+    const sql=await getSql();
+    const rows=await sql.query<{snapshot:unknown}>(
+      `select vyndi_recovery_compare_snapshot($1,$2) as snapshot`,
+      [data.entityType,data.entityId],
+    );
+    const current=rows[0]?.snapshot ?? null;
+    if(!current) throw new Error("Canonical compare record was not found.");
+
+    let recovery:unknown=null;
+    if(data.recoverySnapshotJson?.trim()){
+      try{
+        recovery=JSON.parse(data.recoverySnapshotJson);
+      }catch{
+        throw new Error("Recovered snapshot JSON is invalid.");
+      }
+      if(!recovery||typeof recovery!=="object"||Array.isArray(recovery)){
+        throw new Error("Recovered snapshot must be a JSON object.");
+      }
+    }
+
+    const support=selectiveRecoverySupport.find(row=>row.entityType===data.entityType);
+    if(!support||support.mode!=="compare_only") throw new Error("Compare-only recovery policy is unavailable.");
+    return {
+      currentJson:JSON.stringify(current),
+      recoveryJson:recovery ? JSON.stringify(recovery) : null,
+      executable:false as const,
+      canonicalRoute:support.canonicalRoute,
+      authorityNote:support.authorityNote,
     };
   });
 
