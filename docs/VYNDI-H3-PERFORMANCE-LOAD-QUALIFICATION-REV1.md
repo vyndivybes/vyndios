@@ -9,7 +9,7 @@ H3 establishes a reproducible **minimum qualified operating envelope**. CI resul
 1. **PostgreSQL read concurrency** — 5, 10 and 20 concurrent workers.
 2. **Governed transaction writes** — unique Sales Orders at 5, 10 and 20 concurrent workers.
 3. **Hot-row contention** — 12 overlapping revisions of one Sales Order, proving advisory-lock serialization, complete revision history and attributed audit lineage.
-4. **Authenticated route concurrency** — concurrent GETs across release-critical protected routes after one governed login.
+4. **Authenticated route concurrency** — each release-critical protected route is first opened sequentially to record cold route/module cost; the measured concurrency envelope then uses 8 authenticated browser pages against the warmed application. Cold-start evidence remains visible and is not discarded.
 5. **VIBPE optimizer compute** — deterministic published HiGHS runtime benchmark under the existing 12-second hard execution ceiling.
 6. Existing Stage D, H1 SLO, H2 Recovery, CI, VIBPE and CodeQL gates remain mandatory.
 
@@ -27,7 +27,7 @@ These thresholds are deliberately below the system's theoretical infrastructure 
 | governed write throughput | >= 5 ops/s |
 | hot-row concurrency | 12 overlapping revisions, zero lost revisions |
 | hot-row p95 | <= 5 s |
-| protected-route concurrent requests | 8 concurrent workers |
+| protected-route concurrent requests | 8 concurrent authenticated browser pages after recorded sequential warm-up |
 | protected-route error rate | 0% in qualification run |
 | protected-route p95 | <= 8 s |
 | protected-route p99 | <= 15 s |
@@ -42,6 +42,7 @@ These thresholds are deliberately below the system's theoretical infrastructure 
 - VIBPE optimizer remains advisory-only. Performance pressure cannot grant transaction authority or bypass the solver runtime ceiling.
 - No automatic retry of a heavy optimizer request is introduced.
 - H3 does not increase concurrency, pool or runtime limits merely to make a benchmark pass.
+- Cold route/module initialization is recorded separately from steady-state concurrency so asset/module loading variance is not misclassified as server saturation; H1 and production telemetry remain the authority for cold-start user experience.
 
 ## Production-like qualification
 
