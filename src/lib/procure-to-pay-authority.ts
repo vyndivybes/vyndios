@@ -237,15 +237,47 @@ export const resolveGoodsReceipt = createServerFn({ method: "POST" })
 export const getPayablesData = createServerFn({ method: "GET" }).handler(async () => {
   await requirePageView("/command/payables");
   const sql = await getSql();
-  const [purchaseOrders, payables] = await Promise.all([
+  const [purchaseOrders, payables, receipts, supplierReturns, supplierRefunds] = await Promise.all([
     sql.query<SqlRow>(
       `select * from vyndi_purchase_order_status where quantity_accepted>0 order by expected_receipt_on,id`,
     ),
     sql.query<SqlRow>(
       `select * from vyndi_accounts_payable order by case when amount_open_inr>0 then 0 else 1 end,due_on,id`,
     ),
+    sql.query<SqlRow>(
+      `select g.id,g.purchase_order_id,g.received_on::text as received_on,g.quantity_accepted,g.inspection_status,
+              g.inventory_movement_id,p.sku,p.unit,p.unit_price_inr
+         from vyndi_goods_receipts g
+         join vyndi_purchase_orders p on p.id=g.purchase_order_id
+        where g.quantity_accepted>0 and g.inventory_movement_id is not null
+        order by g.received_on desc,g.id desc`,
+    ),
+    sql.query<SqlRow>(
+      `select r.id,r.supplier_invoice_id,r.goods_receipt_id,r.plan_month,r.returned_on::text as returned_on,
+              r.quantity,r.sku,r.unit,r.fifo_cost_inr,r.taxable_value_inr,r.gst_inr,r.gross_amount_inr,
+              r.ap_offset_inr,r.recoverable_inr,r.debit_note_reference,r.source_reference,r.journal_id,
+              coalesce(f.refunded_inr,0) as refunded_inr,
+              greatest(r.recoverable_inr-coalesce(f.refunded_inr,0),0) as recoverable_open_inr,
+              i.invoice_number
+         from vyndi_supplier_returns r
+         join vyndi_supplier_invoices i on i.id=r.supplier_invoice_id
+         left join (
+           select supplier_return_id,sum(amount_inr) as refunded_inr
+             from vyndi_supplier_refunds where status='posted' group by supplier_return_id
+         ) f on f.supplier_return_id=r.id
+        order by r.returned_on desc,r.created_at desc`,
+    ),
+    sql.query<SqlRow>(
+      `select f.id,f.supplier_return_id,f.plan_month,f.received_on::text as received_on,f.amount_inr,
+              f.evidence_reference,f.journal_id,f.cash_actual_revision,f.new_closing_cash_lakh,
+              f.status,f.revision,f.reversal_reason,f.created_by,f.created_at::text as created_at,
+              r.supplier_invoice_id,r.debit_note_reference
+         from vyndi_supplier_refunds f
+         join vyndi_supplier_returns r on r.id=f.supplier_return_id
+        order by f.created_at desc,f.id desc`,
+    ),
   ]);
-  return { purchaseOrders, payables };
+  return { purchaseOrders, payables, receipts, supplierReturns, supplierRefunds };
 });
 
 export const postSupplierInvoice = createServerFn({ method: "POST" })
@@ -400,3 +432,75 @@ export const getDecisionInboxData = createServerFn({ method: "GET" }).handler(as
   ].filter((item) => canPerform(role, "view", getRouteMeta(String(item.route))));
   return { items };
 });
+
+
+export const postSupplierReturnDebitNote = createServerFn({ method: "POST" })
+  .validator(z.object({
+    id: identifier,
+    supplierInvoiceId: identifier,
+    goodsReceiptId: identifier,
+    planMonth: z.number().int().min(1).max(36),
+    returnedOn: z.string().date(),
+    quantity: positiveQuantity,
+    debitNoteReference: reference,
+    sourceReference: reference,
+  }))
+  .handler(async ({ data }) => {
+    const actor = await requirePageActor("/command/payables", "approve");
+    const sql = await getSql();
+    const rows = await sql.query<{
+      supplier_return_id:string;
+      gross_amount_inr:number|string;
+      ap_offset_inr:number|string;
+      recoverable_inr:number|string;
+      fifo_cost_inr:number|string;
+    }>(
+      `select * from post_vyndi_supplier_return_debit_note($1,$2,$3,$4,$5::date,$6,$7,$8,$9,$10)`,
+      [data.id.toUpperCase(),data.supplierInvoiceId,data.goodsReceiptId,data.planMonth,data.returnedOn,
+       data.quantity,data.debitNoteReference,data.sourceReference,actor.userId,actor.role],
+    );
+    if (!rows[0]) throw new Error("Supplier return / debit note did not return a controlled result.");
+    return {
+      id:rows[0].supplier_return_id,
+      grossAmountInr:Number(rows[0].gross_amount_inr),
+      apOffsetInr:Number(rows[0].ap_offset_inr),
+      recoverableInr:Number(rows[0].recoverable_inr),
+      fifoCostInr:Number(rows[0].fifo_cost_inr),
+    };
+  });
+
+export const postSupplierRefund = createServerFn({ method: "POST" })
+  .validator(z.object({
+    id:identifier,
+    supplierReturnId:identifier,
+    paymentPlanMonth:z.number().int().min(1).max(36),
+    receivedOn:z.string().date(),
+    amountInr:z.number().positive().max(1_000_000_000_000),
+    evidenceReference:reference,
+  }))
+  .handler(async ({ data }) => {
+    const actor = await requirePageActor("/command/payables", "approve");
+    const sql = await getSql();
+    const rows = await sql.query<{
+      refund_id:string;journal_id:string;new_closing_cash_lakh:number|string;actual_revision:number|string;
+    }>(
+      `select * from post_vyndi_supplier_refund($1,$2,$3,$4::date,$5,$6,$7,$8)`,
+      [data.id.toUpperCase(),data.supplierReturnId,data.paymentPlanMonth,data.receivedOn,
+       data.amountInr,data.evidenceReference,actor.userId,actor.role],
+    );
+    if (!rows[0]) throw new Error("Supplier refund did not return a controlled cash result.");
+    return { id:rows[0].refund_id,journalId:rows[0].journal_id,
+      newClosingCashLakh:Number(rows[0].new_closing_cash_lakh),actualRevision:Number(rows[0].actual_revision) };
+  });
+
+export const reverseSupplierRefund = createServerFn({ method: "POST" })
+  .validator(z.object({ id:identifier,reversedOn:z.string().date(),reason:reference }))
+  .handler(async ({ data }) => {
+    const actor = await requirePageActor("/command/payables", "approve");
+    const sql = await getSql();
+    const rows = await sql.query<{ revision:number|string }>(
+      `select reverse_vyndi_supplier_refund($1,$2::date,$3,$4,$5) as revision`,
+      [data.id,data.reversedOn,data.reason,actor.userId,actor.role],
+    );
+    return { id:data.id,revision:Number(rows[0]?.revision ?? 0) };
+  });
