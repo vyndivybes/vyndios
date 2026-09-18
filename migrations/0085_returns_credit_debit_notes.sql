@@ -1199,12 +1199,12 @@ refunds as (
 select i.id,i.purchase_order_id,p.supplier_id,s.name as supplier_name,i.invoice_number,
        i.invoice_on,i.due_on,i.quantity_invoiced,i.amount_ex_gst_inr,i.gst_inr,
        (i.amount_ex_gst_inr+i.gst_inr) as invoice_total_inr,
-       coalesce(n.debit_note_inr,0) as debit_note_inr,
-       greatest(i.amount_ex_gst_inr+i.gst_inr-coalesce(n.debit_note_inr,0),0)::numeric(18,2) as net_invoice_total_inr,
        coalesce(pay.paid_inr,0) as amount_paid_inr,
        greatest(i.amount_ex_gst_inr+i.gst_inr-coalesce(n.debit_note_inr,0)-coalesce(pay.paid_inr,0),0)::numeric(18,2) as amount_open_inr,
-       greatest(coalesce(n.recoverable_inr,0)-coalesce(ref.refunded_inr,0),0)::numeric(18,2) as supplier_recoverable_inr,
-       i.status,i.match_message,i.source_reference
+       i.status,i.match_message,i.source_reference,
+       coalesce(n.debit_note_inr,0)::numeric(18,2) as debit_note_inr,
+       greatest(i.amount_ex_gst_inr+i.gst_inr-coalesce(n.debit_note_inr,0),0)::numeric(18,2) as net_invoice_total_inr,
+       greatest(coalesce(n.recoverable_inr,0)-coalesce(ref.refunded_inr,0),0)::numeric(18,2) as supplier_recoverable_inr
   from vyndi_supplier_invoices i
   join vyndi_purchase_orders p on p.id=i.purchase_order_id
   join vyndi_suppliers s on s.id=p.supplier_id
@@ -1253,16 +1253,9 @@ select
   round(coalesce(i.taxable_value_inr,i.amount_lakh*100000),2) as taxable_value_inr,
   round(coalesce(i.gst_inr,0),2) as gst_inr,
   round(case when coalesce(i.gross_amount_inr,0)>0 then i.gross_amount_inr else i.amount_lakh*100000 end,2) as gross_amount_inr,
-  coalesce(cr.credit_taxable_inr,0)::numeric(18,2) as credit_note_taxable_inr,
-  coalesce(cr.credit_gst_inr,0)::numeric(18,2) as credit_note_gst_inr,
-  coalesce(cr.credit_gross_inr,0)::numeric(18,2) as credit_note_gross_inr,
   coalesce(c.collected_inr,0)::numeric(18,2) as collected_inr,
-  coalesce(rf.refunded_inr,0)::numeric(18,2) as refunded_inr,
   greatest(round(case when coalesce(i.gross_amount_inr,0)>0 then i.gross_amount_inr else i.amount_lakh*100000 end,2)
     -coalesce(cr.credit_gross_inr,0)-coalesce(c.collected_inr,0)+coalesce(rf.refunded_inr,0),0)::numeric(18,2) as balance_inr,
-  greatest(coalesce(c.collected_inr,0)-coalesce(rf.refunded_inr,0)
-    -(round(case when coalesce(i.gross_amount_inr,0)>0 then i.gross_amount_inr else i.amount_lakh*100000 end,2)
-      -coalesce(cr.credit_gross_inr,0)),0)::numeric(18,2) as refund_due_inr,
   case
     when i.status='void' then 'void'
     when greatest(coalesce(c.collected_inr,0)-coalesce(rf.refunded_inr,0)
@@ -1288,7 +1281,14 @@ select
   case when i.sale_type='spare_component' then s.fifo_cost_inr else null end as fifo_cogs_inr,
   case when i.sale_type='spare_component' then round(coalesce(i.taxable_value_inr,i.amount_lakh*100000)-coalesce(cr.credit_taxable_inr,0)-s.fifo_cost_inr,2) else null end as gross_margin_inr,
   i.status as invoice_status,
-  i.source_reference
+  i.source_reference,
+  coalesce(cr.credit_taxable_inr,0)::numeric(18,2) as credit_note_taxable_inr,
+  coalesce(cr.credit_gst_inr,0)::numeric(18,2) as credit_note_gst_inr,
+  coalesce(cr.credit_gross_inr,0)::numeric(18,2) as credit_note_gross_inr,
+  coalesce(rf.refunded_inr,0)::numeric(18,2) as refunded_inr,
+  greatest(coalesce(c.collected_inr,0)-coalesce(rf.refunded_inr,0)
+    -(round(case when coalesce(i.gross_amount_inr,0)>0 then i.gross_amount_inr else i.amount_lakh*100000 end,2)
+      -coalesce(cr.credit_gross_inr,0)),0)::numeric(18,2) as refund_due_inr
 from vyndi_invoices i
 left join vyndi_sales_orders o on o.id=i.sales_order_id
 left join vyndi_spare_sales s on s.id=i.spare_sale_id
