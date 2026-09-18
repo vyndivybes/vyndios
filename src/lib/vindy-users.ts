@@ -7,19 +7,10 @@ import { authMiddleware, optionalAuthMiddleware } from "@/lib/auth/middleware";
 import { auth } from "@/lib/auth/server";
 import { getAssignedCommandRole } from "@/lib/command-user-role.server";
 import { getSql } from "@/lib/db";
+import { isBootstrapAdminEmail, recordVindyPrivilegedAccessEvent } from "@/lib/access-governance";
 
 const roles: CommandRole[] = ["admin", "management", "board", "finance", "operations", "engineering", "qa", "compliance", "viewer"];
 const isRole = (value: unknown): value is CommandRole => typeof value === "string" && roles.includes(value as CommandRole);
-
-function isBootstrapAdminEmail(email: string | null | undefined): boolean {
-  const normalizedEmail = email?.trim().toLowerCase();
-  if (!normalizedEmail) return false;
-  return (process.env.VINDY_ADMIN_EMAILS ?? "")
-    .split(",")
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean)
-    .includes(normalizedEmail);
-}
 
 async function requireAdmin(userId: string, email?: string | null) {
   const role = await getAssignedCommandRole(userId, email);
@@ -33,7 +24,7 @@ export const getVindyUserContext = createServerFn({ method: "GET" })
     const role = context.userId
       ? await getAssignedCommandRole(context.userId, context.userEmail)
       : null;
-    return { id: context.userId ?? null, email: context.userEmail ?? null, role: isRole(role) ? role : null };
+    return { id: context.userId ?? null, email: context.userEmail ?? null, role: isRole(role) ? role : null, bootstrapAdmin: isBootstrapAdminEmail(context.userEmail) };
   });
 
 export const listVindyUsers = createServerFn({ method: "GET" })
@@ -47,10 +38,18 @@ export const listVindyUsers = createServerFn({ method: "GET" })
       email: string | null;
       role: string | null;
       created_at: string;
+      role_updated_at: string | null;
+      active_sessions: number;
     }>`
-      select u.id, u.name, u.email, r.role, u."createdAt" as created_at
+      select u.id, u.name, u.email, r.role, u."createdAt" as created_at,
+             r.updated_at as role_updated_at,
+             coalesce(s.active_sessions,0)::int as active_sessions
       from "user" u
       left join vindy_user_roles r on r.user_id = u.id
+      left join (
+        select "userId" as user_id,count(*)::int as active_sessions
+        from "session" where "expiresAt">now() group by "userId"
+      ) s on s.user_id=u.id
       order by u."createdAt" desc
     `;
   });
@@ -171,10 +170,33 @@ export const createVindyUser = createServerFn({ method: "POST" })
 
     await ensureCredentialPassword(sql, userId, data.password);
     await verifyWithBetterAuth(sql, userId, data.password);
+
+    const actorRole = await requireAdmin(context.userId, context.userEmail);
+    const initialRole: CommandRole = isBootstrapAdminEmail(email) ? "admin" : "viewer";
     await sql`
-      insert into vindy_user_roles (user_id, role) values (${userId}, ${data.role})
+      insert into vindy_user_roles (user_id, role) values (${userId}, ${initialRole})
       on conflict (user_id) do update set role = excluded.role, updated_at = now()
     `;
+    await recordVindyPrivilegedAccessEvent({
+      id: `ACCESS-EVT-${randomUUID()}`,
+      eventType: "user_provisioned",
+      targetUserId: userId,
+      actorUserId: context.userId,
+      actorRole,
+      roleAfter: initialRole,
+      reason: "Individual VYNDI account provisioned",
+      sourceReference: "USER-ADMIN",
+      metadata: { requestedRole: data.role, bootstrapAdmin: isBootstrapAdminEmail(email) },
+    });
+
+    let pendingRoleRequestId: string | null = null;
+    if (data.role !== initialRole) {
+      pendingRoleRequestId = `ACCESS-${randomUUID()}`;
+      await sql.query(
+        `select * from request_vyndi_role_change($1,$2,$3,$4,$5,$6)`,
+        [pendingRoleRequestId,userId,data.role,"Requested during user provisioning",context.userId,actorRole],
+      );
+    }
 
     const created = await sql<{
       id: string;
@@ -188,21 +210,32 @@ export const createVindyUser = createServerFn({ method: "POST" })
       where u.id = ${userId} limit 1
     `;
     if (!created[0]) throw new Error("Account was created but could not be verified in the user register.");
-    return { ok: true, user: created[0] };
+    return { ok: true, user: created[0], pendingRoleRequestId };
   });
 
 export const resetVindyUserPassword = createServerFn({ method: "POST" })
   .validator(z.object({ userId: z.string().min(1).max(200), password: z.string().min(8).max(128) }))
   .middleware([authMiddleware])
   .handler(async ({ data, context }) => {
-    await requireAdmin(context.userId, context.userEmail);
+    const actorRole = await requireAdmin(context.userId, context.userEmail);
     const sql = await getSql();
-    const existing = await sql<{ id: string }>`
-      select id from "user" where id = ${data.userId} limit 1
+    const existing = await sql<{ id: string; role: CommandRole | null }>`
+      select u.id,r.role from "user" u left join vindy_user_roles r on r.user_id=u.id where u.id = ${data.userId} limit 1
     `;
     if (!existing[0]) throw new Error("User account was not found.");
     await ensureCredentialPassword(sql, data.userId, data.password);
     await verifyWithBetterAuth(sql, data.userId, data.password);
+    await recordVindyPrivilegedAccessEvent({
+      id: `ACCESS-EVT-${randomUUID()}`,
+      eventType: "password_reset",
+      targetUserId: data.userId,
+      actorUserId: context.userId,
+      actorRole,
+      roleBefore: existing[0].role,
+      roleAfter: existing[0].role,
+      reason: "Administrator credential reset",
+      sourceReference: "USER-ADMIN",
+    });
     return { ok: true };
   });
 
@@ -211,11 +244,12 @@ export const setVindyUserRole = createServerFn({ method: "POST" })
     z.object({
       userId: z.string().min(1).max(200),
       role: z.enum(["admin", "management", "board", "finance", "operations", "engineering", "qa", "compliance", "viewer"]),
+      reason: z.string().trim().min(3).max(500),
     }),
   )
   .middleware([authMiddleware])
   .handler(async ({ data, context }) => {
-    await requireAdmin(context.userId, context.userEmail);
+    const actorRole = await requireAdmin(context.userId, context.userEmail);
     const sql = await getSql();
     const target = await sql<{ email: string | null }>`
       select email from "user" where id = ${data.userId} limit 1
@@ -224,27 +258,38 @@ export const setVindyUserRole = createServerFn({ method: "POST" })
     if (isBootstrapAdminEmail(target[0].email) && data.role !== "admin") {
       throw new Error("The configured bootstrap administrator cannot be downgraded.");
     }
-    await sql`
-      insert into vindy_user_roles (user_id, role) values (${data.userId}, ${data.role})
-      on conflict (user_id) do update set role = excluded.role, updated_at = now()
-    `;
-    return { ok: true };
+    const requestId=`ACCESS-${randomUUID()}`;
+    await sql.query(
+      `select * from request_vyndi_role_change($1,$2,$3,$4,$5,$6)`,
+      [requestId,data.userId,data.role,data.reason,context.userId,actorRole],
+    );
+    return { ok: true, requestId, status:"pending" as const };
   });
 
 export const deleteVindyUser = createServerFn({ method: "POST" })
   .validator(z.object({ userId: z.string().min(1).max(200) }))
   .middleware([authMiddleware])
   .handler(async ({ data, context }) => {
-    await requireAdmin(context.userId, context.userEmail);
+    const actorRole = await requireAdmin(context.userId, context.userEmail);
     if (context.userId === data.userId) throw new Error("You cannot delete the account currently in use.");
     const sql = await getSql();
-    const target = await sql<{ email: string | null }>`
-      select email from "user" where id = ${data.userId} limit 1
+    const target = await sql<{ email: string | null; role: CommandRole | null }>`
+      select u.email,r.role from "user" u left join vindy_user_roles r on r.user_id=u.id where u.id = ${data.userId} limit 1
     `;
     if (!target[0]) throw new Error("User account was not found.");
     if (isBootstrapAdminEmail(target[0].email)) {
       throw new Error("The configured bootstrap administrator cannot be deleted.");
     }
+    await recordVindyPrivilegedAccessEvent({
+      id: `ACCESS-EVT-${randomUUID()}`,
+      eventType: "user_deleted",
+      targetUserId: data.userId,
+      actorUserId: context.userId,
+      actorRole,
+      roleBefore: target[0].role,
+      reason: "Administrator account deletion",
+      sourceReference: "USER-ADMIN",
+    });
     await sql`delete from vindy_user_roles where user_id = ${data.userId}`;
     await sql`delete from "user" where id = ${data.userId}`;
     return { ok: true, userId: data.userId };
