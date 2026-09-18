@@ -11,21 +11,22 @@ import {
   reverseCustomerRefund,
   reverseSpareSaleDispatch,
 } from "@/lib/sales-ledger-authority";
+import type { SalesLedgerWorkspaceData } from "@/lib/sales-ledger-authority";
 
 export const Route = createFileRoute("/command/sales-ledger")({
   loader: () => getSalesLedgerWorkspace(),
   component: SalesLedgerWorkspace,
 });
 
-const text = (row: Record<string, unknown>, key: string) => String(row[key] ?? "");
-const num = (row: Record<string, unknown>, key: string) => Number(row[key] ?? 0);
+const text = (row: object, key: string) => String((row as Record<string, unknown>)[key] ?? "");
+const num = (row: object, key: string) => Number((row as Record<string, unknown>)[key] ?? 0);
 const money = (value: unknown) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(Number(value ?? 0));
 const today = () => new Date().toISOString().slice(0, 10);
 type TaxMode = "cgst_sgst" | "igst" | "zero_rated" | "exempt";
 
 function SalesLedgerWorkspace() {
-  const data = Route.useLoaderData();
+  const data = Route.useLoaderData() as SalesLedgerWorkspaceData;
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -290,7 +291,7 @@ function SalesLedgerWorkspace() {
           {!data.customerReturns.length ? <p className="text-sm text-muted">No customer returns / RMAs recorded.</p> : null}
         </div>
         <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {data.customerCreditNotes.map((row) => <article key={text(row, "id")} className="rounded-xl border border-border p-4 text-sm"><p className="font-mono text-xs text-accent">{text(row, "id")} · invoice {text(row, "invoice_id")}</p><p className="mt-2 text-muted">Credit {money(row.gross_amount_inr)} · refunded {money(row.refunded_inr)} · open {money(row.credit_open_inr)}</p>{number(row, "credit_open_inr")>0 ? <button type="button" disabled={busy} onClick={() => void refundCredit(row)} className="mt-3 text-xs font-semibold text-accent">Post customer refund</button> : null}</article>)}
+          {data.customerCreditNotes.map((row) => <article key={text(row, "id")} className="rounded-xl border border-border p-4 text-sm"><p className="font-mono text-xs text-accent">{text(row, "id")} · invoice {text(row, "invoice_id")}</p><p className="mt-2 text-muted">Credit {money(row.gross_amount_inr)} · refunded {money(row.refunded_inr)} · open {money(row.credit_open_inr)}</p>{num(row, "credit_open_inr")>0 ? <button type="button" disabled={busy} onClick={() => void refundCredit(row)} className="mt-3 text-xs font-semibold text-accent">Post customer refund</button> : null}</article>)}
         </div>
         <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {data.customerRefunds.map((row) => <article key={text(row, "id")} className="rounded-xl border border-border p-4 text-sm"><p className="font-mono text-xs text-accent">{text(row, "id")} · {text(row, "credit_note_id")}</p><p className="mt-2 text-muted">M{text(row, "plan_month")} · {money(row.amount_inr)} · {text(row, "status")}</p><p className="mt-1 text-xs text-muted break-words">{text(row, "evidence_reference")}</p>{text(row, "status")==="posted" ? <button type="button" disabled={busy} onClick={() => void reverseRefund(row)} className="mt-3 text-xs font-semibold text-warn">Reverse refund</button> : <p className="mt-3 text-xs text-muted">{text(row, "reversal_reason")}</p>}</article>)}
