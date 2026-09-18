@@ -420,6 +420,7 @@ export const routeRegistry: Record<string, RouteMeta> = {
     "operations",
     "keep",
     "Operate",
+    { navHidden: true },
   ),
   "/command/inventory-master": meta(
     "/command/inventory-master",
@@ -796,11 +797,11 @@ export const routeOwnership: Record<string, RouteOwnership> = {
     notes: "Canonical server-backed item, MSL, demand-plan, receipt and health workspace.",
   },
   "/command/inventory-stocktake": {
-    canonicalRoute: "/command/inventory-stocktake",
+    canonicalRoute: "/command/inventory",
     source: "operational",
     mutability: "editable",
     notes:
-      "Controlled physical-count snapshot, evidence, maker/checker variance approval, FIFO adjustment and accounting linkage.",
+      "Hidden controlled stocktake surface owned by canonical Master Inventory; physical-count evidence, maker/checker variance approval, FIFO adjustment and accounting linkage remain inside the single inventory workspace.",
   },
   "/command/inventory-master": {
     canonicalRoute: "/command/inventory",
