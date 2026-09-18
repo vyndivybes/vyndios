@@ -347,6 +347,49 @@ begin
   s:=r.recovery_snapshot;
 
   if r.entity_type='sales_order' then
+    if coalesce(s->>'status','') not in ('lead','confirmed','delivered','cancelled') then
+      raise exception 'Recovered Sales Order has an invalid status.';
+    end if;
+    if coalesce(s->>'product','') not in ('aluminium','carbon','premiumCarbon') then
+      raise exception 'Recovered Sales Order has an invalid product authority.';
+    end if;
+    if coalesce(s->>'channel','') not in ('direct','dealer','online') then
+      raise exception 'Recovered Sales Order has an invalid channel.';
+    end if;
+    if coalesce((s->>'units')::numeric,0)<=0 then
+      raise exception 'Recovered Sales Order units must be greater than zero.';
+    end if;
+    if coalesce((s->>'aspLakh')::numeric,-1)<0 then
+      raise exception 'Recovered Sales Order ASP cannot be negative.';
+    end if;
+    if (s->>'status') in ('confirmed','delivered') and (
+      coalesce(s->>'modelTier','') not in ('core','pro','apex')
+      or trim(coalesce(s->>'variantId',''))=''
+      or jsonb_typeof(coalesce(s->'configuration','{}'::jsonb))<>'object'
+    ) then
+      raise exception 'Recovered committed Sales Order lacks controlled model/configuration authority.';
+    end if;
+
+    if exists(select 1 from vyndi_shipments where sales_order_id=r.entity_id)
+       or exists(select 1 from vyndi_invoices where sales_order_id=r.entity_id) then
+      raise exception 'Sales Order selective recovery is blocked after dispatch or invoice evidence exists. Use the owning reversal/correction authorities.';
+    end if;
+    if exists(
+      select 1 from epr_production_job_cards
+       where sales_order_id=r.entity_id and status in ('in_progress','complete')
+    ) then
+      raise exception 'Sales Order selective recovery is blocked once Production is in progress or complete. Use controlled Production correction/hold authority.';
+    end if;
+    if exists(
+      select 1
+        from vyndi_purchase_orders p
+        join epr_production_job_cards c on c.id=p.job_card_id
+       where c.sales_order_id=r.entity_id
+         and p.status not in ('draft','cancelled')
+    ) then
+      raise exception 'Sales Order selective recovery is blocked after committed Procurement evidence exists. Use Procurement correction/cancellation authority.';
+    end if;
+
     select revision into v_revision from save_vyndi_sales_order(
       r.entity_id,
       (s->>'month')::integer,
