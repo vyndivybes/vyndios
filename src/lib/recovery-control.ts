@@ -161,7 +161,7 @@ export const previewVindySelectiveRecovery = createServerFn({method:"POST"})
     entityId:z.string().trim().min(1).max(160),
     sourceKind,
     sourceRevision:z.number().int().positive().nullable().optional(),
-    recoverySnapshot:z.record(z.string(),z.unknown()).nullable().optional(),
+    recoverySnapshotJson:z.string().trim().max(20000).nullable().optional(),
   }))
   .middleware([authMiddleware])
   .handler(async({data,context})=>{
@@ -171,7 +171,17 @@ export const previewVindySelectiveRecovery = createServerFn({method:"POST"})
       `select vyndi_recovery_current_snapshot($1,$2) as snapshot`,
       [data.entityType,data.entityId],
     );
-    let recovery:unknown=data.recoverySnapshot ?? null;
+    let recovery:unknown=null;
+    if(data.sourceKind==="external_backup" && data.recoverySnapshotJson){
+      try{
+        recovery=JSON.parse(data.recoverySnapshotJson);
+      }catch{
+        throw new Error("Recovered snapshot JSON is invalid.");
+      }
+      if(!recovery||typeof recovery!=="object"||Array.isArray(recovery)){
+        throw new Error("Recovered snapshot must be a JSON object.");
+      }
+    }
     if(data.sourceKind==="revision_history") {
       if(!data.sourceRevision) throw new Error("Source revision is required.");
       const rows=await sql.query<{snapshot:unknown}>(
@@ -222,7 +232,7 @@ export const requestVindySelectiveRecovery = createServerFn({method:"POST"})
     entityId:z.string().trim().min(1).max(160),
     sourceKind,
     sourceRevision:z.number().int().positive().nullable().optional(),
-    recoverySnapshot:z.record(z.string(),z.unknown()).nullable().optional(),
+    recoverySnapshotJson:z.string().trim().max(20000).nullable().optional(),
     checkpointId:z.string().trim().max(160).nullable().optional(),
     reason:z.string().trim().min(8).max(1000),
     evidenceReference:reference,
@@ -231,10 +241,21 @@ export const requestVindySelectiveRecovery = createServerFn({method:"POST"})
   .handler(async({data,context})=>{
     const actor=await requireAdmin(context.userId,context.userEmail);
     const sql=await getSql();
+    let recoverySnapshotJson:string|null=null;
+    if(data.sourceKind==="external_backup"){
+      if(!data.recoverySnapshotJson) throw new Error("Recovered snapshot JSON is required.");
+      try{
+        const parsed=JSON.parse(data.recoverySnapshotJson);
+        if(!parsed||typeof parsed!=="object"||Array.isArray(parsed)) throw new Error();
+        recoverySnapshotJson=JSON.stringify(parsed);
+      }catch{
+        throw new Error("Recovered snapshot must be a valid JSON object.");
+      }
+    }
     const rows=await sql.query<{id:string}>(
       `select request_vyndi_selective_recovery($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,$11) as id`,
       [data.id,data.entityType,data.entityId,data.sourceKind,data.sourceRevision ?? null,
-       data.recoverySnapshot ? JSON.stringify(data.recoverySnapshot) : null,
+       recoverySnapshotJson,
        data.checkpointId ?? null,data.reason,data.evidenceReference,actor.userId,actor.role],
     );
     return {ok:true,id:rows[0]?.id ?? data.id.toUpperCase()};
