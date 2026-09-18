@@ -5,6 +5,7 @@ import {
   executeVindySelectiveRecovery,
   getVindyRecoveryCentre,
   previewVindySelectiveRecovery,
+  previewVindyCompareOnlyRecovery,
   recordVindyFullRestoreCutover,
   registerVindyRecoveryCheckpoint,
   rejectVindyRecoveryRequest,
@@ -30,6 +31,12 @@ function RecoveryCentre() {
   const [error,setError]=useState("");
   const [message,setMessage]=useState("");
   const [preview,setPreview]=useState("");
+  const [comparePreview,setComparePreview]=useState("");
+  const [compareOnly,setCompareOnly]=useState({
+    entityType:"purchase_order" as "purchase_order"|"grn_receipt"|"production_job_card"|"inventory_identity"|"invoice"|"supplier_payment"|"quality_record",
+    entityId:"",
+    recoveryJson:"",
+  });
   const [checkpoint,setCheckpoint]=useState({
     id:id("BKP"),
     checkpointType:"pg_dump" as "neon_history"|"neon_branch"|"pg_dump"|"managed_snapshot",
@@ -113,6 +120,20 @@ function RecoveryCentre() {
     );
     setSelective(current=>({...current,id:id("REC"),reason:"",evidenceReference:""}));
     setPreview("");
+  }
+
+  async function previewCompareOnly(){
+    try{
+      setBusy(true);setError("");setComparePreview("");
+      const result=await previewVindyCompareOnlyRecovery({data:{
+        entityType:compareOnly.entityType,
+        entityId:compareOnly.entityId,
+        recoverySnapshotJson:compareOnly.recoveryJson.trim()?compareOnly.recoveryJson:null,
+      }});
+      setComparePreview(JSON.stringify(result,null,2));
+    }catch(err){
+      setError(err instanceof Error?err.message:"Unable to compare recovery evidence.");
+    }finally{setBusy(false);}
   }
 
   async function registerCheckpoint(){
@@ -233,6 +254,35 @@ function RecoveryCentre() {
             <tbody>{(data?.policy.selectiveRecoverySupport??[]).map(row=><tr key={row.entityType} className="border-b border-slate-100 align-top"><td className="py-3 pr-4 font-semibold">{row.label}</td><td className="pr-4"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${row.mode==="executable"?"bg-emerald-100 text-emerald-800":"bg-slate-100 text-slate-700"}`}>{row.mode==="executable"?"EXECUTABLE":"COMPARE / CORRECTIVE"}</span></td><td className="pr-4 font-mono text-xs">{row.canonicalRoute}</td><td className="text-xs leading-5 text-slate-600">{row.authorityNote}</td></tr>)}</tbody>
           </table>
         </div>
+      </section>
+
+      <section className={card}>
+        <p className="text-xs font-bold uppercase tracking-wide text-orange-600">Compare-only recovery evidence</p>
+        <h2 className="mt-1 text-xl font-semibold">Inspect current canonical record vs recovered evidence</h2>
+        <p className="mt-1 text-xs leading-5 text-slate-600">
+          For domains where generic restore is unsafe, Admin can retrieve the current canonical record by exact ID and optionally compare it with a JSON snapshot extracted from an isolated restored database. This tool is read-only and never exposes an Execute Restore button.
+        </p>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <label className="text-sm font-semibold">Entity
+            <select className={field} value={compareOnly.entityType} onChange={e=>setCompareOnly({...compareOnly,entityType:e.target.value as typeof compareOnly.entityType})}>
+              <option value="purchase_order">Purchase Order</option>
+              <option value="grn_receipt">GRN / Receipt</option>
+              <option value="production_job_card">Production Job Card</option>
+              <option value="inventory_identity">Inventory lot / serial / identity</option>
+              <option value="invoice">Customer Invoice</option>
+              <option value="supplier_payment">Supplier Payment</option>
+              <option value="quality_record">Quality inspection / release</option>
+            </select>
+          </label>
+          <label className="text-sm font-semibold md:col-span-2">Exact entity ID / identity
+            <input className={field} value={compareOnly.entityId} onChange={e=>setCompareOnly({...compareOnly,entityId:e.target.value})} placeholder="Exact canonical ID or visible identity"/>
+          </label>
+          <label className="text-sm font-semibold md:col-span-3">Recovered snapshot JSON · optional
+            <textarea className={`${field} font-mono text-xs`} rows={7} value={compareOnly.recoveryJson} onChange={e=>setCompareOnly({...compareOnly,recoveryJson:e.target.value})} placeholder="Paste only a snapshot extracted from an isolated restored database; leave blank to inspect current canonical state."/>
+          </label>
+        </div>
+        <button type="button" disabled={busy||!compareOnly.entityId.trim()} onClick={()=>void previewCompareOnly()} className="mt-4 rounded-xl border border-slate-400 bg-white px-4 py-2.5 text-sm font-semibold disabled:opacity-40">Load / compare evidence</button>
+        {comparePreview&&<pre className="mt-4 max-h-[420px] overflow-auto rounded-xl bg-slate-950 p-4 text-xs leading-5 text-slate-100">{comparePreview}</pre>}
       </section>
 
       <section className="grid gap-6 xl:grid-cols-2">
