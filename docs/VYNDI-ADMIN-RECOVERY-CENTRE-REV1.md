@@ -107,5 +107,7 @@ The Recovery Centre refuses cutover-ready state unless all four required validat
 - `src/lib/recovery-control.ts`
 - `src/routes/command/recovery.tsx`
 - `scripts/admin-recovery-control.test.mjs`
+- `scripts/vyndi-zero-cost-backup.ps1`
+- `scripts/vyndi-zero-cost-restore.ps1`
 - `.github/workflows/admin-recovery-centre.yml`
 
