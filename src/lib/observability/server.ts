@@ -19,6 +19,20 @@ export function currentRuntimeSourceSha(): string | null {
   return shaPattern.test(value) ? value : null;
 }
 
+export async function runtimeSourceSha(): Promise<string | null> {
+  const processSha = currentRuntimeSourceSha();
+  if (processSha) return processSha;
+  try {
+    const cloudflareWorkersModule = "cloudflare:workers";
+    const workers = await import(/* @vite-ignore */ cloudflareWorkersModule);
+    const runtimeEnv = workers.env as Record<string, unknown> | undefined;
+    const workerSha = typeof runtimeEnv?.VYNDI_SOURCE_SHA === "string" ? runtimeEnv.VYNDI_SOURCE_SHA.trim() : "";
+    return shaPattern.test(workerSha) ? workerSha : null;
+  } catch {
+    return null;
+  }
+}
+
 export function emitOperationalEvent(input: OperationalEventInput): void {
   const payload = {
     event: "vyndi.operational",
