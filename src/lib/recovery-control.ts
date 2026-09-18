@@ -3,6 +3,7 @@ import { z } from "zod";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { getAssignedCommandRole } from "@/lib/command-user-role.server";
 import { getSql } from "@/lib/db";
+import { runtimeSourceSha } from "@/lib/observability/server";
 
 const reference = z.string().trim().min(3).max(500);
 const requestId = z.string().trim().min(3).max(160);
@@ -67,6 +68,14 @@ export type RecoveryEventRow = {
   created_at:string;
 };
 
+export type RecoverySupportRow = {
+  entityType:string;
+  label:string;
+  mode:"executable"|"compare_only";
+  canonicalRoute:string;
+  authorityNote:string;
+};
+
 export type RecoveryCentreWorkspace = {
   checkpoints:RecoveryCheckpointRow[];
   requests:RecoveryRequestRow[];
@@ -78,15 +87,91 @@ export type RecoveryCentreWorkspace = {
     cutover_ready_requests:number;
     executed_requests:number;
   };
+  runtime:{
+    sourceSha:string;
+    databaseHealth:"ok";
+  };
+  backupStatus:{
+    externalBackupState:"registered"|"missing";
+    latestExternalBackupAt:string|null;
+    latestExternalBackupId:string|null;
+  };
   me:{id:string};
   policy:{
     rpoHours:number;
     rtoMinutes:number;
     productionOverwriteAllowed:false;
     selectiveRecoveryEntities:string[];
+    selectiveRecoverySupport:RecoverySupportRow[];
     externalBackupsRequired:true;
   };
 };
+
+const selectiveRecoverySupport:RecoverySupportRow[]=[
+  {
+    entityType:"sales_order",
+    label:"Sales Order",
+    mode:"executable",
+    canonicalRoute:"/command/sales",
+    authorityNote:"Revisioned recovery replays through save_vyndi_sales_order and creates a new canonical revision.",
+  },
+  {
+    entityType:"monthly_actual",
+    label:"Monthly Actual",
+    mode:"executable",
+    canonicalRoute:"/command/actuals",
+    authorityNote:"Management-controlled fields replay through save_vyndi_monthly_actual; transaction-derived revenue, units and receivables remain canonical.",
+  },
+  {
+    entityType:"purchase_order",
+    label:"Purchase Order",
+    mode:"compare_only",
+    canonicalRoute:"/command/purchase-execution",
+    authorityNote:"Use Procurement owning amendment/cancellation authority; generic row replacement is prohibited.",
+  },
+  {
+    entityType:"grn_receipt",
+    label:"GRN / Receipt",
+    mode:"compare_only",
+    canonicalRoute:"/command/receiving",
+    authorityNote:"Use Receiving correction/reversal authority so inventory and inspection lineage remain intact.",
+  },
+  {
+    entityType:"production_job_card",
+    label:"Production Job Card",
+    mode:"compare_only",
+    canonicalRoute:"/command/production",
+    authorityNote:"Use Production supersession/correction authority; genealogy and issued-material lineage must not be rewritten.",
+  },
+  {
+    entityType:"inventory_identity",
+    label:"Inventory lot / serial / identity",
+    mode:"compare_only",
+    canonicalRoute:"/command/inventory",
+    authorityNote:"Use Inventory movement, stocktake, return or controlled adjustment authority so FIFO and identity history remain intact.",
+  },
+  {
+    entityType:"invoice",
+    label:"Customer Invoice",
+    mode:"compare_only",
+    canonicalRoute:"/command/sales-ledger",
+    authorityNote:"Use credit/debit/reversal authority; invoice and receivable history is not generically overwritten.",
+  },
+  {
+    entityType:"supplier_payment",
+    label:"Supplier Payment",
+    mode:"compare_only",
+    canonicalRoute:"/command/payables",
+    authorityNote:"Use Payables/payment reconciliation authority so canonical cash and finance evidence remain consistent.",
+  },
+  {
+    entityType:"quality_record",
+    label:"Quality Record",
+    mode:"compare_only",
+    canonicalRoute:"/command/quality",
+    authorityNote:"Use Quality disposition/retest/correction authority; inspection genealogy and release evidence remain append-only.",
+  },
+];
 
 async function readWorkspace(sql:Awaited<ReturnType<typeof getSql>>) {
   const [checkpoints,requests,events,summary]=await Promise.all([
@@ -142,14 +227,23 @@ export const getVindyRecoveryCentre = createServerFn({method:"GET"})
     const actor=await requireAdmin(context.userId,context.userEmail);
     const sql=await getSql();
     const workspace=await readWorkspace(sql);
+    const sourceSha=await runtimeSourceSha();
+    const latestExternal=workspace.checkpoints.find(row=>row.checkpoint_type==="pg_dump") ?? null;
     return {
       ...workspace,
+      runtime:{sourceSha,databaseHealth:"ok" as const},
+      backupStatus:{
+        externalBackupState:latestExternal ? "registered" as const : "missing" as const,
+        latestExternalBackupAt:latestExternal?.captured_at ?? null,
+        latestExternalBackupId:latestExternal?.id ?? null,
+      },
       me:{id:actor.userId},
       policy:{
         rpoHours:24,
         rtoMinutes:60,
         productionOverwriteAllowed:false as const,
         selectiveRecoveryEntities:["sales_order","monthly_actual"],
+        selectiveRecoverySupport,
         externalBackupsRequired:true as const,
       },
     } satisfies RecoveryCentreWorkspace;
