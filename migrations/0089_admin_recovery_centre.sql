@@ -515,7 +515,7 @@ create or replace function vyndi_recovery_compare_snapshot(
   p_entity_type text,
   p_entity_id text
 ) returns jsonb
-language plpgsql stable as $
+language plpgsql stable as $recovery$
 declare v jsonb;
 begin
   if trim(coalesce(p_entity_id,''))='' then
@@ -554,7 +554,7 @@ begin
   end if;
   return v;
 end;
-$;
+$recovery$;
 
 create or replace view vyndi_recovery_control_summary as
 select
