@@ -280,6 +280,14 @@ export const deleteVindyUser = createServerFn({ method: "POST" })
     if (isBootstrapAdminEmail(target[0].email)) {
       throw new Error("The configured bootstrap administrator cannot be deleted.");
     }
+    const pending = await sql<{ count: number }>`
+      select count(*)::int as count
+      from vyndi_access_role_change_requests
+      where target_user_id = ${data.userId} and status = 'pending'
+    `;
+    if (Number(pending[0]?.count ?? 0) > 0) {
+      throw new Error("Resolve the pending role-change request before deleting this user.");
+    }
     await recordVindyPrivilegedAccessEvent({
       id: `ACCESS-EVT-${randomUUID()}`,
       eventType: "user_deleted",
