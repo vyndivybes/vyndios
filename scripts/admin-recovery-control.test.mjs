@@ -97,6 +97,122 @@ test("selective recovery fails closed when canonical state changes after preview
   assert.equal(request.rows[0].status,"approved");
 });
 
+test("Sales Order recovery fails closed after downstream Production authority exists",async(t)=>{
+  const database=await db();t.after(()=>database.close());
+  await saveOrder(database,{units:1,asp:1.5,reason:"baseline"});
+  await saveOrder(database,{units:2,asp:1.7,reason:"later demand"});
+
+  await database.query(
+    `select request_vyndi_selective_recovery(
+      'REC-DOWNSTREAM','sales_order','REC-SO-1','revision_history',1,null,null,
+      'Recover earlier approved demand','INC-DOWNSTREAM','ADMIN-MAKER','admin'
+    )`,
+  );
+  await database.query(
+    `select decide_vyndi_recovery_request('REC-DOWNSTREAM','approve','independent checker','ADMIN-CHECKER','admin')`,
+  );
+  await database.query(
+    `insert into epr_production_job_cards(
+      id,sales_order_id,product_id,product_label,units,bom_tier,due_month,status,
+      production_owner,created_by,sales_order_revision,updated_by
+    ) values(
+      'JC-REC-DOWNSTREAM','REC-SO-1','aluminium','Recovery guard test',2,'core',6,'in_progress',
+      'operations','ADMIN-OTHER',2,'ADMIN-OTHER'
+    )`,
+  );
+
+  await assert.rejects(
+    ()=>database.query(
+      `select * from execute_vyndi_selective_recovery(
+        'REC-DOWNSTREAM','EXEC-DOWNSTREAM','ADMIN-CHECKER','admin'
+      )`,
+    ),
+    /blocked once Production is in progress or complete/i,
+  );
+  const request=await database.query(
+    `select status,result_revision from vyndi_recovery_requests where id='REC-DOWNSTREAM'`,
+  );
+  assert.deepEqual(request.rows[0],{status:"approved",result_revision:null});
+});
+
+test("external Sales Order recovery validates recovered business state before replay",async(t)=>{
+  const database=await db();t.after(()=>database.close());
+  await saveOrder(database,{units:1,asp:1.5,reason:"baseline"});
+  await database.query(
+    `select register_vyndi_recovery_checkpoint(
+      'BKP-INVALID','pg_dump',now(),'sha','backup-log-invalid','local/vyndi.dump','hash',1000,
+      'invalid snapshot test','ADMIN-MAKER','admin'
+    )`,
+  );
+  const invalidSnapshot={
+    id:"REC-SO-1",month:6,product:"aluminium",units:1,aspLakh:1.5,channel:"direct",
+    status:"forged-status",modelTier:"core",variantId:"core-tiagra",
+    variantName:"VYNDI Longitude Tiagra",configuration:{groupset:"gs-tiagra-4700"},
+  };
+  await database.query(
+    `select request_vyndi_selective_recovery(
+      'REC-INVALID-SNAPSHOT','sales_order','REC-SO-1','external_backup',null,$1::jsonb,'BKP-INVALID',
+      'Recover external state safely','EXT-INVALID','ADMIN-MAKER','admin'
+    )`,
+    [JSON.stringify(invalidSnapshot)],
+  );
+  await database.query(
+    `select decide_vyndi_recovery_request(
+      'REC-INVALID-SNAPSHOT','approve','checker','ADMIN-CHECKER','admin'
+    )`,
+  );
+  await assert.rejects(
+    ()=>database.query(
+      `select * from execute_vyndi_selective_recovery(
+        'REC-INVALID-SNAPSHOT','EXEC-INVALID','ADMIN-CHECKER','admin'
+      )`,
+    ),
+    /invalid status/i,
+  );
+});
+
+test("monthly actual recovery creates a new governed revision without restoring transaction-owned fields",async(t)=>{
+  const database=await db();t.after(()=>database.close());
+  await database.query(
+    `select save_vyndi_monthly_actual(
+      35,null,null,null,null,5,null,null,null,'REC-CASH-R1',true,'ADMIN-MAKER','admin'
+    )`,
+  );
+  await database.query(
+    `select save_vyndi_monthly_actual(
+      35,null,null,null,null,9,null,null,null,'REC-CASH-R2',true,'ADMIN-MAKER','admin'
+    )`,
+  );
+  await database.query(
+    `select request_vyndi_selective_recovery(
+      'REC-ACTUAL','monthly_actual','M35','revision_history',1,null,null,
+      'Restore evidenced cash baseline','INC-ACTUAL','ADMIN-MAKER','admin'
+    )`,
+  );
+  await database.query(
+    `select decide_vyndi_recovery_request(
+      'REC-ACTUAL','approve','independent checker','ADMIN-CHECKER','admin'
+    )`,
+  );
+  const executed=await database.query(
+    `select * from execute_vyndi_selective_recovery(
+      'REC-ACTUAL','EXEC-ACTUAL','ADMIN-CHECKER','admin'
+    )`,
+  );
+  assert.deepEqual(executed.rows[0],{entity_type:"monthly_actual",entity_id:"M35",new_revision:3});
+
+  const actual=await database.query(
+    `select revision,revenue,units,closing_cash,receivables,verified
+       from vyndi_monthly_actuals where plan_month=35`,
+  );
+  assert.equal(Number(actual.rows[0].revision),3);
+  assert.equal(Number(actual.rows[0].closing_cash),5);
+  assert.equal(Number(actual.rows[0].revenue),0);
+  assert.equal(Number(actual.rows[0].units),0);
+  assert.equal(Number(actual.rows[0].receivables),0);
+  assert.equal(actual.rows[0].verified,true);
+});
+
 test("external-backup selective recovery requires registered checkpoint evidence",async(t)=>{
   const database=await db();t.after(()=>database.close());
   await saveOrder(database,{units:1});
@@ -177,6 +293,12 @@ test("recovery evidence is append-only and UI preserves the canonical authority 
   ]);
   assert.match(migration,/save_vyndi_sales_order/);
   assert.match(migration,/save_vyndi_monthly_actual/);
+  assert.match(migration,/vyndi_shipments/);
+  assert.match(migration,/vyndi_invoices/);
+  assert.match(migration,/vyndi_purchase_orders/);
+  assert.match(migration,/status in \('in_progress','complete'\)/);
+  assert.match(migration,/blocked after dispatch or invoice evidence/i);
+  assert.match(migration,/invalid status/i);
   assert.doesNotMatch(migration,/update\s+vyndi_sales_orders/i);
   assert.doesNotMatch(migration,/delete\s+from\s+vyndi_sales_orders/i);
   assert.doesNotMatch(migration,/insert\s+into\s+epr_inventory_ledger/i);
