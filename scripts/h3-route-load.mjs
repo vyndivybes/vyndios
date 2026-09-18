@@ -81,6 +81,7 @@ const evidence={
   concurrency,
   samplesPerRoute,
   startedAt:new Date().toISOString(),
+  warmup:[],
   summary:null,
   byRoute:null,
   thresholds:{p95LimitMs,p99LimitMs},
@@ -97,8 +98,35 @@ try{
   await page.getByLabel(/Authorised Email/i).fill(email);
   await page.getByLabel(/^Password$/i).fill(password);
   await page.getByRole("button",{name:/Authorize · Enter Command/i}).click();
-  await page.waitForURL(/\/command(?:\/|$)/,{timeout:45_000});
+  await page.waitForURL(/\/command(?:\/|$)/,{timeout:45_000,waitUntil:"domcontentloaded"});
   await page.close();
+
+  // Warm each route sequentially before measuring concurrency. This records cold
+  // route/module cost separately and prevents route-chunk compilation/loading
+  // from being mistaken for steady-state concurrency saturation.
+  for(const route of routes){
+    const warmPage=await context.newPage();
+    const pageErrors=[];
+    warmPage.on("pageerror",(error)=>pageErrors.push(String(error?.message || error)));
+    const started=Date.now();
+    try{
+      const response=await warmPage.goto(`${baseUrl}${route}`,{waitUntil:"domcontentloaded",timeout:60_000});
+      const status=response?.status() ?? null;
+      assert.ok(response?.ok(),`Warm-up ${route} returned HTTP ${status ?? "none"}`);
+      await warmPage.locator("body").waitFor({state:"visible",timeout:30_000});
+      await warmPage.waitForFunction(()=>(document.body?.innerText || "").trim().length>40,undefined,{timeout:30_000});
+      const body=(await warmPage.locator("body").innerText()).trim();
+      assert.doesNotMatch(warmPage.url(),/\/login(?:\?|$)|\/command-login/,`Warm-up ${route} lost authenticated access`);
+      assert.doesNotMatch(body,/Internal Server Error|Something went wrong|Cannot read properties of undefined/i,`Warm-up ${route} rendered fatal error content`);
+      assert.deepEqual(pageErrors,[],`Warm-up ${route} emitted browser errors: ${pageErrors.join(" | ")}`);
+      evidence.warmup.push({route,status,ok:true,durationMs:Date.now()-started});
+    }catch(error){
+      evidence.warmup.push({route,status:null,ok:false,durationMs:Date.now()-started,error:error instanceof Error ? error.message : String(error)});
+      throw error;
+    }finally{
+      await warmPage.close().catch(()=>{});
+    }
+  }
 
   const tasks=[];
   for(const route of routes){
