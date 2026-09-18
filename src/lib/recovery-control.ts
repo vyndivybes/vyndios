@@ -1,0 +1,340 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { authMiddleware } from "@/lib/auth/middleware";
+import { getAssignedCommandRole } from "@/lib/command-user-role.server";
+import { getSql } from "@/lib/db";
+
+const reference = z.string().trim().min(3).max(500);
+const requestId = z.string().trim().min(3).max(160);
+const entityType = z.enum(["sales_order","monthly_actual"]);
+const sourceKind = z.enum(["revision_history","external_backup"]);
+const checkpointType = z.enum(["neon_history","neon_branch","pg_dump","managed_snapshot"]);
+
+async function requireAdmin(userId:string,email?:string|null) {
+  const role=await getAssignedCommandRole(userId,email);
+  if(role!=="admin") throw new Error("Admin access is required.");
+  return { userId,role } as const;
+}
+
+export type RecoveryCheckpointRow = {
+  id:string;
+  checkpoint_type:string;
+  captured_at:string;
+  source_sha:string;
+  source_reference:string;
+  storage_reference:string;
+  checksum:string;
+  size_bytes:number|null;
+  notes:string;
+  recorded_by:string;
+  created_at:string;
+};
+
+export type RecoveryRequestRow = {
+  id:string;
+  mode:string;
+  source_kind:string;
+  checkpoint_id:string|null;
+  entity_type:string|null;
+  entity_id:string|null;
+  source_revision:number|null;
+  impact_preview:unknown;
+  reason:string;
+  evidence_reference:string;
+  status:string;
+  requested_by:string;
+  requested_at:string;
+  decided_by:string|null;
+  decided_at:string|null;
+  decision_note:string|null;
+  validated_by:string|null;
+  validated_at:string|null;
+  executed_by:string|null;
+  executed_at:string|null;
+  result_revision:number|null;
+  cutover_reference:string|null;
+};
+
+export type RecoveryEventRow = {
+  id:string;
+  request_id:string|null;
+  checkpoint_id:string|null;
+  event_type:string;
+  actor_user_id:string;
+  actor_role:string;
+  evidence_reference:string;
+  payload_json:unknown;
+  created_at:string;
+};
+
+export type RecoveryCentreWorkspace = {
+  checkpoints:RecoveryCheckpointRow[];
+  requests:RecoveryRequestRow[];
+  events:RecoveryEventRow[];
+  summary:{
+    latest_checkpoint_at:string|null;
+    checkpoint_count:number;
+    pending_requests:number;
+    cutover_ready_requests:number;
+    executed_requests:number;
+  };
+  me:{id:string};
+  policy:{
+    rpoHours:number;
+    rtoMinutes:number;
+    productionOverwriteAllowed:false;
+    selectiveRecoveryEntities:string[];
+    externalBackupsRequired:true;
+  };
+};
+
+async function readWorkspace(sql:Awaited<ReturnType<typeof getSql>>) {
+  const [checkpoints,requests,events,summary]=await Promise.all([
+    sql.query<RecoveryCheckpointRow>(
+      `select id,checkpoint_type,captured_at::text,source_sha,source_reference,storage_reference,
+              checksum,size_bytes,notes,recorded_by,created_at::text
+         from vyndi_recovery_checkpoints
+        order by captured_at desc,created_at desc limit 100`,
+    ),
+    sql.query<RecoveryRequestRow>(
+      `select id,mode,source_kind,checkpoint_id,entity_type,entity_id,source_revision,
+              impact_preview,reason,evidence_reference,status,requested_by,requested_at::text,
+              decided_by,decided_at::text,decision_note,validated_by,validated_at::text,
+              executed_by,executed_at::text,result_revision,cutover_reference
+         from vyndi_recovery_requests
+        order by requested_at desc limit 100`,
+    ),
+    sql.query<RecoveryEventRow>(
+      `select id,request_id,checkpoint_id,event_type,actor_user_id,actor_role,evidence_reference,
+              payload_json,created_at::text
+         from vyndi_recovery_events
+        order by created_at desc limit 150`,
+    ),
+    sql.query<{
+      latest_checkpoint_at:string|null;
+      checkpoint_count:number;
+      pending_requests:number;
+      cutover_ready_requests:number;
+      executed_requests:number;
+    }>(
+      `select latest_checkpoint_at::text,checkpoint_count::int,pending_requests::int,
+              cutover_ready_requests::int,executed_requests::int
+         from vyndi_recovery_control_summary`,
+    ),
+  ]);
+  return {
+    checkpoints,
+    requests,
+    events,
+    summary:summary[0] ?? {
+      latest_checkpoint_at:null,
+      checkpoint_count:0,
+      pending_requests:0,
+      cutover_ready_requests:0,
+      executed_requests:0,
+    },
+  };
+}
+
+export const getVindyRecoveryCentre = createServerFn({method:"GET"})
+  .middleware([authMiddleware])
+  .handler(async({context})=>{
+    const actor=await requireAdmin(context.userId,context.userEmail);
+    const sql=await getSql();
+    const workspace=await readWorkspace(sql);
+    return {
+      ...workspace,
+      me:{id:actor.userId},
+      policy:{
+        rpoHours:24,
+        rtoMinutes:60,
+        productionOverwriteAllowed:false as const,
+        selectiveRecoveryEntities:["sales_order","monthly_actual"],
+        externalBackupsRequired:true as const,
+      },
+    } satisfies RecoveryCentreWorkspace;
+  });
+
+export const previewVindySelectiveRecovery = createServerFn({method:"POST"})
+  .validator(z.object({
+    entityType,
+    entityId:z.string().trim().min(1).max(160),
+    sourceKind,
+    sourceRevision:z.number().int().positive().nullable().optional(),
+    recoverySnapshot:z.record(z.string(),z.unknown()).nullable().optional(),
+  }))
+  .middleware([authMiddleware])
+  .handler(async({data,context})=>{
+    await requireAdmin(context.userId,context.userEmail);
+    const sql=await getSql();
+    const currentRows=await sql.query<{snapshot:unknown}>(
+      `select vyndi_recovery_current_snapshot($1,$2) as snapshot`,
+      [data.entityType,data.entityId],
+    );
+    let recovery:unknown=data.recoverySnapshot ?? null;
+    if(data.sourceKind==="revision_history") {
+      if(!data.sourceRevision) throw new Error("Source revision is required.");
+      const rows=await sql.query<{snapshot:unknown}>(
+        `select vyndi_recovery_revision_snapshot($1,$2,$3) as snapshot`,
+        [data.entityType,data.entityId,data.sourceRevision],
+      );
+      recovery=rows[0]?.snapshot ?? null;
+    }
+    if(!recovery) throw new Error("Recovery snapshot is required.");
+    return {
+      current:currentRows[0]?.snapshot ?? null,
+      recovery,
+      destructiveOverwrite:false,
+      willCreateNewRevision:true,
+      canonicalWriter:data.entityType==="sales_order" ? "save_vyndi_sales_order" : "save_vyndi_monthly_actual",
+    };
+  });
+
+export const registerVindyRecoveryCheckpoint = createServerFn({method:"POST"})
+  .validator(z.object({
+    id:requestId,
+    checkpointType,
+    capturedAt:z.string().datetime(),
+    sourceSha:z.string().trim().max(80).optional(),
+    sourceReference:reference,
+    storageReference:z.string().trim().max(500).optional(),
+    checksum:z.string().trim().max(256).optional(),
+    sizeBytes:z.number().int().nonnegative().nullable().optional(),
+    notes:z.string().trim().max(1000).optional(),
+  }))
+  .middleware([authMiddleware])
+  .handler(async({data,context})=>{
+    const actor=await requireAdmin(context.userId,context.userEmail);
+    const sql=await getSql();
+    const rows=await sql.query<{id:string}>(
+      `select register_vyndi_recovery_checkpoint($1,$2,$3::timestamptz,$4,$5,$6,$7,$8,$9,$10,$11) as id`,
+      [data.id,data.checkpointType,data.capturedAt,data.sourceSha ?? "",data.sourceReference,
+       data.storageReference ?? "",data.checksum ?? "",data.sizeBytes ?? null,data.notes ?? "",
+       actor.userId,actor.role],
+    );
+    return {ok:true,id:rows[0]?.id ?? data.id.toUpperCase()};
+  });
+
+export const requestVindySelectiveRecovery = createServerFn({method:"POST"})
+  .validator(z.object({
+    id:requestId,
+    entityType,
+    entityId:z.string().trim().min(1).max(160),
+    sourceKind,
+    sourceRevision:z.number().int().positive().nullable().optional(),
+    recoverySnapshot:z.record(z.string(),z.unknown()).nullable().optional(),
+    checkpointId:z.string().trim().max(160).nullable().optional(),
+    reason:z.string().trim().min(8).max(1000),
+    evidenceReference:reference,
+  }))
+  .middleware([authMiddleware])
+  .handler(async({data,context})=>{
+    const actor=await requireAdmin(context.userId,context.userEmail);
+    const sql=await getSql();
+    const rows=await sql.query<{id:string}>(
+      `select request_vyndi_selective_recovery($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,$11) as id`,
+      [data.id,data.entityType,data.entityId,data.sourceKind,data.sourceRevision ?? null,
+       data.recoverySnapshot ? JSON.stringify(data.recoverySnapshot) : null,
+       data.checkpointId ?? null,data.reason,data.evidenceReference,actor.userId,actor.role],
+    );
+    return {ok:true,id:rows[0]?.id ?? data.id.toUpperCase()};
+  });
+
+export const requestVindyFullRestore = createServerFn({method:"POST"})
+  .validator(z.object({
+    id:requestId,
+    checkpointId:z.string().trim().min(1).max(160),
+    reason:z.string().trim().min(8).max(1000),
+    evidenceReference:reference,
+  }))
+  .middleware([authMiddleware])
+  .handler(async({data,context})=>{
+    const actor=await requireAdmin(context.userId,context.userEmail);
+    const sql=await getSql();
+    const rows=await sql.query<{id:string}>(
+      `select request_vyndi_full_restore($1,$2,$3,$4,$5,$6) as id`,
+      [data.id,data.checkpointId,data.reason,data.evidenceReference,actor.userId,actor.role],
+    );
+    return {ok:true,id:rows[0]?.id ?? data.id.toUpperCase()};
+  });
+
+async function decide(input:{requestId:string;decision:"approve"|"reject";note:string},actor:{userId:string;role:"admin"}) {
+  const sql=await getSql();
+  const rows=await sql.query<{status:string}>(
+    `select decide_vyndi_recovery_request($1,$2,$3,$4,$5) as status`,
+    [input.requestId,input.decision,input.note,actor.userId,actor.role],
+  );
+  return {ok:true,status:rows[0]?.status ?? input.decision};
+}
+
+export const approveVindyRecoveryRequest = createServerFn({method:"POST"})
+  .validator(z.object({requestId, note:z.string().trim().max(1000).optional()}))
+  .middleware([authMiddleware])
+  .handler(async({data,context})=>{
+    const actor=await requireAdmin(context.userId,context.userEmail);
+    return decide({requestId:data.requestId,decision:"approve",note:data.note ?? ""},actor);
+  });
+
+export const rejectVindyRecoveryRequest = createServerFn({method:"POST"})
+  .validator(z.object({requestId, note:z.string().trim().min(3).max(1000)}))
+  .middleware([authMiddleware])
+  .handler(async({data,context})=>{
+    const actor=await requireAdmin(context.userId,context.userEmail);
+    return decide({requestId:data.requestId,decision:"reject",note:data.note},actor);
+  });
+
+export const executeVindySelectiveRecovery = createServerFn({method:"POST"})
+  .validator(z.object({requestId, executionReference:reference}))
+  .middleware([authMiddleware])
+  .handler(async({data,context})=>{
+    const actor=await requireAdmin(context.userId,context.userEmail);
+    const sql=await getSql();
+    const rows=await sql.query<{entity_type:string;entity_id:string;new_revision:number}>(
+      `select * from execute_vyndi_selective_recovery($1,$2,$3,$4)`,
+      [data.requestId,data.executionReference,actor.userId,actor.role],
+    );
+    return {ok:true,entityType:rows[0]?.entity_type,entityId:rows[0]?.entity_id,newRevision:Number(rows[0]?.new_revision ?? 0)};
+  });
+
+export const validateVindyFullRestore = createServerFn({method:"POST"})
+  .validator(z.object({
+    requestId,
+    evidenceReference:reference,
+    hashMatch:z.boolean(),
+    databaseHealth:z.boolean(),
+    goldenOrder:z.boolean(),
+    authenticatedSmoke:z.boolean(),
+    restoredSourceSha:z.string().trim().min(7).max(80),
+    restoredTargetReference:z.string().trim().min(3).max(500),
+  }))
+  .middleware([authMiddleware])
+  .handler(async({data,context})=>{
+    const actor=await requireAdmin(context.userId,context.userEmail);
+    const sql=await getSql();
+    const evidence={
+      hashMatch:data.hashMatch,
+      databaseHealth:data.databaseHealth,
+      goldenOrder:data.goldenOrder,
+      authenticatedSmoke:data.authenticatedSmoke,
+      restoredSourceSha:data.restoredSourceSha,
+      restoredTargetReference:data.restoredTargetReference,
+    };
+    const rows=await sql.query<{status:string}>(
+      `select validate_vyndi_full_restore($1,$2::jsonb,$3,$4,$5) as status`,
+      [data.requestId,JSON.stringify(evidence),data.evidenceReference,actor.userId,actor.role],
+    );
+    return {ok:true,status:rows[0]?.status ?? "cutover_ready"};
+  });
+
+export const recordVindyFullRestoreCutover = createServerFn({method:"POST"})
+  .validator(z.object({requestId,cutoverReference:reference}))
+  .middleware([authMiddleware])
+  .handler(async({data,context})=>{
+    const actor=await requireAdmin(context.userId,context.userEmail);
+    const sql=await getSql();
+    const rows=await sql.query<{status:string}>(
+      `select record_vyndi_full_restore_cutover($1,$2,$3,$4) as status`,
+      [data.requestId,data.cutoverReference,actor.userId,actor.role],
+    );
+    return {ok:true,status:rows[0]?.status ?? "executed"};
+  });
