@@ -23,6 +23,8 @@ test("H3 qualifies bounded DB, route and optimizer load without weakening govern
   assert.match(route,/H3_ROUTE_CONCURRENCY \|\| 8/);
   assert.match(route,/p95LimitMs.*8000/);
   assert.match(route,/p99LimitMs.*15000/);
+  assert.match(route,/Warm each route sequentially before measuring concurrency/);
+  assert.match(route,/evidence\.warmup\.push/);
   assert.doesNotMatch(route,/context\.request\.(post|put|patch|delete)\(/);
   assert.match(optimizer,/loadHighs/);
   assert.match(optimizer,/hardRuntimeMs=12_000/);
