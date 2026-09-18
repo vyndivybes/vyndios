@@ -51,8 +51,12 @@ jobs:
       - name: Generate disposable H3 runtime credentials
         shell: bash
         run: |
-          echo "BETTER_AUTH_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
-          echo "STAGE_D_USER_PASSWORD=H3-$(openssl rand -hex 16)" >> "$GITHUB_ENV"
+          auth_secret="$(openssl rand -hex 32)"
+          user_password="H3-$(openssl rand -hex 16)"
+          echo "::add-mask::$auth_secret"
+          echo "::add-mask::$user_password"
+          echo "BETTER_AUTH_SECRET=$auth_secret" >> "$GITHUB_ENV"
+          echo "STAGE_D_USER_PASSWORD=$user_password" >> "$GITHUB_ENV"
 
       - name: Configure isolated PostgreSQL qualification capacity
         run: |
