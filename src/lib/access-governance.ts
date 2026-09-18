@@ -52,6 +52,39 @@ type PendingRoleChangeRow = {
   emergency_override: boolean;
 };
 
+export type AccessEventRow = {
+  id: string;
+  event_type: string;
+  target_user_id: string | null;
+  actor_user_id: string;
+  actor_role: string;
+  role_before: string | null;
+  role_after: string | null;
+  reason: string | null;
+  source_reference: string | null;
+  metadata_json: string;
+  created_at: string;
+};
+
+export type AccessCertificationRow = {
+  id: string;
+  captured_by: string;
+  actor_role: string;
+  source_reference: string;
+  snapshot_json: string;
+  exception_count: number;
+  created_at: string;
+};
+
+export type AccessGovernanceWorkspace = {
+  users: AccessUserRow[];
+  pending: PendingRoleChangeRow[];
+  events: AccessEventRow[];
+  certifications: AccessCertificationRow[];
+  exceptions: Array<{ code:string; severity:"critical"|"warning"; userId?:string; message:string }>;
+  me: { id:string; bootstrapAdmin:boolean };
+};
+
 function accessExceptions(users: AccessUserRow[], pending: PendingRoleChangeRow[]) {
   const bootstrap = new Set(bootstrapAdminEmails());
   const exceptions: Array<{ code:string; severity:"critical"|"warning"; userId?:string; message:string }> = [];
@@ -96,19 +129,52 @@ async function readWorkspace(sql: Awaited<ReturnType<typeof getSql>>) {
         where q.status='pending'
         order by q.requested_at asc`,
     ),
-    sql.query<Record<string, unknown>>(
+    sql.query<{
+      id:string; event_type:string; target_user_id:string|null; actor_user_id:string; actor_role:string;
+      role_before:string|null; role_after:string|null; reason:string|null; source_reference:string|null;
+      metadata_json:unknown; created_at:string;
+    }>(
       `select id,event_type,target_user_id,actor_user_id,actor_role,role_before,role_after,
               reason,source_reference,metadata_json,created_at::text as created_at
          from vyndi_access_events order by created_at desc limit 100`,
     ),
-    sql.query<Record<string, unknown>>(
+    sql.query<{
+      id:string; captured_by:string; actor_role:string; source_reference:string;
+      snapshot_json:unknown; exception_count:number; created_at:string;
+    }>(
       `select id,captured_by,actor_role,source_reference,snapshot_json,exception_count,
               created_at::text as created_at
          from vyndi_access_certifications order by created_at desc limit 20`,
     ),
   ]);
   const exceptions=accessExceptions(users,pending);
-  return { users,pending,events,certifications,exceptions };
+  return {
+    users,
+    pending,
+    events: events.map((row)=>({
+      id:String(row.id),
+      event_type:String(row.event_type),
+      target_user_id:row.target_user_id ? String(row.target_user_id) : null,
+      actor_user_id:String(row.actor_user_id),
+      actor_role:String(row.actor_role),
+      role_before:row.role_before ? String(row.role_before) : null,
+      role_after:row.role_after ? String(row.role_after) : null,
+      reason:row.reason ? String(row.reason) : null,
+      source_reference:row.source_reference ? String(row.source_reference) : null,
+      metadata_json:JSON.stringify(row.metadata_json ?? {}),
+      created_at:String(row.created_at),
+    })) satisfies AccessEventRow[],
+    certifications: certifications.map((row)=>({
+      id:String(row.id),
+      captured_by:String(row.captured_by),
+      actor_role:String(row.actor_role),
+      source_reference:String(row.source_reference),
+      snapshot_json:JSON.stringify(row.snapshot_json ?? {}),
+      exception_count:Number(row.exception_count ?? 0),
+      created_at:String(row.created_at),
+    })) satisfies AccessCertificationRow[],
+    exceptions,
+  };
 }
 
 export const getVindyAccessGovernance = createServerFn({ method:"GET" })
@@ -117,7 +183,7 @@ export const getVindyAccessGovernance = createServerFn({ method:"GET" })
     const actor=await requireAdmin(context.userId,context.userEmail);
     const sql=await getSql();
     const workspace=await readWorkspace(sql);
-    return { ...workspace, me:{ id:actor.userId, bootstrapAdmin:actor.bootstrapAdmin } };
+    return { ...workspace, me:{ id:actor.userId, bootstrapAdmin:actor.bootstrapAdmin } } satisfies AccessGovernanceWorkspace;
   });
 
 export const requestVindyUserRoleChange = createServerFn({ method:"POST" })
