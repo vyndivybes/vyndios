@@ -38,7 +38,7 @@ export type RecoveryRequestRow = {
   entity_type:string|null;
   entity_id:string|null;
   source_revision:number|null;
-  impact_preview:unknown;
+  impact_preview_json:string;
   reason:string;
   evidence_reference:string;
   status:string;
@@ -63,7 +63,7 @@ export type RecoveryEventRow = {
   actor_user_id:string;
   actor_role:string;
   evidence_reference:string;
-  payload_json:unknown;
+  payload_json:string;
   created_at:string;
 };
 
@@ -98,7 +98,7 @@ async function readWorkspace(sql:Awaited<ReturnType<typeof getSql>>) {
     ),
     sql.query<RecoveryRequestRow>(
       `select id,mode,source_kind,checkpoint_id,entity_type,entity_id,source_revision,
-              impact_preview,reason,evidence_reference,status,requested_by,requested_at::text,
+              impact_preview::text as impact_preview_json,reason,evidence_reference,status,requested_by,requested_at::text,
               decided_by,decided_at::text,decision_note,validated_by,validated_at::text,
               executed_by,executed_at::text,result_revision,cutover_reference
          from vyndi_recovery_requests
@@ -106,7 +106,7 @@ async function readWorkspace(sql:Awaited<ReturnType<typeof getSql>>) {
     ),
     sql.query<RecoveryEventRow>(
       `select id,request_id,checkpoint_id,event_type,actor_user_id,actor_role,evidence_reference,
-              payload_json,created_at::text
+              payload_json::text as payload_json,created_at::text
          from vyndi_recovery_events
         order by created_at desc limit 150`,
     ),
@@ -182,8 +182,8 @@ export const previewVindySelectiveRecovery = createServerFn({method:"POST"})
     }
     if(!recovery) throw new Error("Recovery snapshot is required.");
     return {
-      current:currentRows[0]?.snapshot ?? null,
-      recovery,
+      currentJson:JSON.stringify(currentRows[0]?.snapshot ?? null),
+      recoveryJson:JSON.stringify(recovery),
       destructiveOverwrite:false,
       willCreateNewRevision:true,
       canonicalWriter:data.entityType==="sales_order" ? "save_vyndi_sales_order" : "save_vyndi_monthly_actual",
