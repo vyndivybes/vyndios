@@ -4,7 +4,7 @@ export const VIBPE_OPTIMIZER_RELEASE_CONTRACT = "VIBPE-OPTIMIZER-CLOSURE-5";
 
 const SOURCE_SHA_PATTERN = /^[0-9a-f]{7,64}$/i;
 
-async function runtimeSourceSha(): Promise<string | null> {
+export async function runtimeSourceSha(): Promise<string | null> {
   const processSha =
     typeof process !== "undefined" && typeof process.env?.VYNDI_SOURCE_SHA === "string"
       ? process.env.VYNDI_SOURCE_SHA.trim()
