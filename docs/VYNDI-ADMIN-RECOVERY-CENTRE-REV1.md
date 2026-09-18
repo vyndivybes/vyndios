@@ -33,12 +33,26 @@ Current zero-cost layers are:
 
 The application cannot safely invoke `pg_dump` from Cloudflare Workers and therefore does not pretend that a UI button is a physical database backup. Physical backups remain an infrastructure operation; the Admin page registers their evidence and governs recovery from them.
 
+The Admin Recovery Centre also reports the runtime release SHA when exposed by the release marker path, confirms that the Recovery Centre database query is healthy, and shows external backup state as **REGISTERED** or **MISSING**. Missing external backup evidence is never silently treated as healthy.
+
 ## Selective recovery boundary
 
 V1 executable selective recovery is intentionally limited to entities with a proven revisioned canonical writer:
 
 - `sales_order` → `save_vyndi_sales_order`
 - `monthly_actual` → `save_vyndi_monthly_actual`
+
+The Admin surface also exposes a fail-closed support matrix for domains that are **compare / corrective-action-only** rather than generically restorable:
+
+- Purchase Order → Procurement authority
+- GRN / Receipt → Receiving authority
+- Production Job Card → Production authority
+- Inventory lot / serial / controlled identity → Inventory movement / stocktake / return authority
+- Customer Invoice → Sales Ledger credit/debit/reversal authority
+- Supplier Payment → Payables / cash-reconciliation authority
+- Quality Record → Quality disposition / retest / correction authority
+
+These types are deliberately not raw-restored from backup because doing so could bypass FIFO, serial/lot identity, finance journals, tax evidence or production/quality genealogy.
 
 A selective recovery:
 
