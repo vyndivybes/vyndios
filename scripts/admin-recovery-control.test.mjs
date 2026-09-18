@@ -181,8 +181,8 @@ test("recovery evidence is append-only and UI preserves the canonical authority 
   assert.doesNotMatch(migration,/delete\s+from\s+vyndi_sales_orders/i);
   assert.doesNotMatch(migration,/insert\s+into\s+epr_inventory_ledger/i);
   assert.doesNotMatch(migration,/insert\s+into\s+epr_finance_journal/i);
-  assert.match(authority,/role!==\"admin\"|role !== \"admin\"/);
+  assert.match(authority,/role\s*!==\s*"admin"/);
   assert.match(route,/Production rows are never blindly overwritten/);
   assert.match(workflow,/\/command\/recovery/);
-  assert.match(metadata,/\"\/command\/recovery\"[\s\S]{0,300}adminOnly: true/);
+  assert.match(metadata,/["']\/command\/recovery["'][\s\S]{0,300}adminOnly: true/);
 });
