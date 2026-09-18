@@ -83,18 +83,12 @@ function RecoveryCentre() {
   async function previewSelective(){
     try{
       setBusy(true);setError("");setPreview("");
-      let recoverySnapshot:Record<string,unknown>|null=null;
-      if(selective.sourceKind==="external_backup"){
-        const parsed=JSON.parse(selective.recoveryJson);
-        if(!parsed||typeof parsed!=="object"||Array.isArray(parsed)) throw new Error("Recovered snapshot must be a JSON object.");
-        recoverySnapshot=parsed as Record<string,unknown>;
-      }
       const result=await previewVindySelectiveRecovery({data:{
         entityType:selective.entityType,
         entityId:selective.entityId,
         sourceKind:selective.sourceKind,
         sourceRevision:selective.sourceKind==="revision_history"?Number(selective.sourceRevision):null,
-        recoverySnapshot,
+        recoverySnapshotJson:selective.sourceKind==="external_backup"?selective.recoveryJson:null,
       }});
       setPreview(JSON.stringify(result,null,2));
     }catch(err){
@@ -103,12 +97,6 @@ function RecoveryCentre() {
   }
 
   async function submitSelective(){
-    let recoverySnapshot:Record<string,unknown>|null=null;
-    if(selective.sourceKind==="external_backup"){
-      const parsed=JSON.parse(selective.recoveryJson);
-      if(!parsed||typeof parsed!=="object"||Array.isArray(parsed)) throw new Error("Recovered snapshot must be a JSON object.");
-      recoverySnapshot=parsed as Record<string,unknown>;
-    }
     await run(
       ()=>requestVindySelectiveRecovery({data:{
         id:selective.id,
@@ -116,7 +104,7 @@ function RecoveryCentre() {
         entityId:selective.entityId,
         sourceKind:selective.sourceKind,
         sourceRevision:selective.sourceKind==="revision_history"?Number(selective.sourceRevision):null,
-        recoverySnapshot,
+        recoverySnapshotJson:selective.sourceKind==="external_backup"?selective.recoveryJson:null,
         checkpointId:selective.sourceKind==="external_backup"?selective.checkpointId||null:null,
         reason:selective.reason,
         evidenceReference:selective.evidenceReference,
