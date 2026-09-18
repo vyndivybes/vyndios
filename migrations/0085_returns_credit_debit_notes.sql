@@ -306,9 +306,9 @@ begin
   v_igst:=round(i.igst_inr*v_ratio,2);
   v_cess:=round(i.cess_inr*v_ratio,2);
 
-  select coalesce(sum(taxable_value_inr),0),coalesce(sum(gst_inr),0),coalesce(sum(gross_amount_inr),0)
+  select coalesce(sum(cn.taxable_value_inr),0),coalesce(sum(cn.gst_inr),0),coalesce(sum(cn.gross_amount_inr),0)
     into v_prior_taxable,v_prior_gst,v_prior_gross
-    from vyndi_customer_credit_notes where invoice_id=i.id and status='active';
+    from vyndi_customer_credit_notes cn where cn.invoice_id=i.id and cn.status='active';
   if v_prior_taxable+v_taxable>i.taxable_value_inr+0.01
      or v_prior_gst+v_gst>i.gst_inr+0.01
      or v_prior_gross+v_gross>i.gross_amount_inr+0.01 then
@@ -357,8 +357,8 @@ begin
     from vyndi_customer_refunds f
     join vyndi_customer_credit_notes c on c.id=f.credit_note_id
    where c.invoice_id=i.id and f.status='posted';
-  select coalesce(sum(gross_amount_inr),0) into v_total_credits
-    from vyndi_customer_credit_notes where invoice_id=i.id and status='active';
+  select coalesce(sum(cn.gross_amount_inr),0) into v_total_credits
+    from vyndi_customer_credit_notes cn where cn.invoice_id=i.id and cn.status='active';
   v_invoice_gross:=case when i.gross_amount_inr>0 then i.gross_amount_inr else i.amount_lakh*100000 end;
   v_refund_due:=greatest(v_collected-v_refunded-(v_invoice_gross-v_total_credits),0);
 
@@ -797,8 +797,8 @@ begin
   v_igst:=case when i.quantity_invoiced>0 then round(i.igst_inr*(p_quantity/i.quantity_invoiced),2) else 0 end;
   v_cess:=case when i.quantity_invoiced>0 then round(i.cess_inr*(p_quantity/i.quantity_invoiced),2) else 0 end;
 
-  select coalesce(sum(gross_amount_inr),0) into v_prior_credit
-    from vyndi_supplier_returns where supplier_invoice_id=i.id and status='posted';
+  select coalesce(sum(sr.gross_amount_inr),0) into v_prior_credit
+    from vyndi_supplier_returns sr where sr.supplier_invoice_id=i.id and sr.status='posted';
   if v_prior_credit+v_gross>i.amount_ex_gst_inr+i.gst_inr+0.01 then
     raise exception 'Supplier debit notes cannot exceed the original supplier invoice gross amount.';
   end if;
