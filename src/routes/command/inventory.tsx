@@ -3,6 +3,7 @@ import {
   Archive,
   CheckCircle2,
   ChevronRight,
+  ClipboardCheck,
   PackagePlus,
   Search,
   TriangleAlert,
@@ -223,6 +224,10 @@ function MasterInventory() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link to="/command/inventory-stocktake" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-semibold text-fg hover:border-accent">
+            <ClipboardCheck className="size-4" />
+            Stocktake
+          </Link>
           <Link to="/command/receiving" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-bg">
             <PackagePlus className="size-4" />
             Receive against PO

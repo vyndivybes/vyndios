@@ -63,7 +63,11 @@ async function periodBlockers(periodValue: string) {
           from epr_finance_journal_lines l join epr_finance_journals j on j.id=l.journal_id
          where j.status='posted' and to_char(j.entry_date,'YYYY-MM')=$1),0))::numeric(18,2) as tb_difference,
        (select count(*) from epr_finance_bank_reconciliation_sessions
-          where period=$1 and status='reconciled' and approved_by is not null)::int as approved_bank_reconciliations`,
+          where period=$1 and status='reconciled' and approved_by is not null)::int as approved_bank_reconciliations,
+       (select count(*) from epr_inventory_stocktakes
+          where period=$1 and status='posted')::int as posted_stocktakes,
+       (select count(*) from epr_inventory_stocktakes
+          where period=$1 and status in ('draft','submitted','approved'))::int as open_stocktakes`,
     [periodValue],
   );
   const values = row ?? {};
@@ -79,27 +83,31 @@ async function periodBlockers(periodValue: string) {
     assetEvidence: Number(values.assets ?? 0),
     trialBalanceDifferenceInr: Number(values.tb_difference ?? 0),
     approvedBankReconciliations: Number(values.approved_bank_reconciliations ?? 0),
+    postedStocktakes: Number(values.posted_stocktakes ?? 0),
+    openStocktakes: Number(values.open_stocktakes ?? 0),
   };
   const blockerCount = blockers.unmatchedBank + blockers.gstEvidence + blockers.unverifiedInputItc +
     blockers.pendingSupplierItc + blockers.invoiceTax + blockers.missingIrn + blockers.payrollEvidence +
-    blockers.postingExceptions + blockers.assetEvidence +
+    blockers.postingExceptions + blockers.assetEvidence + blockers.openStocktakes +
     (Math.abs(blockers.trialBalanceDifferenceInr) > 0.01 ? 1 : 0) +
-    (blockers.approvedBankReconciliations > 0 ? 0 : 1);
+    (blockers.approvedBankReconciliations > 0 ? 0 : 1) +
+    (blockers.postedStocktakes > 0 ? 0 : 1);
   return { blockers, blockerCount };
 }
 
 export const getStatutoryFinanceControl = createServerFn({ method: "GET" }).handler(async () => {
   await requireView();
   const sql = await getSql();
-  const [registration, readiness, gstSummary, closures, bankSessions, packs] = await Promise.all([
+  const [registration, readiness, gstSummary, closures, bankSessions, packs, stocktakes] = await Promise.all([
     sql.query<SqlRow>(`select * from epr_finance_tax_registration where id='PRIMARY'`),
     sql.query<SqlRow>(`select * from epr_finance_ca_readiness`),
     sql.query<SqlRow>(`select * from epr_finance_gst_period_summary limit 36`),
     sql.query<SqlRow>(`select period,status,evidence_reference,updated_by,updated_at::text as updated_at from epr_finance_period_closures order by period desc limit 36`),
     sql.query<SqlRow>(`select id,bank_account_ref,period,opening_balance_inr,closing_balance_inr,statement_movement_inr,book_movement_inr,difference_inr,status,evidence_reference,prepared_by,prepared_at::text as prepared_at,approved_by,approved_at::text as approved_at from epr_finance_bank_reconciliation_sessions order by period desc,prepared_at desc limit 100`),
     sql.query<SqlRow>(`select id,period,status,blocker_count,summary_json,evidence_reference,generated_by,generated_at::text as generated_at,approved_by,approved_at::text as approved_at from epr_finance_ca_evidence_packs order by period desc,generated_at desc limit 100`),
+    sql.query<SqlRow>(`select id,period,status,effective_on::text as effective_on,evidence_reference,prepared_by,approved_by,posted_by,posted_at::text as posted_at,variance_line_count,gain_value_inr,loss_value_inr,finance_journal_id from epr_inventory_stocktakes order by period desc,prepared_at desc limit 36`),
   ]);
-  return { registration: registration[0] ?? null, readiness: readiness[0] ?? {}, gstSummary, closures, bankSessions, packs };
+  return { registration: registration[0] ?? null, readiness: readiness[0] ?? {}, gstSummary, closures, bankSessions, packs, stocktakes };
 });
 
 export const saveTaxRegistration = createServerFn({ method: "POST" })
@@ -209,8 +217,9 @@ export const captureCaEvidencePack = createServerFn({ method: "POST" })
     const [closure] = await sql.query<SqlRow>(`select status,evidence_reference from epr_finance_period_closures where period=$1`,[data.period]);
     const [gst] = await sql.query<SqlRow>(`select * from epr_finance_gst_period_summary where period=$1`,[data.period]);
     const [bank] = await sql.query<SqlRow>(`select id,status,difference_inr,approved_by,approved_at::text as approved_at,evidence_reference from epr_finance_bank_reconciliation_sessions where period=$1 and status='reconciled' order by prepared_at desc limit 1`,[data.period]);
+    const [stocktake] = await sql.query<SqlRow>(`select id,status,effective_on::text as effective_on,evidence_reference,prepared_by,approved_by,posted_by,posted_at::text as posted_at,variance_line_count,gain_value_inr,loss_value_inr,finance_journal_id from epr_inventory_stocktakes where period=$1 and status='posted' order by posted_at desc limit 1`,[data.period]);
     const packStatus = blockerCount===0 && ["soft_closed","hard_closed"].includes(String(closure?.status ?? "")) ? "review_ready" : "draft";
-    const summary = { period:data.period,blockers,closure:closure ?? null,gst:gst ?? null,bank:bank ?? null,capturedAt:new Date().toISOString() };
+    const summary = { period:data.period,blockers,closure:closure ?? null,gst:gst ?? null,bank:bank ?? null,stocktake:stocktake ?? null,capturedAt:new Date().toISOString() };
     await sql.query(
       `insert into epr_finance_ca_evidence_packs(id,period,status,blocker_count,summary_json,evidence_reference,generated_by) values($1,$2,$3,$4,$5::jsonb,$6,$7)`,
       [data.id,data.period,packStatus,blockerCount,JSON.stringify(summary),data.evidenceReference,actor.userId],

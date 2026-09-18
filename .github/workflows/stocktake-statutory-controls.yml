@@ -1,0 +1,54 @@
+name: Stocktake Statutory Controls Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stocktake-statutory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: vyndi_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d vyndi_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vyndi_ci
+      VYNDI_ALLOW_DB_MIGRATIONS: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Fresh PostgreSQL migration including stocktake controls
+        run: npm run db:migrate
+
+      - name: Stocktake maker-checker / FIFO / statutory regression
+        run: node --test scripts/stocktake-statutory-controls.test.mjs
+
+      - name: Stocktake type and build compatibility
+        run: npm run typecheck
