@@ -34,8 +34,13 @@ export type SalesLedgerRow = {
   taxable_value_inr: number;
   gst_inr: number;
   gross_amount_inr: number;
+  credit_note_taxable_inr: number;
+  credit_note_gst_inr: number;
+  credit_note_gross_inr: number;
   collected_inr: number;
+  refunded_inr: number;
   balance_inr: number;
+  refund_due_inr: number;
   payment_status: string;
   credit_terms_days: number | null;
   due_on: string;
@@ -91,6 +96,65 @@ export type SpareIdentityOption = {
   supplierLot: string;
 };
 
+export type CustomerReturnRow = {
+  id: string;
+  invoice_id: string;
+  plan_month: number;
+  returned_on: string;
+  quantity: number;
+  disposition: string;
+  reason: string;
+  source_reference: string;
+  sale_type: string;
+  identity_uid: string;
+  restored_cogs_inr: number;
+  credit_note_id: string;
+  credit_note_gross_inr: number;
+};
+
+export type CustomerCreditNoteRow = {
+  id: string;
+  customer_return_id: string;
+  invoice_id: string;
+  plan_month: number;
+  credit_on: string;
+  quantity: number;
+  taxable_value_inr: number;
+  gst_inr: number;
+  gross_amount_inr: number;
+  source_reference: string;
+  refunded_inr: number;
+  credit_open_inr: number;
+};
+
+export type CustomerRefundRow = {
+  id: string;
+  credit_note_id: string;
+  plan_month: number;
+  refunded_on: string;
+  amount_inr: number;
+  evidence_reference: string;
+  journal_id: string;
+  cash_actual_revision: number;
+  new_closing_cash_lakh: number;
+  status: string;
+  revision: number;
+  reversal_reason: string;
+  created_by: string;
+  created_at: string;
+  invoice_id: string;
+};
+
+export type SalesLedgerWorkspaceData = {
+  ledger: SalesLedgerRow[];
+  spareSales: SpareSaleRow[];
+  inventory: SpareInventoryOption[];
+  identities: SpareIdentityOption[];
+  customerReturns: CustomerReturnRow[];
+  customerCreditNotes: CustomerCreditNoteRow[];
+  customerRefunds: CustomerRefundRow[];
+};
+
 const nullableNumber = (value: unknown) => (value == null ? null : Number(value));
 
 function toSalesLedgerRow(row: Record<string, unknown>): SalesLedgerRow {
@@ -117,8 +181,13 @@ function toSalesLedgerRow(row: Record<string, unknown>): SalesLedgerRow {
     taxable_value_inr: Number(row.taxable_value_inr ?? 0),
     gst_inr: Number(row.gst_inr ?? 0),
     gross_amount_inr: Number(row.gross_amount_inr ?? 0),
+    credit_note_taxable_inr: Number(row.credit_note_taxable_inr ?? 0),
+    credit_note_gst_inr: Number(row.credit_note_gst_inr ?? 0),
+    credit_note_gross_inr: Number(row.credit_note_gross_inr ?? 0),
     collected_inr: Number(row.collected_inr ?? 0),
+    refunded_inr: Number(row.refunded_inr ?? 0),
     balance_inr: Number(row.balance_inr ?? 0),
+    refund_due_inr: Number(row.refund_due_inr ?? 0),
     payment_status: String(row.payment_status ?? ""),
     credit_terms_days: nullableNumber(row.credit_terms_days),
     due_on: String(row.due_on ?? ""),
@@ -158,7 +227,7 @@ export const getSalesLedgerWorkspace = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await requireBusinessActor("view", actorInput(context));
     const sql = await getSql();
-    const [ledger, spareSales, inventory, identities] = await Promise.all([
+    const [ledger, spareSales, inventory, identities, customerReturns, customerCreditNotes, customerRefunds] = await Promise.all([
       sql.query<Record<string, unknown>>(
         `select * from vyndi_report_sales_ledger order by issued_on desc,invoice_id desc`,
       ),
@@ -189,6 +258,36 @@ export const getSalesLedgerWorkspace = createServerFn({ method: "GET" })
           where status='active' and part_sku<>''
           order by part_sku,visible_id`,
       ),
+      sql.query<Record<string, unknown>>(
+        `select r.id,r.invoice_id,r.plan_month,r.returned_on::text as returned_on,r.quantity,r.disposition,
+                r.reason,r.source_reference,r.sale_type,r.identity_uid::text,r.restored_cogs_inr,
+                cn.id as credit_note_id,cn.gross_amount_inr as credit_note_gross_inr
+           from vyndi_customer_returns r
+           left join vyndi_customer_credit_notes cn on cn.customer_return_id=r.id and cn.status='active'
+          order by r.returned_on desc,r.created_at desc`,
+      ),
+      sql.query<Record<string, unknown>>(
+        `select c.id,c.customer_return_id,c.invoice_id,c.plan_month,c.credit_on::text as credit_on,c.quantity,
+                c.taxable_value_inr,c.gst_inr,c.gross_amount_inr,c.source_reference,
+                coalesce(x.refunded_inr,0) as refunded_inr,
+                greatest(c.gross_amount_inr-coalesce(x.refunded_inr,0),0) as credit_open_inr
+           from vyndi_customer_credit_notes c
+           left join (
+             select credit_note_id,sum(amount_inr) as refunded_inr
+               from vyndi_customer_refunds where status='posted' group by credit_note_id
+           ) x on x.credit_note_id=c.id
+          where c.status='active'
+          order by c.credit_on desc,c.created_at desc`,
+      ),
+      sql.query<Record<string, unknown>>(
+        `select r.id,r.credit_note_id,r.plan_month,r.refunded_on::text as refunded_on,r.amount_inr,
+                r.evidence_reference,r.journal_id,r.cash_actual_revision,r.new_closing_cash_lakh,
+                r.status,r.revision,r.reversal_reason,r.created_by,r.created_at::text as created_at,
+                c.invoice_id
+           from vyndi_customer_refunds r
+           join vyndi_customer_credit_notes c on c.id=r.credit_note_id
+          order by r.created_at desc,r.id desc`,
+      ),
     ]);
 
     return {
@@ -216,7 +315,53 @@ export const getSalesLedgerWorkspace = createServerFn({ method: "GET" })
         oemSerialNumber: String(row.oem_serial_number ?? ""),
         supplierLot: String(row.supplier_lot ?? ""),
       })) satisfies SpareIdentityOption[],
-    };
+      customerReturns: customerReturns.map((row) => ({
+        id: String(row.id),
+        invoice_id: String(row.invoice_id),
+        plan_month: Number(row.plan_month ?? 0),
+        returned_on: String(row.returned_on ?? ""),
+        quantity: Number(row.quantity ?? 0),
+        disposition: String(row.disposition ?? ""),
+        reason: String(row.reason ?? ""),
+        source_reference: String(row.source_reference ?? ""),
+        sale_type: String(row.sale_type ?? ""),
+        identity_uid: String(row.identity_uid ?? ""),
+        restored_cogs_inr: Number(row.restored_cogs_inr ?? 0),
+        credit_note_id: String(row.credit_note_id ?? ""),
+        credit_note_gross_inr: Number(row.credit_note_gross_inr ?? 0),
+      })) satisfies CustomerReturnRow[],
+      customerCreditNotes: customerCreditNotes.map((row) => ({
+        id: String(row.id),
+        customer_return_id: String(row.customer_return_id),
+        invoice_id: String(row.invoice_id),
+        plan_month: Number(row.plan_month ?? 0),
+        credit_on: String(row.credit_on ?? ""),
+        quantity: Number(row.quantity ?? 0),
+        taxable_value_inr: Number(row.taxable_value_inr ?? 0),
+        gst_inr: Number(row.gst_inr ?? 0),
+        gross_amount_inr: Number(row.gross_amount_inr ?? 0),
+        source_reference: String(row.source_reference ?? ""),
+        refunded_inr: Number(row.refunded_inr ?? 0),
+        credit_open_inr: Number(row.credit_open_inr ?? 0),
+      })) satisfies CustomerCreditNoteRow[],
+      customerRefunds: customerRefunds.map((row) => ({
+        id: String(row.id),
+        credit_note_id: String(row.credit_note_id),
+        plan_month: Number(row.plan_month ?? 0),
+        refunded_on: String(row.refunded_on ?? ""),
+        amount_inr: Number(row.amount_inr ?? 0),
+        evidence_reference: String(row.evidence_reference ?? ""),
+        journal_id: String(row.journal_id ?? ""),
+        cash_actual_revision: Number(row.cash_actual_revision ?? 0),
+        new_closing_cash_lakh: Number(row.new_closing_cash_lakh ?? 0),
+        status: String(row.status ?? ""),
+        revision: Number(row.revision ?? 0),
+        reversal_reason: String(row.reversal_reason ?? ""),
+        created_by: String(row.created_by ?? ""),
+        created_at: String(row.created_at ?? ""),
+        invoice_id: String(row.invoice_id ?? ""),
+      })) satisfies CustomerRefundRow[],
+    } satisfies SalesLedgerWorkspaceData;
   });
 
 export const postSpareSaleDispatch = createServerFn({ method: "POST" })
@@ -353,4 +498,74 @@ export const issueSpareSaleInvoice = createServerFn({ method: "POST" })
       grossAmountInr: Number(row.gross_amount_inr),
       dueOn: String(row.due_on),
     };
+  });
+
+
+export const postCustomerReturn = createServerFn({ method: "POST" })
+  .validator(z.object({
+    id,
+    invoiceId: id,
+    planMonth: z.number().int().min(1).max(36),
+    returnedOn: z.string().date(),
+    quantity: z.number().positive(),
+    disposition: z.enum(["restock","quarantine","scrap"]),
+    identityUid: z.string().uuid().optional(),
+    reason: reference,
+    sourceReference: reference,
+  }))
+  .middleware([authMiddleware])
+  .handler(async ({ data, context }) => {
+    const actor = await requireBusinessActor("edit", actorInput(context));
+    const sql = await getSql();
+    const rows = await sql.query<{ return_id:string; restored_cogs_inr:number|string }>(
+      `select * from post_vyndi_customer_return($1,$2,$3,$4::date,$5,$6,$7::uuid,$8,$9,$10,$11)`,
+      [data.id,data.invoiceId,data.planMonth,data.returnedOn,data.quantity,data.disposition,
+       data.identityUid ?? null,data.reason,data.sourceReference,actor.userId,actor.role],
+    );
+    if (!rows[0]) throw new Error("Customer return / RMA did not return a controlled record.");
+    return { id:rows[0].return_id, restoredCogsInr:Number(rows[0].restored_cogs_inr) };
+  });
+
+export const issueCustomerCreditNote = createServerFn({ method: "POST" })
+  .validator(z.object({ id, customerReturnId:id, creditOn:z.string().date(), sourceReference:reference }))
+  .middleware([authMiddleware])
+  .handler(async ({ data, context }) => {
+    const actor = await requireBusinessActor("approve", actorInput(context));
+    const sql = await getSql();
+    const rows = await sql.query<{ credit_note_id:string; gross_amount_inr:number|string; refund_due_inr:number|string }>(
+      `select * from issue_vyndi_customer_credit_note($1,$2,$3::date,$4,$5,$6)`,
+      [data.id,data.customerReturnId,data.creditOn,data.sourceReference,actor.userId,actor.role],
+    );
+    if (!rows[0]) throw new Error("Customer credit note did not return a controlled record.");
+    return { id:rows[0].credit_note_id, grossAmountInr:Number(rows[0].gross_amount_inr), refundDueInr:Number(rows[0].refund_due_inr) };
+  });
+
+export const postCustomerRefund = createServerFn({ method: "POST" })
+  .validator(z.object({
+    id, creditNoteId:id, paymentPlanMonth:z.number().int().min(1).max(36),
+    refundedOn:z.string().date(), amountInr:z.number().positive(), evidenceReference:reference,
+  }))
+  .middleware([authMiddleware])
+  .handler(async ({ data, context }) => {
+    const actor = await requireBusinessActor("approve", actorInput(context));
+    const sql = await getSql();
+    const rows = await sql.query<{ refund_id:string; journal_id:string; new_closing_cash_lakh:number|string; actual_revision:number|string }>(
+      `select * from post_vyndi_customer_refund($1,$2,$3,$4::date,$5,$6,$7,$8)`,
+      [data.id,data.creditNoteId,data.paymentPlanMonth,data.refundedOn,data.amountInr,data.evidenceReference,actor.userId,actor.role],
+    );
+    if (!rows[0]) throw new Error("Customer refund did not return a controlled cash result.");
+    return { id:rows[0].refund_id, journalId:rows[0].journal_id, newClosingCashLakh:Number(rows[0].new_closing_cash_lakh), actualRevision:Number(rows[0].actual_revision) };
+  });
+
+export const reverseCustomerRefund = createServerFn({ method: "POST" })
+  .validator(z.object({ id, reversedOn:z.string().date(), reason:reference }))
+  .middleware([authMiddleware])
+  .handler(async ({ data, context }) => {
+    const actor = await requireBusinessActor("approve", actorInput(context));
+    const sql = await getSql();
+    const rows = await sql.query<{ revision:number|string }>(
+      `select reverse_vyndi_customer_refund($1,$2::date,$3,$4,$5) as revision`,
+      [data.id,data.reversedOn,data.reason,actor.userId,actor.role],
+    );
+    return { id:data.id, revision:Number(rows[0]?.revision ?? 0) };
   });
