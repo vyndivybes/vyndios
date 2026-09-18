@@ -178,6 +178,16 @@ export const routeRegistry: Record<string, RouteMeta> = {
     "keep",
     "Command",
   ),
+  "/command/recovery": meta(
+    "/command/recovery",
+    "Backup & Recovery Centre",
+    "operate",
+    "admin",
+    "founder",
+    "keep",
+    "Command",
+    { adminOnly: true },
+  ),
   "/command/investor-board": meta(
     "/command/investor-board",
     "Investor / Board",
