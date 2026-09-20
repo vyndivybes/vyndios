@@ -44,6 +44,7 @@ export const Route = createFileRoute("/command/engineering")({
   loader: async () => {
     const data = await listEngineeringAuthority();
     return {
+      vedmAuthority: data.vedmAuthority,
       baselines: (Array.isArray(data.baselines) ? data.baselines : []).map((row) => baselineView(row as Row)),
       changes: (Array.isArray(data.changes) ? data.changes : []).map((row) => changeView(row as Row)),
     };
@@ -160,6 +161,7 @@ function ChangeRecord({ row }: { row: Row }) {
 
 function Engineering() {
   const data = Route.useLoaderData();
+  const authority = data.vedmAuthority;
   const baselines = data.baselines as Row[];
   const changes = data.changes as Row[];
   const released = baselines.filter((row) => text(row, "status") === "released").length;
@@ -183,6 +185,29 @@ function Engineering() {
           <Link to="/command/bom-control" className="text-accent">BOM control →</Link>
         </div>
       </header>
+
+      <Panel title="VEDM Design Authority" kicker="Controlled geometry authority · preferred front-end development">
+        <div className="grid gap-3 lg:grid-cols-[1fr_1fr_1.6fr]">
+          <div className="rounded-lg border border-border/80 bg-bg/45 p-3">
+            <p className="text-[9px] font-semibold uppercase tracking-wider text-subtle">Frame geometry</p>
+            <p className="mt-1 text-sm font-semibold text-accent">{authority.frameGeometry}</p>
+          </div>
+          <div className="rounded-lg border border-border/80 bg-bg/45 p-3">
+            <p className="text-[9px] font-semibold uppercase tracking-wider text-subtle">Preferred development</p>
+            <p className="mt-1 text-sm font-semibold text-accent">{authority.preferredFrontEnd}</p>
+            <p className="mt-1 text-[10px] font-semibold uppercase text-amber">{authority.status}</p>
+          </div>
+          <div className="rounded-lg border border-border/80 bg-bg/45 p-3">
+            <p className="text-[9px] font-semibold uppercase tracking-wider text-subtle">Release boundary</p>
+            <p className="mt-1 text-xs leading-5 text-muted">{authority.summary}</p>
+            <p className="mt-2 text-[10px] text-subtle">{authority.sourceReference}</p>
+          </div>
+        </div>
+        <div className="mt-3 rounded-lg border border-border/80 bg-bg/45 p-3">
+          <p className="text-[9px] font-semibold uppercase tracking-wider text-subtle">Open decisive gates</p>
+          <p className="mt-1 text-xs leading-5 text-muted">{authority.releaseBlockers.join(" · ")}</p>
+        </div>
+      </Panel>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi label="Baselines" value={String(baselines.length)} hint="Canonical records" />
