@@ -53,6 +53,8 @@ test("active presentation surfaces contain no superseded VéLOXIS or VINDY label
     "src/routes/command/investor-pitch.tsx",
     "src/routes/command/market-survey.tsx",
     "src/routes/command/platform-walkthrough.tsx",
+    "src/routes/command/epr-live.tsx",
+    "src/routes/command/bom.tsx",
   ];
   for (const path of paths) {
     const content = await source(path);

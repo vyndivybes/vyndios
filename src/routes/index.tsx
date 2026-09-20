@@ -65,7 +65,7 @@ function Home() {
 
       <section className="mx-auto grid max-w-6xl gap-8 px-4 pb-20 sm:px-6 lg:grid-cols-3">
         {TIERS.map((t) => (
-          <Link key={t.id} to="/range/$tier" params={{ tier: t.id }} className="group block">
+          <Link key={t.id} to="/range/$tier" params={{ tier: t.name.replace("VYNDI ", "").toLowerCase() }} className="group block">
             <div className="vyndi-public-card overflow-hidden rounded-xl border border-border transition-colors duration-200 hover:border-accent/45">
               <img src={t.image} alt={`${t.name} carbon bicycle`} className="media aspect-[4/3] w-full object-cover transition-transform duration-500 group-hover:scale-[1.035]" />
               <div className="p-5">

@@ -1,27 +1,83 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getCommandRole } from "@/lib/command-access";
-import { requireBusinessActor } from "@/lib/business-actor";
+import { getBusinessWriteReadiness, requireBusinessActor } from "@/lib/business-actor";
+import { CURRENT_CARBON_EPR_PILOT_AUTHORITY } from "@/lib/engineering-current-authority";
 import { getSql } from "@/lib/db";
+import { canAccessRoute } from "@/lib/page-access";
 
 const ventureSchema = z.enum(["carbon", "aluminium"]);
 const gateSchema = z.enum(["EPR-04","EPR-05","EPR-06","EPR-07","EPR-08","EPR-09","EPR-10","EPR-11","EPR-12"]);
 const modelSchema = z.enum(["core", "pro", "apex"]);
 const modelNameSchema = z.enum(["Longitude", "Latitude", "Altitude"]);
+const EPR_ROUTE = "/command/epr-live";
+
 const modelNameForId: Record<z.infer<typeof modelSchema>, z.infer<typeof modelNameSchema>> = {
   core: "Longitude",
   pro: "Latitude",
   apex: "Altitude",
 };
+const familyForModelId: Record<z.infer<typeof modelSchema>, "longitude" | "latitude" | "altitude"> = {
+  core: "longitude",
+  pro: "latitude",
+  apex: "altitude",
+};
 
 async function requireCommand(write = false) {
   if (write) {
-    const actor = await requireBusinessActor("admin");
+    const actor = await requireBusinessActor("edit");
+    if (!canAccessRoute(actor.role, EPR_ROUTE)) throw new Error("EPR edit permission denied.");
     return actor.userId;
   }
   const role = await getCommandRole();
-  if (!role) throw new Error("Command access is required for EPR access.");
+  if (!role || !canAccessRoute(role, EPR_ROUTE)) throw new Error("EPR view permission denied.");
   return role;
+}
+
+async function resolveTravellerAuthority(
+  sql: Awaited<ReturnType<typeof getSql>>,
+  venture: z.infer<typeof ventureSchema>,
+  modelId: z.infer<typeof modelSchema>,
+) {
+  const bomRows = await sql.query<{ bom_revision: string }>(
+    `select bom_revision
+       from vyndi_bom_revision_current_state
+      where venture=$1 and model_id=$2
+      order by released_at desc nulls last, bom_revision desc
+      limit 1`,
+    [venture, modelId],
+  );
+  const bomRevision = bomRows[0]?.bom_revision?.trim();
+  if (!bomRevision) {
+    throw new Error(`Traveller creation blocked: no current controlled BOM revision exists for ${venture} / ${modelNameForId[modelId]}.`);
+  }
+
+  if (venture === "carbon") {
+    return {
+      bomRevision,
+      engineeringRevision: CURRENT_CARBON_EPR_PILOT_AUTHORITY,
+      engineeringStatus: "controlled-development-pilot" as const,
+    };
+  }
+
+  const engineeringRows = await sql.query<{ revision_code: string }>(
+    `select revision_code
+       from vyndi_released_engineering_baselines
+      where family_code=$1
+      order by released_at desc nulls last, updated_at desc
+      limit 1`,
+    [familyForModelId[modelId]],
+  );
+  const revision = engineeringRows[0]?.revision_code?.trim();
+  if (!revision) {
+    throw new Error(`Traveller creation blocked: no released engineering baseline exists for ${modelNameForId[modelId]}.`);
+  }
+
+  return {
+    bomRevision,
+    engineeringRevision: revision,
+    engineeringStatus: "released-baseline" as const,
+  };
 }
 
 function id(prefix: string) {
@@ -70,7 +126,14 @@ export const getEprSnapshot = createServerFn({ method: "GET" }).handler(async ()
   const evidence = await sql.query(`select id, traveller_id, gate_id, evidence_type, title, reference, disposition, notes, recorded_by, recorded_at from epr_evidence order by recorded_at desc limit 250`);
   const gateEvents = await sql.query(`select id, traveller_id, gate_id, status, reason, actor, created_at from epr_gate_events order by created_at desc limit 250`);
   const auditEvents = await sql.query(`select id, venture, entity_type, entity_id, action, actor, payload_json, created_at from epr_audit_events order by created_at desc limit 100`);
-  return { travellers, evidence, gateEvents, auditEvents };
+  const readiness = await getBusinessWriteReadiness();
+  const routeAllowed = Boolean(readiness.role && canAccessRoute(readiness.role, EPR_ROUTE));
+  const writeReadiness = {
+    ...readiness,
+    canEdit: routeAllowed && readiness.canEdit,
+    canApprove: routeAllowed && readiness.canApprove,
+  };
+  return { travellers, evidence, gateEvents, auditEvents, writeReadiness };
 });
 
 export const createEprTraveller = createServerFn({ method: "POST" })
@@ -79,8 +142,6 @@ export const createEprTraveller = createServerFn({ method: "POST" })
     modelId: modelSchema,
     modelName: modelNameSchema,
     sku: z.string().min(1).max(120),
-    bomRevision: z.string().min(1).max(120),
-    engineeringRevision: z.string().min(1).max(120),
     serialNumber: z.string().min(3).max(120),
     supplier: z.string().max(200).default(""),
   }))
@@ -90,11 +151,12 @@ export const createEprTraveller = createServerFn({ method: "POST" })
     if (modelNameForId[data.modelId] !== data.modelName) {
       throw new Error(`Model identity mismatch: ${data.modelId} maps to ${modelNameForId[data.modelId]}.`);
     }
+    const authority = await resolveTravellerAuthority(sql, data.venture, data.modelId);
     const travellerId = id("TRV");
     try {
       await sql.query(
         `insert into epr_travellers (id, venture, model_id, model_name, sku, bom_revision, engineering_revision, serial_number, supplier, created_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-        [travellerId, data.venture, data.modelId, data.modelName, data.sku, data.bomRevision, data.engineeringRevision, data.serialNumber.trim(), data.supplier.trim(), actor],
+        [travellerId, data.venture, data.modelId, data.modelName, data.sku, authority.bomRevision, authority.engineeringRevision, data.serialNumber.trim(), data.supplier.trim(), actor],
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -104,7 +166,14 @@ export const createEprTraveller = createServerFn({ method: "POST" })
       throw error;
     }
     await sql.query(`insert into epr_gate_events (id, traveller_id, gate_id, status, actor) values ($1,$2,'EPR-04','planned',$3)`, [id("GATE"), travellerId, actor]);
-    await audit(sql, data.venture, "traveller", travellerId, "created", actor, { ...data, serialNumber: data.serialNumber.trim() });
+    await audit(sql, data.venture, "traveller", travellerId, "created", actor, {
+      ...data,
+      serialNumber: data.serialNumber.trim(),
+      bomRevision: authority.bomRevision,
+      engineeringRevision: authority.engineeringRevision,
+      engineeringStatus: authority.engineeringStatus,
+      authorityResolvedServerSide: true,
+    });
     return { ok: true, travellerId };
   });
 
@@ -117,7 +186,9 @@ export const updateEprGate = createServerFn({ method: "POST" })
     reason: z.string().max(1000).default(""),
   }))
   .handler(async ({ data }) => {
-    const actor = await requireCommand(true);
+    const actorRecord = await requireBusinessActor(data.status === "passed" || data.status === "rejected" ? "approve" : "edit");
+    if (!canAccessRoute(actorRecord.role, EPR_ROUTE)) throw new Error("EPR gate permission denied.");
+    const actor = actorRecord.userId;
     const sql = await getSql();
     const traveller = await getTraveller(sql, data.travellerId);
     if (traveller.venture !== data.venture) throw new Error("Venture scope mismatch.");

@@ -29,6 +29,11 @@ export const Route = createFileRoute("/command/epr-live")({ component: LiveEpr }
 type Snapshot = Awaited<ReturnType<typeof getEprSnapshot>>;
 type Chain = Awaited<ReturnType<typeof getEprExecutionChain>>;
 const models = { core: "Longitude", pro: "Latitude", apex: "Altitude" } as const;
+const modelSkus = {
+  core: "VYNDI-LONGITUDE-PILOT",
+  pro: "VYNDI-LATITUDE-PILOT",
+  apex: "VYNDI-ALTITUDE-PILOT",
+} as const;
 const control = "rounded-md border border-border bg-bg px-3 py-2 text-sm";
 
 function LiveEpr() {
@@ -40,9 +45,7 @@ function LiveEpr() {
     venture: "carbon",
     modelId: "core",
     modelName: "Longitude",
-    sku: "VINDY-LONGITUDE-PILOT",
-    bomRevision: "BOM-001",
-    engineeringRevision: "VEDM-301-5.3.8",
+    sku: "VYNDI-LONGITUDE-PILOT",
     serialNumber: "",
     supplier: "",
   });
@@ -68,6 +71,8 @@ function LiveEpr() {
   }, []);
 
   const travellers = data?.travellers ?? [];
+  const canEdit = Boolean(data?.writeReadiness?.canEdit);
+  const canApprove = Boolean(data?.writeReadiness?.canApprove);
   const travellerVenture = (travellerId: string) =>
     (travellers.find((traveller: any) => traveller.id === travellerId)?.venture ?? "carbon") as "carbon" | "aluminium";
 
@@ -168,6 +173,7 @@ function LiveEpr() {
 
       <div className="rounded-xl border border-accent/30 bg-accent/5 p-4 text-xs leading-5 text-muted">
         <strong className="text-fg">Inventory authority:</strong> physical stock, valuation, MSL and FIFO are canonical in <Link to="/command/inventory" className="font-semibold text-accent">Master Inventory</Link>. Job-card reservations are commitments, not movements, and reserved material must be consumed from <Link to="/command/production" className="font-semibold text-accent">Production</Link> against the released traveller/serial. This EPR form is only for permitted direct unreserved issue/consume or return transactions.
+        {!canEdit ? <p className="mt-2 font-semibold text-warn">Read-only session: an individually authenticated role with edit permission is required for EPR transactions.</p> : null}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
@@ -181,13 +187,14 @@ function LiveEpr() {
       <Panel title="Create controlled pilot traveller" kicker="EPR-04 · serial genealogy root">
         <div className="grid gap-3 md:grid-cols-4">
           <select value={form.venture} onChange={(event) => setForm({ ...form, venture: event.target.value })} className={control}><option value="carbon">VYNDI · Carbon</option><option value="aluminium">Aluminium Bicycle</option></select>
-          <select value={form.modelId} onChange={(event) => { const modelId = event.target.value as keyof typeof models; setForm({ ...form, modelId, modelName: models[modelId] }); }} className={control}><option value="core">Longitude</option><option value="pro">Latitude</option><option value="apex">Altitude</option></select>
+          <select value={form.modelId} onChange={(event) => { const modelId = event.target.value as keyof typeof models; setForm({ ...form, modelId, modelName: models[modelId], sku: modelSkus[modelId] }); }} className={control}><option value="core">Longitude</option><option value="pro">Latitude</option><option value="apex">Altitude</option></select>
           <input value={form.sku} onChange={(event) => setForm({ ...form, sku: event.target.value })} placeholder="SKU" className={control} />
           <input value={form.serialNumber} onChange={(event) => setForm({ ...form, serialNumber: event.target.value })} placeholder="Serial number *" className={control} />
-          <input value={form.bomRevision} onChange={(event) => setForm({ ...form, bomRevision: event.target.value })} placeholder="BOM revision" className={control} />
-          <input value={form.engineeringRevision} onChange={(event) => setForm({ ...form, engineeringRevision: event.target.value })} placeholder="Engineering revision" className={control} />
+          <div className="rounded-md border border-border bg-surface px-3 py-2 text-xs leading-5 text-muted md:col-span-2">
+            BOM revision and engineering authority are resolved server-side from the controlled current state. Carbon pilot travellers are explicitly stamped as development-only until formal engineering release.
+          </div>
           <input value={form.supplier} onChange={(event) => setForm({ ...form, supplier: event.target.value })} placeholder="Supplier / OEM" className={control} />
-          <Button disabled={busy} onClick={create}><ClipboardPlus /> Create traveller</Button>
+          <Button disabled={busy || !canEdit} onClick={create}><ClipboardPlus /> Create traveller</Button>
         </div>
       </Panel>
 
@@ -202,7 +209,7 @@ function LiveEpr() {
           <input type="number" value={lot.quantity} onChange={(event) => setLot({ ...lot, quantity: Number(event.target.value) })} placeholder="Quantity" className={control} />
           <select value={lot.disposition} onChange={(event) => setLot({ ...lot, disposition: event.target.value })} className={control}><option>quarantine</option><option>accepted</option><option>rejected</option><option>consumed</option></select>
         </div>
-        <Button className="mt-3" disabled={busy} onClick={() => void execute("lot")}><PackageCheck /> Record lot</Button>
+        <Button className="mt-3" disabled={busy || !canEdit} onClick={() => void execute("lot")}><PackageCheck /> Record lot</Button>
       </Panel>
 
       <Panel title="Process execution" kicker="EPR-06 · traveller-linked operation record">
@@ -214,7 +221,7 @@ function LiveEpr() {
           <input value={operation.operatorName} onChange={(event) => setOperation({ ...operation, operatorName: event.target.value })} placeholder="Operator" className={control} />
           <select value={operation.status} onChange={(event) => setOperation({ ...operation, status: event.target.value })} className={control}><option>planned</option><option>in_progress</option><option>completed</option><option>hold</option><option>rework</option><option>rejected</option></select>
           <input value={operation.recordReference} onChange={(event) => setOperation({ ...operation, recordReference: event.target.value })} placeholder="Record reference" className={control} />
-          <Button disabled={busy} onClick={() => void execute("operation")}><Factory /> Record operation</Button>
+          <Button disabled={busy || !canEdit} onClick={() => void execute("operation")}><Factory /> Record operation</Button>
         </div>
       </Panel>
 
@@ -229,7 +236,7 @@ function LiveEpr() {
           <select value={inspection.result} onChange={(event) => setInspection({ ...inspection, result: event.target.value })} className={control}><option>pending</option><option>pass</option><option>fail</option><option>conditional</option></select>
           <input value={inspection.evidenceReference} onChange={(event) => setInspection({ ...inspection, evidenceReference: event.target.value })} placeholder="Evidence reference" className={control} />
         </div>
-        <Button className="mt-3" disabled={busy} onClick={() => void execute("inspection")}><Ruler /> Commit inspection</Button>
+        <Button className="mt-3" disabled={busy || !canEdit} onClick={() => void execute("inspection")}><Ruler /> Commit inspection</Button>
       </Panel>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -244,7 +251,7 @@ function LiveEpr() {
             <textarea value={ncr.description} onChange={(event) => setNcr({ ...ncr, description: event.target.value })} placeholder="Description *" className={`min-h-20 w-full ${control}`} />
             <textarea value={ncr.containment} onChange={(event) => setNcr({ ...ncr, containment: event.target.value })} placeholder="Containment" className={`min-h-16 w-full ${control}`} />
             <textarea value={ncr.correctiveAction} onChange={(event) => setNcr({ ...ncr, correctiveAction: event.target.value })} placeholder="Corrective action" className={`min-h-16 w-full ${control}`} />
-            <Button disabled={busy} onClick={() => void execute("ncr")}><AlertTriangle /> Commit NCR/CAPA</Button>
+            <Button disabled={busy || !canEdit} onClick={() => void execute("ncr")}><AlertTriangle /> Commit NCR/CAPA</Button>
           </div>
         </Panel>
 
@@ -262,7 +269,7 @@ function LiveEpr() {
               <input type="number" min="0.01" value={movement.quantity} onChange={(event) => setMovement({ ...movement, quantity: Number(event.target.value) })} className={control} />
             </div>
             <input value={movement.reference} onChange={(event) => setMovement({ ...movement, reference: event.target.value })} placeholder="Reference" className={`w-full ${control}`} />
-            <Button disabled={busy} onClick={() => void execute("movement")}><Boxes /> Commit direct movement</Button>
+            <Button disabled={busy || !canEdit} onClick={() => void execute("movement")}><Boxes /> Commit direct movement</Button>
           </div>
         </Panel>
       </div>
@@ -275,9 +282,9 @@ function LiveEpr() {
           <input value={evidence.title} onChange={(event) => setEvidence({ ...evidence, title: event.target.value })} placeholder="Evidence title *" className={control} />
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
-          <Button disabled={busy} onClick={addEvidence}><FilePlus2 /> Commit evidence</Button>
-          <Button disabled={busy || !evidence.travellerId} variant="outline" onClick={() => void gate(evidence.travellerId, "in_progress")}><ArrowRight /> Start selected gate</Button>
-          <Button disabled={busy || !evidence.travellerId} onClick={() => void gate(evidence.travellerId, "passed")}><CheckCircle2 /> Pass selected gate</Button>
+          <Button disabled={busy || !canEdit} onClick={addEvidence}><FilePlus2 /> Commit evidence</Button>
+          <Button disabled={busy || !canEdit || !evidence.travellerId} variant="outline" onClick={() => void gate(evidence.travellerId, "in_progress")}><ArrowRight /> Start selected gate</Button>
+          <Button disabled={busy || !canApprove || !evidence.travellerId} onClick={() => void gate(evidence.travellerId, "passed")}><CheckCircle2 /> Pass selected gate</Button>
         </div>
       </Panel>
 

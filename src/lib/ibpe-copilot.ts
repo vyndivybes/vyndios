@@ -33,6 +33,7 @@ export type IbpeCopilotResponse = {
     sourceSha: string;
   };
   scenarioId?: string;
+  knowledgeEvidence?: VibpeKnowledgeEvidence[];
   advisoryOnly: true;
 };
 
@@ -656,8 +657,9 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
       }
     }
 
-    if (shouldSurfaceKnowledgeEvidence(data.question) && knowledgeEvidence.length) {
-      const evidenceText = formatKnowledgeEvidence(knowledgeEvidence);
+    const surfacedKnowledgeEvidence = shouldSurfaceKnowledgeEvidence(data.question) ? knowledgeEvidence : [];
+    if (surfacedKnowledgeEvidence.length) {
+      const evidenceText = formatKnowledgeEvidence(surfacedKnowledgeEvidence);
       if (evidenceText && !answer.includes("VIBPE knowledge evidence (governed Drive references; not automatic master authority):")) {
         answer = `${answer}\n\n${evidenceText}`;
       }
@@ -697,6 +699,7 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
       mode,
       lineage,
       scenarioId,
+      knowledgeEvidence: surfacedKnowledgeEvidence,
       advisoryOnly: true,
     };
   }));

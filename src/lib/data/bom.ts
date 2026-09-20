@@ -1,3 +1,5 @@
+import { TIERS } from "./company";
+
 export type BomLine = {
   item: string;
   core: number;
@@ -53,8 +55,10 @@ export const BLENDED_COGS =
 
 // Keep the blended commercial model tied to the published tier ASPs.
 // This prevents stale pricing from diverging from the Range page / product model.
+const ASP_BY_TIER = Object.fromEntries(TIERS.map((tier) => [tier.id, tier.asp])) as Record<keyof typeof MIX, number>;
+
 export const BLENDED_ASP =
-  129900 * MIX.core + 179900 * MIX.pro + 264900 * MIX.apex;
+  ASP_BY_TIER.core * MIX.core + ASP_BY_TIER.pro * MIX.pro + ASP_BY_TIER.apex * MIX.apex;
 
 export const CHANNEL = {
   d2cShare: 0.7,

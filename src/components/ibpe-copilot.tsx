@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "@tanstack/react-router";
-import { Bot, BrainCircuit, ChevronRight, FileSearch, Printer, Send, ShieldCheck, Sparkles, X } from "lucide-react";
+import { Bot, BrainCircuit, ChevronRight, ExternalLink, FileSearch, Printer, Send, ShieldCheck, Sparkles, X } from "lucide-react";
 import { VIBPE_COPILOT_NAME } from "@/lib/ibpe-brand";
 import { VYNDI_PRINT_BRAND_CSS, vyndiPrintBrandMarkup } from "@/lib/print-brand";
-import { askIbpeCopilot } from "@/lib/ibpe-copilot";
+import { askIbpeCopilot, type IbpeCopilotResponse } from "@/lib/ibpe-copilot";
 import { getAdvancedPlanningVibpeEvidence } from "@/lib/advanced-planning-vibpe-evidence";
 import type { IbpeScenarioRequest } from "@/lib/ibpe-scenario-lab";
 import { askVibpeOperationalStatus } from "@/lib/vibpe-operational-status";
 import { askTraceabilityCopilot } from "@/lib/traceability-search";
 import { askVibpeGovernanceCopilot } from "@/lib/vibpe-governance-server";
+import { workspaceForRoute, type CanonicalWorkspaceId } from "@/lib/operating-workflow";
+
+type KnowledgeEvidence = NonNullable<IbpeCopilotResponse["knowledgeEvidence"]>[number];
 
 type Message = {
   id: string;
@@ -17,6 +20,7 @@ type Message = {
   question?: string;
   meta?: string;
   traceabilityQuery?: string;
+  knowledgeEvidence?: KnowledgeEvidence[];
 };
 
 type ScenarioEvent = CustomEvent<IbpeScenarioRequest | null>;
@@ -25,6 +29,7 @@ type RoutedAnswer = {
   text: string;
   meta?: string;
   traceabilityQuery?: string;
+  knowledgeEvidence?: KnowledgeEvidence[];
 };
 
 const suggestions = [
@@ -34,14 +39,19 @@ const suggestions = [
   "Find the records related to a Job Card, serial number or PO reference.",
 ];
 
+const COPILOT_WORKSPACE_LABELS: Record<CanonicalWorkspaceId, string> = {
+  command: "Command",
+  "plan-sales": "Plan & Commercial",
+  engineering: "Product & Engineering",
+  operations: "Supply & Operations",
+  "people-office": "People & Office",
+  finance: "Finance",
+  governance: "Governance & Assurance",
+  admin: "Admin",
+};
+
 function workspaceLabel(pathname: string) {
-  if (pathname.startsWith("/command/planning") || pathname.startsWith("/command/scenarios")) return "Planning";
-  if (pathname.startsWith("/command/inventory") || pathname.startsWith("/command/procurement") || pathname.startsWith("/command/production") || pathname.startsWith("/command/operations")) return "Supply & Production";
-  if (pathname.startsWith("/command/financial") || pathname.startsWith("/command/finance") || pathname.startsWith("/command/cash") || pathname.startsWith("/command/funding")) return "Finance";
-  if (pathname.startsWith("/command/sales")) return "Commercial";
-  if (pathname.startsWith("/command/engineering") || pathname.startsWith("/command/bom") || pathname.startsWith("/command/product")) return "Engineering";
-  if (pathname.startsWith("/command/governance")) return "Governance";
-  return "Command";
+  return COPILOT_WORKSPACE_LABELS[workspaceForRoute(pathname) ?? "command"];
 }
 
 function numberedQuestions(text: string) {
@@ -219,6 +229,7 @@ export function IbpeCopilot() {
       meta: response.lineage
         ? `Governed R${response.lineage.approvedPlanRevision} · ${response.lineage.inputHash.slice(0, 8)}${response.scenarioId ? ` · scenario ${response.scenarioId}` : ""}${advancedPacketId ? " · advanced evidence linked" : ""}`
         : undefined,
+      knowledgeEvidence: response.knowledgeEvidence,
     };
   }
 
@@ -275,6 +286,7 @@ export function IbpeCopilot() {
           question: clean,
           meta: routed.meta,
           traceabilityQuery: routed.traceabilityQuery,
+          knowledgeEvidence: routed.knowledgeEvidence,
         },
       ]);
     } catch (error) {
@@ -352,6 +364,30 @@ export function IbpeCopilot() {
                     <article key={message.id} className={message.role === "user" ? "ml-8 rounded-xl border border-accent/25 bg-accent/8 p-4" : "mr-4 rounded-xl border border-border bg-surface/35 p-4"}>
                       <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-green">{message.role === "user" ? "You" : VIBPE_COPILOT_NAME}</p>
                       <div className="whitespace-pre-wrap text-sm leading-6 text-fg">{message.text}</div>
+                      {message.role === "assistant" && message.knowledgeEvidence?.length ? (
+                        <div className="mt-3 grid gap-2">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-green">Evidence</p>
+                          {message.knowledgeEvidence.map((evidence) => (
+                            <div key={`${evidence.documentId}-${evidence.sourceLocator ?? evidence.claimText}`} className="rounded-lg border border-border bg-bg/55 p-3">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="truncate text-xs font-semibold text-fg">{evidence.title}</p>
+                                  <p className="mt-1 text-[10px] text-subtle">
+                                    {evidence.sourceRevision ? `Rev ${evidence.sourceRevision} · ` : ""}{evidence.authority} · {evidence.reviewDate ?? "undated"}
+                                  </p>
+                                </div>
+                                {evidence.externalUrl ? (
+                                  <a href={evidence.externalUrl} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 rounded-md border border-accent/35 px-2 py-1 text-[10px] font-semibold text-accent hover:bg-accent/10">
+                                    Open source <ExternalLink className="size-3" />
+                                  </a>
+                                ) : null}
+                              </div>
+                              <p className="mt-2 text-xs leading-5 text-muted">{evidence.claimText}</p>
+                              {evidence.sourcePath ? <p className="mt-2 break-all text-[10px] text-subtle">{evidence.sourcePath}</p> : null}
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
                       {message.role === "assistant" ? (
                         <div className="mt-3 flex flex-wrap gap-2 border-t border-border/70 pt-3">
                           <button type="button" onClick={() => printAssistantResult(message, workspace)} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-fg" aria-label="Print VIBPE result"><Printer className="size-3.5" /> Print Result</button>

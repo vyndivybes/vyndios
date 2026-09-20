@@ -281,11 +281,11 @@ export const routeRegistry: Record<string, RouteMeta> = {
   "/command/epr-live": meta(
     "/command/epr-live",
     "Live EPR Transactions",
-    "observe",
+    "operate",
     "epr",
     "compliance",
     "keep",
-    "Observe",
+    "Operate",
   ),
   "/command/planning": meta(
     "/command/planning",

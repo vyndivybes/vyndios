@@ -4,13 +4,9 @@ import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { TIERS } from "@/lib/data/company";
 import { BOM, bomTotal } from "@/lib/data/bom";
 import { SEED_INVENTORY, type InventoryCategory, type InventoryItem } from "@/lib/data/inventory";
-import { getAuthoritativeInventory } from "@/lib/inventory-authority";
 import { inr, pct } from "@/lib/format";
 
-export const Route = createFileRoute("/range/$tier")({
-  loader: async () => getAuthoritativeInventory(),
-  component: TierPage,
-});
+export const Route = createFileRoute("/range/$tier")({ component: TierPage });
 const DEFAULTS = {
   core: {
     groupset: "gs-105-r7000",
@@ -56,6 +52,14 @@ const DEFAULTS = {
   },
 } as const;
 type Tier = keyof typeof DEFAULTS;
+const PUBLIC_TIER_TO_ID: Record<string, Tier> = {
+  longitude: "core",
+  latitude: "pro",
+  altitude: "apex",
+  core: "core",
+  pro: "pro",
+  apex: "apex",
+};
 const CONFIG_CATEGORIES: { key: InventoryCategory; title: string }[] = [
   { key: "groupset", title: "Groupset" },
   { key: "wheelset", title: "Wheelset" },
@@ -83,30 +87,17 @@ function delta(item: InventoryItem, options: readonly InventoryItem[], defaultId
 
 function TierPage() {
   const { tier } = Route.useParams();
-  const authoritative = Route.useLoaderData();
-  const t = TIERS.find((x) => x.id === tier);
+  const tierId = PUBLIC_TIER_TO_ID[tier.toLowerCase()];
+  if (!tierId) throw notFound();
+  const t = TIERS.find((x) => x.id === tierId);
   if (!t) throw notFound();
-  const tierId = t.id as Tier;
   const defaults = DEFAULTS[tierId];
-  const inventory = useMemo(() => {
-    const balanceBySku = new Map<string, number>();
-    for (const row of authoritative) {
-      if (row.venture !== "carbon") continue;
-      balanceBySku.set(`${row.sku}|${row.unit}`, Number(row.quantity_balance ?? 0));
-    }
-    return SEED_INVENTORY.map((item) => ({
-      ...item,
-      stockQty: balanceBySku.get(`${item.sku}|unit`) ?? 0,
-    }));
-  }, [authoritative]);
-  const eligible = inventory.filter((x) => tierEnabled(x, tierId));
-  const options = useMemo(
-    () =>
-      Object.fromEntries(
-        CONFIG_CATEGORIES.map(({ key }) => [key, eligible.filter((x) => x.category === key)]),
-      ) as Record<InventoryCategory, InventoryItem[]>,
-    [inventory, tierId],
-  );
+  const options = useMemo(() => {
+    const eligible = SEED_INVENTORY.filter((x) => tierEnabled(x, tierId));
+    return Object.fromEntries(
+      CONFIG_CATEGORIES.map(({ key }) => [key, eligible.filter((x) => x.category === key)]),
+    ) as Record<InventoryCategory, InventoryItem[]>;
+  }, [tierId]);
   const [selection, setSelection] = useState<Record<string, string>>({ ...defaults });
   useEffect(() => {
     const next = { ...selection };
@@ -114,7 +105,7 @@ function TierPage() {
       if (!options[key]?.some((x) => x.id === next[key])) next[key] = options[key]?.[0]?.id ?? "";
     });
     setSelection(next);
-  }, [inventory, tierId]);
+  }, [options, tierId]);
   const selected = useMemo(
     () =>
       Object.fromEntries(
@@ -184,9 +175,9 @@ function TierPage() {
               </p>
               <h2 className="mt-1 text-3xl font-bold text-accent">Configure an eligible build</h2>
               <p className="mt-2 max-w-2xl text-sm text-muted">
-                Every range-approved option remains selectable even when physical stock is zero.
-                Price comes from the catalogue; availability comes only from posted inventory and
-                shortages feed procurement after demand is confirmed.
+                Every range-approved option remains selectable from the public catalogue.
+                Live physical stock and valuation stay protected inside VYNDI OS; availability is
+                confirmed only after demand is captured.
               </p>
             </div>
             <div className="rounded-xl border border-accent/40 bg-bg/90 px-5 py-3 text-right">
@@ -321,8 +312,7 @@ function Dropdown({
           return (
             <option key={option.id} value={option.id}>
               {optionLabel(option)} · {option.subcategory} · {option.detail} ·{" "}
-              {d === 0 ? "Included" : d > 0 ? `+${inr(d)}` : `−${inr(Math.abs(d))}`} ·{" "}
-              {option.stockQty} available
+              {d === 0 ? "Included" : d > 0 ? `+${inr(d)}` : `−${inr(Math.abs(d))}`}
             </option>
           );
         })}
@@ -333,15 +323,7 @@ function Dropdown({
             <span>
               Catalogue rate: <strong className="text-fg">{inr(selected.priceInr)}</strong>
             </span>
-            <span>
-              Physical stock:{" "}
-              <strong className={selected.stockQty > 0 ? "text-green" : "text-warn"}>
-                {selected.stockQty}
-              </strong>
-            </span>
-            {selected.stockQty <= 0 ? (
-              <span className="font-semibold text-warn">Procurement required when ordered</span>
-            ) : null}
+            <span>Availability: <strong className="text-fg">confirmed after demand capture</strong></span>
           </>
         ) : null}
       </div>
