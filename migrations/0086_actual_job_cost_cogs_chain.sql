@@ -201,7 +201,7 @@ create or replace function post_vyndi_shipment(
   p_actor_user_id text,p_actor_role text
 ) returns text
 language plpgsql
-as $
+as $$
 declare
   v_order_status text;
   v_order_units numeric;
@@ -295,7 +295,7 @@ begin
 
   return p_id;
 end;
-$;
+$$;
 
 create or replace view vyndi_job_actual_cost_trace as
 select

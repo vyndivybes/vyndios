@@ -21,7 +21,7 @@ create or replace function create_vyndi_people_office_actual_expenditure(
   p_actor_role text
 ) returns text
 language plpgsql
-as $
+as $$
 declare
   v_label text;
   v_category text;
@@ -76,7 +76,7 @@ begin
       'amountInr',round(p_amount_inr,2),'debitAccount',v_debit,'liabilityAccount',v_liability));
   return p_id;
 end;
-$;
+$$;
 
 create or replace view vyndi_people_office_finance_feed as
 with months as (select generate_series(1,36)::int as plan_month),
@@ -351,7 +351,7 @@ $$;
 create or replace function refresh_vyndi_tooling_depreciation_allocation_status(p_journal_id text)
 returns void
 language plpgsql
-as $
+as $$
 declare
   v_run_id text;
   v_total integer:=0;
@@ -380,19 +380,19 @@ begin
      end
    where id=v_run_id;
 end;
-$;
+$$;
 
 create or replace function trg_refresh_vyndi_tooling_allocation_status()
 returns trigger
 language plpgsql
-as $
+as $$
 begin
   if new.category='manufacturing_depreciation' then
     perform refresh_vyndi_tooling_depreciation_allocation_status(new.source_journal_id);
   end if;
   return new;
 end;
-$;
+$$;
 
 drop trigger if exists trg_vyndi_tooling_allocation_status on epr_job_conversion_cost_allocations;
 create trigger trg_vyndi_tooling_allocation_status

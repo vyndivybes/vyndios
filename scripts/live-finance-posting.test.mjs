@@ -31,6 +31,16 @@ const accountingRoute = read("src/routes/command/accounting.tsx");
 const peopleOfficeAuthority = read("src/lib/people-office-authority.ts");
 const peopleOfficeRoute = read("src/routes/command/people-office.tsx");
 
+test("manufacturing finance migrations use valid PL/pgSQL dollar quoting", () => {
+  for (const [name, sql] of [
+    ["0086 actual job COGS", actualCogsMigration],
+    ["0087 tooling recovery", toolingRecoveryMigration],
+  ]) {
+    assert.doesNotMatch(sql, /\bas \$\r?\n/, `${name} contains a single-dollar PL/pgSQL opening delimiter`);
+    assert.doesNotMatch(sql, /^\$;\s*$/m, `${name} contains a single-dollar PL/pgSQL closing delimiter`);
+  }
+});
+
 test("live accounting migration covers canonical transaction chain", () => {
   for (const required of [
     "trg_vyndi_finance_supplier_invoice",
