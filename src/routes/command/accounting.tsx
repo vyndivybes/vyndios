@@ -3,9 +3,15 @@ import { BookOpenCheck, Boxes, Landmark, ReceiptText, Scale, WalletCards } from 
 import { useState, type ReactNode } from "react";
 import { Kpi, Panel } from "@/components/kpi";
 import {
+  approveJobConversionCostAllocation,
+  approveToolingCostProfile,
+  createJobConversionCostAllocation,
+  createToolingCostProfile,
   getAccountingWorkbench,
   importBankStatementLine,
   matchBankStatementLine,
+  postToolingDepreciation,
+  rejectJobConversionCostAllocation,
   savePayrollControl,
 } from "@/lib/finance/accounting-authority";
 import { CORE_CHART_OF_ACCOUNTS } from "@/lib/finance/general-ledger";
@@ -30,6 +36,28 @@ function AccountingWorkbench() {
   const [message, setMessage] = useState("");
   const [bankDraft, setBankDraft] = useState({ id: "", bankAccountRef: "BANK-01", statementDate: today(), amountInr: 0, reference: "" });
   const [payrollDraft, setPayrollDraft] = useState({ payrollId: "", sourceExpenditureId: "", period: month(), grossPayInr: 0, deductionsInr: 0, employerCostInr: 0, statutoryPayableInr: 0, paymentReference: "", returnEvidenceReference: "" });
+  const [toolDraft, setToolDraft] = useState({
+    id: "",
+    assetId: "",
+    toolType: "frame_mould" as "frame_mould" | "fork_mould" | "seatpost_mould" | "bladder_eps_mandrel" | "trim_drill_fixture" | "bonding_fixture" | "curing_fixture" | "inspection_gauge" | "other_tooling",
+    productId: "",
+    variantId: "",
+    frameSize: "",
+    process: "",
+    residualValueInr: 0,
+    commercialRecoveryBasisInr: 0,
+    targetRecoveryQuantity: 0,
+    sourceReference: "",
+  });
+  const [toolDepDraft, setToolDepDraft] = useState({ profileId: "", period: month(), sourceReference: "" });
+  const [costDraft, setCostDraft] = useState({
+    id: "",
+    jobCardId: "",
+    category: "direct_labour" as "direct_labour" | "outsourcing" | "manufacturing_consumables" | "manufacturing_depreciation" | "support_depreciation" | "overhead" | "scrap" | "rework",
+    amountInr: 0,
+    sourceJournalLine: "",
+    sourceReference: "",
+  });
 
   const summary = data.summary as Record<string, unknown>;
   const openExceptions = data.exceptions.filter((row) => !row.resolved);
@@ -122,22 +150,241 @@ function AccountingWorkbench() {
         </div>
       </Panel>
 
-      <Panel title="Job Cost · WIP · Finished Goods" kicker="FIFO actual material → controlled completion">
+      <Panel title="Job Cost · WIP · Finished Goods" kicker="FIFO material + approved conversion cost → controlled completion → dispatch COGS">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {data.jobCosts.map((row) => (
             <article key={text(row, "id")} className="rounded-xl border border-border p-4">
               <div className="flex items-start justify-between gap-3"><div><p className="font-mono text-xs text-accent">{text(row, "job_card_id")}</p><p className="mt-1 text-sm font-semibold">{text(row, "model")}</p></div><Boxes className="size-4 text-green" /></div>
               <dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted">
                 <Stat label="Material actual" value={money(row.material_actual_inr)} />
-                <Stat label="Variance" value={money(row.material_variance_inr)} />
+                <Stat label="Direct labour" value={money(row.direct_labour_inr)} />
+                <Stat label="Outsourcing" value={money(row.outsourcing_inr)} />
+                <Stat label="Mfg overhead" value={money(Number(row.manufacturing_consumables_inr??0)+Number(row.manufacturing_depreciation_inr??0)+Number(row.support_depreciation_inr??0)+Number(row.overhead_inr??0)+Number(row.scrap_inr??0)+Number(row.rework_inr??0))} />
+                <Stat label="Total actual" value={money(row.total_actual_cost_inr)} />
                 <Stat label="Unit actual" value={money(row.unit_actual_cost_inr)} />
                 <Stat label="FG value" value={money(row.finished_goods_value_inr)} />
-                <Stat label="WIP" value={money(row.wip_value_inr)} />
                 <Stat label="Completed" value={String(row.completed_quantity ?? 0)} />
               </dl>
             </article>
           ))}
           {!data.jobCosts.length ? <Empty>Job cost snapshots will appear when controlled Production completes.</Empty> : null}
+        </div>
+      </Panel>
+
+      <Panel title="Tooling Cost & Recovery Authority" kicker="Fixed asset → depreciation → Job Card COGS · commercial recovery remains separate">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Kpi label="Approved tooling profiles" value={String(data.toolingRecovery.length)} hint="Mapped fixed tooling assets" />
+          <Kpi label="Tooling acquisition basis" value={money(data.toolingRecovery.reduce((sum,row)=>sum+num(row,"acquisition_cost_inr"),0))} hint="Governed fixed-asset cost" />
+          <Kpi label="Commercial recovery achieved" value={money(data.toolingRecovery.reduce((sum,row)=>sum+num(row,"commercial_recovery_progress_inr"),0))} hint="Management KPI · not a journal" />
+          <Kpi label="Unrecovered tooling" value={money(data.toolingRecovery.reduce((sum,row)=>sum+num(row,"commercial_recovery_remaining_inr"),0))} hint="Target recovery balance" tone={data.toolingRecovery.some(row=>num(row,"commercial_recovery_remaining_inr")>0)?"warn":"ok"} />
+        </div>
+
+        <div className="mt-4 rounded-xl border border-border bg-surface/60 p-4 text-sm leading-6 text-muted">
+          <span className="font-semibold text-fg">Accounting:</span> monthly tooling depreciation posts <span className="font-mono text-xs">Dr 6500 / Cr 1590</span>, then creates draft manufacturing-depreciation allocations for eligible open Job Cards. Approved allocations move the cost into WIP and ultimately actual COGS.
+          <span className="ml-1 font-semibold text-fg">Commercial recovery:</span> target ₹/unit and unrecovered balance are management/pricing measures only; they do not inflate accounting COGS.
+          <div className="mt-3 flex flex-wrap gap-3">
+            <Link to="/command/people-office" className="font-semibold text-accent">Open source Asset Register →</Link>
+            <Link to="/command/accounting/people-office-payments" className="font-semibold text-accent">Open actual CAPEX / payment evidence →</Link>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-5 xl:grid-cols-2">
+          <form onSubmit={(event)=>{
+            event.preventDefault();
+            void run(
+              ()=>createToolingCostProfile({data:{
+                id:toolDraft.id,
+                assetId:toolDraft.assetId,
+                toolType:toolDraft.toolType,
+                productId:toolDraft.productId||undefined,
+                variantId:toolDraft.variantId||undefined,
+                frameSize:toolDraft.frameSize||undefined,
+                process:toolDraft.process||undefined,
+                residualValueInr:toolDraft.residualValueInr,
+                commercialRecoveryBasisInr:toolDraft.commercialRecoveryBasisInr,
+                targetRecoveryQuantity:toolDraft.targetRecoveryQuantity,
+                sourceReference:toolDraft.sourceReference,
+              }}),
+              `${toolDraft.id} tooling profile saved as draft.`,
+            );
+          }} className="rounded-xl border border-border p-4">
+            <h3 className="text-sm font-semibold text-fg">1 · Map governed tooling asset</h3>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <Field label="Profile ID"><input className="control mt-1.5" value={toolDraft.id} onChange={(e)=>setToolDraft({...toolDraft,id:e.target.value})} placeholder="TOOL-FRAME-M-S01" /></Field>
+              <Field label="Fixed tooling asset">
+                <select className="control mt-1.5" value={toolDraft.assetId} onChange={(e)=>setToolDraft({...toolDraft,assetId:e.target.value})}>
+                  <option value="">Select governed fixed asset</option>
+                  {data.assets.filter(row=>text(row,"status")==="active").map(row=><option key={text(row,"asset_id")} value={text(row,"asset_id")}>{text(row,"asset_id")} · {text(row,"description")} · {money(row.acquisition_cost_inr)}</option>)}
+                </select>
+              </Field>
+              <Field label="Tool type">
+                <select className="control mt-1.5" value={toolDraft.toolType} onChange={(e)=>setToolDraft({...toolDraft,toolType:e.target.value as typeof toolDraft.toolType})}>
+                  <option value="frame_mould">Frame mould</option><option value="fork_mould">Fork mould</option><option value="seatpost_mould">Seatpost mould</option>
+                  <option value="bladder_eps_mandrel">Bladder / EPS / mandrel</option><option value="trim_drill_fixture">Trim / drill fixture</option>
+                  <option value="bonding_fixture">Bonding fixture</option><option value="curing_fixture">Curing fixture</option><option value="inspection_gauge">Inspection gauge</option><option value="other_tooling">Other tooling</option>
+                </select>
+              </Field>
+              <Field label="Product ID · optional"><input className="control mt-1.5" value={toolDraft.productId} onChange={(e)=>setToolDraft({...toolDraft,productId:e.target.value})} placeholder="carbon" /></Field>
+              <Field label="Variant · optional"><input className="control mt-1.5" value={toolDraft.variantId} onChange={(e)=>setToolDraft({...toolDraft,variantId:e.target.value})} placeholder="Exact variant if dedicated" /></Field>
+              <Field label="Frame size · optional"><input className="control mt-1.5" value={toolDraft.frameSize} onChange={(e)=>setToolDraft({...toolDraft,frameSize:e.target.value})} placeholder="XS / S / M / L / XL" /></Field>
+              <Field label="Process · descriptive only"><input className="control mt-1.5" value={toolDraft.process} onChange={(e)=>setToolDraft({...toolDraft,process:e.target.value})} placeholder="Cure / bonding / inspection" /></Field>
+              <Field label="Residual value"><input className="control mt-1.5" type="number" min="0" step="0.01" value={toolDraft.residualValueInr} onChange={(e)=>setToolDraft({...toolDraft,residualValueInr:Number(e.target.value)})} /></Field>
+              <Field label="Commercial recovery basis"><input className="control mt-1.5" type="number" min="0.01" step="0.01" value={toolDraft.commercialRecoveryBasisInr} onChange={(e)=>setToolDraft({...toolDraft,commercialRecoveryBasisInr:Number(e.target.value)})} /></Field>
+              <Field label="Target recovery quantity"><input className="control mt-1.5" type="number" min="0.0001" step="1" value={toolDraft.targetRecoveryQuantity} onChange={(e)=>setToolDraft({...toolDraft,targetRecoveryQuantity:Number(e.target.value)})} /></Field>
+              <Field label="Evidence / policy"><input className="control mt-1.5" value={toolDraft.sourceReference} onChange={(e)=>setToolDraft({...toolDraft,sourceReference:e.target.value})} placeholder="Asset invoice + tooling recovery approval" /></Field>
+            </div>
+            <button disabled={busy||!toolDraft.id||!toolDraft.assetId||!toolDraft.sourceReference||toolDraft.commercialRecoveryBasisInr<=0||toolDraft.targetRecoveryQuantity<=0||!(toolDraft.productId||toolDraft.variantId||toolDraft.frameSize)} className="mt-4 min-h-11 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-40">Save tooling profile</button>
+          </form>
+
+          <form onSubmit={(event)=>{
+            event.preventDefault();
+            void run(
+              ()=>postToolingDepreciation({data:toolDepDraft}),
+              `Tooling depreciation posted for ${toolDepDraft.period}; eligible Job Card allocations created as drafts.`,
+            );
+          }} className="rounded-xl border border-border p-4">
+            <h3 className="text-sm font-semibold text-fg">2 · Post monthly tooling depreciation</h3>
+            <p className="mt-2 text-xs leading-5 text-muted">Straight-line depreciation uses the governed fixed-asset acquisition cost, useful life and tooling residual value. The system will not depreciate beyond the governed depreciable basis.</p>
+            <div className="mt-3 grid gap-3">
+              <Field label="Approved tooling profile">
+                <select className="control mt-1.5" value={toolDepDraft.profileId} onChange={(e)=>setToolDepDraft({...toolDepDraft,profileId:e.target.value})}>
+                  <option value="">Select approved profile</option>
+                  {data.toolingProfiles.filter(row=>text(row,"status")==="approved").map(row=><option key={text(row,"id")} value={text(row,"id")}>{text(row,"id")} · {text(row,"description")}</option>)}
+                </select>
+              </Field>
+              <Field label="Period"><input className="control mt-1.5" type="month" value={toolDepDraft.period} onChange={(e)=>setToolDepDraft({...toolDepDraft,period:e.target.value})} /></Field>
+              <Field label="Posting evidence"><input className="control mt-1.5" value={toolDepDraft.sourceReference} onChange={(e)=>setToolDepDraft({...toolDepDraft,sourceReference:e.target.value})} placeholder="Monthly depreciation review / close reference" /></Field>
+            </div>
+            <button disabled={busy||!toolDepDraft.profileId||!toolDepDraft.period||!toolDepDraft.sourceReference} className="mt-4 min-h-11 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-40">Post depreciation & create allocations</button>
+          </form>
+        </div>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {data.toolingProfiles.map((row)=>(
+            <article key={text(row,"id")} className="rounded-xl border border-border p-4">
+              <div className="flex items-start justify-between gap-3"><div><p className="font-mono text-xs text-accent">{text(row,"id")}</p><p className="mt-1 text-sm font-semibold">{text(row,"description")}</p></div><span className={`text-[10px] font-semibold uppercase ${text(row,"status")==="approved"?"text-green":"text-warn"}`}>{text(row,"status")}</span></div>
+              <p className="mt-2 text-xs text-muted">{text(row,"tool_type").replaceAll("_"," ")} · {text(row,"product_id")||"all product"} · {text(row,"frame_size")||"all sizes"}</p>
+              <dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted">
+                <Stat label="Asset cost" value={money(row.acquisition_cost_inr)} />
+                <Stat label="Acc. depreciation" value={money(row.accumulated_depreciation_inr)} />
+                <Stat label="Recovery basis" value={money(row.commercial_recovery_basis_inr)} />
+                <Stat label="Target volume" value={String(row.target_recovery_quantity??0)} />
+              </dl>
+              {text(row,"status")==="draft"?<button disabled={busy} type="button" onClick={()=>void run(()=>approveToolingCostProfile({data:{id:text(row,"id")}}),`${text(row,"id")} tooling profile approved.`)} className="mt-3 text-xs font-semibold text-green">Approve profile</button>:null}
+            </article>
+          ))}
+        </div>
+
+        <div className="mt-5">
+          <h3 className="text-sm font-semibold text-fg">Depreciation & allocation runs</h3>
+          <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {data.toolingRuns.map((row)=>(
+              <article key={text(row,"id")} className="rounded-xl border border-border p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div><p className="font-mono text-xs text-accent">{text(row,"id")}</p><p className="mt-1 text-sm font-semibold">{text(row,"period")} · {text(row,"profile_id")}</p></div>
+                  <span className={`text-[10px] font-semibold uppercase ${text(row,"allocation_status")==="fully_approved"?"text-green":text(row,"allocation_status")==="no_eligible_jobs"?"text-muted":"text-warn"}`}>{text(row,"allocation_status").replaceAll("_"," ")}</span>
+                </div>
+                <dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted">
+                  <Stat label="Depreciation" value={money(row.depreciation_inr)} />
+                  <Stat label="Journal" value={text(row,"journal_id")} />
+                </dl>
+                <p className="mt-2 text-xs text-muted break-words">{text(row,"source_reference")}</p>
+              </article>
+            ))}
+            {!data.toolingRuns.length?<Empty>No tooling depreciation run has been posted yet.</Empty>:null}
+          </div>
+        </div>
+
+        <div className="mt-5 overflow-x-auto">
+          <table className="w-full min-w-[980px] text-left text-xs">
+            <thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle"><tr><th className="px-2 py-2">Tool</th><th className="px-2 py-2">Scope</th><th className="px-2 py-2 text-right">₹ / unit target</th><th className="px-2 py-2 text-right">Dispatched units</th><th className="px-2 py-2 text-right">Recovered target</th><th className="px-2 py-2 text-right">Remaining</th><th className="px-2 py-2 text-right">Progress</th></tr></thead>
+            <tbody>{data.toolingRecovery.map(row=><tr key={text(row,"profile_id")} className="border-t border-border/70"><td className="px-2 py-3 font-mono">{text(row,"profile_id")}</td><td className="px-2 py-3">{text(row,"product_id")||"—"} · {text(row,"variant_id")||"all variants"} · {text(row,"frame_size")||"all sizes"}</td><td className="px-2 py-3 text-right">{money(row.target_recovery_per_unit_inr)}</td><td className="px-2 py-3 text-right">{String(row.eligible_dispatched_units??0)}</td><td className="px-2 py-3 text-right">{money(row.commercial_recovery_progress_inr)}</td><td className="px-2 py-3 text-right font-semibold">{money(row.commercial_recovery_remaining_inr)}</td><td className="px-2 py-3 text-right">{num(row,"recovery_progress_pct").toFixed(1)}%</td></tr>)}</tbody>
+          </table>
+          {!data.toolingRecovery.length?<Empty>No approved tooling recovery profiles yet.</Empty>:null}
+        </div>
+      </Panel>
+
+      <Panel title="Actual Job Conversion Cost" kicker="Posted source cost → approved WIP allocation → Finished Goods → dispatch COGS">
+        <div className="rounded-xl border border-border bg-surface/60 p-4 text-sm leading-6 text-muted">
+          Allocate only evidenced posted costs to a Job Card. Approval verifies the selected journal debit, prevents over-allocation, and reclassifies the approved amount into WIP. Production completion then capitalizes material plus approved conversion cost into Finished Goods; dispatch recognizes COGS from that actual Job Card unit cost.
+        </div>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            const [sourceJournalId, sourceLineNoText] = costDraft.sourceJournalLine.split("|");
+            const sourceLineNo = Number(sourceLineNoText);
+            void run(
+              () => createJobConversionCostAllocation({
+                data: {
+                  id: costDraft.id,
+                  jobCardId: costDraft.jobCardId,
+                  category: costDraft.category,
+                  amountInr: costDraft.amountInr,
+                  sourceJournalId,
+                  sourceLineNo,
+                  sourceReference: costDraft.sourceReference,
+                },
+              }),
+              `${costDraft.id} saved as a draft Job Card cost allocation.`,
+            );
+          }}
+          className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3"
+        >
+          <Field label="Allocation ID"><input className="control mt-1.5" value={costDraft.id} onChange={(e) => setCostDraft({ ...costDraft, id: e.target.value })} placeholder="JCOST-JBC-001-LAB-01" /></Field>
+          <Field label="Open Job Card">
+            <select className="control mt-1.5" value={costDraft.jobCardId} onChange={(e) => setCostDraft({ ...costDraft, jobCardId: e.target.value })}>
+              <option value="">Select Job Card</option>
+              {data.openJobs.map((row) => <option key={text(row,"id")} value={text(row,"id")}>{text(row,"id")} · {text(row,"model")} · {text(row,"status")}</option>)}
+            </select>
+          </Field>
+          <Field label="Cost category">
+            <select className="control mt-1.5" value={costDraft.category} onChange={(e) => setCostDraft({ ...costDraft, category: e.target.value as typeof costDraft.category })}>
+              <option value="direct_labour">Direct labour</option>
+              <option value="outsourcing">Outsourcing</option>
+              <option value="manufacturing_consumables">Manufacturing consumables</option>
+              <option value="manufacturing_depreciation">Manufacturing depreciation</option>
+              <option value="support_depreciation">Support depreciation</option>
+              <option value="overhead">Manufacturing overhead</option>
+              <option value="scrap">Scrap</option>
+              <option value="rework">Rework</option>
+            </select>
+          </Field>
+          <Field label="Amount · INR"><input className="control mt-1.5" type="number" min="0.01" step="0.01" value={costDraft.amountInr} onChange={(e) => setCostDraft({ ...costDraft, amountInr: Number(e.target.value) })} /></Field>
+          <Field label="Posted source journal debit">
+            <select className="control mt-1.5" value={costDraft.sourceJournalLine} onChange={(e) => setCostDraft({ ...costDraft, sourceJournalLine: e.target.value })}>
+              <option value="">Select posted cost line</option>
+              {data.sourceCostLines.map((row) => {
+                const value=`${text(row,"journal_id")}|${text(row,"line_no")}`;
+                return <option key={value} value={value}>{text(row,"journal_id")} · L{text(row,"line_no")} · {text(row,"account_code")} · {money(row.debit_inr)}</option>;
+              })}
+            </select>
+          </Field>
+          <Field label="Evidence / allocation basis"><input className="control mt-1.5" value={costDraft.sourceReference} onChange={(e) => setCostDraft({ ...costDraft, sourceReference: e.target.value })} placeholder="Timesheet / supplier service / allocation evidence" /></Field>
+          <div className="flex items-end"><button disabled={busy || !costDraft.id || !costDraft.jobCardId || !costDraft.sourceJournalLine || !costDraft.sourceReference || costDraft.amountInr<=0} className="inline-flex min-h-11 items-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-40">Save draft allocation</button></div>
+        </form>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {data.conversionCosts.map((row) => (
+            <article key={text(row,"id")} className="rounded-xl border border-border p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div><p className="font-mono text-xs text-accent">{text(row,"id")}</p><p className="mt-1 text-sm font-semibold">{text(row,"job_card_id")} · {text(row,"category").replaceAll("_"," ")}</p></div>
+                <span className={`text-[10px] font-semibold uppercase ${text(row,"status")==="approved"?"text-green":text(row,"status")==="rejected"?"text-danger":"text-warn"}`}>{text(row,"status")}</span>
+              </div>
+              <dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted">
+                <Stat label="Amount" value={money(row.amount_inr)} />
+                <Stat label="Source" value={`${text(row,"source_journal_id")} · L${text(row,"source_line_no")}`} />
+              </dl>
+              <p className="mt-2 text-xs text-muted break-words">{text(row,"source_reference")}</p>
+              {text(row,"status")==="draft" ? <div className="mt-3 flex gap-3">
+                <button disabled={busy} type="button" onClick={()=>void run(()=>approveJobConversionCostAllocation({data:{id:text(row,"id")}}),`${text(row,"id")} approved and capitalized to WIP.`)} className="text-xs font-semibold text-green">Approve to WIP</button>
+                <button disabled={busy} type="button" onClick={()=>{
+                  const reason=window.prompt("Rejection reason","")?.trim();
+                  if(reason) void run(()=>rejectJobConversionCostAllocation({data:{id:text(row,"id"),reason}}),`${text(row,"id")} rejected.`);
+                }} className="text-xs font-semibold text-danger">Reject</button>
+              </div> : null}
+            </article>
+          ))}
+          {!data.conversionCosts.length ? <Empty>No conversion-cost allocations yet. Material FIFO cost will still accumulate automatically from controlled issues.</Empty> : null}
         </div>
       </Panel>
 

@@ -122,8 +122,23 @@ const SECTIONS: readonly ManualSection[] = [
     title: "Product & BOM Control",
     route: "/command/bom-control",
     purpose: "Establish the controlled product identity and released material definition used by procurement and production.",
-    steps: ["Verify model, variant, product configuration, released BOM, BOM revision, SKU mapping and required quantity before execution."],
-    warnings: ["Do not substitute a component merely because it appears physically compatible. Use approved Engineering/BOM authority."],
+    steps: [
+      "Create the new BOM revision as a controlled master and submit/approve it.",
+      "Add every required component/SKU and quantity to that revision. New SKUs must already be approved in Inventory Master.",
+      "Enter the engineering release reason / ECR reference and select Release revision. VYNDI activates the complete revision and supersedes the prior active revision for the same model scope.",
+      "Review Bottom-up BOM cost and missing-cost exceptions, then open Procurement impact.",
+      "Review Existing Job Card impact. Current/future planning follows the new BOM; already released or in-progress Job Cards retain their frozen BOM revision and mapping snapshot.",
+      "Rerun governed VIBPE after a material BOM change before relying on updated procurement/funding recommendations.",
+    ],
+    controls: [
+      "Only one released BOM revision may be active for a model/variant scope.",
+      "BOM release requires an approved BOM master and approved Inventory Master records for every mapped SKU.",
+      "Procurement and bottom-up COGS read the active released BOM dynamically.",
+    ],
+    warnings: [
+      "Do not substitute a component merely because it appears physically compatible. Use approved Engineering/BOM authority.",
+      "Do not silently resynchronize an existing Job Card to a later BOM revision. A frozen build requires controlled production-change review.",
+    ],
   },
   {
     id: "07",

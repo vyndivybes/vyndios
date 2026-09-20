@@ -11,6 +11,8 @@ const salesCreditMigration = read("migrations/0080_sales_credit_to_cash.sql");
 const salesLedgerMigration = read("migrations/0081_sales_ledger_spare_components.sql");
 const spareIdentityMigration = read("migrations/0082_spare_sales_identity_fifo_fix.sql");
 const accountingSourceAuthorityMigration = read("migrations/0084_accounting_source_authority.sql");
+const actualCogsMigration = read("migrations/0086_actual_job_cost_cogs_chain.sql");
+const toolingRecoveryMigration = read("migrations/0087_tooling_cost_recovery_authority.sql");
 const authority = read("src/lib/finance/accounting-authority.ts");
 const cashFundingAuthority = read("src/lib/cash-funding-authority.ts");
 const peopleOfficeActualAuthority = read("src/lib/finance/people-office-actual-spend-authority.ts");
@@ -25,6 +27,9 @@ const rootRoute = read("src/routes/__root.tsx");
 const workbench = read("src/routes/command/accounting.tsx");
 const access = read("src/lib/page-access.ts");
 const financeControl = read("src/routes/command/finance-control.tsx");
+const accountingRoute = read("src/routes/command/accounting.tsx");
+const peopleOfficeAuthority = read("src/lib/people-office-authority.ts");
+const peopleOfficeRoute = read("src/routes/command/people-office.tsx");
 
 test("live accounting migration covers canonical transaction chain", () => {
   for (const required of [
@@ -216,4 +221,78 @@ test("route loading feedback keeps the top bar and adds a Vayu cursor halo", () 
   assert.match(rootRoute, /VAYU_LOGO_PATH/);
   assert.match(rootRoute, /motion-safe:animate-spin/);
   assert.match(rootRoute, /pointermove/);
+});
+
+
+test("actual manufacturing cost flows from evidenced source cost to WIP, FG and dispatch COGS", () => {
+  assert.match(actualCogsMigration, /epr_job_conversion_cost_allocations/);
+  assert.match(actualCogsMigration, /approve_vyndi_job_conversion_cost/);
+  assert.match(actualCogsMigration, /Source journal line must be posted/);
+  assert.match(actualCogsMigration, /Job allocation exceeds the evidenced source journal debit/);
+  assert.match(actualCogsMigration, /'1210','debitInr'/);
+  assert.match(actualCogsMigration, /v_total:=round\(v_material\+v_labour\+v_outsourcing\+v_consumables\+v_mfg_dep\+v_support_dep\+v_overhead\+v_scrap\+v_rework/);
+  assert.match(actualCogsMigration, /'1220','debitInr',v_total/);
+  assert.match(actualCogsMigration, /unit_actual_cost_inr/);
+  assert.match(actualCogsMigration, /Dispatch blocked: completed Job Card % has no governed actual finished-goods unit cost/);
+  assert.match(actualCogsMigration, /unitActualCostInr/);
+  assert.match(actualCogsMigration, /vyndi_job_actual_cost_trace/);
+});
+
+test("Accounting Workbench controls conversion-cost allocation without creating parallel cost truth", () => {
+  assert.match(authority, /createJobConversionCostAllocation/);
+  assert.match(authority, /approveJobConversionCostAllocation/);
+  assert.match(authority, /rejectJobConversionCostAllocation/);
+  assert.match(authority, /epr_job_conversion_cost_allocations/);
+  assert.match(authority, /sourceCostLines/);
+  assert.match(accountingRoute, /Actual Job Conversion Cost/);
+  assert.match(accountingRoute, /Posted source cost → approved WIP allocation → Finished Goods → dispatch COGS/);
+  assert.match(accountingRoute, /Approve to WIP/);
+  assert.match(accountingRoute, /Total actual/);
+});
+
+
+test("tooling authority separates accounting depreciation from commercial recovery", () => {
+  assert.match(toolingRecoveryMigration, /vyndi_tooling_cost_profiles/);
+  assert.match(toolingRecoveryMigration, /vyndi_tooling_depreciation_runs/);
+  assert.match(toolingRecoveryMigration, /approve_vyndi_tooling_cost_profile/);
+  assert.match(toolingRecoveryMigration, /post_vyndi_tooling_depreciation/);
+  assert.match(toolingRecoveryMigration, /'6500','debitInr',v_dep/);
+  assert.match(toolingRecoveryMigration, /'1590','creditInr',v_dep/);
+  assert.match(toolingRecoveryMigration, /v_remaining:=greatest\(v_depreciable-coalesce\(v_asset\.accumulated_depreciation_inr,0\),0\)/);
+  assert.match(toolingRecoveryMigration, /least\(v_monthly,v_remaining\)/);
+  assert.match(toolingRecoveryMigration, /'manufacturing_depreciation'/);
+  assert.match(toolingRecoveryMigration, /row_number\(\) over\(order by j\.id\)/);
+  assert.match(toolingRecoveryMigration, /round\(v_dep-v_allocated,2\)/);
+  assert.match(toolingRecoveryMigration, /sum\(s\.units\) filter\(where j\.id is not null\)/);
+  assert.match(toolingRecoveryMigration, /vyndi_tooling_recovery_status/);
+  assert.match(toolingRecoveryMigration, /Commercial recovery does not post accounting journals/);
+  assert.match(toolingRecoveryMigration, /manufacturing_tooling/);
+  assert.match(toolingRecoveryMigration, /when v_category in \('office_admin','manufacturing_tooling'\) then '1500'/);
+  assert.match(toolingRecoveryMigration, /asset_class in \('office_admin','manufacturing_tooling'\)/);
+  assert.match(toolingRecoveryMigration, /refresh_vyndi_tooling_depreciation_allocation_status/);
+  assert.match(toolingRecoveryMigration, /fully_approved/);
+});
+
+test("Accounting Workbench exposes tooling depreciation and non-ledger recovery KPIs", () => {
+  assert.match(authority, /createToolingCostProfile/);
+  assert.match(authority, /approveToolingCostProfile/);
+  assert.match(authority, /postToolingDepreciation/);
+  assert.match(authority, /toolingRecovery/);
+  assert.match(accountingRoute, /Tooling Cost & Recovery Authority/);
+  assert.match(accountingRoute, /Dr 6500 \/ Cr 1590/);
+  assert.match(accountingRoute, /Commercial recovery/);
+  assert.match(accountingRoute, /management\/pricing measures only; they do not inflate accounting COGS/);
+  assert.match(accountingRoute, /Unrecovered tooling/);
+  assert.match(accountingRoute, /Depreciation & allocation runs/);
+  assert.match(accountingRoute, /Open source Asset Register/);
+  assert.match(accountingRoute, /Open actual CAPEX \/ payment evidence/);
+});
+
+
+test("manufacturing tooling is a first-class governed capital asset", () => {
+  assert.match(peopleOfficeAuthority, /"manufacturing_tooling"/);
+  assert.match(peopleOfficeRoute, /Manufacturing tooling \/ mould \/ fixture/);
+  assert.match(toolingRecoveryMigration, /asset_class in \('office_admin','office_consumable','manufacturing_tooling'\)/);
+  assert.match(toolingRecoveryMigration, /when v_category in \('office_admin','manufacturing_tooling'\) then '1500'/);
+  assert.match(toolingRecoveryMigration, /a\.asset_class in \('office_admin','manufacturing_tooling'\)/);
 });

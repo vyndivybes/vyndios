@@ -41,6 +41,56 @@ No duplicate People, Office, CAPEX or consumables ledger is introduced.
 
 The resulting snapshot is persisted in `epr_job_cost_snapshots` with Job Card traceability.
 
+## F2A — Actual manufacturing cost and COGS authority
+
+Actual bicycle COGS is not taken from a finance target or planning assumption once a Job Card enters execution.
+
+The governed actual chain is:
+
+`FIFO material issue → WIP 1210 → evidenced conversion-cost allocation → Job Card actual-cost snapshot → Finished Goods 1220 → posted dispatch → COGS 5000`
+
+Rules:
+
+- FIFO material issues remain the canonical direct-material source.
+- Labour, outsourcing, manufacturing consumables, depreciation, overhead, scrap and rework may enter Job Card cost only by allocating an already-posted source journal debit.
+- Allocation approval validates the source journal, source account, available unallocated debit and Job Card status before reclassifying the evidenced amount into WIP.
+- A completed Job Card snapshot totals material plus all approved conversion-cost allocations.
+- Production completion capitalizes the full actual Job Card cost from WIP to Finished Goods.
+- Dispatch is blocked when the completed Job Card has no positive governed actual finished-goods unit cost.
+- Posted dispatch recognizes `Dr 5000 Cost of Goods Sold / Cr 1220 Finished Goods` using the latest completed Job Card actual unit cost.
+- Reversal controls continue to reverse the linked dispatch COGS journal rather than mutating posted accounting history.
+- Planning/target COGS remains available for forecast and variance comparison only; it is not the authority for actual COGS.
+
+The controlled operator surface is Finance → Accounting Workbench → **Actual Job Conversion Cost**.
+
+## F2B — Tooling depreciation and commercial recovery
+
+Carbon-frame tooling is controlled as a governed fixed asset, not as an immediate one-period COGS charge.
+
+Accounting path:
+
+`Governed fixed tooling asset → monthly straight-line depreciation → Dr 6500 Depreciation / Cr 1590 Accumulated Depreciation → draft Job Card manufacturing-depreciation allocations → approved WIP 1210 → Finished Goods 1220 → dispatch COGS 5000`
+
+Controls:
+
+- tooling profiles can reference only an existing governed fixed asset;
+- approval validates active asset status, acquisition cost, residual value and recovery basis;
+- monthly depreciation uses the fixed asset's governed useful life and cannot exceed the remaining depreciable basis;
+- depreciation is allocated only to matching open/released Job Cards by controlled product / variant / frame-size scope;
+- allocation rounding reconciles exactly to the posted monthly tooling depreciation;
+- Job Card allocations still require governed approval before they enter WIP;
+- if no eligible production exists, depreciation remains the period depreciation expense rather than being forced into inventory.
+
+Commercial recovery is a separate management measure:
+
+`Commercial recovery target per unit = approved recovery basis ÷ target recovery quantity`
+
+`Commercial recovery progress = eligible dispatched units × target recovery per unit`
+
+This recovery value does **not** post a finance journal, does not increase accounting COGS, and is used for pricing, margin and capital-recovery decisions only.
+
+The Accounting Workbench exposes acquisition basis, accumulated accounting depreciation, target recovery per unit, eligible dispatched units, recovery progress and unrecovered tooling capital.
+
 ## F3 — Accounting core
 
 `src/lib/finance/general-ledger.ts` provides:

@@ -142,8 +142,8 @@ export const syncProductionJobCard = createServerFn({ method: "POST" })
     );
     if (!order) throw new Error("Sales order not found in the central order authority.");
 
-    const [existing] = await sql.query<{ id: string; status: string; sales_order_revision: number | string; approved_at:string|null }>(
-      `select id,status,sales_order_revision,approved_at::text as approved_at from epr_production_job_cards where sales_order_id=$1 limit 1`,
+    const [existing] = await sql.query<{ id: string; status: string; sales_order_revision: number | string; bom_revision:string|null; approved_at:string|null }>(
+      `select id,status,sales_order_revision,bom_revision,approved_at::text as approved_at from epr_production_job_cards where sales_order_id=$1 limit 1`,
       [order.id],
     );
 
@@ -175,6 +175,11 @@ export const syncProductionJobCard = createServerFn({ method: "POST" })
     }
 
     const { bomRevision, rows: mappings, authority } = await activeReleasedMappings(sql, order);
+    if (existing?.bom_revision && existing.bom_revision !== bomRevision) {
+      throw new Error(
+        `Job Card ${existing.id} is frozen to BOM ${existing.bom_revision}; current released BOM is ${bomRevision}. Do not silently resynchronize it. Review BOM Control → Revision impact and use a controlled production change/re-release if this build must adopt the new BOM.`,
+      );
+    }
     if (existing && existing.status === "in_progress" && Number(existing.sales_order_revision) !== Number(order.revision)) {
       throw new Error("This job card is already in progress. Put it on controlled hold and process a production change before revising the order.");
     }

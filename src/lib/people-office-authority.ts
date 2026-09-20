@@ -207,7 +207,7 @@ const assetSchema = z.object({
   id: z.string().min(1).max(120),
   name: z.string().min(1).max(300),
   category: z.string().min(1).max(200),
-  assetClass: z.enum(["office_admin", "office_consumable"]),
+  assetClass: z.enum(["office_admin", "office_consumable", "manufacturing_tooling"]),
   costLakh: z.number().min(0),
   monthlyCostLakh: z.number().min(0),
   purchaseMonth: z.number().int().min(1).max(36),

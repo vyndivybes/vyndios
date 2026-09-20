@@ -167,3 +167,57 @@ export const retireControlledBomMapping = createServerFn({ method: "POST" })
       [`AUD-${crypto.randomUUID()}`, mapping.id, actor.userId, actor.role, JSON.stringify({ reason: data.reason })]);
     return { ok: true };
   });
+
+
+export const getBomRevisionPropagationState = createServerFn({ method: "GET" }).handler(async () => {
+  await requireAdminView();
+  const sql = await getSql();
+  const [current, impact] = await Promise.all([
+    sql.query<Record<string, unknown>>(
+      `select * from vyndi_bom_revision_current_state order by venture,model_id,bom_revision`,
+    ),
+    sql.query<Record<string, unknown>>(
+      `select * from vyndi_bom_revision_job_card_impact
+        order by case bom_revision_state
+          when 'RELEASED_REVIEW_REQUIRED' then 0
+          when 'PROTECTED_FROZEN' then 1
+          when 'NO_CURRENT_BOM' then 2
+          else 3 end,
+          updated_at desc,job_card_id`,
+    ),
+  ]);
+  return { current, impact };
+});
+
+export const releaseControlledBomRevision = createServerFn({ method: "POST" })
+  .validator(z.object({
+    venture: ventureSchema,
+    modelId: z.string().trim().min(1).max(120),
+    bomRevision: z.string().trim().min(1).max(120),
+    reason: z.string().trim().min(3).max(1000),
+  }))
+  .handler(async ({ data }) => {
+    const actor = await requireStableAdmin();
+    assertModelScope(data.modelId);
+    const sql = await getSql();
+    const rows = await sql.query<{
+      release_id: string;
+      previous_bom_revision: string | null;
+      released_bom_revision: string;
+      mapping_count: number | string;
+      protected_job_cards: number | string;
+    }>(
+      `select * from release_vyndi_bom_revision($1,$2,$3,$4,$5,$6)`,
+      [data.venture,data.modelId,data.bomRevision,data.reason,actor.userId,actor.role],
+    );
+    const row = rows[0];
+    if (!row) throw new Error("BOM release did not return a controlled result.");
+    return {
+      ok: true,
+      releaseId: row.release_id,
+      previousBomRevision: row.previous_bom_revision,
+      bomRevision: row.released_bom_revision,
+      mappingCount: Number(row.mapping_count),
+      protectedJobCards: Number(row.protected_job_cards),
+    };
+  });

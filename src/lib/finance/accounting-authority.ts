@@ -15,6 +15,27 @@ const permissionRoute = "/command/finance-control";
 const id = z.string().trim().min(1).max(160);
 const reference = z.string().trim().min(1).max(500);
 const money = z.number().finite().min(-1_000_000_000_000).max(1_000_000_000_000);
+const toolingType = z.enum([
+  "frame_mould",
+  "fork_mould",
+  "seatpost_mould",
+  "bladder_eps_mandrel",
+  "trim_drill_fixture",
+  "bonding_fixture",
+  "curing_fixture",
+  "inspection_gauge",
+  "other_tooling",
+]);
+const conversionCategory = z.enum([
+  "direct_labour",
+  "outsourcing",
+  "manufacturing_consumables",
+  "manufacturing_depreciation",
+  "support_depreciation",
+  "overhead",
+  "scrap",
+  "rework",
+]);
 
 async function requireView() {
   const role = await getCommandRole();
@@ -35,7 +56,7 @@ async function requireEdit() {
 export const getAccountingWorkbench = createServerFn({ method: "GET" }).handler(async () => {
   await requireView();
   const sql = await getSql();
-  const [summary, trialBalance, generalLedger, journals, jobCosts, gst, bank, assets, payroll, exceptions] = await Promise.all([
+  const [summary, trialBalance, generalLedger, journals, jobCosts, conversionCosts, openJobs, sourceCostLines, toolingProfiles, toolingRecovery, toolingRuns, gst, bank, assets, payroll, exceptions] = await Promise.all([
     sql.query<SqlRow>(`select * from epr_finance_control_summary`),
     sql.query<SqlRow>(`select * from epr_finance_trial_balance order by account_code`),
     sql.query<SqlRow>(`select * from epr_finance_general_ledger limit 500`),
@@ -54,6 +75,42 @@ export const getAccountingWorkbench = createServerFn({ method: "GET" }).handler(
              total_actual_cost_inr,unit_actual_cost_inr,finished_goods_value_inr,wip_value_inr,
              source_action_id,captured_at::text as captured_at
         from epr_job_cost_snapshots order by captured_at desc limit 250`),
+    sql.query<SqlRow>(`
+      select id,job_card_id,category,amount_inr,source_journal_id,source_line_no,source_reference,status,
+             created_by,created_at::text as created_at,approved_by,approved_at::text as approved_at
+        from epr_job_conversion_cost_allocations
+       order by created_at desc limit 500`),
+    sql.query<SqlRow>(`
+      select id,coalesce(variant_id,product_label,product_id,'unknown') as model,status,units,sales_order_id
+        from epr_production_job_cards
+       where status<>'complete'
+       order by updated_at desc,id limit 250`),
+    sql.query<SqlRow>(`
+      select j.id as journal_id,l.line_no,l.account_code,l.debit_inr,l.memo,j.entry_date::text as entry_date,
+             j.source_type,j.source_id,j.description
+        from epr_finance_journals j
+        join epr_finance_journal_lines l on l.journal_id=j.id
+       where j.status='posted'
+         and l.debit_inr>0
+         and l.account_code in ('5000','5100','5200','6100','6200','6300','6400','6500')
+       order by j.entry_date desc,j.posted_at desc,l.line_no
+       limit 500`),
+    sql.query<SqlRow>(`
+      select p.id,p.asset_id,p.tool_type,p.product_id,p.variant_id,p.frame_size,p.process,
+             p.residual_value_inr,p.commercial_recovery_basis_inr,p.target_recovery_quantity,
+             p.source_reference,p.status,p.created_at::text as created_at,p.approved_at::text as approved_at,
+             a.description,a.acquisition_cost_inr,a.useful_life_months,a.accumulated_depreciation_inr
+        from vyndi_tooling_cost_profiles p
+        join epr_finance_fixed_assets a on a.asset_id=p.asset_id
+       order by p.created_at desc,p.id`),
+    sql.query<SqlRow>(`
+      select * from vyndi_tooling_recovery_status
+       order by commercial_recovery_remaining_inr desc,profile_id`),
+    sql.query<SqlRow>(`
+      select id,profile_id,asset_id,period,depreciation_inr,journal_id,allocation_status,
+             source_reference,posted_by,posted_at::text as posted_at
+        from vyndi_tooling_depreciation_runs
+       order by period desc,posted_at desc,id limit 250`),
     sql.query<SqlRow>(`
       select id,period,direction,source_type,source_id,taxable_value_inr,gst_inr,eligible_itc,evidence_reference,
              document_date::text as document_date,document_number,counterparty_gstin,place_of_supply_code,hsn_sac,
@@ -80,7 +137,24 @@ export const getAccountingWorkbench = createServerFn({ method: "GET" }).handler(
         from epr_finance_posting_exceptions order by resolved asc,
           case severity when 'critical' then 1 when 'high' then 2 when 'medium' then 3 else 4 end,created_at desc`),
   ]);
-  return { summary: summary[0] ?? {}, trialBalance, generalLedger, journals, jobCosts, gst, bank, assets, payroll, exceptions };
+  return {
+    summary: summary[0] ?? {},
+    trialBalance,
+    generalLedger,
+    journals,
+    jobCosts,
+    conversionCosts,
+    openJobs,
+    sourceCostLines,
+    toolingProfiles,
+    toolingRecovery,
+    toolingRuns,
+    gst,
+    bank,
+    assets,
+    payroll,
+    exceptions,
+  };
 });
 
 
@@ -277,4 +351,159 @@ export const resolveFinancePostingException = createServerFn({ method: "POST" })
       [data.id, data.reference],
     );
     return { ok: true, id: data.id };
+  });
+
+
+export const createJobConversionCostAllocation = createServerFn({ method: "POST" })
+  .validator(z.object({
+    id,
+    jobCardId: id,
+    category: conversionCategory,
+    amountInr: z.number().finite().positive().max(1_000_000_000_000),
+    sourceJournalId: id,
+    sourceLineNo: z.number().int().positive(),
+    sourceReference: reference,
+  }))
+  .handler(async ({ data }) => {
+    const actor = await requireEdit();
+    const sql = await getSql();
+    await sql.query(
+      `insert into epr_job_conversion_cost_allocations(
+         id,job_card_id,category,amount_inr,source_journal_id,source_line_no,source_reference,created_by
+       ) values($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [
+        data.id,
+        data.jobCardId,
+        data.category,
+        data.amountInr,
+        data.sourceJournalId,
+        data.sourceLineNo,
+        data.sourceReference,
+        actor.userId,
+      ],
+    );
+    return { ok: true, id: data.id, status: "draft" as const };
+  });
+
+export const approveJobConversionCostAllocation = createServerFn({ method: "POST" })
+  .validator(z.object({ id }))
+  .handler(async ({ data }) => {
+    const actor = await requireBusinessActor("approve");
+    if (!canPerform(actor.role, "approve", getRouteMeta(permissionRoute))) {
+      throw new Error("Job conversion cost approval permission denied.");
+    }
+    const sql = await getSql();
+    const rows = await sql.query<{ approved_id: string }>(
+      `select approve_vyndi_job_conversion_cost($1,$2,$3) as approved_id`,
+      [data.id, actor.userId, actor.role],
+    );
+    return { ok: true, id: rows[0]?.approved_id ?? data.id, status: "approved" as const };
+  });
+
+export const rejectJobConversionCostAllocation = createServerFn({ method: "POST" })
+  .validator(z.object({ id, reason: reference }))
+  .handler(async ({ data }) => {
+    const actor = await requireBusinessActor("approve");
+    if (!canPerform(actor.role, "approve", getRouteMeta(permissionRoute))) {
+      throw new Error("Job conversion cost rejection permission denied.");
+    }
+    const sql = await getSql();
+    await sql.query(
+      `update epr_job_conversion_cost_allocations
+          set status='rejected',rejected_by=$2,rejected_at=now(),rejection_reason=$3
+        where id=$1 and status='draft'`,
+      [data.id, actor.userId, data.reason],
+    );
+    return { ok: true, id: data.id, status: "rejected" as const };
+  });
+
+
+export const createToolingCostProfile = createServerFn({ method: "POST" })
+  .validator(z.object({
+    id,
+    assetId: id,
+    toolType: toolingType,
+    productId: z.string().trim().max(120).optional(),
+    variantId: z.string().trim().max(160).optional(),
+    frameSize: z.string().trim().max(40).optional(),
+    process: z.string().trim().max(160).optional(),
+    residualValueInr: z.number().finite().min(0).max(1_000_000_000_000),
+    commercialRecoveryBasisInr: z.number().finite().positive().max(1_000_000_000_000),
+    targetRecoveryQuantity: z.number().finite().positive().max(1_000_000_000),
+    sourceReference: reference,
+  }).refine(
+    (data) => Boolean(data.productId || data.variantId || data.frameSize),
+    "Tooling recovery requires product, variant or frame-size applicability.",
+  ))
+  .handler(async ({ data }) => {
+    const actor = await requireEdit();
+    const sql = await getSql();
+    await sql.query(
+      `insert into vyndi_tooling_cost_profiles(
+         id,asset_id,tool_type,product_id,variant_id,frame_size,process,residual_value_inr,
+         commercial_recovery_basis_inr,target_recovery_quantity,source_reference,created_by
+       ) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+      [
+        data.id,
+        data.assetId,
+        data.toolType,
+        data.productId || null,
+        data.variantId || null,
+        data.frameSize || null,
+        data.process || null,
+        data.residualValueInr,
+        data.commercialRecoveryBasisInr,
+        data.targetRecoveryQuantity,
+        data.sourceReference,
+        actor.userId,
+      ],
+    );
+    return { ok: true, id: data.id, status: "draft" as const };
+  });
+
+export const approveToolingCostProfile = createServerFn({ method: "POST" })
+  .validator(z.object({ id }))
+  .handler(async ({ data }) => {
+    const actor = await requireBusinessActor("approve");
+    if (!canPerform(actor.role, "approve", getRouteMeta(permissionRoute))) {
+      throw new Error("Tooling profile approval permission denied.");
+    }
+    const sql = await getSql();
+    const rows = await sql.query<{ approved_id: string }>(
+      `select approve_vyndi_tooling_cost_profile($1,$2,$3) as approved_id`,
+      [data.id, actor.userId, actor.role],
+    );
+    return { ok: true, id: rows[0]?.approved_id ?? data.id };
+  });
+
+export const postToolingDepreciation = createServerFn({ method: "POST" })
+  .validator(z.object({
+    profileId: id,
+    period: z.string().regex(/^\\d{4}-(0[1-9]|1[0-2])$/),
+    sourceReference: reference,
+  }))
+  .handler(async ({ data }) => {
+    const actor = await requireBusinessActor("approve");
+    if (!canPerform(actor.role, "approve", getRouteMeta(permissionRoute))) {
+      throw new Error("Tooling depreciation posting permission denied.");
+    }
+    const sql = await getSql();
+    const rows = await sql.query<{
+      run_id: string;
+      journal_id: string;
+      depreciation_inr: number | string;
+      draft_allocations: number | string;
+    }>(
+      `select * from post_vyndi_tooling_depreciation($1,$2,$3,$4,$5)`,
+      [data.profileId, data.period, data.sourceReference, actor.userId, actor.role],
+    );
+    const row = rows[0];
+    if (!row) throw new Error("Tooling depreciation posting did not return a controlled result.");
+    return {
+      ok: true,
+      runId: row.run_id,
+      journalId: row.journal_id,
+      depreciationInr: Number(row.depreciation_inr),
+      draftAllocations: Number(row.draft_allocations),
+    };
   });

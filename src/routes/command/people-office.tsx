@@ -66,7 +66,7 @@ interface AssetForm {
   id: string;
   name: string;
   category: string;
-  assetClass: "office_admin" | "office_consumable";
+  assetClass: "office_admin" | "office_consumable" | "manufacturing_tooling";
   costLakh: string;
   monthlyCostLakh: string;
   purchaseMonth: string;
@@ -424,7 +424,7 @@ function PeopleOffice() {
                               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
                                 <label className="text-xs font-medium text-muted">Asset<input className={inputClass} value={assetForm.name} onChange={(e) => setAssetForm({ ...assetForm, name: e.target.value })} /></label>
                                 <label className="text-xs font-medium text-muted">Category<input className={inputClass} value={assetForm.category} onChange={(e) => setAssetForm({ ...assetForm, category: e.target.value })} /></label>
-                                <label className="text-xs font-medium text-muted">Class<select className={inputClass} value={assetForm.assetClass} onChange={(e) => setAssetForm({ ...assetForm, assetClass: e.target.value as AssetForm["assetClass"] })}><option value="office_admin">Office / admin</option><option value="office_consumable">Office consumable</option></select></label>
+                                <label className="text-xs font-medium text-muted">Class<select className={inputClass} value={assetForm.assetClass} onChange={(e) => setAssetForm({ ...assetForm, assetClass: e.target.value as AssetForm["assetClass"] })}><option value="office_admin">Office / admin asset</option><option value="manufacturing_tooling">Manufacturing tooling / mould / fixture</option><option value="office_consumable">Office consumable</option></select></label>
                                 <label className="text-xs font-medium text-muted">Cost ₹L<input className={inputClass} type="number" min="0" step="0.01" value={assetForm.costLakh} onChange={(e) => setAssetForm({ ...assetForm, costLakh: e.target.value })} /></label>
                                 <label className="text-xs font-medium text-muted">Monthly cost ₹L<input className={inputClass} type="number" min="0" step="0.01" value={assetForm.monthlyCostLakh} onChange={(e) => setAssetForm({ ...assetForm, monthlyCostLakh: e.target.value })} /></label>
                                 <label className="text-xs font-medium text-muted">Purchase month<input className={inputClass} type="number" min="1" max="36" value={assetForm.purchaseMonth} onChange={(e) => setAssetForm({ ...assetForm, purchaseMonth: e.target.value })} /></label>
