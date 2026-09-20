@@ -14,7 +14,7 @@ export interface ReadinessGate {
 export const DEPLOYMENT_GATES: ReadinessGate[] = [
   { id: "DR-01", title: "Application source integrated", priority: "critical", status: "ready", requirement: "Stages 1–11 must be represented in the repository without destructive replacement of existing work.", evidence: "Knowledge, Technical, Finance, Funding, Legal, Manufacturing, Founder, Investor, AI and QA modules/routes", releaseCondition: "Keep the integrated source as the release candidate." },
   { id: "DR-02", title: "Evidence governance", priority: "critical", status: "ready", requirement: "Controlled data must distinguish confirmed, planned, pending, conflict and superseded states.", evidence: "Knowledge + QA registers", releaseCondition: "No unsupported completion claims." },
-  { id: "DR-03", title: "Engineering baseline lock", priority: "critical", status: "blocked", requirement: "VEDM-301 Rev 5.3.8, complete geometry, T47i 85.5mm and 700×40 envelope must be reconciled before design freeze.", evidence: "TC-01 through TC-06 / QA-03 to QA-05", releaseCondition: "Resolve conflicts and attach controlled engineering evidence." },
+  { id: "DR-03", title: "Engineering baseline lock", priority: "critical", status: "blocked", requirement: "VEDM-301 Rev 5.3.9 E-K75 frame authority and Rev 5.4 FK75 front-end development must close native solver, MATERIAL-01, XL tolerance/deformed-clearance, drape/tooling and physical-validation gates before design freeze.", evidence: "TC-01 through TC-06 / QA-03 to QA-05", releaseCondition: "Resolve conflicts and attach controlled engineering evidence." },
   { id: "DR-04", title: "Validation evidence", priority: "critical", status: "blocked", requirement: "FEA, prototype inspection, NDT and ISO 4210 validation require actual results before product validation is claimed.", evidence: "TC-11 through TC-14", releaseCondition: "Store reports/results and update gate statuses." },
   { id: "DR-05", title: "Legal/IP release", priority: "critical", status: "conditional", requirement: "Founder/contributor IP, trademark, OEM NDA/IP non-use, tooling ownership and customer/legal pack require evidence.", evidence: "Legal Control L-01 through L-18", releaseCondition: "Executed documents, receipts, adviser confirmation or policy evidence." },
   { id: "DR-06", title: "Supplier/tooling release", priority: "critical", status: "conditional", requirement: "OEM qualification, RFQ, NDA, tooling custody, pilot QC and traceability must precede controlled production release.", evidence: "Manufacturing M-01 through M-18", releaseCondition: "Pass supplier, tooling, pilot and quality gates." },
@@ -37,8 +37,8 @@ export const HANDOVER_CHECKLIST = [
 ];
 
 export const UNRESOLVED_BLOCKERS = [
-  { id: "B-01", title: "700×40 front/rear clearance verification", owner: "Founder / Engineering", severity: "critical" },
-  { id: "B-02", title: "VEDM + geometry reconciliation", owner: "Founder / Engineering", severity: "critical" },
+  { id: "B-01", title: "FK75 XL tolerance and deformed-clearance closure", owner: "Founder / Engineering", severity: "critical" },
+  { id: "B-02", title: "FK75 MATERIAL-01 + native composite solver closure", owner: "Founder / Engineering", severity: "critical" },
   { id: "B-03", title: "FEA / prototype / NDT / ISO 4210 evidence", owner: "Engineering / Lab", severity: "critical" },
   { id: "B-04", title: "Production authentication/authorization boundary", owner: "Application", severity: "critical" },
 ];
