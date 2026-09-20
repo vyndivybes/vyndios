@@ -22,12 +22,12 @@ export const DEPLOYMENT_GATES: ReadinessGate[] = [
   { id: "DR-08", title: "Investor/board evidence", priority: "high", status: "conditional", requirement: "Investor claims, tranche asks and board decisions must match the controlled evidence state.", evidence: "Investor / Board Control", releaseCondition: "Diligence room complete for the relevant tranche." },
   { id: "DR-09", title: "Application runtime verification", priority: "critical", status: "external", requirement: "Build, typecheck, tests and generated route validation must be executed in a supported runtime.", evidence: "Repository scripts: build, typecheck, test, check:auth, lint", releaseCondition: "Fresh successful execution of the applicable checks." },
   { id: "DR-10", title: "Production authentication boundary", priority: "critical", status: "blocked", requirement: "Founder-only/sensitive records require server-side authentication and authorization, not UI-only hiding.", evidence: "QA-14 / AI Knowledge boundary", releaseCondition: "Verify enforced access control before sensitive production use." },
-  { id: "DR-11", title: "Deployment provider status", priority: "critical", status: "external", requirement: "Vercel must report success for the final release commit before deployment is called successful.", evidence: "Vercel commit status", releaseCondition: "Fresh Vercel status = success." },
+  { id: "DR-11", title: "Deployment provider status", priority: "critical", status: "external", requirement: "Cloudflare Workers must report success for the final release commit before deployment is called successful.", evidence: "Cloudflare Workers deployment status tied to the exact GitHub commit", releaseCondition: "Fresh Cloudflare Workers deployment = success for the exact release commit." },
 ];
 
 export const HANDOVER_CHECKLIST = [
   "Freeze the release candidate commit after successful runtime verification.",
-  "Record Vercel success against the exact release commit.",
+  "Record Cloudflare Workers success against the exact release commit.",
   "Attach engineering evidence before calling the product validated or design frozen.",
   "Attach legal/IP evidence before calling controls complete.",
   "Verify current grant/funding terms immediately before submission.",
