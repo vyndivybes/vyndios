@@ -30,7 +30,7 @@ export const FOUNDER_ACTIONS: FounderAction[] = [
     stage: "M2–M3",
     owner: "Founder",
     outcome: "Single controlled engineering baseline",
-    dependency: "VEDM-301 Rev 5.3.8 + 700×40 envelope",
+    dependency: "VEDM-301 Rev 5.3.9 E-K75 + Rev 5.4 FK75 closure gates",
   },
   {
     id: "FC-03",
