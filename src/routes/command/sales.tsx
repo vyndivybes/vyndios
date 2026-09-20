@@ -365,14 +365,15 @@ function Commercial() {
         </div>
       </details>
 
-      <Panel title="Connected controls" kicker="One owner per concept">
-        <div className="flex flex-wrap gap-2">
-          <Link to="/command/production" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">Production release</Link>
-          <Link to="/command/procurement-planning" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">Procurement reconciliation</Link>
-          <Link to="/command/actuals" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">Actuals</Link>
-          <Link to="/command/finance-assumptions" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">Plan assumptions</Link>
+      <details className="rounded-xl border border-border bg-surface/25 p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-fg">Related downstream controls</summary>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <Link to="/command/production" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent">Production</Link>
+          <Link to="/command/procurement-planning" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent">Material Requirements</Link>
+          <Link to="/command/actuals" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent">Operational Actuals</Link>
+          <Link to="/command/finance-assumptions" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent">Financial Planning</Link>
         </div>
-      </Panel>
+      </details>
     </div>
   );
 }

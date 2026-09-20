@@ -74,15 +74,13 @@ export const OPERATIONS_TABS: readonly WorkspaceLink[] = [
   { to: "/command/quality", label: "Quality" },
 ];
 
-/** Finance — cash → AP/AR → financial position. */
+/** Finance primary tabs — keep only high-frequency operational destinations. */
 export const FINANCE_TABS: readonly WorkspaceLink[] = [
   { to: FINANCE_HOME, label: "Overview" },
   { to: "/command/cash", label: "Cash" },
   { to: "/command/payables", label: "Payables" },
   { to: "/command/receivables", label: "Receivables" },
-  { to: "/command/sales-ledger", label: "Sales Ledger" },
   { to: "/command/accounting-statements", label: "Statements" },
-  { to: "/command/balance-sheet", label: "Balance Sheet" },
 ];
 
 /** Governance & Assurance — approvals, risk, legal, audit. */
@@ -141,50 +139,109 @@ export const WORKSPACE_NAVIGATION: Record<CanonicalWorkspaceId, readonly Workspa
   ],
   "plan-sales": [
     {
-      label: "Commercial flow",
-      items: [...PLAN_SALES_TABS, { to: "/command/market-survey", label: "Market Survey" }],
+      label: "Planning",
+      items: [
+        { to: PLAN_HOME, label: "Business Plan" },
+        { to: "/command/scenarios", label: "Scenarios" },
+      ],
+    },
+    {
+      label: "Commercial",
+      items: [
+        { to: SALES_HOME, label: "Demand & Orders" },
+        { to: "/command/gtm", label: "Go-to-Market" },
+        { to: "/command/market-survey", label: "Market Survey" },
+      ],
     },
   ],
   engineering: [
     {
-      label: "Product flow",
-      items: ENGINEERING_TABS,
+      label: "Product",
+      items: [
+        { to: "/command/product", label: "Product Master" },
+        { to: ENGINEERING_HOME, label: "Engineering" },
+      ],
+    },
+    {
+      label: "BOM & configuration",
+      items: [
+        { to: "/command/bom-control", label: "BOM Control" },
+        { to: "/command/bom", label: "BOM Cost" },
+      ],
     },
   ],
   operations: [
     {
-      label: "Execution flow",
-      items: OPERATIONS_TABS,
+      label: "Overview",
+      items: [{ to: OPERATIONS_HOME, label: "Operations Overview" }],
     },
     {
-      label: "Controls",
+      label: "Inventory",
       items: [
+        { to: "/command/inventory", label: "Inventory" },
+        { to: "/command/procurement-planning", label: "Material Requirements" },
+      ],
+    },
+    {
+      label: "Procurement",
+      items: [
+        { to: "/command/purchase-execution", label: "Purchase Execution" },
         { to: "/command/procurement", label: "Procurement Control" },
+        { to: "/command/receiving", label: "Receiving" },
+      ],
+    },
+    {
+      label: "Manufacturing",
+      items: [
+        { to: "/command/production", label: "Production / Build" },
         { to: "/command/manufacturing", label: "Manufacturing Controls" },
         { to: "/command/actuals", label: "Operational Actuals" },
       ],
     },
+    {
+      label: "Quality",
+      items: [{ to: "/command/quality", label: "Quality" }],
+    },
   ],
   "people-office": [
     {
-      label: "Administration",
+      label: "People & administration",
       items: [{ to: PEOPLE_HOME, label: "People & Office" }],
     },
   ],
   finance: [
     {
-      label: "Finance flow",
-      items: [...FINANCE_TABS, { to: "/command/finance-assumptions", label: "Financial Planning" }],
+      label: "Overview",
+      items: [{ to: FINANCE_HOME, label: "Finance Overview" }],
     },
     {
-      label: "Controls & analysis",
+      label: "Transactions",
+      items: [
+        { to: "/command/cash", label: "Cash & Bank" },
+        { to: "/command/payables", label: "Payables" },
+        { to: "/command/receivables", label: "Receivables" },
+        { to: "/command/sales-ledger", label: "Sales Ledger" },
+      ],
+    },
+    {
+      label: "Accounting & statements",
       items: [
         { to: "/command/accounting", label: "Accounting Workbench" },
-        { to: "/command/finance-control", label: "Finance Control" },
+        { to: "/command/accounting-statements", label: "Financial Statements" },
+      ],
+    },
+    {
+      label: "Planning & analysis",
+      items: [
+        { to: "/command/finance-assumptions", label: "Financial Planning" },
+        { to: "/command/finance-control", label: "Plan / Forecast / Actual" },
         { to: "/command/finance", label: "Finance Analysis" },
         { to: "/command/master-finance", label: "Consolidated Finance" },
-        { to: "/command/aluminium-finance", label: "Aluminium Vertical" },
       ],
+    },
+    {
+      label: "Business views",
+      items: [{ to: "/command/aluminium-finance", label: "Aluminium Vertical" }],
     },
   ],
   governance: [
@@ -197,7 +254,7 @@ export const WORKSPACE_NAVIGATION: Record<CanonicalWorkspaceId, readonly Workspa
       ],
     },
     {
-      label: "Compliance / EPR",
+      label: "Compliance",
       items: [
         { to: "/command/epr-workflow", label: "EPR Workflow" },
         { to: "/command/epr-execution", label: "EPR Execution" },
@@ -207,7 +264,7 @@ export const WORKSPACE_NAVIGATION: Record<CanonicalWorkspaceId, readonly Workspa
       ],
     },
     {
-      label: "Audit",
+      label: "Audit & assurance",
       items: [
         { to: "/command/actions", label: "Audit & Actions" },
         { to: "/command/ca-audit", label: "CA Audit" },
@@ -216,8 +273,19 @@ export const WORKSPACE_NAVIGATION: Record<CanonicalWorkspaceId, readonly Workspa
   ],
   admin: [
     {
-      label: "Administration",
-      items: [...ADMIN_TABS, { to: "/command/classification", label: "Classification" }],
+      label: "Access & security",
+      items: [{ to: ADMIN_HOME, label: "Users & Roles" }],
+    },
+    {
+      label: "System data",
+      items: [
+        { to: "/command/master-data", label: "Master Data" },
+        { to: "/command/classification", label: "Classification" },
+      ],
+    },
+    {
+      label: "Resilience",
+      items: [{ to: "/command/recovery", label: "Backup & Recovery" }],
     },
   ],
 };

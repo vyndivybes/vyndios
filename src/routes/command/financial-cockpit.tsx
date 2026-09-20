@@ -55,23 +55,10 @@ function FinancialCockpit() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col gap-4 border-b border-border pb-6 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">Finance · executive financial control · 36M</p>
-          <h1 className="mt-1 font-display text-4xl text-accent">Finance</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">One executive view of liquidity, funding, break-even and runway. Revenue, COGS and operating drivers remain visible in the money chain; assumptions, cash, balance sheet, CA audit and scenarios stay in the Finance tabs.</p>
-        </div>
-        <div className="flex flex-wrap gap-3 text-sm font-semibold">
-          <Link to="/command/finance-assumptions" className="text-accent hover:text-fg">
-            Edit assumptions →
-          </Link>
-          <Link to="/command/inventory" className="text-accent hover:text-fg">
-            Inventory →
-          </Link>
-          <Link to="/command/procurement" className="text-accent hover:text-fg">
-            Procurement →
-          </Link>
-        </div>
+      <header className="border-b border-border pb-6">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">Finance · executive financial control · 36M</p>
+        <h1 className="mt-1 font-display text-4xl text-accent">Finance Overview</h1>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">Executive summary of liquidity, funding, break-even and runway. Use the Finance workspace navigation for transactions, statements, planning and analysis; this page stays focused on management status.</p>
       </header>
 
       <div className="rounded-xl border border-border bg-surface/40 p-3">
@@ -211,46 +198,28 @@ function FinancialCockpit() {
         </Panel>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Panel title="Funding decision" kicker="Liquidity guardrail">
-          <p className="text-sm text-muted">
-            To preserve a <span className="text-fg">₹{cashFloor}L</span> management floor at the accounting cash trough:
-          </p>
-          <p className="mt-2 font-display text-2xl text-fg">{fundingBuffer > 0 ? `${money(fundingBuffer)} buffer` : "No extra buffer"}</p>
-          <p className="mt-1 text-xs text-muted">
-            Current planned funding: {money(at.financingCashFlow)}. Stress trough: {money(stressTrough.closingCash)}.
-          </p>
-          <Link to="/command/cash" className="mt-4 inline-block text-sm text-accent hover:text-fg">
-            Open cash & working capital →
-          </Link>
-        </Panel>
-        <Panel title="Operating levers" kicker="Change once, see everywhere">
-          <div className="space-y-2 text-sm">
-            <Link className="block rounded-lg border border-border p-3 hover:border-accent" to="/command/finance-assumptions">
-              ASP · COGS · volume · mix · launch
-            </Link>
-            <Link className="block rounded-lg border border-border p-3 hover:border-accent" to="/command/production">
-              Production · units · inventory draw
-            </Link>
-            <Link className="block rounded-lg border border-border p-3 hover:border-accent" to="/command/sales">
-              Sales · revenue · sell-through
-            </Link>
+      <Panel title="Funding decision" kicker="Liquidity guardrail">
+        <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
+          <div>
+            <p className="text-sm text-muted">To preserve a <span className="text-fg">₹{cashFloor}L</span> management floor at the accounting cash trough:</p>
+            <p className="mt-2 font-display text-2xl text-fg">{fundingBuffer > 0 ? `${money(fundingBuffer)} buffer` : "No extra buffer"}</p>
+            <p className="mt-1 text-xs text-muted">Current planned funding: {money(at.financingCashFlow)}. Stress trough: {money(stressTrough.closingCash)}.</p>
           </div>
-        </Panel>
-        <Panel title="Executive drill-down" kicker="Follow the chain">
-          <div className="space-y-2 text-sm">
-            <Link className="block rounded-lg border border-border p-3 hover:border-accent" to="/command/finance-control">
-              Finance Control · plan / forecast / actual
-            </Link>
-            <Link className="block rounded-lg border border-border p-3 hover:border-accent" to="/command/scenarios">
-              Scenarios · compare outcomes
-            </Link>
-            <Link className="block rounded-lg border border-border p-3 hover:border-accent" to="/command/aluminium-finance">
-              Aluminium · dedicated vertical
-            </Link>
-          </div>
-        </Panel>
-      </div>
+          <Link to="/command/cash" className="text-sm font-semibold text-accent hover:text-fg">Open Cash & Bank →</Link>
+        </div>
+      </Panel>
+
+      <details className="rounded-xl border border-border bg-surface/25 p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-fg">Related analysis & operating drivers</summary>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <Link className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent" to="/command/finance-assumptions">Financial Planning</Link>
+          <Link className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent" to="/command/finance-control">Plan / Forecast / Actual</Link>
+          <Link className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent" to="/command/scenarios">Scenarios</Link>
+          <Link className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent" to="/command/production">Production</Link>
+          <Link className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent" to="/command/sales">Demand & Orders</Link>
+          <Link className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent" to="/command/aluminium-finance">Aluminium Vertical</Link>
+        </div>
+      </details>
 
       <div className="rounded-xl border border-border bg-surface/35 p-4 text-xs leading-5 text-muted">
         <span className="font-semibold text-green">Decision rule:</span> use Finance for direction, assumptions for changing the plan, operations pages for execution, and Finance Control for plan / forecast / actual review. Accounting cash drives liquidity signals; actual accounting, tax, GST and statutory reporting still require CA reconciliation.

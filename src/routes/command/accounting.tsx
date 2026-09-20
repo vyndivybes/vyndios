@@ -71,12 +71,7 @@ function AccountingWorkbench() {
             Trial Balance, job cost/WIP/FG valuation and statutory-evidence controls without creating a second finance truth.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Link to="/command/accounting-statements" className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted hover:border-accent hover:text-accent">Financial Statements</Link>
-          <Link to="/command/payables" className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted hover:border-accent hover:text-accent">Payables</Link>
-          <Link to="/command/receivables" className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted hover:border-accent hover:text-accent">Receivables</Link>
-          <Link to="/command/ca-audit" className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted hover:border-accent hover:text-accent">CA Audit</Link>
-        </div>
+        <p className="max-w-sm text-xs leading-5 text-muted">Use Finance → Accounting & Statements for formal statements; this workbench remains the journal, reconciliation and accounting-control surface.</p>
       </header>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">

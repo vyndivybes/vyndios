@@ -227,9 +227,16 @@ test("G5: People & Office is first-class, compact and Finance is downstream", ()
 
 test("G6: Finance and Governance & Assurance have separate internal navigation contracts", () => {
   const finance = workflow.slice(workflow.indexOf("FINANCE_TABS"), workflow.indexOf("GOVERNANCE_TABS"));
-  for (const label of ["Overview", "Cash", "Payables", "Receivables", "Balance Sheet"])
+  for (const label of ["Overview", "Cash", "Payables", "Receivables", "Statements"])
     assert.match(finance, new RegExp(label));
   assert.doesNotMatch(finance, /Approvals|Risk|Legal & IP|Audit & Actions|CA Audit/);
+
+  const financeNavigation = workflow.slice(workflow.indexOf("finance: ["), workflow.indexOf("governance: ["));
+  for (const section of ["Overview", "Transactions", "Accounting & statements", "Planning & analysis", "Business views"])
+    assert.match(financeNavigation, new RegExp(section.replace(/[&]/g, "\\&")));
+  assert.match(financeNavigation, /Financial Statements/);
+  assert.match(financeNavigation, /Accounting Workbench/);
+  assert.doesNotMatch(financeNavigation, /to: "\/command\/balance-sheet"/);
 
   const governance = workflow.slice(workflow.indexOf("GOVERNANCE_TABS"), workflow.indexOf("ADMIN_TABS"));
   for (const label of ["Approvals", "Risk", "Legal & IP", "Audit & Actions", "CA Audit"])
@@ -242,6 +249,35 @@ test("G6: Finance and Governance & Assurance have separate internal navigation c
   assert.match(shell, /label="Governance and Assurance workspace"/);
   assert.match(workflow, /FINANCE_GOVERNANCE_TABS/);
   assert.match(workflow, /FINANCE_GOVERNANCE_CONTEXT/);
+});
+
+test("G6A: all workspace heads use nested business-function navigation", () => {
+  const planNavigation = workflow.slice(workflow.indexOf('"plan-sales": ['), workflow.indexOf("engineering: ["));
+  for (const section of ["Planning", "Commercial"]) assert.match(planNavigation, new RegExp(section));
+  assert.match(planNavigation, /Business Plan/);
+  assert.match(planNavigation, /Demand & Orders/);
+
+  const engineeringNavigation = workflow.slice(workflow.indexOf("engineering: ["), workflow.indexOf("operations: ["));
+  for (const section of ["Product", "BOM & configuration"]) assert.match(engineeringNavigation, new RegExp(section.replace(/[&]/g, "\\&")));
+  assert.match(engineeringNavigation, /Product Master/);
+  assert.match(engineeringNavigation, /BOM Control/);
+
+  const operationsNavigation = workflow.slice(workflow.indexOf("operations: ["), workflow.indexOf('"people-office": ['));
+  for (const section of ["Overview", "Inventory", "Procurement", "Manufacturing", "Quality"])
+    assert.match(operationsNavigation, new RegExp(section));
+  assert.match(operationsNavigation, /Material Requirements/);
+  assert.match(operationsNavigation, /Purchase Execution/);
+  assert.match(operationsNavigation, /Production \/ Build/);
+
+  const governanceNavigation = workflow.slice(workflow.indexOf("governance: ["), workflow.indexOf("admin: ["));
+  for (const section of ["Governance", "Compliance", "Audit & assurance"])
+    assert.match(governanceNavigation, new RegExp(section.replace(/[&]/g, "\\&")));
+
+  const adminNavigation = workflow.slice(workflow.indexOf("admin: ["), workflow.indexOf("};", workflow.indexOf("admin: [")));
+  for (const section of ["Access & security", "System data", "Resilience"])
+    assert.match(adminNavigation, new RegExp(section.replace(/[&]/g, "\\&")));
+  assert.match(adminNavigation, /Users & Roles/);
+  assert.match(adminNavigation, /Backup & Recovery/);
 });
 
 test("G7: Command leads with today's operational control and demotes program governance", () => {

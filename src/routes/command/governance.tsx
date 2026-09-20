@@ -179,11 +179,19 @@ function Governance() {
         <Link to="/command/actions" className="mt-4 inline-block text-sm font-semibold text-accent">Open Action & Audit Log →</Link>
       </details>
 
-      <section className="rounded-xl border border-border bg-surface/25 p-5">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-green">Evidence owners</p>
-        <div className="mt-3 flex flex-wrap gap-2"><Link to="/command/master-data" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">Master Data Engine</Link><Link to="/command/risk" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">Risk register</Link><Link to="/command/legal" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">Legal & IP</Link><Link to="/command/qa-verification" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">QA verification</Link><Link to="/command/actions" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">Action & audit log</Link><Link to="/command/ca-audit" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">CA evidence</Link><Link to="/command/epr-live" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">EPR evidence</Link></div>
+      <details className="rounded-xl border border-border bg-surface/25 p-5">
+        <summary className="cursor-pointer text-sm font-semibold text-fg">Evidence owners & related assurance surfaces</summary>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <Link to="/command/master-data" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent">Master Data</Link>
+          <Link to="/command/risk" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent">Risk Register</Link>
+          <Link to="/command/legal" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent">Legal & IP</Link>
+          <Link to="/command/qa-verification" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent">QA Verification</Link>
+          <Link to="/command/actions" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent">Audit & Actions</Link>
+          <Link to="/command/ca-audit" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent">CA Audit</Link>
+          <Link to="/command/epr-live" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent">EPR Live Evidence</Link>
+        </div>
         <p className="mt-4 text-xs leading-5 text-muted">Gate OPEN/CLOSED state is persisted through the governed operating-action authority. Evidence approval remains a separate control dimension; closing a gate does not fabricate or alter evidence status.</p>
-      </section>
+      </details>
     </div>
   );
 }
