@@ -25,10 +25,10 @@ export const DECISION_PACKETS: DecisionPacket[] = [
   },
   {
     id: "K-02", priority: "critical", state: "blocked", title: "Engineering baseline", trigger: "FC-02 / FC-03 are blocked",
-    owner: "Founder + Engineering", decision: "Resolve VEDM master reconciliation and 700×40 clearance evidence before design freeze",
-    evidence: "VEDM-301 Rev 5.3.8 + TC-04 / TC-05 / TC-06", approval: "Engineering / QA gate",
+    owner: "Founder + Engineering", decision: "Keep E-K75 as frame authority and close FK75 solver, material, XL tolerance and physical-validation gates before design freeze",
+    evidence: "VEDM-301 Rev 5.3.9 E-K75 + Rev 5.4 FK75 / Configuration Rev 0.8 / TC-04 to TC-06", approval: "Engineering / QA gate",
     financialImpact: "Protects prototype and tooling spend from premature release", operationalImpact: "Unlocks supplier RFQs and validation path",
-    nextAction: "Produce controlled geometry reconciliation + measured clearance evidence", source: "/command/engineering",
+    nextAction: "Complete native FK75 composite FEA, MATERIAL-01 interlaminar qualification, XL tolerance/deformed-clearance and prototype/NDT/ISO evidence", source: "/command/engineering",
   },
   {
     id: "K-03", priority: "high", state: "approval", title: "Funding evidence room", trigger: "FC-06 is active",
