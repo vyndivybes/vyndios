@@ -36,6 +36,7 @@ const PEOPLE_OFFICE_PAGE: PageMeta = {
   group: "Operate",
 };
 const ACCOUNTING_ROUTE = "/command/accounting";
+const ACCOUNTING_STATEMENTS_ROUTE = "/command/accounting-statements";
 const ACCOUNTING_PAGE: PageMeta = {
   mode: "operate",
   domain: "finance",
@@ -171,7 +172,11 @@ export function canAccessRoute(role: CommandRole | null, route: string): boolean
   const direct = getRouteMeta(route);
   if (direct) return canAccessPage(role, direct);
   if (route === PEOPLE_OFFICE_ROUTE) return canAccessPage(role, PEOPLE_OFFICE_PAGE);
-  if (route === ACCOUNTING_ROUTE || route.startsWith(`${ACCOUNTING_ROUTE}/`))
+  if (
+    route === ACCOUNTING_ROUTE ||
+    route === ACCOUNTING_STATEMENTS_ROUTE ||
+    route.startsWith(`${ACCOUNTING_ROUTE}/`)
+  )
     return canAccessPage(role, ACCOUNTING_PAGE);
   if (route === SALES_LEDGER_ROUTE) return canAccessPage(role, SALES_LEDGER_PAGE);
 

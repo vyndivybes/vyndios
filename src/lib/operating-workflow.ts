@@ -81,6 +81,7 @@ export const FINANCE_TABS: readonly WorkspaceLink[] = [
   { to: "/command/payables", label: "Payables" },
   { to: "/command/receivables", label: "Receivables" },
   { to: "/command/sales-ledger", label: "Sales Ledger" },
+  { to: "/command/accounting-statements", label: "Statements" },
   { to: "/command/balance-sheet", label: "Balance Sheet" },
 ];
 
@@ -178,6 +179,7 @@ export const WORKSPACE_NAVIGATION: Record<CanonicalWorkspaceId, readonly Workspa
     {
       label: "Controls & analysis",
       items: [
+        { to: "/command/accounting", label: "Accounting Workbench" },
         { to: "/command/finance-control", label: "Finance Control" },
         { to: "/command/finance", label: "Finance Analysis" },
         { to: "/command/master-finance", label: "Consolidated Finance" },

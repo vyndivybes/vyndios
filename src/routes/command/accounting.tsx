@@ -72,6 +72,7 @@ function AccountingWorkbench() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link to="/command/accounting-statements" className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted hover:border-accent hover:text-accent">Financial Statements</Link>
           <Link to="/command/payables" className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted hover:border-accent hover:text-accent">Payables</Link>
           <Link to="/command/receivables" className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted hover:border-accent hover:text-accent">Receivables</Link>
           <Link to="/command/ca-audit" className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted hover:border-accent hover:text-accent">CA Audit</Link>
