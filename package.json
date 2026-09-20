@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "node scripts/with-app-env.mjs vite dev --host 0.0.0.0 --port 8080",
-    "build": "node scripts/with-app-env.mjs vite build && npm run db:migrate",
+    "build": "npm run db:validate && node scripts/with-app-env.mjs vite build && npm run db:migrate",
     "db:migrate": "node scripts/migrate.mjs",
     "build:dev": "node scripts/with-app-env.mjs vite build --mode development",
     "preview": "node scripts/with-app-env.mjs vite preview",
@@ -30,7 +30,8 @@
     "check:routes": "node scripts/check-route-invariants.mjs",
     "test:stocktake:statutory": "node --test scripts/stocktake-statutory-controls.test.mjs",
     "test:h5:integrations": "node --test scripts/h5-governed-integrations.test.mjs",
-    "test:admin:recovery": "node --test scripts/admin-recovery-control.test.mjs"
+    "test:admin:recovery": "node --test scripts/admin-recovery-control.test.mjs",
+    "db:validate": "node scripts/validate-migration-syntax.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
