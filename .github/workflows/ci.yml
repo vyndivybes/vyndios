@@ -1,13 +1,11 @@
 name: CI
 
+# GitHub-hosted runners for this private repository are currently unavailable
+# before job allocation. Automatic validation is enforced by Netlify via
+# npm run ci:external. Keep this workflow manual so it can be re-enabled
+# immediately when GitHub-hosted Actions capacity/budget is available.
 on:
-  push:
-    branches:
-      - main
-      - "phase-*"
-  pull_request:
-    branches:
-      - main
+  workflow_dispatch:
 
 permissions:
   contents: read

@@ -1,14 +1,10 @@
 name: CodeQL
 
+# Private-repository CodeQL requires both an available Actions runner and
+# the applicable GitHub Code Security entitlement. Keep the workflow available
+# for an explicit security run without creating a failing status on every push.
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
-  schedule:
-    - cron: "23 3 * * 1"
+  workflow_dispatch:
 
 permissions:
   contents: read
