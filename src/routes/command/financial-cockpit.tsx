@@ -1,12 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Kpi, Panel } from "@/components/kpi";
 import { FinanceVisual } from "@/components/finance-visual";
 import { buildModelWithInputs, totals, type ScenarioId } from "@/lib/finance/model";
 import { accountingTotals, buildAccountingModel } from "@/lib/finance/accounting";
-import { useVeloxis } from "@/lib/store";
+import { getOperatingPlanState, type OperatingPlanSnapshot } from "@/lib/operating-plan-authority";
 
-export const Route = createFileRoute("/command/financial-cockpit")({ component: FinancialCockpit });
+export const Route = createFileRoute("/command/financial-cockpit")({
+  loader: async () => {
+    const state = await getOperatingPlanState();
+    if (!state.approved) throw new Error("Consolidated Finance requires an approved Integrated Operating Plan.");
+    return state.approved;
+  },
+  component: FinancialCockpit,
+});
 
 const money = (n: number, digits = 1) => `₹${n.toFixed(digits)}L`;
 const scenarios: { id: ScenarioId; label: string }[] = [
@@ -16,12 +23,11 @@ const scenarios: { id: ScenarioId; label: string }[] = [
 ];
 
 function FinancialCockpit() {
-  const scenario = useVeloxis((s) => s.scenario);
-  const setScenario = useVeloxis((s) => s.setScenario);
-  const drawStandby = useVeloxis((s) => s.drawStandby);
-  const setDrawStandby = useVeloxis((s) => s.setDrawStandby);
-  const finance = useVeloxis((s) => s.finance);
-  const accounting = useVeloxis((s) => s.accounting);
+  const approvedPlan = Route.useLoaderData() as OperatingPlanSnapshot;
+  const [scenario, setScenario] = useState<ScenarioId>(approvedPlan.scenario);
+  const [drawStandby, setDrawStandby] = useState(Boolean(approvedPlan.drawStandby));
+  const finance = approvedPlan.finance;
+  const accounting = approvedPlan.accounting;
 
   const rows = useMemo(() => buildModelWithInputs(scenario, drawStandby, finance), [scenario, drawStandby, finance]);
   const stressRows = useMemo(() => buildModelWithInputs("stress", drawStandby, finance), [drawStandby, finance]);
@@ -39,7 +45,7 @@ function FinancialCockpit() {
   const breakEven = accountingRows.find((r) => r.ebitda >= 0)?.m ?? null;
   const troughRow = accountingRows.reduce((min, r) => (r.closingCash < min.closingCash ? r : min), accountingRows[0]);
   const stressTrough = stressAccountingRows.reduce((min, r) => (r.closingCash < min.closingCash ? r : min), stressAccountingRows[0]);
-  const cashFloor = 15;
+  const cashFloor = finance.operatingPlan?.cashFloorLakh ?? 0;
   const fundingBuffer = Math.max(0, cashFloor - troughRow.closingCash);
   const operatingOutflow = at.opex + totalCapex + totalInventoryBuy;
   const m12 = rows[11];
@@ -57,14 +63,14 @@ function FinancialCockpit() {
     <div className="space-y-6">
       <header className="border-b border-border pb-6">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">Finance · executive financial control · 36M</p>
-        <h1 className="mt-1 font-display text-4xl text-accent">Finance Overview</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">Executive summary of liquidity, funding, break-even and runway. Use the Finance workspace navigation for transactions, statements, planning and analysis; this page stays focused on management status.</p>
+        <h1 className="mt-1 font-display text-4xl text-accent">Consolidated Finance Overview</h1>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">Executive portfolio view of liquidity, funding, break-even, runway and operating drivers across the business. Use Transactions for ledger activity, Accounting & Statements for books, and Planning & Control for the approved Integrated Operating Plan and variance review.</p>
       </header>
 
       <div className="rounded-xl border border-border bg-surface/40 p-3">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-green">Live scenario</span>
+            <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-green">Forecast scenario</span>
             {scenarios.map((item) => (
               <button key={item.id} type="button" onClick={() => setScenario(item.id)} className={`rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors ${scenario === item.id ? "border-accent bg-accent text-accent-fg" : "border-border text-muted hover:border-accent/40 hover:text-fg"}`}>
                 {item.label}
@@ -73,7 +79,7 @@ function FinancialCockpit() {
           </div>
           <label className="flex cursor-pointer items-center gap-2 text-xs text-muted">
             <input type="checkbox" checked={drawStandby} onChange={(e) => setDrawStandby(e.target.checked)} className="accent-current" />
-            Include standby funding
+            Include standby funding in this view
           </label>
         </div>
       </div>
@@ -84,9 +90,9 @@ function FinancialCockpit() {
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-green">Executive status</p>
             <div className="mt-1 flex items-baseline gap-3">
               <h2 className="font-display text-3xl text-accent">{health}</h2>
-              <span className="text-sm text-muted">{scenario} plan · M1–M36</span>
+              <span className="text-sm text-muted">{scenario} forecast · approved R{approvedPlan.revision}</span>
             </div>
-            <p className="mt-2 max-w-2xl text-xs leading-5 text-muted">Status and runway use timed accounting cash after receivables, payables, tax and GST settlement. The operating chart remains linked to the same live planning inputs.</p>
+            <p className="mt-2 max-w-2xl text-xs leading-5 text-muted">Status and runway use timed accounting cash after receivables, payables, tax and GST settlement. The operating chart uses approved Integrated Operating Plan R{approvedPlan.revision}; scenario controls on this page are view-only forecast comparisons.</p>
           </div>
           <div className={`rounded-lg border px-4 py-3 text-right ${healthTone === "ok" ? "border-ok/40" : healthTone === "warn" ? "border-warn/40" : "border-danger/40"}`}>
             <p className="text-[10px] uppercase tracking-[0.14em] text-green">Accounting cash trough</p>
@@ -212,8 +218,8 @@ function FinancialCockpit() {
       <details className="rounded-xl border border-border bg-surface/25 p-4">
         <summary className="cursor-pointer text-sm font-semibold text-fg">Related analysis & operating drivers</summary>
         <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          <Link className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent" to="/command/finance-assumptions">Financial Planning</Link>
-          <Link className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent" to="/command/finance-control">Plan / Forecast / Actual</Link>
+          <Link className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent" to="/command/planning">Integrated Operating Plan</Link>
+          <Link className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent" to="/command/finance-control">Budget vs Forecast vs Actual</Link>
           <Link className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent" to="/command/scenarios">Scenarios</Link>
           <Link className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent" to="/command/production">Production</Link>
           <Link className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent" to="/command/sales">Demand & Orders</Link>
@@ -222,7 +228,7 @@ function FinancialCockpit() {
       </details>
 
       <div className="rounded-xl border border-border bg-surface/35 p-4 text-xs leading-5 text-muted">
-        <span className="font-semibold text-green">Decision rule:</span> use Finance for direction, assumptions for changing the plan, operations pages for execution, and Finance Control for plan / forecast / actual review. Accounting cash drives liquidity signals; actual accounting, tax, GST and statutory reporting still require CA reconciliation.
+        <span className="font-semibold text-green">Decision rule:</span> use the Integrated Operating Plan for governed company planning, Engineering / Commercial / Operations for source reality, Finance for financial consequences, and Budget vs Forecast vs Actual for variance review. Accounting cash drives liquidity signals; actual accounting, tax, GST and statutory reporting still require CA reconciliation.
       </div>
     </div>
   );

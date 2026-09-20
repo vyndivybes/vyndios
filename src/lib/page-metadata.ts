@@ -289,7 +289,7 @@ export const routeRegistry: Record<string, RouteMeta> = {
   ),
   "/command/planning": meta(
     "/command/planning",
-    "Planning",
+    "Integrated Operating Plan",
     "operate",
     "command",
     "founder",
@@ -298,7 +298,7 @@ export const routeRegistry: Record<string, RouteMeta> = {
   ),
   "/command/finance-assumptions": meta(
     "/command/finance-assumptions",
-    "Financial Planning",
+    "Forecast Parameters",
     "operate",
     "finance",
     "finance",
@@ -307,7 +307,7 @@ export const routeRegistry: Record<string, RouteMeta> = {
   ),
   "/command/master-finance": meta(
     "/command/master-finance",
-    "Financial Cockpit (consolidated)",
+    "Consolidated Finance (compatibility)",
     "operate",
     "finance",
     "finance",
@@ -316,7 +316,7 @@ export const routeRegistry: Record<string, RouteMeta> = {
   ),
   "/command/finance-control": meta(
     "/command/finance-control",
-    "Finance Control",
+    "Budget vs Forecast vs Actual",
     "operate",
     "finance",
     "finance",
@@ -650,7 +650,7 @@ export const routeRegistry: Record<string, RouteMeta> = {
   ),
   "/command/financial-cockpit": meta(
     "/command/financial-cockpit",
-    "Financial Cockpit",
+    "Consolidated Finance Overview",
     "observe",
     "finance",
     "founder",

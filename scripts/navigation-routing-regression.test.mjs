@@ -232,7 +232,7 @@ test("G6: Finance and Governance & Assurance have separate internal navigation c
   assert.doesNotMatch(finance, /Approvals|Risk|Legal & IP|Audit & Actions|CA Audit/);
 
   const financeNavigation = workflow.slice(workflow.indexOf("finance: ["), workflow.indexOf("governance: ["));
-  for (const section of ["Overview", "Transactions", "Accounting & statements", "Planning & analysis", "Business views"])
+  for (const section of ["Overview", "Transactions", "Accounting & statements", "Planning & control", "Business views"])
     assert.match(financeNavigation, new RegExp(section.replace(/[&]/g, "\\&")));
   assert.match(financeNavigation, /Financial Statements/);
   assert.match(financeNavigation, /Accounting Workbench/);
@@ -278,6 +278,70 @@ test("G6A: all workspace heads use nested business-function navigation", () => {
     assert.match(adminNavigation, new RegExp(section.replace(/[&]/g, "\\&")));
   assert.match(adminNavigation, /Users & Roles/);
   assert.match(adminNavigation, /Backup & Recovery/);
+});
+
+test("G6B: Finance navigation exposes only real destinations", () => {
+  const financeNavigation = workflow.slice(workflow.indexOf("finance: ["), workflow.indexOf("governance: ["));
+  assert.match(financeNavigation, /Consolidated Overview/);
+  assert.match(financeNavigation, /Integrated Operating Plan/);
+  assert.match(financeNavigation, /Budget vs Forecast vs Actual/);
+  assert.doesNotMatch(financeNavigation, /Finance Analysis/);
+  assert.doesNotMatch(financeNavigation, /Consolidated Finance/);
+  assert.doesNotMatch(financeNavigation, /\/command\/master-finance/);
+  assert.doesNotMatch(financeNavigation, /\/command\/finance", label/);
+});
+
+test("G6C: overall planning authority is engineering-connected and not assumption-led", () => {
+  const financeNavigation = workflow.slice(workflow.indexOf("finance: ["), workflow.indexOf("governance: ["));
+  assert.match(financeNavigation, /Integrated Operating Plan/);
+  assert.doesNotMatch(financeNavigation, /Plan Inputs & Assumptions/);
+  assert.doesNotMatch(financeNavigation, /Financial Planning/);
+
+  const planning = read("src/routes/command/planning.tsx");
+  assert.match(planning, /listEngineeringAuthority/);
+  assert.match(planning, /getProcurementPlanningReport/);
+  assert.match(planning, /Plan reality gate/);
+  assert.match(planning, /Engineering release coverage/);
+  assert.match(planning, /confirmed order\(s\).*production\/BOM synchronization/);
+
+  const studio = read("src/components/planning-studio.tsx");
+  assert.match(studio, /Integrated 36-month Plan Studio/);
+  assert.match(studio, /realityBlockers/);
+  assert.match(studio, /Acceleration is disabled/);
+});
+
+test("G6D: integrated forecast chain uses approved authorities end-to-end", () => {
+  const procurementData = read("src/lib/data/procurement-planning.ts");
+  assert.match(procurementData, /buildModelWithInputs/);
+  assert.match(procurementData, /FinanceAssumptions/);
+  assert.doesNotMatch(procurementData, /DEFAULT_FINANCE_ASSUMPTIONS/);
+  assert.doesNotMatch(procurementData, /MIX\./);
+  assert.match(procurementData, /coreUnits: row\.aluminiumUnits/);
+  assert.match(procurementData, /proUnits: row\.carbonUnits/);
+  assert.match(procurementData, /apexUnits: row\.premiumCarbonUnits/);
+
+  const procurementAuthority = read("src/lib/procurement-authority.ts");
+  assert.match(procurementAuthority, /from vyndi_plan_revisions/);
+  assert.match(procurementAuthority, /status='approved'/);
+  assert.match(procurementAuthority, /approvedPlan\.finance_json/);
+  assert.match(procurementAuthority, /approvedPlanRevision/);
+
+  const financeControl = read("src/routes/command/finance-control.tsx");
+  assert.match(financeControl, /getOperatingPlanState/);
+  assert.match(financeControl, /Finance Control requires an approved Integrated Operating Plan/);
+  assert.match(financeControl, /approvedPlan\.finance/);
+  assert.match(financeControl, /approvedPlan\.accounting/);
+  assert.doesNotMatch(financeControl, /useVeloxis\(\(s\)=>s\.finance\)/);
+  assert.doesNotMatch(financeControl, /useVeloxis\(\(s\)=>s\.accounting\)/);
+
+  const operatingPlan = read("src/lib/planning/operating-plan.ts");
+  assert.match(operatingPlan, /cascadeEngineeringSchedule/);
+  assert.match(operatingPlan, /engineeringBaseline \+ 3/);
+  assert.match(operatingPlan, /prototypeValidation \+ 2/);
+  assert.match(operatingPlan, /toolingPilot \+ 3/);
+
+  const studio = read("src/components/planning-studio.tsx");
+  assert.match(studio, /cascadeEngineeringSchedule\(draft/);
 });
 
 test("G7: Command leads with today's operational control and demotes program governance", () => {

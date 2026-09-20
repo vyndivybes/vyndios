@@ -371,7 +371,7 @@ function Commercial() {
           <Link to="/command/production" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent">Production</Link>
           <Link to="/command/procurement-planning" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent">Material Requirements</Link>
           <Link to="/command/actuals" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent">Operational Actuals</Link>
-          <Link to="/command/finance-assumptions" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent">Financial Planning</Link>
+          <Link to="/command/planning" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent">Integrated Operating Plan</Link>
         </div>
       </details>
     </div>

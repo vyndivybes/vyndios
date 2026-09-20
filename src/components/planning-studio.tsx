@@ -8,6 +8,7 @@ import { canPerform, type CommandRole } from "@/lib/page-access";
 import {
   DEFAULT_APPROVED_OPERATING_PLAN,
   calendarMonthForPlanMonth,
+  cascadeEngineeringSchedule,
   normalizeOperatingPlan,
   operatingPlanHorizonLabel,
   planningRisks,
@@ -44,11 +45,13 @@ function impact(finance: FinanceAssumptions, plan: OperatingPlan, drawStandby: b
   };
 }
 
-export function PlanningStudio({ role, approvedFinance, draftFinance, draftId }: {
+export function PlanningStudio({ role, approvedFinance, draftFinance, draftId, engineeringCoverage = 0, realityBlockers = [] }: {
   role: CommandRole | null;
   approvedFinance?: FinanceAssumptions | null;
   draftFinance?: FinanceAssumptions | null;
   draftId?: string | null;
+  engineeringCoverage?: number;
+  realityBlockers?: string[];
 }) {
   const router = useRouter();
   const storeFinance = useVeloxis((s) => s.finance);
@@ -133,7 +136,7 @@ export function PlanningStudio({ role, approvedFinance, draftFinance, draftId }:
 
   const delta = draft.milestoneMonths.commercialLaunch - approvedPlan.milestoneMonths.commercialLaunch;
   return <div className="space-y-5">
-    <Panel title="Rolling 36-month Scenario Studio" kicker="Edit → simulate → save draft → submit → approve → publish">
+    <Panel title="Integrated 36-month Plan Studio" kicker="Reality-constrained targets → simulate → govern → approve">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         <div className="rounded-xl border border-border p-4"><p className="text-[10px] uppercase tracking-wider text-green">Approved horizon</p><p className="mt-2 font-semibold">{operatingPlanHorizonLabel(approvedPlan)}</p></div>
         <div className="rounded-xl border border-border p-4"><p className="text-[10px] uppercase tracking-wider text-green">Approved launch</p><p className="mt-2 text-xl font-semibold text-accent">M{approvedPlan.milestoneMonths.commercialLaunch}</p><p className="text-xs text-muted">{calendarMonthForPlanMonth(approvedPlan, approvedPlan.milestoneMonths.commercialLaunch)}</p></div>
@@ -143,7 +146,7 @@ export function PlanningStudio({ role, approvedFinance, draftFinance, draftId }:
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2">
-        <button disabled={!editable||busy} onClick={()=>update(shiftOperatingPlan(draft,-1))} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold disabled:opacity-40">Accelerate 1 month</button>
+        <button disabled={!editable||busy||realityBlockers.length>0} onClick={()=>update(shiftOperatingPlan(draft,-1))} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold disabled:opacity-40">Accelerate 1 month</button>
         <button disabled={!editable||busy} onClick={()=>update(shiftOperatingPlan(draft,1))} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold disabled:opacity-40">Delay 1 month</button>
         <button disabled={!editable||busy} onClick={()=>update(rollOperatingPlan(draft,1))} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold disabled:opacity-40">Roll horizon +1 month</button>
         <button disabled={!editable||busy} onClick={()=>update(approvedPlan)} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold disabled:opacity-40">Reset to approved</button>
@@ -153,7 +156,7 @@ export function PlanningStudio({ role, approvedFinance, draftFinance, draftId }:
         <div className="rounded-xl border border-border p-4">
           <fieldset disabled={!editable} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 disabled:opacity-60">
             <label className="block"><span className="text-xs font-medium">Horizon start</span><input type="month" value={draft.horizonStart} onChange={(e)=>update({...draft,horizonStart:e.target.value})} className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm"/></label>
-            <NumberInput label="Engineering baseline" value={draft.milestoneMonths.engineeringBaseline} suffix="M" onChange={(v)=>update({...draft,milestoneMonths:{...draft.milestoneMonths,engineeringBaseline:clampMonth(v)}})}/>
+            <NumberInput label="Target engineering release" value={draft.milestoneMonths.engineeringBaseline} suffix="M" onChange={(v)=>update(cascadeEngineeringSchedule(draft, clampMonth(v)))}/>
             <NumberInput label="Prototype / validation" value={draft.milestoneMonths.prototypeValidation} suffix="M" onChange={(v)=>update({...draft,milestoneMonths:{...draft.milestoneMonths,prototypeValidation:clampMonth(v)}})}/>
             <NumberInput label="Tooling / pilot" value={draft.milestoneMonths.toolingPilot} suffix="M" onChange={(v)=>update({...draft,milestoneMonths:{...draft.milestoneMonths,toolingPilot:clampMonth(v)}})}/>
             <NumberInput label="Commercial launch" value={draft.milestoneMonths.commercialLaunch} suffix="M" onChange={(v)=>update({...draft,milestoneMonths:{...draft.milestoneMonths,commercialLaunch:clampMonth(v)}})}/>
@@ -177,9 +180,15 @@ export function PlanningStudio({ role, approvedFinance, draftFinance, draftId }:
         </div>
       </div>
 
+      <div className={`mt-5 rounded-xl border p-4 ${realityBlockers.length ? "border-warn/40 bg-warn/5" : "border-green/30 bg-green/5"}`}>
+        <p className="text-xs font-semibold uppercase tracking-wider">Execution basis</p>
+        <p className="mt-2 text-sm text-fg">Engineering release coverage: {engineeringCoverage}/3 families.</p>
+        <p className="mt-1 text-xs leading-5 text-muted">{realityBlockers.length ? "This working plan is conditional. Acceleration is disabled until the current engineering/material/commitment blockers are resolved." : "Current engineering, material and commitment authorities support an executable planning basis."}</p>
+      </div>
+
       <details className="mt-5 rounded-xl border border-border bg-bg/30 p-4" open>
         <summary className="cursor-pointer text-sm font-semibold text-fg">Month-by-month base production / demand units</summary>
-        <p className="mt-2 max-w-4xl text-xs leading-5 text-muted">Admin-editable planning inputs only. A monthly override recalculates demand, product mix, revenue, COGS, inventory purchases and funding forecasts. It never creates a Commercial order, Production job card, traveller, inventory movement or supplier commitment.</p>
+        <p className="mt-2 max-w-4xl text-xs leading-5 text-muted">Controlled forecast quantities only. Confirmed Commercial demand and released Engineering/BOM requirements remain authoritative where they exist. A monthly forecast quantity can fill uncommitted demand but never overrides a confirmed order, released BOM, Production job card, traveller, inventory movement or supplier commitment.</p>
         <fieldset disabled={!editable} className="mt-4 grid gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-9 disabled:opacity-60">
           {monthlyRows.map((row) => (
             <label key={row.month} className={`rounded-lg border p-2 ${row.overridden ? "border-accent/50 bg-accent/5" : "border-border bg-surface/30"}`}>

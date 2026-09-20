@@ -49,7 +49,7 @@ export const COMMAND_SHORTCUTS: readonly WorkspaceLink[] = [
 
 /** Plan & Commercial — demand, horizon planning, scenarios and route-to-market. */
 export const PLAN_SALES_TABS: readonly WorkspaceLink[] = [
-  { to: PLAN_HOME, label: "Plan" },
+  { to: PLAN_HOME, label: "Integrated Plan" },
   { to: SALES_HOME, label: "Demand & Orders" },
   { to: "/command/scenarios", label: "Scenarios" },
   { to: "/command/gtm", label: "GTM" },
@@ -141,7 +141,7 @@ export const WORKSPACE_NAVIGATION: Record<CanonicalWorkspaceId, readonly Workspa
     {
       label: "Planning",
       items: [
-        { to: PLAN_HOME, label: "Business Plan" },
+        { to: PLAN_HOME, label: "Integrated Operating Plan" },
         { to: "/command/scenarios", label: "Scenarios" },
       ],
     },
@@ -212,7 +212,7 @@ export const WORKSPACE_NAVIGATION: Record<CanonicalWorkspaceId, readonly Workspa
   finance: [
     {
       label: "Overview",
-      items: [{ to: FINANCE_HOME, label: "Finance Overview" }],
+      items: [{ to: FINANCE_HOME, label: "Consolidated Overview" }],
     },
     {
       label: "Transactions",
@@ -231,12 +231,10 @@ export const WORKSPACE_NAVIGATION: Record<CanonicalWorkspaceId, readonly Workspa
       ],
     },
     {
-      label: "Planning & analysis",
+      label: "Planning & control",
       items: [
-        { to: "/command/finance-assumptions", label: "Financial Planning" },
-        { to: "/command/finance-control", label: "Plan / Forecast / Actual" },
-        { to: "/command/finance", label: "Finance Analysis" },
-        { to: "/command/master-finance", label: "Consolidated Finance" },
+        { to: PLAN_HOME, label: "Integrated Operating Plan" },
+        { to: "/command/finance-control", label: "Budget vs Forecast vs Actual" },
       ],
     },
     {

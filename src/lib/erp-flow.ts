@@ -83,8 +83,8 @@ export const ERP_FLOW: ErpFlowStep[] = [
     inputs: "Operational actuals, assumptions and funding data",
     outputs: "Finance, cash, funding and scenario views",
     routes: [
-      "/command/finance",
-      "/command/finance-assumptions",
+      "/command/financial-cockpit",
+      "/command/planning",
       "/command/cash",
       "/command/funding",
       "/command/scenarios",

@@ -5,6 +5,8 @@ import { Kpi, Panel } from "@/components/kpi";
 import { PlanningStudio } from "@/components/planning-studio";
 import { COMPANY, TRANCHES } from "@/lib/data/company";
 import { getCommandRole } from "@/lib/command-access";
+import { listEngineeringAuthority } from "@/lib/engineering-authority";
+import { getProcurementPlanningReport } from "@/lib/procurement-authority";
 import { approveOperatingPlan, getOperatingPlanState, submitOperatingPlan } from "@/lib/operating-plan-authority";
 import { canPerform } from "@/lib/page-access";
 import {
@@ -16,18 +18,24 @@ import {
 
 export const Route = createFileRoute("/command/planning")({
   loader: async () => {
-    const [role, plan] = await Promise.all([getCommandRole(), getOperatingPlanState()]);
-    return { role, plan };
+    const [role, plan, engineering, procurement] = await Promise.all([
+      getCommandRole(),
+      getOperatingPlanState(),
+      listEngineeringAuthority(),
+      getProcurementPlanningReport(),
+    ]);
+    return { role, plan, engineering, procurement };
   },
   component: MasterPlan,
 });
 
 const PLAN_TABS = [
-  { label: "Roadmap", to: "/command/planning" },
+  { label: "Integrated Plan", to: "/command/planning" },
+  { label: "Engineering", to: "/command/engineering" },
   { label: "Demand", to: "/command/sales" },
   { label: "Procurement", to: "/command/procurement-planning" },
   { label: "Production", to: "/command/production" },
-  { label: "Finance", to: "/command/finance-assumptions" },
+  { label: "Finance", to: "/command/financial-cockpit" },
   { label: "Scenarios", to: "/command/scenarios" },
 ] as const;
 
@@ -42,7 +50,7 @@ const ROADMAP_META = [
 const capitalLadder = TRANCHES.filter((t) => t.id !== "STBY").reduce((s, t) => s + t.amount, 0);
 
 function MasterPlan() {
-  const { role, plan } = Route.useLoaderData();
+  const { role, plan, engineering, procurement } = Route.useLoaderData();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -50,6 +58,21 @@ function MasterPlan() {
   const active = plan.draft ?? plan.approved;
   const approvedOperatingPlan = normalizeOperatingPlan(plan.approved?.finance.operatingPlan ?? DEFAULT_APPROVED_OPERATING_PLAN);
   const activeOperatingPlan = normalizeOperatingPlan(active?.finance.operatingPlan ?? approvedOperatingPlan);
+  const releasedFamilies = new Set(
+    engineering.baselines
+      .filter((row) => String(row.status ?? "").toLowerCase() === "released")
+      .map((row) => String(row.family_code ?? "")),
+  );
+  const engineeringCoverage = ["longitude", "latitude", "altitude"].filter((family) => releasedFamilies.has(family)).length;
+  const openEngineeringChanges = engineering.changes.filter((row) => !["implemented", "rejected"].includes(String(row.status ?? "").toLowerCase())).length;
+  const materialPlanningBlockers = procurement.planningMappingIssues.length;
+  const committedDemandExceptions = procurement.unprojectedCommitments.length;
+  const realityBlockers = [
+    ...(engineeringCoverage < 3 ? [`Engineering release coverage is ${engineeringCoverage}/3 product families.`] : []),
+    ...(openEngineeringChanges > 0 ? [`${openEngineeringChanges} engineering change request(s) remain open.`] : []),
+    ...procurement.planningMappingIssues,
+    ...(committedDemandExceptions > 0 ? [`${committedDemandExceptions} confirmed order(s) are not synchronized to a current released production/BOM state.`] : []),
+  ];
 
   async function submit() {
     if (!plan.draft) return;
@@ -83,9 +106,9 @@ function MasterPlan() {
   return <main className="space-y-6">
     <header className="flex flex-col gap-4 border-b border-border pb-6 lg:flex-row lg:items-end lg:justify-between">
       <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">Planning · canonical rolling operating intent</p>
-        <h1 className="mt-1 font-display text-4xl text-accent">Master Plan</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">One governed rolling 36-month plan for {COMPANY.brand}. Plan, forecast, scenario and actual remain distinct; only an approved revision becomes company planning truth.</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">Integrated planning · engineering → demand → supply → operations → finance</p>
+        <h1 className="mt-1 font-display text-4xl text-accent">Integrated Operating Plan</h1>
+        <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">One governed 36-month company plan constrained by released engineering, controlled BOM/material availability, confirmed demand, production readiness and finance. Forecast parameters may fill genuine data gaps, but they are provisional inputs—not planning truth.</p>
       </div>
       <Link to="/command" className="w-fit rounded-lg border border-border px-4 py-2.5 text-sm font-semibold text-muted hover:border-accent">Command Centre →</Link>
     </header>
@@ -95,10 +118,41 @@ function MasterPlan() {
       <Kpi label="Approved revision" value={plan.approved ? `R${plan.approved.revision}` : "None"} hint={plan.approved?.approvedAt ? `Approved ${plan.approved.approvedAt.slice(0, 10)}` : "Approval required"} tone={plan.approved ? "ok" : "warn"} />
       <Kpi label="Your draft" value={plan.draft ? `R${plan.draft.revision}` : "None"} hint={plan.draft ? "Server-backed editable draft" : "Using approved plan"} />
       <Kpi label="Commercial launch" value={activeOperatingPlan.milestoneMonths.commercialLaunch > 0 ? `M${activeOperatingPlan.milestoneMonths.commercialLaunch}` : "Historical"} hint={calendarMonthForPlanMonth(activeOperatingPlan, activeOperatingPlan.milestoneMonths.commercialLaunch)} />
-      <Kpi label="Capital ladder" value={`₹${capitalLadder}L`} hint="Approved envelope; draw timing is forecast-driven" />
+      <Kpi label="Engineering release" value={`${engineeringCoverage}/3`} hint={openEngineeringChanges ? `${openEngineeringChanges} open change(s)` : "No open engineering changes"} tone={engineeringCoverage === 3 && openEngineeringChanges === 0 ? "ok" : "warn"} />
+      <Kpi label="Reality blockers" value={String(realityBlockers.length)} hint="Engineering / BOM / committed demand" tone={realityBlockers.length ? "danger" : "ok"} />
     </div>
 
     {message ? <div className="rounded-lg border border-border bg-surface px-4 py-3 text-sm text-muted">{message}</div> : null}
+
+    <Panel title="Plan reality gate" kicker="Live authorities constrain the plan before finance">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-xl border border-border bg-surface/35 p-4">
+          <p className="text-[10px] uppercase tracking-wider text-green">Engineering</p>
+          <p className="mt-2 text-xl font-semibold text-fg">{engineeringCoverage}/3 families released</p>
+          <p className="mt-1 text-xs text-muted">{openEngineeringChanges ? `${openEngineeringChanges} open engineering change(s)` : "Released baseline has no open change blocker."}</p>
+          <Link to="/command/engineering" className="mt-3 inline-block text-xs font-semibold text-accent">Open Engineering Authority →</Link>
+        </div>
+        <div className="rounded-xl border border-border bg-surface/35 p-4">
+          <p className="text-[10px] uppercase tracking-wider text-green">BOM & material feasibility</p>
+          <p className="mt-2 text-xl font-semibold text-fg">{materialPlanningBlockers ? "Blocked" : "Mapped"}</p>
+          <p className="mt-1 text-xs text-muted">{materialPlanningBlockers ? `${materialPlanningBlockers} planning-standard BOM mapping issue(s)` : "Planning BOM mappings are available for material calculation."}</p>
+          <Link to="/command/procurement-planning" className="mt-3 inline-block text-xs font-semibold text-accent">Open Material Requirements →</Link>
+        </div>
+        <div className="rounded-xl border border-border bg-surface/35 p-4">
+          <p className="text-[10px] uppercase tracking-wider text-green">Committed demand</p>
+          <p className="mt-2 text-xl font-semibold text-fg">{committedDemandExceptions ? "Exception" : "Reconciled"}</p>
+          <p className="mt-1 text-xs text-muted">{committedDemandExceptions ? `${committedDemandExceptions} confirmed order(s) need production/BOM synchronization.` : "Confirmed demand is reconciled to released production state."}</p>
+          <Link to="/command/sales" className="mt-3 inline-block text-xs font-semibold text-accent">Open Demand & Orders →</Link>
+        </div>
+        <div className="rounded-xl border border-border bg-surface/35 p-4">
+          <p className="text-[10px] uppercase tracking-wider text-green">Finance</p>
+          <p className="mt-2 text-xl font-semibold text-fg">Constraint / output</p>
+          <p className="mt-1 text-xs text-muted">Cash, funding and profitability test the feasible operating plan; they do not independently define engineering or production reality.</p>
+          <Link to="/command/financial-cockpit" className="mt-3 inline-block text-xs font-semibold text-accent">Open Consolidated Finance →</Link>
+        </div>
+      </div>
+      {realityBlockers.length ? <div className="mt-4 rounded-xl border border-warn/35 bg-warn/5 p-4"><p className="text-xs font-semibold uppercase tracking-wider text-warn">Current plan is conditional</p><div className="mt-2 space-y-1">{realityBlockers.map((item) => <p key={item} className="text-xs leading-5 text-muted">• {item}</p>)}</div><p className="mt-3 text-xs leading-5 text-muted">The plan may be modeled and reviewed, but these items remain explicit constraints. VYNDI must not present the affected milestones as executable evidence until the owning authority is resolved.</p></div> : <div className="mt-4 rounded-xl border border-green/30 bg-green/5 p-4 text-xs text-green">Engineering, planning BOM and committed-demand reconciliation currently provide a coherent execution basis.</div>}
+    </Panel>
 
     <Panel title="Plan governance" kicker="Draft → submit → approval → one company truth">
       <div className="grid gap-4 lg:grid-cols-3">
@@ -146,7 +200,7 @@ function MasterPlan() {
       </div>
     </Panel>
 
-    <PlanningStudio role={role} approvedFinance={plan.approved?.finance ?? null} draftFinance={plan.draft?.finance ?? null} draftId={plan.draft?.id ?? null} />
+    <PlanningStudio role={role} approvedFinance={plan.approved?.finance ?? null} draftFinance={plan.draft?.finance ?? null} draftId={plan.draft?.id ?? null} engineeringCoverage={engineeringCoverage} realityBlockers={realityBlockers} />
 
     <nav className="overflow-x-auto rounded-xl border border-border bg-surface/40 p-1"><div className="flex min-w-max gap-1">{PLAN_TABS.map((tab) => <Link key={tab.label} to={tab.to as never} className={`rounded-lg px-4 py-2 text-xs font-semibold ${tab.to === "/command/planning" ? "bg-accent text-accent-fg" : "text-muted hover:bg-bg/60 hover:text-fg"}`}>{tab.label}</Link>)}</div></nav>
 

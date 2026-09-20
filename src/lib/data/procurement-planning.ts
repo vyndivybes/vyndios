@@ -1,5 +1,4 @@
-import { buildModel, type ScenarioId } from "@/lib/finance/model";
-import { MIX } from "@/lib/data/bom";
+import { buildModelWithInputs, type FinanceAssumptions, type ScenarioId } from "@/lib/finance/model";
 import { TRANCHES } from "@/lib/data/company";
 
 export const PROCUREMENT_PLANNING_HORIZON = 36;
@@ -28,8 +27,12 @@ export function trancheForMonth(month: number) {
   return previous ?? TRANCHES[0];
 }
 
-export function buildProcurementForecast(scenario: ScenarioId = "base"): ProcurementForecastRow[] {
-  const rows = buildModel(scenario, false);
+export function buildProcurementForecast(
+  scenario: ScenarioId,
+  finance: FinanceAssumptions,
+  drawStandby: boolean,
+): ProcurementForecastRow[] {
+  const rows = buildModelWithInputs(scenario, drawStandby, finance);
   return rows.map((row) => {
     const procurement = Number(row.inventoryBuy.toFixed(2));
     const active = row.units > 0 || procurement > 0;
@@ -43,9 +46,9 @@ export function buildProcurementForecast(scenario: ScenarioId = "base"): Procure
       tranche: tranche.id,
       trancheName: tranche.name,
       units: row.units,
-      coreUnits: Math.round(row.units * MIX.core),
-      proUnits: Math.round(row.units * MIX.pro),
-      apexUnits: Math.max(0, row.units - Math.round(row.units * MIX.core) - Math.round(row.units * MIX.pro)),
+      coreUnits: row.aluminiumUnits,
+      proUnits: row.carbonUnits,
+      apexUnits: row.premiumCarbonUnits,
       procurementLakh: procurement,
       financialImpactMonth: row.m,
       trigger,
@@ -54,8 +57,12 @@ export function buildProcurementForecast(scenario: ScenarioId = "base"): Procure
   });
 }
 
-export function procurementSummary(scenario: ScenarioId = "base") {
-  const rows = buildProcurementForecast(scenario);
+export function procurementSummary(
+  scenario: ScenarioId,
+  finance: FinanceAssumptions,
+  drawStandby: boolean,
+) {
+  const rows = buildProcurementForecast(scenario, finance, drawStandby);
   return {
     scenario,
     horizonMonths: PROCUREMENT_PLANNING_HORIZON,

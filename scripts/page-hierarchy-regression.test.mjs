@@ -36,3 +36,41 @@ test("admin access page uses the canonical VYNDI visual language", () => {
   assert.doesNotMatch(users, /bg-white/);
   assert.doesNotMatch(users, /text-orange-/);
 });
+
+
+test("integrated planning and finance labels stay consistent across user-facing pages", () => {
+  const workflow = read("src/lib/operating-workflow.ts");
+  const cockpit = read("src/routes/command/financial-cockpit.tsx");
+  const sales = read("src/routes/command/sales.tsx");
+  const scenarios = read("src/routes/command/scenarios.tsx");
+  const manual = read("src/routes/command/user-manual.tsx");
+  const procurement = read("src/routes/command/procurement-planning.tsx");
+  const metadata = read("src/lib/page-metadata.ts");
+
+  assert.match(workflow, /Integrated Operating Plan/);
+  assert.match(workflow, /Budget vs Forecast vs Actual/);
+  assert.doesNotMatch(workflow, /Financial Planning/);
+  assert.doesNotMatch(workflow, /Finance Analysis/);
+
+  assert.match(cockpit, /getOperatingPlanState/);
+  assert.match(cockpit, /approvedPlan\.finance/);
+  assert.match(cockpit, /approvedPlan\.accounting/);
+  assert.doesNotMatch(cockpit, /useVeloxis/);
+  assert.match(cockpit, /Budget vs Forecast vs Actual/);
+
+  assert.match(sales, /Integrated Operating Plan/);
+  assert.doesNotMatch(sales, />Financial Planning</);
+
+  assert.match(scenarios, /Integrated Operating Plan/);
+  assert.match(scenarios, /Budget vs Forecast vs Actual/);
+  assert.doesNotMatch(scenarios, /Approved assumptions/);
+
+  assert.match(manual, /Integrated Operating Plan/);
+  assert.match(manual, /Consolidated Overview/);
+
+  assert.match(procurement, /Approved-plan procurement/);
+  assert.match(procurement, /approvedPlanRevision/);
+
+  assert.match(metadata, /Forecast Parameters/);
+  assert.match(metadata, /Consolidated Finance Overview/);
+});

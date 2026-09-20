@@ -108,8 +108,8 @@ function ScenarioStudio() {
         <p className="mt-3 max-w-4xl text-sm leading-6 text-muted">Flex demand, capacity, supplier lead time, procurement cost, receipt timing and funding against the latest governed IBPE snapshot. Approved plan, actuals and contractual commitments remain untouched.</p>
       </div>
       <div className="flex flex-wrap gap-2">
-        <Link to="/command/planning" className="rounded-lg border border-border px-3 py-2 text-sm text-muted transition hover:border-accent/45 hover:text-fg">Master Plan</Link>
-        <Link to="/command/finance-assumptions" className="rounded-lg border border-border px-3 py-2 text-sm text-muted transition hover:border-accent/45 hover:text-fg">Approved assumptions</Link>
+        <Link to="/command/planning" className="rounded-lg border border-border px-3 py-2 text-sm text-muted transition hover:border-accent/45 hover:text-fg">Integrated Operating Plan</Link>
+        <Link to="/command/finance-control" className="rounded-lg border border-border px-3 py-2 text-sm text-muted transition hover:border-accent/45 hover:text-fg">Budget vs Forecast vs Actual</Link>
       </div>
     </header>
 

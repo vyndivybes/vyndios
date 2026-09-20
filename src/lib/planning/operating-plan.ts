@@ -117,6 +117,29 @@ export function normalizeOperatingPlan(plan: OperatingPlan): OperatingPlan {
   };
 }
 
+
+export function cascadeEngineeringSchedule(plan: OperatingPlan, engineeringReleaseMonth: number): OperatingPlan {
+  const engineeringBaseline = clampRelativeMonth(engineeringReleaseMonth);
+  const prototypeValidation = Math.max(plan.milestoneMonths.prototypeValidation, engineeringBaseline + 3);
+  const toolingPilot = Math.max(plan.milestoneMonths.toolingPilot, prototypeValidation + 2);
+  const commercialLaunch = Math.max(plan.milestoneMonths.commercialLaunch, toolingPilot + 3);
+  return normalizeOperatingPlan({
+    ...plan,
+    milestoneMonths: {
+      ...plan.milestoneMonths,
+      engineeringBaseline,
+      prototypeValidation,
+      toolingPilot,
+      commercialLaunch,
+    },
+    productLaunchMonths: {
+      longitude: Math.max(plan.productLaunchMonths.longitude, commercialLaunch),
+      latitude: Math.max(plan.productLaunchMonths.latitude, commercialLaunch),
+      altitude: Math.max(plan.productLaunchMonths.altitude, commercialLaunch),
+    },
+  });
+}
+
 export function scenarioDelayMonths(scenario: PlanningScenarioId) {
   return SCENARIO_DELAY[scenario];
 }

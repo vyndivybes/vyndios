@@ -5,6 +5,7 @@ import { getCommandRole } from "@/lib/command-access";
 import { canPerform } from "@/lib/page-access";
 import { requireBusinessActor } from "@/lib/business-actor";
 import { procurementSummary, type ProcurementForecastRow } from "@/lib/data/procurement-planning";
+import type { FinanceAssumptions, ScenarioId } from "@/lib/finance/model";
 
 async function requireProcurementView() {
   const role = await getCommandRole();
@@ -90,7 +91,24 @@ function plannedSkuRequirements(forecast: ProcurementForecastRow[], mappings: Pl
 export const getProcurementPlanningReport = createServerFn({ method: "GET" }).handler(async () => {
   await requireProcurementView();
   const sql = await getSql();
-  const summary = procurementSummary("base");
+  const approvedPlanRows = await sql.query<{
+    scenario: ScenarioId;
+    draw_standby: boolean;
+    finance_json: FinanceAssumptions;
+    revision: number | string;
+  }>(
+    `select scenario,draw_standby,finance_json,revision
+       from vyndi_plan_revisions
+      where status='approved'
+      order by revision desc
+      limit 1`,
+  );
+  const approvedPlan = approvedPlanRows[0];
+  if (!approvedPlan) throw new Error("Procurement planning blocked: no approved Integrated Operating Plan exists.");
+  if (!approvedPlan.finance_json?.operatingPlan) {
+    throw new Error("Procurement planning blocked: approved plan has no operating-plan payload.");
+  }
+  const summary = procurementSummary(approvedPlan.scenario, approvedPlan.finance_json, Boolean(approvedPlan.draw_standby));
   const forecast = summary.rows as ProcurementForecastRow[];
 
   const actions = await sql`
@@ -234,7 +252,18 @@ export const getProcurementPlanningReport = createServerFn({ method: "GET" }).ha
     }
   }
 
-  return { summary, forecast, actions, skuActions, stock, committed, requirements, planningMappingIssues, unprojectedCommitments };
+  return {
+    summary,
+    forecast,
+    actions,
+    skuActions,
+    stock,
+    committed,
+    requirements,
+    planningMappingIssues,
+    unprojectedCommitments,
+    approvedPlanRevision: Number(approvedPlan.revision),
+  };
 });
 
 export const setProcurementPlanningAction = createServerFn({ method: "POST" })
