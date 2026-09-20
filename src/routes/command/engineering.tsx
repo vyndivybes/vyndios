@@ -195,7 +195,7 @@ function Engineering() {
           <div className="rounded-lg border border-border/80 bg-bg/45 p-3">
             <p className="text-[9px] font-semibold uppercase tracking-wider text-subtle">Preferred development</p>
             <p className="mt-1 text-sm font-semibold text-accent">{authority.preferredFrontEnd}</p>
-            <p className="mt-1 text-[10px] font-semibold uppercase text-amber">{authority.status}</p>
+            <p className="mt-1 text-[10px] font-semibold uppercase text-accent">{authority.status}</p>
           </div>
           <div className="rounded-lg border border-border/80 bg-bg/45 p-3">
             <p className="text-[9px] font-semibold uppercase tracking-wider text-subtle">Release boundary</p>
