@@ -22,6 +22,29 @@ test("route ownership metadata is internally complete", () => {
   }
 });
 
+test("seven canonical workspaces have explicit ownership and Finance compatibility resolves to the cockpit", () => {
+  const canonical = [
+    "/command",
+    "/command/planning",
+    "/command/engineering",
+    "/command/operations",
+    "/command/sales",
+    "/command/financial-cockpit",
+    "/command/governance",
+  ];
+  for (const route of canonical) {
+    assert.equal(getRouteOwnership(route)?.canonicalRoute, route, `${route} must own itself`);
+  }
+  assert.equal(getRouteOwnership("/command/finance")?.canonicalRoute, "/command/financial-cockpit");
+  assert.equal(getRouteOwnership("/command/finance")?.compatibility, true);
+});
+
+test("ERP flow places the Master Plan upstream of inventory and Governance in the decision stage", () => {
+  assert.equal(getErpFlowStep("/command/planning")?.step.id, "mapping");
+  assert.equal(getErpFlowStep("/command/financial-cockpit")?.step.id, "finance");
+  assert.equal(getErpFlowStep("/command/governance")?.step.id, "decision");
+});
+
 test("canonical inventory and compatibility boundaries remain explicit", () => {
   assert.equal(getRouteOwnership("/inventory")?.source, "reference");
   assert.equal(getRouteOwnership("/inventory")?.compatibility, true);
@@ -34,8 +57,8 @@ test("canonical inventory and compatibility boundaries remain explicit", () => {
 test("ERP flow covers nested inventory ledger routes", () => {
   const match = getErpFlowStep("/command/inventory-ledgers/components");
   assert.ok(match);
-  assert.equal(match.step, ERP_FLOW[3]);
   assert.equal(match.step.id, "inventory");
+  assert.equal(ERP_FLOW[match.index]?.id, "inventory");
 });
 
 test("nested inventory ledger pages inherit the parent access policy", () => {

@@ -30,12 +30,12 @@ export const ERP_FLOW: ErpFlowStep[] = [
   },
   {
     id: "mapping",
-    label: "3 · Mapping",
+    label: "3 · Plan & Mapping",
     purpose:
-      "Connect the production plan and item-level demand assumptions before forecasting stock.",
-    inputs: "Approved product plan + component requirements",
-    outputs: "Monthly demand by inventory item",
-    routes: ["/command/bom-control"],
+      "Turn the approved Integrated Operating Plan and controlled BOM into item-level demand before forecasting stock.",
+    inputs: "Approved company plan + controlled product/BOM requirements",
+    outputs: "Governed monthly demand and explicit BOM-to-inventory mapping",
+    routes: ["/command/planning", "/command/bom-control"],
   },
   {
     id: "inventory",
@@ -84,7 +84,6 @@ export const ERP_FLOW: ErpFlowStep[] = [
     outputs: "Finance, cash, funding and scenario views",
     routes: [
       "/command/financial-cockpit",
-      "/command/planning",
       "/command/cash",
       "/command/funding",
       "/command/scenarios",
@@ -101,6 +100,7 @@ export const ERP_FLOW: ErpFlowStep[] = [
     outputs: "Decisions, actions and board/investor view",
     routes: [
       "/command/control-tower",
+      "/command/governance",
       "/command/investor-board",
       "/command/actions",
       "/command/decision-inbox",

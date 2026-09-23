@@ -871,6 +871,42 @@ export const routeOwnership: Record<string, RouteOwnership> = {
     mutability: "editable",
     notes: "Canonical GRN and incoming-inspection transaction workspace; accepted stock posts to Master Inventory.",
   },
+  "/command": {
+    canonicalRoute: "/command",
+    source: "operational",
+    mutability: "read-only",
+    notes: "Canonical Command Centre executive workspace; it reads governed evidence without owning domain transactions.",
+  },
+  "/command/planning": {
+    canonicalRoute: "/command/planning",
+    source: "planning",
+    mutability: "editable",
+    notes: "Canonical 36-month Integrated Operating Plan and governed company-planning lifecycle.",
+  },
+  "/command/engineering": {
+    canonicalRoute: "/command/engineering",
+    source: "operational",
+    mutability: "editable",
+    notes: "Canonical Engineering workspace for controlled product, design, BOM and validation authority.",
+  },
+  "/command/operations": {
+    canonicalRoute: "/command/operations",
+    source: "operational",
+    mutability: "editable",
+    notes: "Canonical Supply & Production workspace coordinating procurement, inventory, production and quality execution.",
+  },
+  "/command/sales": {
+    canonicalRoute: "/command/sales",
+    source: "operational",
+    mutability: "editable",
+    notes: "Canonical Commercial workspace for centrally persisted demand and Sales Order revisions.",
+  },
+  "/command/governance": {
+    canonicalRoute: "/command/governance",
+    source: "operational",
+    mutability: "read-only",
+    notes: "Canonical Governance workspace for approvals, risk, legal, QA evidence and controlled actions.",
+  },
   "/command/actuals": {
     canonicalRoute: "/command/actuals",
     source: "operational",
@@ -878,10 +914,11 @@ export const routeOwnership: Record<string, RouteOwnership> = {
     notes: "Read model of operational actuals; source transactions remain in domain workflows.",
   },
   "/command/finance": {
-    canonicalRoute: "/command/finance",
+    canonicalRoute: "/command/financial-cockpit",
     source: "planning",
     mutability: "read-only",
-    notes: "Scenario projection over persisted planning assumptions.",
+    compatibility: true,
+    notes: "Compatibility route only; the Financial Cockpit is the canonical Finance workspace.",
   },
   "/command/finance-assumptions": {
     canonicalRoute: "/command/finance-assumptions",
