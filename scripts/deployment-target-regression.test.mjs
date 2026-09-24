@@ -20,19 +20,12 @@ test("Cloudflare remains the VYNDI production deployment authority while legacy 
   assert.match(productionSmoke, /vyndios\.shyamsundhar1982\.workers\.dev/);
   assert.match(releaseScript, /vyndios\.shyamsundhar1982\.workers\.dev/);
   assert.equal(pkg.devDependencies["@cloudflare/vite-plugin"], "1.54.7");
-  assert.equal(pkg.devDependencies.nitro, "3.0.260610-beta");
+  assert.equal(pkg.dependencies?.["@vercel/analytics"], undefined);
+  assert.equal(pkg.devDependencies?.nitro, undefined);
 
   assert.match(vite, /import \{ cloudflare \} from "@cloudflare\/vite-plugin"/);
-  assert.match(vite, /import \{ nitro \} from "nitro\/vite"/);
-  assert.match(vite, /const isVercel = Boolean\(process\.env\.VERCEL\)/);
-  assert.match(vite, /isVercel\s*\? \[\]\s*:\s*\[cloudflare\(/s);
-  assert.match(vite, /isVercel \? \[nitro\(\{ preset: "vercel", serverDir: "\.\/server" \}\)\] : \[\]/);
-});
-
-test("legacy Vercel adapter remains build-compatible but is not release authority", () => {
-  assert.doesNotMatch(vite, /plugins:\s*\[\s*cloudflare\([^]*tanstackStart\(\)[^]*viteReact\(\)\s*,?\s*\]/);
-  assert.match(vite, /Vercel needs a routable Nitro server output/);
-  assert.match(vite, /Cloudflare keeps its native/);
+  assert.match(vite, /cloudflare\(\{ viteEnvironment: \{ name: "ssr" \} \}\)/);
+  assert.doesNotMatch(vite, /process\.env\.VERCEL|nitro\/vite|preset: "vercel"/i);
 });
 
 test("release marker exposes the runtime source SHA and production smoke validates it exactly", () => {
@@ -50,5 +43,5 @@ test("release acceptance policy names Cloudflare Workers as the production path"
   const audit = read("docs/MASTER-PHASE-1-6A-AUDIT.md");
   assert.match(audit, /Declared production deployer:\*\* Cloudflare Workers/);
   assert.match(audit, /Cloudflare Workers is the \*\*declared production deployer\*\*/);
-  assert.match(audit, /Vercel is \*\*disconnected and excluded from release acceptance\*\*/);
+  assert.match(audit, /Cloudflare Workers is the \*\*declared production deployer\*\*/);
 });
