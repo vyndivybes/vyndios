@@ -9,8 +9,7 @@ import { getOperatingPlanState, type OperatingPlanSnapshot } from "@/lib/operati
 export const Route = createFileRoute("/command/financial-cockpit")({
   loader: async () => {
     const state = await getOperatingPlanState();
-    if (!state.approved) throw new Error("Consolidated Finance requires an approved Integrated Operating Plan.");
-    return state.approved;
+    return state.approved ?? null;
   },
   component: FinancialCockpit,
 });
@@ -23,7 +22,26 @@ const scenarios: { id: ScenarioId; label: string }[] = [
 ];
 
 function FinancialCockpit() {
-  const approvedPlan = Route.useLoaderData() as OperatingPlanSnapshot;
+  const approvedPlan = Route.useLoaderData();
+  if (!approvedPlan) {
+    return (
+      <main className="mx-auto max-w-5xl space-y-6">
+        <header className="border-b border-border pb-6">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">Finance · governed readiness</p>
+          <h1 className="mt-1 font-display text-4xl text-accent">Consolidated Finance Overview</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">No approved Integrated Operating Plan is available. Finance remains controlled and does not synthesize forecast, liquidity or profitability from unapproved assumptions.</p>
+        </header>
+        <Panel title="Planning authority required" kicker="Controlled empty state">
+          <p className="text-sm leading-6 text-muted">Approve an Integrated Operating Plan before using the consolidated 36-month financial model.</p>
+          <Link to="/command/planning" className="mt-4 inline-block text-sm font-semibold text-accent hover:text-fg">Open Integrated Operating Plan →</Link>
+        </Panel>
+      </main>
+    );
+  }
+  return <FinancialCockpitReady approvedPlan={approvedPlan} />;
+}
+
+function FinancialCockpitReady({ approvedPlan }: { approvedPlan: OperatingPlanSnapshot }) {
   const [scenario, setScenario] = useState<ScenarioId>(approvedPlan.scenario);
   const [drawStandby, setDrawStandby] = useState(Boolean(approvedPlan.drawStandby));
   const finance = approvedPlan.finance;

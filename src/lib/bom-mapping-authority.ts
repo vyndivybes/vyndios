@@ -173,11 +173,40 @@ export const getBomRevisionPropagationState = createServerFn({ method: "GET" }).
   await requireAdminView();
   const sql = await getSql();
   const [current, impact] = await Promise.all([
-    sql.query<Record<string, unknown>>(
-      `select * from vyndi_bom_revision_current_state order by venture,model_id,bom_revision`,
+    sql.query<{
+      venture: string;
+      model_id: string;
+      bom_revision: string;
+      active_mapping_count: number;
+      missing_cost_skus: number;
+      governed_bom_cost_inr: string | number | null;
+      previous_bom_revision: string | null;
+      release_reason: string | null;
+      released_by: string | null;
+      released_at: string | null;
+    }>(
+      `select venture,model_id,bom_revision,active_mapping_count,missing_cost_skus,governed_bom_cost_inr,
+              previous_bom_revision,release_reason,released_by,released_at::text as released_at
+         from vyndi_bom_revision_current_state
+        order by venture,model_id,bom_revision`,
     ),
-    sql.query<Record<string, unknown>>(
-      `select * from vyndi_bom_revision_job_card_impact
+    sql.query<{
+      job_card_id: string;
+      sales_order_id: string;
+      job_card_status: string;
+      model_tier: string;
+      variant_id: string;
+      frozen_bom_revision: string | null;
+      current_bom_revision: string | null;
+      bom_revision_state: string;
+      frozen_mapping_count: number;
+      approved_at: string | null;
+      updated_at: string | null;
+    }>(
+      `select job_card_id,sales_order_id,job_card_status,model_tier,variant_id,frozen_bom_revision,
+              current_bom_revision,bom_revision_state,frozen_mapping_count,
+              approved_at::text as approved_at,updated_at::text as updated_at
+         from vyndi_bom_revision_job_card_impact
         order by case bom_revision_state
           when 'RELEASED_REVIEW_REQUIRED' then 0
           when 'PROTECTED_FROZEN' then 1

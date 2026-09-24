@@ -11,10 +11,26 @@ import {
 } from "@/lib/procurement-cost-authority";
 
 export const Route=createFileRoute("/command/procurement-planning")({
-  loader:async()=>({
-    ...(await getProcurementPlanningReport()),
-    costAuthority:await getProcurementCostAuthorityReport(),
-  }),
+  loader:async()=>{
+    const costAuthority=await getProcurementCostAuthorityReport();
+    try {
+      return {
+        blocked:false as const,
+        blockedReason:null,
+        ...(await getProcurementPlanningReport()),
+        costAuthority,
+      };
+    } catch (error) {
+      const message=error instanceof Error?error.message:String(error);
+      if (
+        message.includes("no approved Integrated Operating Plan exists")
+        || message.includes("approved plan has no operating-plan payload")
+      ) {
+        return {blocked:true as const,blockedReason:message,costAuthority};
+      }
+      throw error;
+    }
+  },
   component:ProcurementPlanning,
 });
 const lakh=(n:number)=>`₹${Number(n).toFixed(1)}L`;
@@ -37,6 +53,19 @@ function ProcurementPlanning(){
   const [busy,setBusy]=useState<string|null>(null);
   const [message,setMessage]=useState("");
   const [costDrafts,setCostDrafts]=useState<Record<string,CostDraft>>({});
+  if (data.blocked) {
+    return <main className="mx-auto max-w-5xl space-y-6 px-4 py-10 sm:px-6">
+      <header className="border-b border-border pb-6">
+        <p className="text-[10px] uppercase tracking-[0.22em] text-green">Supply & operations · governed readiness</p>
+        <h1 className="mt-2 text-4xl font-bold text-accent">Procurement Planning</h1>
+        <p className="mt-3 max-w-4xl text-sm leading-6 text-muted">Material planning remains blocked until an approved Integrated Operating Plan exists. No forecast requirement or supplier commitment is invented from fallback assumptions.</p>
+      </header>
+      <Panel title="Planning authority required" kicker="Controlled empty state">
+        <p className="text-sm leading-6 text-muted">{data.blockedReason}</p>
+        <Link to="/command/planning" className="mt-4 inline-block text-sm font-semibold text-accent hover:text-fg">Open Integrated Operating Plan →</Link>
+      </Panel>
+    </main>;
+  }
   const net=data.requirements.reduce((s,r)=>s+r.netRequirement,0);
   const committed=data.requirements.reduce((s,r)=>s+r.committedRequirement,0);
   const exceptions=data.unprojectedCommitments.length+data.planningMappingIssues.length;

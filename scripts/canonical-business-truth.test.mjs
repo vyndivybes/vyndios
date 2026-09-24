@@ -124,6 +124,21 @@ test("Stage 2 order → production → quality → dispatch → invoice → rece
 
   await assert.rejects(
     ()=>db.query(`select post_vyndi_shipment($1,$2,$3,$4,$5,$6,$7)`,["SHIP-STAGE2","SO-STAGE2",6,2,"DISPATCH-001","test-user","operations"]),
+    /governed actual finished-goods unit cost/,
+  );
+
+  // This chain test is not the cost-accounting fixture. Supply a positive governed
+  // completion snapshot so downstream dispatch can continue to the independent
+  // Quality-release gate; dedicated finance tests exercise how this snapshot is built.
+  await db.query(
+    `insert into epr_job_cost_snapshots
+      (id,job_card_id,model,planned_quantity,completed_quantity,total_actual_cost_inr,
+       unit_actual_cost_inr,finished_goods_value_inr,wip_value_inr,source_action_id,captured_at)
+     values ('COST-CARD-STAGE2-GOVERNED','CARD-STAGE2','core-tiagra',2,2,200000,100000,200000,0,'SO-STAGE2',now()+interval '1 millisecond')`,
+  );
+
+  await assert.rejects(
+    ()=>db.query(`select post_vyndi_shipment($1,$2,$3,$4,$5,$6,$7)`,["SHIP-STAGE2","SO-STAGE2",6,2,"DISPATCH-001","test-user","operations"]),
     /Quality release evidence/,
   );
 
