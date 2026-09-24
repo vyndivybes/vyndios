@@ -95,7 +95,7 @@ function positiveNumber(value: number | string | null | undefined) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 function sourceSha() {
-  const sha = process.env.VYNDI_SOURCE_SHA || process.env.VERCEL_GIT_COMMIT_SHA || process.env.CF_PAGES_COMMIT_SHA || process.env.GITHUB_SHA;
+  const sha = process.env.VYNDI_SOURCE_SHA || process.env.CF_PAGES_COMMIT_SHA || process.env.GITHUB_SHA;
   if (!sha || sha.trim().length < 7) throw new Error("Governed IBPE run blocked: deployed source SHA is unavailable.");
   return sha.trim();
 }
