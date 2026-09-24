@@ -10,5 +10,5 @@ test("bearer transport is limited to preview and loopback acceptance hosts", () 
   assert.equal(isBearerTransportHost("::1"), true);
   assert.equal(isBearerTransportHost("[::1]"), true);
   assert.equal(isBearerTransportHost("tiger-field-flora-finch.vercel.app"), false);
-  assert.equal(isBearerTransportHost("tiger-field-flora-finch.shyamsundhar1982.workers.dev"), false);
+  assert.equal(isBearerTransportHost("vyndios.shyamsundhar1982.workers.dev"), false);
 });
