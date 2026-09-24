@@ -17,11 +17,14 @@ test("central business mutation authority enforces same-site requests", () => {
   assert.match(businessActor, /assertSameSiteRequest\(\);\s*const \{ user, role \} = await getAssignedBusinessIdentity/s);
 });
 
-test("EPR execution and containment mutations require an individual admin actor", () => {
-  for (const source of [execution, containment]) {
-    assert.match(source, /if \(write\) \{\s*const actor = await requireBusinessActor\("admin"\);\s*return actor\.userId;/s);
-    assert.match(source, /requireCommand\(true\)/);
-  }
+test("EPR execution and containment mutations require an individual authorised actor", () => {
+  assert.match(execution, /if \(write\) \{\s*const actor = await requireBusinessActor\("edit"\);/s);
+  assert.match(execution, /canAccessRoute\(actor\.role, EPR_ROUTE\)/);
+  assert.match(execution, /return actor\.userId/);
+  assert.match(execution, /requireCommand\(true\)/);
+
+  assert.match(containment, /if \(write\) \{\s*const actor = await requireBusinessActor\("admin"\);\s*return actor\.userId;/s);
+  assert.match(containment, /requireCommand\(true\)/);
 });
 
 test("genealogy rebuild cannot use a shared Command admin session", () => {
@@ -36,9 +39,12 @@ test("5M mutations require an individually authenticated admin", () => {
 });
 
 test("traceability and final-control split legacy read authority from individual mutation authority", () => {
-  for (const source of [traceability, finalControl]) {
-    assert.match(source, /async function admin\(write = false\)/);
-    assert.match(source, /if \(write\) \{\s*const actor = await requireBusinessActor\("admin"\);\s*return actor\.userId;/s);
-    assert.match(source, /admin\(true\)/);
-  }
+  assert.match(traceability, /async function eprAccess\(write = false\)/);
+  assert.match(traceability, /if \(write\) \{\s*const actor = await requireBusinessActor\("edit"\);/s);
+  assert.match(traceability, /canAccessRoute\(actor\.role, EPR_ROUTE\)/);
+  assert.match(traceability, /eprAccess\(true\)/);
+
+  assert.match(finalControl, /async function admin\(write = false\)/);
+  assert.match(finalControl, /if \(write\) \{\s*const actor = await requireBusinessActor\("admin"\);\s*return actor\.userId;/s);
+  assert.match(finalControl, /admin\(true\)/);
 });
