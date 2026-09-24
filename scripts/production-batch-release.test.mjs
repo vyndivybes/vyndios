@@ -250,7 +250,7 @@ test("governed planning supports admin-editable M1-M36 unit overrides without cr
   assert.match(plan, /unitsForPlanMonth/);
   assert.match(studio, /Month-by-month base production \/ demand units/);
   assert.match(studio, /setMonthUnits/);
-  assert.match(studio, /never creates a Commercial order, Production job card, traveller, inventory movement or supplier commitment/);
+  assert.match(studio, /never overrides a confirmed order, released BOM, Production job card, traveller, inventory movement or supplier commitment/);
   assert.match(store, /key === "unitMultiplier"/);
   assert.match(store, /demandScale: value/);
 });
