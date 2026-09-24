@@ -31,7 +31,8 @@
     "test:stocktake:statutory": "node --test scripts/stocktake-statutory-controls.test.mjs",
     "test:h5:integrations": "node --test scripts/h5-governed-integrations.test.mjs",
     "test:admin:recovery": "node --test scripts/admin-recovery-control.test.mjs",
-    "db:validate": "node scripts/validate-migration-syntax.mjs"
+    "db:validate": "node scripts/validate-migration-syntax.mjs",
+    "check:single-provider": "node scripts/single-provider-production-gate.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",

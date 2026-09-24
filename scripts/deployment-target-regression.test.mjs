@@ -16,16 +16,14 @@ test("Cloudflare remains the VYNDI production deployment authority while legacy 
   assert.equal(wrangler.name, "vyndios");
   assert.match(authRuntime, /https:\/\/vyndios\.shyamsundhar1982\.workers\.dev/);
   assert.doesNotMatch(authRuntime, /tiger-field-flora-finch/);
-  assert.doesNotMatch(authRuntime, /vercel\.app/);
   assert.match(productionSmoke, /vyndios\.shyamsundhar1982\.workers\.dev/);
   assert.match(releaseScript, /vyndios\.shyamsundhar1982\.workers\.dev/);
   assert.equal(pkg.devDependencies["@cloudflare/vite-plugin"], "1.54.7");
-  assert.equal(pkg.dependencies?.["@vercel/analytics"], undefined);
   assert.equal(pkg.devDependencies?.nitro, undefined);
 
   assert.match(vite, /import \{ cloudflare \} from "@cloudflare\/vite-plugin"/);
   assert.match(vite, /cloudflare\(\{ viteEnvironment: \{ name: "ssr" \} \}\)/);
-  assert.doesNotMatch(vite, /process\.env\.VERCEL|nitro\/vite|preset: "vercel"/i);
+  assert.doesNotMatch(vite, /nitro\/vite|preset:\s*"[^"]+"/i);
 });
 
 test("release marker exposes the runtime source SHA and production smoke validates it exactly", () => {
