@@ -8,10 +8,12 @@ import {
   resolveAuthSecret,
 } from "./runtime-config.ts";
 
-test("Cloudflare and the exact Vercel production hostname are allowed", () => {
-  assert.ok(AUTH_ALLOWED_HOSTS.includes("tiger-field-flora-finch.shyamsundhar1982.workers.dev"));
-  assert.ok(AUTH_ALLOWED_HOSTS.includes("tiger-field-flora-finch.vercel.app"));
-  assert.ok(AUTH_TRUSTED_ORIGINS.includes("https://tiger-field-flora-finch.vercel.app"));
+test("only canonical Cloudflare production and local/preview hosts are trusted", () => {
+  assert.ok(AUTH_ALLOWED_HOSTS.includes("vyndios.shyamsundhar1982.workers.dev"));
+  assert.ok(AUTH_TRUSTED_ORIGINS.includes("https://vyndios.shyamsundhar1982.workers.dev"));
+  assert.ok(!AUTH_ALLOWED_HOSTS.some((host) => host.includes("vercel.app")));
+  assert.ok(!AUTH_TRUSTED_ORIGINS.some((origin) => origin.includes("vercel.app")));
+  assert.ok(!AUTH_ALLOWED_HOSTS.some((host) => host.includes("tiger-field-flora-finch")));
 });
 
 test("auth base URL resolves dynamically with Cloudflare as the safe fallback", () => {
