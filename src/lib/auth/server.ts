@@ -58,7 +58,7 @@ export const authConfigured = !authDisabled && Boolean(grokClientId && grokClien
 const explicitBaseURL = validHttpUrl(env("BETTER_AUTH_URL"));
 const previewAllowedHosts: string[] = [...PREVIEW_ALLOWED_HOSTS];
 // Resolve the concrete base URL from each incoming request. Cloudflare,
-// Vercel production aliases and Vercel previews therefore issue host-local
+// Hosted preview aliases therefore issue host-local
 // cookies and callbacks even if BETTER_AUTH_URL is missing or was scoped to a
 // different deployment target.
 const baseURL = resolveAuthBaseURL(explicitBaseURL);
