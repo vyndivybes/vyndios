@@ -46,7 +46,6 @@ test("secondary functions inherit workspace ownership instead of a global mode b
     "/command/procurement",
     "/command/manufacturing",
     "/command/actuals",
-    "/command/finance-assumptions",
     "/command/finance-control",
     "/command/epr-workflow",
     "/command/epr-execution",
@@ -254,7 +253,7 @@ test("G6: Finance and Governance & Assurance have separate internal navigation c
 test("G6A: all workspace heads use nested business-function navigation", () => {
   const planNavigation = workflow.slice(workflow.indexOf('"plan-sales": ['), workflow.indexOf("engineering: ["));
   for (const section of ["Planning", "Commercial"]) assert.match(planNavigation, new RegExp(section));
-  assert.match(planNavigation, /Business Plan/);
+  assert.match(planNavigation, /Integrated Operating Plan/);
   assert.match(planNavigation, /Demand & Orders/);
 
   const engineeringNavigation = workflow.slice(workflow.indexOf("engineering: ["), workflow.indexOf("operations: ["));
@@ -389,7 +388,8 @@ test("G10: route ownership follows business parent rather than historical contex
   assert.doesNotMatch(planNavigation, /finance-assumptions/);
 
   const financeNavigation = workflow.slice(workflow.indexOf("finance: ["), workflow.indexOf("governance: ["));
-  assert.match(financeNavigation, /finance-assumptions/);
+  assert.doesNotMatch(financeNavigation, /finance-assumptions/);
+  assert.match(financeNavigation, /Integrated Operating Plan/);
   assert.match(financeNavigation, /finance-control/);
 
   const governanceNavigation = workflow.slice(workflow.indexOf("governance: ["), workflow.indexOf("admin: ["));
