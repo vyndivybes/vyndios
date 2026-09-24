@@ -505,14 +505,20 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
     if (!data.question) return { ok: false, error: "Ask a question first.", advisoryOnly: true };
 
     const { sql, row } = await latestRun();
+    let knowledgeRefreshWarning: string | undefined;
     try {
       await Promise.all([
         refreshVibpeWeeklyReviewsIfStale(actor.role, 6),
         refreshVayuShastrDriveIfStale(actor.role, 12),
       ]);
-    } catch {
-      // Drive refresh is supplementary. Missing OAuth or a transient provider
-      // failure must never block governed VIBPE analysis.
+    } catch (error) {
+      // Supplementary knowledge must not block governed deterministic analysis,
+      // but stale-source operation must be visible to the operator and audit log.
+      knowledgeRefreshWarning =
+        "Knowledge source status: refresh failed; using the last successfully ingested governed corpus.";
+      console.warn("[vibpe] supplementary knowledge refresh failed", {
+        errorName: error instanceof Error ? error.name : typeof error,
+      });
     }
     const lineage = {
       governedRunId: row.id,
@@ -667,6 +673,10 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
       }
     }
 
+    if (knowledgeRefreshWarning) {
+      answer = `${answer}\n\n${knowledgeRefreshWarning}`;
+    }
+
     const surfacedKnowledgeEvidence = shouldSurfaceKnowledgeEvidence(data.question) ? knowledgeEvidence : [];
     if (surfacedKnowledgeEvidence.length) {
       const evidenceText = formatKnowledgeEvidence(surfacedKnowledgeEvidence);
@@ -696,6 +706,7 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
           executiveAssessment,
           answerChars: answer.length,
           knowledgeEvidenceCount: knowledgeEvidence.length,
+          knowledgeRefreshWarning: knowledgeRefreshWarning ?? null,
           knowledgeEvidenceDocumentIds: [...new Set(knowledgeEvidence.map((item) => item.documentId))],
           copilotVersion: handledByVibpe2 ? "2.0" : "legacy-fallback",
           vibpe2FallbackReason: vibpe2FallbackReason ?? null,

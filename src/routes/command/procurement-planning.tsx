@@ -46,6 +46,9 @@ function authorityLabel(value:ProcurementCostAuthorityRow["costAuthority"]){
 function ProcurementPlanning(){
   const data=Route.useLoaderData();
   const router=useRouter();
+  const [busy,setBusy]=useState<string|null>(null);
+  const [message,setMessage]=useState("");
+  const [costDrafts,setCostDrafts]=useState<Record<string,CostDraft>>({});
   if(data.blocked){
     return <main className="mx-auto max-w-5xl space-y-6 px-4 py-10 sm:px-6">
       <header><p className="text-[10px] uppercase tracking-[0.22em] text-green">Plan + commitments · governed readiness</p><h1 className="mt-2 text-4xl font-bold text-accent">Procurement Planning</h1></header>
@@ -58,9 +61,6 @@ function ProcurementPlanning(){
       </Panel>
     </main>;
   }
-  const [busy,setBusy]=useState<string|null>(null);
-  const [message,setMessage]=useState("");
-  const [costDrafts,setCostDrafts]=useState<Record<string,CostDraft>>({});
   const net=data.requirements.reduce((s,r)=>s+r.netRequirement,0);
   const committed=data.requirements.reduce((s,r)=>s+r.committedRequirement,0);
   const exceptions=data.unprojectedCommitments.length+data.planningMappingIssues.length;

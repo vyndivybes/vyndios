@@ -151,7 +151,7 @@ missing. Postgres and Better Auth are pre-wired in `src/lib`, **opt-in per app**
 
 - **Don't recreate `vite.config.ts` / `tsconfig.json`** or import a vendored
   `vite-tanstack-config` preset. Editing? Keep both port contracts, the
-  build/preview-gated nitro plugin and `grokPwaPlugin()`
+  Cloudflare production adapter and `grokPwaPlugin()`
   (`.grok/references/deploy-target.md`).
 - **Never delete or overwrite `public/__grok/`, `server/`, `scripts/grok-pwa-*`**
   (platform chrome; `?install=1&platform=ios` serves the install tutorial, not
@@ -163,9 +163,11 @@ missing. Postgres and Better Auth are pre-wired in `src/lib`, **opt-in per app**
   looping on failed installs, and prefer a pure-JS alternative. Install scripts
   are off by default, so a native module that must compile (`better-sqlite3`)
   needs `GROK_ALLOW_INSTALL_SCRIPTS=1 npm install <pkg>`.
-- **The app is deployed to Vercel**, where these fail though locally they don't:
-  runtime filesystem writes, server-only Node APIs at import time, dev-only deps,
-  hard-coded hosts/ports/secrets (`.grok/references/deploy-target.md`).
+- **VYNDI production is deployed to Cloudflare Workers**. Vercel, Supabase and
+  Netlify are not VYNDI release authorities. Runtime filesystem writes,
+  unsupported server-only Node APIs, dev-only deps and hard-coded
+  hosts/ports/secrets remain production defects
+  (`.grok/references/deploy-target.md`).
 - **Never create a `.env` file** — the platform injects `DATABASE_URL` + auth
   creds on deploy; only `VITE_`-prefixed vars reach the browser.
 - **`XAI_API_KEY` in the env** = real, server-only xAI access spending the **app
@@ -294,7 +296,7 @@ changes. Revive, reboot-wipe and the `startup.sh` worked example:
    D = right** while moving forward (`controls` §5c). Flip one steer/roll sign
    if inverted; retest.
 8. **Verify the PRODUCTION build, not just dev.** Dev (Vite) can render while
-   the deployed Vercel build is blank. Once `npm run build` (step 5) succeeds,
+   the deployed Cloudflare Worker build fails. Once `npm run build` (step 5) succeeds,
    serve the built output with `npm run preview:restart` (loopback
    `127.0.0.1:8081`) and re-run the smoke script with the dev verdict as
    `--baseline`. Watch for

@@ -9,7 +9,7 @@ const execute = process.env.VIBPE_EXECUTE_OPTIMIZER === "1";
 const evidencePath = resolve(process.env.VIBPE_OPTIMIZER_EVIDENCE_PATH ?? ".grok/evidence/vibpe-optimizer-production.json");
 
 if (!baseUrl) {
-  console.error("VIBPE_UI_BASE_URL is required, e.g. https://tiger-field-flora-finch.<account>.workers.dev");
+  console.error("VIBPE_UI_BASE_URL is required, e.g. https://vyndios.<account>.workers.dev");
   process.exit(2);
 }
 if (!storageState) {

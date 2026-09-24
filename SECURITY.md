@@ -13,7 +13,7 @@ Report security-sensitive findings privately to the repository owner or through 
 - affected route, component, workflow, or deployment surface;
 - the observed impact;
 - the minimum steps needed to reproduce the issue;
-- whether the issue affects Cloudflare production, Vercel preview, Grok preview, or only local development;
+- whether the issue affects Cloudflare production, Grok preview, or only local development; legacy Vercel resources are not VYNDI production authority;
 - suggested remediation if known.
 
 ## Security boundaries

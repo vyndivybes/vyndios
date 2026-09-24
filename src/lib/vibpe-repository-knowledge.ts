@@ -20,13 +20,16 @@ export type VibpeRepositoryKnowledgeRecord = {
 };
 
 const VEDM_REPO = "vayu-shastr/veloxis-engineering-design-manual";
-const VEDM_COMMIT = "2f8cd66ecca7ac74ad5309915ce004d752bfc776";
+const VEDM_COMMIT = "e275bad3b90a4d75fd09aac6b297e61d0d1ae5e7";
 
 const ADV_REPO = "vayu-shastr/adv-vibpe";
 const ADV_COMMIT = "3ca30a7891272870190b3f21340102451d7ff94b";
 
 const VYNDI_REPO = "vayu-shastr/vyndios";
-const VYNDI_COMMIT = "d0cae69f7e7a094e0482619e362af5699623d65a";
+// Self-repository records use the last independently audited main SHA as a
+// stable evidence anchor. They deliberately do not try to equal the commit
+// containing this file, which would be self-referential and impossible.
+const VYNDI_COMMIT = "89de43701c16776a834b4ba67e38620d670160f7";
 
 /**
  * Curated, commit-pinned cross-repository knowledge used by VIBPE Co-Pilot.
@@ -206,7 +209,7 @@ export const VIBPE_REPOSITORY_KNOWLEDGE: VibpeRepositoryKnowledgeRecord[] = [
     authority: "controlled-reference",
     domain: "optimization",
     title: "VYNDI Advanced Planning Optimizer",
-    sourceRevision: "VYNDI User Manual Rev 1.3 / runtime",
+    sourceRevision: "VYNDI User Manual Rev 1.4 / runtime",
     repository: VYNDI_REPO,
     sourceCommit: VYNDI_COMMIT,
     sourcePath: "src/routes/command/ibpe-operating-workspace_.optimizer.tsx",
@@ -247,20 +250,20 @@ export const VIBPE_REPOSITORY_KNOWLEDGE: VibpeRepositoryKnowledgeRecord[] = [
     keywords: ["optimizer", "readiness", "blocked", "packet", "parent ibpe", "lineage", "highs", "execution", "route"],
   },
   {
-    id: "repo-vyndi-user-manual-1-3",
+    id: "repo-vyndi-user-manual-1-4",
     claimText:
-      "VYNDI User Manual Rev 1.3 records the complete ERP optimization operating guide covering architecture, governed inputs/objectives, Procurement Planning, Scenario Studio, Advanced Planning Authority/HiGHS, cash/funding governance, rerun rules and VIBPE Co-Pilot optimization operations.",
+      "VYNDI User Manual Rev 1.4 records the complete ERP optimization operating guide covering architecture, governed inputs/objectives, Procurement Planning, Scenario Studio, Advanced Planning Authority/HiGHS, cash/funding governance, rerun rules and VIBPE Co-Pilot optimization operations.",
     claimClass: "material_change",
     authority: "controlled-reference",
     domain: "operations",
-    title: "VYNDI User Manual Rev 1.3",
-    sourceRevision: "Rev 1.3",
+    title: "VYNDI User Manual Rev 1.4",
+    sourceRevision: "Rev 1.4",
     repository: VYNDI_REPO,
     sourceCommit: VYNDI_COMMIT,
     sourcePath: "src/routes/command/user-manual.tsx",
     sourceDate: "2026-09-24",
     knowledgeTier: "current-operational",
-    keywords: ["user manual", "rev 1.3", "erp optimizer", "scenario studio", "procurement planning", "authority", "rerun", "copilot"],
+    keywords: ["user manual", "rev 1.4", "erp optimizer", "scenario studio", "procurement planning", "authority", "rerun", "copilot"],
   },
 ];
 

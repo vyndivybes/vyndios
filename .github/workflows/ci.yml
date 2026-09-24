@@ -1,10 +1,16 @@
 name: CI
 
-# GitHub-hosted runners for this private repository are currently unavailable
-# before job allocation. Automatic validation is enforced by Netlify via
-# npm run ci:external. Keep this workflow manual so it can be re-enabled
-# immediately when GitHub-hosted Actions capacity/budget is available.
+# Canonical repository CI. Cloudflare is the production deployment authority.
+# This workflow runs for every main-bound PR and again after changes land on
+# main, so direct pushes cannot remain unobserved even where plan-level branch
+# protection is unavailable.
 on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -63,10 +69,6 @@ jobs:
       - name: Generate route tree and typecheck
         run: npm run typecheck
 
-      - name: Vercel SSR build gate
-        env:
-          VERCEL: "1"
-        run: npm run build:dev
 
       - name: Client bundle invariant gate
         run: node scripts/check-client-bundle.mjs

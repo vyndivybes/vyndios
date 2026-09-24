@@ -17,10 +17,12 @@ test("cross-repository knowledge is pinned to reviewed source commits", () => {
     "vayu-shastr/vyndios",
   ]) assert.match(repositoryKnowledge, new RegExp(repo.replace("/", "\\/")));
 
-  assert.match(repositoryKnowledge, /2f8cd66ecca7ac74ad5309915ce004d752bfc776/);
+  assert.match(repositoryKnowledge, /e275bad3b90a4d75fd09aac6b297e61d0d1ae5e7/);
   assert.match(repositoryKnowledge, /3ca30a7891272870190b3f21340102451d7ff94b/);
-  assert.match(repositoryKnowledge, /d0cae69f7e7a094e0482619e362af5699623d65a/);
+  assert.match(repositoryKnowledge, /89de43701c16776a834b4ba67e38620d670160f7/);
   assert.match(repositoryKnowledge, /repositoryKnowledgeUrl/);
+  assert.match(repositoryKnowledge, /VYNDI User Manual Rev 1\.4/);
+  assert.match(repositoryKnowledge, /last independently audited main SHA/);
 });
 
 test("current VEDM authority wins over stale older geometry wording", () => {
