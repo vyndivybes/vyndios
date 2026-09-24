@@ -1,5 +1,6 @@
 export const VAYU_SHASTR_SECRET_FOLDER_IDS = new Set([
   "12D8SfbcnX9y5E9oOa614SE7BUYBbRQEK",
+  "1vA8R9O42GM1DVzj3nI_5ybx63sracrj9",
 ]);
 
 export const VAYU_SHASTR_SECRET_NAME_PATTERN =
