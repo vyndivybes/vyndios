@@ -93,7 +93,8 @@ const context=await browser.newContext({viewport:{width:1280,height:800},reduced
 
 try{
   const page=await context.newPage();
-  const loginResponse=await page.goto(`${baseUrl}/login?returnTo=%2Fcommand`,{waitUntil:"domcontentloaded",timeout:60_000});
+  // Authentication setup is outside the measured route-load interval; wait for client hydration before submit.
+  const loginResponse=await page.goto(`${baseUrl}/login?returnTo=%2Fcommand`,{waitUntil:"networkidle",timeout:60_000});
   assert.ok(loginResponse?.ok(),`Login page HTTP ${loginResponse?.status() ?? "none"}`);
   await page.getByLabel(/Authorised Email/i).fill(email);
   await page.getByLabel(/^Password$/i).fill(password);
@@ -173,7 +174,8 @@ try{
   throw error;
 }finally{
   await mkdir(dirname(evidencePath),{recursive:true});
-  await writeFile(evidencePath,`${JSON.stringify(evidence,null,2)}\n`,"utf8");
+  await writeFile(evidencePath,`${JSON.stringify(evidence,null,2)}
+`,"utf8");
   await context.close().catch(()=>{});
   await browser.close().catch(()=>{});
 }

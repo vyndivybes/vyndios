@@ -92,7 +92,8 @@ try {
 
   const login = await context.newPage();
   const loginStarted = Date.now();
-  const loginResponse = await login.goto(`${baseUrl}/login?returnTo=%2Fcommand`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+  // Authentication setup is outside the protected-route latency sample; wait for client hydration before submit.
+  const loginResponse = await login.goto(`${baseUrl}/login?returnTo=%2Fcommand`, { waitUntil: "networkidle", timeout: 60_000 });
   assert.ok(loginResponse?.ok(), `Login page returned HTTP ${loginResponse?.status() ?? "none"}`);
   await login.getByLabel(/Authorised Email/i).fill(email);
   await login.getByLabel(/^Password$/i).fill(password);
@@ -161,7 +162,8 @@ try {
   report.error = error instanceof Error ? error.stack || error.message : String(error);
   throw error;
 } finally {
-  await writeFile(resolve(evidenceRoot, "slo-report.json"), `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  await writeFile(resolve(evidenceRoot, "slo-report.json"), `${JSON.stringify(report, null, 2)}
+`, "utf8");
   await context.close().catch(() => {});
   await browser.close().catch(() => {});
 }

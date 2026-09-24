@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Kpi, Panel } from "@/components/kpi";
+import { EngineeringWorkbench } from "@/components/engineering-workbench";
 import { listEngineeringAuthority } from "@/lib/engineering-authority";
 
 type Row = Record<string, unknown>;
@@ -185,6 +186,8 @@ function Engineering() {
           <Link to="/command/bom-control" className="text-accent">BOM control →</Link>
         </div>
       </header>
+
+      <EngineeringWorkbench />
 
       <Panel title="VEDM Design Authority" kicker="Controlled geometry authority · preferred front-end development">
         <div className="grid gap-3 lg:grid-cols-[1fr_1fr_1.6fr]">
