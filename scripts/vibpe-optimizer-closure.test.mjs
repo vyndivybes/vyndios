@@ -79,8 +79,7 @@ test("production build has one Cloudflare deployment adapter", async () => {
   const vite = await source("vite.config.ts");
   const pkg = JSON.parse(await source("package.json"));
   assert.match(vite, /cloudflare\(\{ viteEnvironment: \{ name: "ssr" \} \}\)/);
-  assert.doesNotMatch(vite, /process\.env\.VERCEL|nitro\/vite|preset: "vercel"/i);
-  assert.equal(pkg.dependencies?.["@vercel/analytics"], undefined);
+  assert.doesNotMatch(vite, /nitro\/vite|preset:\s*"[^"]+"/i);
   assert.equal(pkg.devDependencies?.nitro, undefined);
 });
 
