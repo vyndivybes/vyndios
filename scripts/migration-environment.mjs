@@ -29,17 +29,6 @@ export function migrationEnvironmentDecision(env = process.env) {
       : { allowed: false, reason: `Cloudflare Workers non-production branch ${workersBranch || "unknown"}` };
   }
 
-  const vercelEnvironment = value(env, "VERCEL_ENV");
-  const vercelBranch = value(env, "VERCEL_GIT_COMMIT_REF");
-  if (value(env, "VERCEL") === "1" || vercelEnvironment || vercelBranch) {
-    return vercelEnvironment === "production" && vercelBranch === "main"
-      ? { allowed: true, reason: "Vercel production main deployment" }
-      : {
-          allowed: false,
-          reason: `Vercel ${vercelEnvironment || "unknown"} deployment on ${vercelBranch || "unknown"}`,
-        };
-  }
-
   const pagesBranch = value(env, "CF_PAGES_BRANCH");
   if (value(env, "CF_PAGES") === "1" || pagesBranch) {
     return pagesBranch === "main"
