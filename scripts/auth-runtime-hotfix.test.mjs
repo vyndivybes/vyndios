@@ -78,11 +78,11 @@ test("Better Auth owns the HTTP cookie response without a duplicate TanStack han
   assert.doesNotMatch(authServer, /tanstackStartCookies/);
 });
 
-test("production hosts use request-local auth URLs and exact trusted origins", () => {
+test("production auth uses the canonical Cloudflare origin and excludes retired hosting", () => {
   assert.match(authServer, /resolveAuthBaseURL\(explicitBaseURL\)/);
-  assert.match(authRuntimeConfig, /"tiger-field-flora-finch\.vercel\.app"/);
-  assert.match(authRuntimeConfig, /"https:\/\/tiger-field-flora-finch\.vercel\.app"/);
-  assert.match(authRuntimeConfig, /"tiger-field-flora-finch\.shyamsundhar1982\.workers\.dev"/);
+  assert.match(authRuntimeConfig, /"https:\/\/vyndios\.shyamsundhar1982\.workers\.dev"/);
+  assert.doesNotMatch(authRuntimeConfig, /tiger-field-flora-finch/);
+  assert.doesNotMatch(authRuntimeConfig, /vercel\.app/);
   assert.match(authRuntimeConfig, /vyndi\/better-auth\/session-secret\/v1/);
   assert.match(authRuntimeConfig, /createHash\("sha256"\)/);
 });
