@@ -37,14 +37,18 @@ function quantity(value: number) {
 
 function isKnowledgeQuestion(question: string) {
   const q = question.toLowerCase();
-  const knowledgeTopic = /\b(fork|axle[-\s]?to[-\s]?crown|a[-\s]?c|geometry|clearance|tyre|tire|wheelbase|chainstay|head tube|bottom bracket|\bbb\b|t47|headset|crank|stack|reach|trail|offset|layup|laminate|carbon|prepreg|toray|t700|t800|t1100|fea|cfd|dossier|cad|iso 4210|bis|is 10613|quality|apqp|fai|ncr|rcca|traveller|router|warranty|consumer|legal metrology|dpdp|privacy|contract|\bip\b|patent|trademark|trade mark|employment|payroll|epf|labour code|anthropometr|bike fit|ride metric|ftp|vo2|max|spo2)\b/i.test(q);
+  const specialistKnowledgeTopic = /\b(general ledger|trial balance|balance sheet|cash flow statement|fund flow|cost accounting|gst|itc|bank reconciliation|period close|optimizer|optimiser|highs|milp|advanced planning|engineering authority|design authority|configuration authority)\b/i.test(q);
+  if (specialistKnowledgeTopic) return true;
+
+  const knowledgeTopic = /\b(fork|axle[-\s]?to[-\s]?crown|a[-\s]?c|geometry|clearance|tyre|tire|wheelbase|chainstay|head tube|bottom bracket|\bbb\b|t47|headset|crank|stack|reach|trail|offset|layup|laminate|carbon|prepreg|toray|t700|t800|t1100|fea|cfd|dossier|cad|iso 4210|bis|is 10613|quality|apqp|fai|ncr|rcca|traveller|router|warranty|consumer|legal metrology|dpdp|privacy|contract|\bip\b|patent|trademark|trade mark|employment|payroll|epf|labour code|anthropometr|bike fit|ride metric|ftp|vo2|max|spo2|accounting|statutory|finance closure)\b/i.test(q);
   if (!knowledgeTopic) return false;
 
-  const explicitIbpeMetric = /\b(capacity shortfall|production capacity|work centre|work center|cash|liquidity|funding|runway|mrp|atp|msl|procurement total|recommended procurement|demand forecast|scenario|baseline health|business health)\b/i.test(q);
+  const explicitIbpeMetric = /\b(capacity shortfall|production capacity|work centre|work center|liquidity|funding|runway|mrp|atp|msl|procurement total|recommended procurement|demand forecast|scenario|baseline health|business health)\b/i.test(q);
   return !explicitIbpeMetric;
 }
 
 function knowledgeAuthorityLabel(evidence: VibpeKnowledgeEvidence[]) {
+  if (evidence.some((item) => item.authority === "controlled-reference")) return "CONTROLLED REPOSITORY REFERENCE";
   if (evidence.some((item) => item.authority === "unresolved")) return "UNRESOLVED / NON-GOVERNING";
   return "ADVISORY / NON-GOVERNING";
 }
@@ -104,19 +108,24 @@ function knowledgeAnswer(question: string, evidence: VibpeKnowledgeEvidence[]) {
   ];
 
   if (asksAuthority) {
-    if (selected.some((item) => item.authority === "unresolved")) {
+    if (primary.authority === "controlled-reference") {
+      lines.push("Authority: CONTROLLED REPOSITORY REFERENCE. The pinned source is the declared authority inside its owning engineering/control domain. This imported snapshot is read-only: it does not create a new approval, mutate ERP master data or bypass the owning release workflow.");
+    } else if (selected.some((item) => item.authority === "unresolved")) {
       lines.push("Authority: No. This evidence is unresolved/non-governing and cannot be treated as production or design authority. Verify the current released controlled master before manufacture, release or transaction use.");
     } else {
       lines.push("Authority: This is advisory knowledge, not automatic production or design authority. The current released controlled master remains governing.");
     }
   } else {
-    lines.push(`Authority: ${authority}. Governed internal/master data takes precedence.`);
+    lines.push(`Authority: ${authority}. Governed internal/master data takes precedence outside the source's owning authority domain.`);
   }
 
   if (selected.length > 1) {
     lines.push(`Supporting evidence: ${selected.slice(1).map((item) => item.claimText).join(" ")}`);
   }
   lines.push(`Evidence source: ${primary.title}${primary.reviewDate ? ` · ${primary.reviewDate}` : ""}${primary.sourceLocator ? ` · ${primary.sourceLocator}` : ""}.`);
+  if (primary.sourceRepository && primary.sourceCommit) {
+    lines.push(`Pinned repository lineage: ${primary.sourceRepository}@${primary.sourceCommit.slice(0, 12)} · ${primary.sourcePath ?? "source path unavailable"}.`);
+  }
   return lines.join("\n\n");
 }
 
@@ -267,7 +276,16 @@ function intentAnswer(intent: VibpeScenarioParse["intent"], question: string, re
   }
 
   if (intent === "optimisation") {
-    return "Optimization intent detected. Use Command → VIBPE → Optimizer to execute the governed HiGHS operator surface against an exact immutable advanced-planning packet. Chat remains advisory and cannot auto-run the optimizer.";
+    return [
+      "Optimization workflow: use Command → VIBPE → Optimizer.",
+      "1) Run/refresh governed IBPE so the current deterministic planning snapshot exists.",
+      "2) Build or refresh the immutable advanced-planning packet from that exact IBPE run.",
+      "3) Clear the preparation gate: authority, model lineage, cash guardrails and required supplier/planning inputs must be valid.",
+      "4) Press “Run governed HiGHS optimization” for explicit human execution.",
+      "5) Review mathematical status, cash-governance status, funding evidence basis, accepted/not-accepted state and the persisted execution receipt.",
+      "6) Check Outputs & Evidence, Assurance and Release Readiness before relying on the result for a controlled decision.",
+      "The solver is advisory only and cannot create POs, production orders, inventory movements, funding actions or sales commitments. If supplier economics are provisional/test/benchmark based, funding exposure is scenario evidence rather than an authoritative fundraising requirement.",
+    ].join("\n");
   }
 
   if (intent === "navigation") {
