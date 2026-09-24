@@ -101,8 +101,21 @@ try{
   assert.ok(loginResponse?.ok(),`Login page HTTP ${loginResponse?.status() ?? "none"}`);
   await page.getByLabel(/Authorised Email/i).fill(email);
   await page.getByLabel(/^Password$/i).fill(password);
-  await page.getByRole("button",{name:/Authorize · Enter Command/i}).click();
-  await page.waitForURL(/\/command(?:\/|$)/,{timeout:45_000,waitUntil:"domcontentloaded"});
+  for(let attempt=1;attempt<=2;attempt+=1){
+    await page.getByRole("button",{name:/Authorize · Enter Command/i}).click();
+    try{
+      await page.waitForURL(/\/command(?:\/|$)/,{timeout:45_000,waitUntil:"domcontentloaded"});
+      break;
+    }catch(error){
+      if(attempt===2) throw error;
+      await page.goto(`${baseUrl}/login?returnTo=%2Fcommand`,{waitUntil:"domcontentloaded",timeout:60_000});
+      await page.getByLabel(/Authorised Email/i).fill(email);
+      await page.getByLabel(/^Password$/i).fill(password);
+    }
+  }
+  const authProbe=await page.goto(`${baseUrl}/command`,{waitUntil:"domcontentloaded",timeout:60_000});
+  assert.ok(authProbe?.ok(),`Post-login Command probe HTTP ${authProbe?.status() ?? "none"}`);
+  assert.doesNotMatch(page.url(),/\/login(?:\?|$)|\/command-login/,"Post-login Command probe did not retain authenticated access");
   await page.close();
 
   // Warm each route sequentially before measuring concurrency. This records cold
