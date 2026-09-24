@@ -19,7 +19,7 @@ async function syncCloudflareRuntimeEnv(): Promise<void> {
   try {
     // Cloudflare Worker bindings live on cloudflare:workers `env`, while some
     // governance code intentionally reads deployment metadata from process.env
-    // for Vercel/Node portability. Bridge only the explicit source-SHA binding.
+    // for non-Worker local portability. Bridge only the explicit source-SHA binding.
     const cloudflareWorkersModule = "cloudflare:workers";
     const workers = await import(/* @vite-ignore */ cloudflareWorkersModule);
     const runtimeEnv = workers.env as Record<string, unknown> | undefined;
