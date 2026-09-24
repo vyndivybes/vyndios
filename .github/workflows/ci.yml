@@ -70,6 +70,9 @@ jobs:
         run: npm run check:single-provider
 
 
+      - name: Production Cloudflare bundle gate
+        run: npm run build:bundle
+
       - name: Generate route tree and typecheck
         run: npm run typecheck
 
