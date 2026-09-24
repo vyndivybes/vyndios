@@ -31,12 +31,13 @@ const SECTIONS: readonly ManualSection[] = [
     id: "00",
     chapter: "A",
     title: "Cover & Document Control",
-    purpose: "Controlled operating manual for authorised VYNDI OS users. Document VYNDI-UM-001 · Revision 1.2 · baseline 24 September 2026 · VIBPE Co-Pilot 2.0.",
+    purpose: "Controlled operating manual for authorised VYNDI OS users. Document VYNDI-UM-001 · Revision 1.3 · baseline 24 September 2026 · VIBPE Co-Pilot 2.0.",
     controls: [
       "Classification: Controlled Internal Operating Document.",
       "Intended users: Management, Commercial, Operations, Engineering, QA, Finance, Compliance and Admin.",
       "Review trigger: material UI, workflow, approval, role, VIBPE, RBAC, production platform or deployment-lineage change.",
       "Revision 1.2 records the GitHub organisation/repository migration to vayu-shastr/vyndios, Cloudflare production rebuild, verified source-lineage stamping, Hyperdrive runtime and Smart Placement.",
+      "Revision 1.3 adds the complete ERP optimization operating guide: architecture, governed inputs and objectives, Procurement Planning UI, Scenario Studio UI, Advanced Planning Authority/HiGHS interface, cash/funding governance, rerun rules and VIBPE Co-Pilot optimization operations.",
     ],
   },
   {
@@ -498,6 +499,249 @@ const SECTIONS: readonly ManualSection[] = [
     warnings: ["Do not describe the VIBPE optimizer as fully production-proven while any release-closure gate remains blocked."],
   },
   {
+    id: "16.7",
+    chapter: "C",
+    title: "ERP Optimization Architecture — What the Engine Optimizes",
+    purpose: "Explain the complete VYNDI optimization stack before an operator uses any recommendation. ERP optimization is a governed decision-support chain that reconciles demand, materials, inventory, supplier lanes, capacity, routing, procurement economics and cash; it is not an automatic transaction engine.",
+    steps: [
+      "Start from governed source truth: approved plan, actual/committed demand, released BOM and exact Job Card requirements, inventory, reservations, committed/open receipts, approved capacity, approved routing, approved supplier lanes and governed finance/cash evidence.",
+      "Run governed IBPE to reconcile the operating picture and persist the authoritative snapshot used by downstream planning.",
+      "Close Advanced Planning Authority gaps for Capacity, Routing and Supplier lanes.",
+      "Build or refresh the immutable advanced-planning packet. The packet freezes the exact source lineage, planning model and authority evidence for one optimization decision.",
+      "Run the governed HiGHS optimizer only when the execution gate is READY.",
+      "Read mathematical feasibility together with cash governance, evidence quality and business-health exceptions. One green mathematical result is never sufficient on its own.",
+      "Use Outputs & Evidence, Assurance and Release Readiness to prove the exact packet → run → actor → audit → deployed-source lineage before describing the run as release-closed.",
+    ],
+    controls: [
+      "Current governed model: VYNDI-ADVANCED-PLANNING-0.1 with a 36-period planning horizon.",
+      "Demand model: committed and forecast demand remain distinct. Committed demand carries higher governed priority and is protected more strongly than forecast demand.",
+      "Material model: released BOM quantity-per-unit and scrap, on-hand quantity, reservations/safety stock and committed receipts form the material constraint set.",
+      "Capacity model: finite work-centre/resource hours, efficiency, routing run hours, setup/yield and resource eligibility constrain production.",
+      "Supplier-lane model: only approved lanes may be used; lead time, MOQ, order multiple, landed cost, reliability, validity and finite period capacity are governed constraints.",
+      "Current governed objective weights are: unmet committed demand 100; unmet forecast demand 30; lateness 50; resource overload 100; supplier overload 100; procurement cost 5; working capital 3; schedule change 2.",
+      "Those objective weights are controlled model policy, not operator sliders. Change them only through an approved model/release change.",
+      "Solver outputs can include demand served/unmet, lateness, production quantities by period, procurement supplier/SKU/order/receipt quantities, resource assignments, binding constraints, diagnostics and objective contributions.",
+      "The optimizer contract supports LP/MILP classes and the production interface executes the governed HiGHS adapter.",
+    ],
+    expected: [
+      "The optimizer should prefer satisfying committed demand and respecting hard resource/supplier constraints before optimizing lower-weight economic objectives.",
+      "A valid optimization result remains advisoryOnly=true, mayCreateTransactions=false and humanApprovalRequiredForBusinessAction=true.",
+    ],
+    warnings: [
+      "Do not interpret an objective value by itself as business performance. Always read its constraint and cash context.",
+      "Do not change master data merely to force a feasible result. Correct source evidence only when the business fact itself changed.",
+      "Do not bypass authority gaps by creating invented supplier, routing, cost or capacity assumptions.",
+    ],
+  },
+  {
+    id: "16.8",
+    chapter: "C",
+    title: "ERP Material & Procurement Optimization — UI and Operation",
+    route: "/command/procurement-planning",
+    purpose: "Operate the Procurement Planning interface as the material-reconciliation and procurement-decision layer that feeds governed IBPE and advanced optimization.",
+    steps: [
+      "Open Supply & Operations → Material Requirements / Procurement Planning.",
+      "Read the top KPI row first: Approved-plan procurement, Committed demand, Net SKU requirement, Control exceptions and Planning horizon.",
+      "If Needs attention appears, resolve planning BOM mapping issues or confirmed orders that are not correctly projected to current released Job Cards before trusting the material promise.",
+      "Open Procurement Cost Authority. Review Active BOM SKUs, Governed costs, Unresolved costs and Reference-only counts.",
+      "For each SKU, read Current authority and Governed INR. The authority hierarchy is FIFO actual → approved purchase order → approved supplier price → approved planning procurement price → Missing.",
+      "To establish a new controlled price, choose New authority = Planning or Supplier. For Supplier, select an approved supplier. Enter INR/unit and Quote / RFQ / approved basis in Evidence.",
+      "Select Save draft. A draft is not yet eligible for governed IBPE valuation. A different authorised user should then review and select Approve draft.",
+      "After price approval, confirm the SKU shows governed cost coverage. Catalogue/reference prices remain excluded until converted into controlled approved authority.",
+      "Open Reconciled SKU requirements. Read each row left-to-right: Month, SKU, Plan, Committed, Governing, Physical, Reserved, ATP, MSL, Open PO, Projected close, Net buy, Basis and Action.",
+      "For a positive Net buy, use RFQ, APPROVAL or PO to record the appropriate procurement-stage action. These buttons record controlled planning/action status; use Execute purchase for the full supplier-commitment workflow.",
+      "Use the 36-month approved-plan context disclosure to see requirement month, planning month, product mix, modeled procurement and tranche context.",
+      "After material/cost authority materially changes, rerun governed IBPE before relying on a new procurement or funding recommendation.",
+    ],
+    controls: [
+      "Planned SKU requirement comes from the approved 36-month plan multiplied by one approved planning-standard BOM per family.",
+      "Committed SKU requirement comes from exact confirmed/released production demand. The larger of planned versus committed requirement governs each period so confirmed demand is not double-counted on top of forecast demand.",
+      "Current monthly net-buy logic: projected opening stock = prior projected stock + open PO; net buy = max(governing requirement + MSL − projected opening stock, 0); projected closing stock = projected opening + net buy − governing requirement.",
+      "Physical, Reserved and ATP remain visible reconciliation signals. Reservations reduce ATP without physically moving stock.",
+      "MSL is protected as safety stock in the requirement calculation.",
+      "Procurement cost authority is separate from catalogue/reference data. Missing controlled cost means procurement/funding valuation is commercially incomplete.",
+      "Finance target COGS is a top-down commercial assumption; bottom-up BOM procurement cost is an independent model and variance is intentionally visible.",
+      "Current procurement-cost entry accepts INR. Foreign-currency supplier quotations require governed FX conversion before controlled entry.",
+      "Planning early does not itself move finance cash timing; approved PO/receipt/payment timing controls the actual cash consequence.",
+    ],
+    expected: [
+      "Control exceptions should be zero or explicitly understood before a material promise is treated as reliable.",
+      "All active planning-BOM and exact committed requirement SKUs needed for valuation should have governed cost authority.",
+      "A positive Net buy should have an owned procurement action and eventually trace into the governed PO/receiving workflow.",
+    ],
+    warnings: [
+      "RFQ / APPROVAL / PO on the requirements grid is not permission to bypass Purchase Execution approval and issuance.",
+      "Do not approve a supplier or planning price without source evidence.",
+      "Do not use catalogue/reference price as if it were a governed procurement cost.",
+    ],
+  },
+  {
+    id: "16.9",
+    chapter: "C",
+    title: "ERP Scenario Studio — What-If Optimization UI",
+    route: "/command/scenarios",
+    purpose: "Use Scenario Studio to test controlled what-if assumptions against the latest governed IBPE snapshot without changing the approved plan, actuals, contractual commitments or operating ledgers.",
+    steps: [
+      "Open Plan & Commercial → Scenarios / IBPE Scenario Studio.",
+      "Choose a Fast scenario preset or keep Custom scenario. Presets include Growth +25%, Supply shock, Capacity lift, Cash protect, Funding bridge and Severe stress.",
+      "Enter a Scenario name. Use Reset whenever you need to return every lever to the governed-baseline multiplier.",
+      "Set Scenario drivers: Demand outlook, Available capacity, Procurement cost, Supplier lead time, Receipt delay and Funding bridge.",
+      "UI ranges are: Demand 25%–200%; Available capacity 50%–200%; Procurement cost 60%–180%; Supplier lead time 50%–250%; Receipt delay 0–12 months; Funding bridge ₹0–₹10,000L with injection month M1–M36.",
+      "Select Run scenario. The deterministic engine derives the scenario from the latest complete governed IBPE snapshot; it does not overwrite that snapshot.",
+      "Read the Decision packet KPIs: Health score, Expected units, Recommended procurement, Min free liquidity, Incremental funding need and Findings. Every KPI shows a delta versus the governed baseline.",
+      "Verify Governed lineage: approved plan revision, input hash, source SHA and parent governed run ID.",
+      "Inspect Liquidity trajectory to compare baseline versus scenario after recommended procurement.",
+      "Inspect Priority findings for the exception, severity, problem and recommended controlled action.",
+      "Inspect Material & purchase actions for Month, SKU, Demand basis, Plan/exact requirement, Shortage, Recommend buy and Cost.",
+      "When more than one scenario has been run, use Scenario comparison memory to compare Health, Units delta, Procurement delta, Liquidity delta and Funding need.",
+      "Use the VIBPE Co-Pilot scenario context to ask why a number changed, which shortage drives the result, or which controlled lever improves feasibility.",
+    ],
+    controls: [
+      "Scenario demand multipliers flex residual forecast/pipeline demand; actual and committed quantities are preserved.",
+      "Capacity multiplier changes analytical available capacity only.",
+      "Procurement-cost multiplier changes analytical material unit costs only.",
+      "Lead-time multiplier changes analytical supplier/material lead time; Receipt delay shifts modeled receipts and drops receipts that move outside M36.",
+      "Funding bridge adds a forecast scenario cash inflow; it does not create real financing or a bank transaction.",
+      "Scenario output is advisoryOnly=true and preserves lineage to the governed snapshot used as its baseline.",
+      "Scenario history shown on the page is comparison memory for the current session; it is not an alternate source of transactional truth.",
+    ],
+    expected: [
+      "A scenario should make trade-offs visible before management commits an operating change.",
+      "The operator should be able to explain which changed lever caused the change in health, procurement, shortage, liquidity or funding need.",
+    ],
+    warnings: [
+      "Do not confuse Scenario Studio with the governed HiGHS production optimizer. Scenario Studio flexes analytical assumptions; the governed optimizer solves an immutable authority-backed planning packet.",
+      "Do not treat a scenario funding bridge as approved funding.",
+      "Do not copy a scenario recommendation into a PO, production order or customer promise without the corresponding canonical approval workflow.",
+    ],
+  },
+  {
+    id: "16.10",
+    chapter: "C",
+    title: "Advanced Planning Authority & HiGHS — Complete UI Interface",
+    route: "/command/ibpe-operating-workspace/optimizer",
+    purpose: "Operate the authority workbench and governed HiGHS interface using the exact screen states, buttons and evidence fields presented by VYNDI.",
+    steps: [
+      "Authority screen: open /command/ibpe-operating-workspace/authority. At Authority sequence, read 1 Capacity, 2 Routing and 3 Supplier lanes.",
+      "Capacity card states are READY or REVIEW REQUIRED. Open Capacity authority and review Status, Work centre, Available h/mo, Efficiency, Std h/unit and Source. Use Approve current capacity standards only after validating the controlled source values.",
+      "Routing card states are READY or REVIEW REQUIRED. If required, select Create routing drafts from approved capacity or Refresh routing drafts. Review each product revision and operation count, then use Approve routing on each valid draft.",
+      "Supplier lanes card states are READY or DATA REQUIRED. Review Approved active suppliers, Approved supplier prices and Approved supplier lanes. Missing SKU coverage must be resolved from Procurement Control / Requirements; supplier-lane facts are never inferred.",
+      "When all authority cards are READY, use Return to Optimizer.",
+      "Optimizer screen: at Governed preparation gate, verify Advanced packet, Parent IBPE run, Packet/model and Execution gate.",
+      "If no packet exists, select Build governed advanced-planning packet. If source/authority evidence changed, select Refresh governed advanced-planning packet. Packet preparation freezes evidence but does not run the solver.",
+      "Read every preparation issue. Execution gate must be READY before the solver button becomes valid.",
+      "Under Run governed optimizer, select Run governed HiGHS optimization. The button runs against the exact frozen packet selected on the page.",
+      "Read the status message immediately after execution. Open Execution receipt when detailed persisted identifiers/response evidence is required.",
+      "Under Latest persisted run, read Run, Mathematical status, Cash governance, Planning disposition, Funding evidence basis, Authoritative for funding decision, first funding/cash-gap value and period, peak funding/exposure value and period, Baseline reserve funding need, Accepted for execution, Objective and Created time.",
+      "Proceed to Outputs & Evidence, then Assurance, then Release Readiness. The optimizer page alone is not the final release verdict.",
+    ],
+    controls: [
+      "Authority sequence is Capacity → persisted Routing → Supplier lanes → rebuild/refresh packet.",
+      "Mathematical status can be optimal, feasible, infeasible, indeterminate or error.",
+      "A feasible mathematical solution is validated against governed model identity, objective weights, demand outcomes, production decisions, supplier-lane identity/approval, lead time, MOQ, order multiple, resource eligibility and other model constraints.",
+      "Accepted for execution is optimizer evidence only; it never substitutes for Procurement, Production, Quality, Finance or Commercial approval.",
+      "Execution is human initiated and produces immutable advisory evidence linked to packet ID and request/run identifiers.",
+    ],
+    expected: [
+      "READY preparation gate + successful HiGHS execution should create a persisted optimization run linked to the immutable packet.",
+      "If a hard constraint cannot be satisfied, the operator should use the diagnostic/binding-constraint evidence to correct the owning business authority or consciously revise the governed plan.",
+    ],
+    warnings: [
+      "Never run repeatedly against a stale packet after a material source or authority change.",
+      "Never approve capacity/routing simply to make the screen green.",
+      "Never treat a solver proposal through an unapproved supplier lane as valid; the validator rejects it.",
+    ],
+  },
+  {
+    id: "16.11",
+    chapter: "C",
+    title: "Cash & Funding Governance — Reading Optimizer Results",
+    purpose: "Interpret the cash overlay that decides whether a mathematically feasible plan is execution-ready, funding-dependent or unsupported by complete cash evidence.",
+    steps: [
+      "After HiGHS returns an optimal/feasible accepted mathematical run, VYNDI evaluates the proposed procurement against governed cash guardrails and payment timing.",
+      "Read Cash governance and Planning disposition together. Planning disposition can be execution-ready, funding-required, cash-evidence-incomplete or not-evaluated.",
+      "If funding-required, read First funding need / First modeled cash gap, its period, Peak additional funding / Peak scenario capital exposure and peak period.",
+      "Read Baseline reserve funding need to distinguish an underlying reserve shortfall from incremental exposure created by the proposed optimized procurement.",
+      "Read Funding evidence basis. commercially-governed means supplier economics are supported by governed commercial evidence; provisional-test-or-benchmark means at least one approved lane still derives economics from test, benchmark or assumption evidence.",
+      "Read Authoritative for funding decision. A provisional evidence basis must display no and the values are scenario exposure, not an authoritative fundraising requirement.",
+      "If cash-evidence-incomplete, repair the cash horizon/evidence before accepting the run; VYNDI requires continuous governed cash periods for the analysis horizon.",
+      "If funding-required with commercially governed evidence, treat the result as a conditional planning requirement and obtain real funding authority/evidence before any dependent business execution.",
+    ],
+    controls: [
+      "Cash governance is required for optimizer acceptance; mathematical feasibility cannot override it.",
+      "Payment lag by SKU affects when proposed procurement consumes cash.",
+      "The governed liquidity reserve must be preserved across the evaluated horizon.",
+      "When cash evidence is incomplete/invalid, acceptance remains blocked rather than inferring a safe result.",
+      "Funding requirement reason is reserve-preserving liquidity gap; execution remains blocked until funding or another governed cash action is evidenced.",
+    ],
+    expected: [
+      "execution-ready: mathematical and cash evidence support the planning proposal, subject to normal transaction approvals.",
+      "funding-required: mathematically feasible but reserve-preserving liquidity is insufficient under current governed evidence.",
+      "cash-evidence-incomplete: the system cannot responsibly classify execution because required cash evidence is missing/invalid.",
+    ],
+    warnings: [
+      "Funding-required is not authority to raise or spend funds.",
+      "Provisional scenario exposure must not be quoted externally as a company funding requirement.",
+      "Do not hide a liquidity breach by editing assumptions without corresponding governed business evidence.",
+    ],
+  },
+  {
+    id: "16.12",
+    chapter: "C",
+    title: "Optimizer Rerun Rules — What to Refresh and When",
+    purpose: "Prevent stale decisions by defining which upstream changes require a governed IBPE rerun, an advanced-packet refresh, a new HiGHS run or only an advisory scenario rerun.",
+    controls: [
+      "Run governed IBPE again when approved plan/demand, confirmed order revision, released Job Card requirement, released BOM/material mapping, inventory/receipts, governed procurement cost, finance/cash evidence or another IBPE source-truth input materially changes.",
+      "Refresh the governed advanced-planning packet after a new governed IBPE run and whenever approved capacity, persisted routing or approved supplier-lane authority changes.",
+      "Run HiGHS again after every packet refresh. Never carry a prior solver result forward to a newly frozen packet.",
+      "After a source-code production deployment changes VYNDI_SOURCE_SHA, rerun the governed IBPE → refresh packet → HiGHS → Release Readiness sequence when exact release lineage is required to be GREEN.",
+      "Scenario Studio changes do not require changing business truth. Rerun the scenario whenever a what-if lever changes; create a new governed operating decision only through the canonical source workflow.",
+      "A UI-only read/print operation does not require a solver rerun unless the deployed-source lineage itself changed and release closure is being re-certified.",
+    ],
+    steps: [
+      "Identify what changed and which canonical authority owns it.",
+      "Correct/approve the source record first.",
+      "If the change affects IBPE source truth, Run governed IBPE.",
+      "If the change affects packet authority/source evidence, Refresh governed advanced-planning packet.",
+      "Run governed HiGHS optimization.",
+      "Review Outputs & Evidence and Assurance.",
+      "Confirm Release Readiness and record exact packet/run/audit/source identifiers for controlled decisions.",
+    ],
+    warnings: [
+      "Do not rerun merely until a preferred answer appears. Every rerun should correspond to changed governed evidence or an explicitly identified analytical scenario.",
+      "Do not compare run values without checking whether their source SHA, parent IBPE run and packet IDs differ.",
+    ],
+  },
+  {
+    id: "16.13",
+    chapter: "C",
+    title: "VIBPE Co-Pilot — Optimization Questions and Navigation",
+    purpose: "Use natural-language analysis to interrogate governed demand, materials, procurement, capacity, funding and scenario evidence while preserving transaction authority.",
+    steps: [
+      "Ask baseline questions such as: What is the current governed plan? or Summarize the latest governed IBPE condition.",
+      "Ask planning-horizon questions such as: Plan the next 12 months or What changes over the next 6 months?",
+      "Ask demand questions such as: Which months have committed demand above plan?",
+      "Ask materials questions such as: Which SKU causes the current shortage? or Show ATP/MSL risk.",
+      "Ask procurement questions such as: What should we buy and when? or Which supplier/lead-time evidence is blocking optimization?",
+      "Ask capacity questions such as: Which work centre is constraining production? or What happens if capacity increases 20%?",
+      "Ask funding questions such as: When does free liquidity breach reserve? or What is the governed funding-dependent period?",
+      "Ask root-cause questions such as: Why did health fall? or What drives the M8 procurement spike?",
+      "Ask scenario questions such as: What if demand rises 25%?, Reduce procurement cost by 10%, Delay receipts 2 months, or Add ₹50L funding in M6.",
+      "Ask comparison/optimization questions such as: Compare that with baseline, Which option reduces funding need?, or Find the lowest-funding feasible direction.",
+      "Use navigation requests such as: Take me to Procurement Planning or Open the Optimizer.",
+      "For protected business updates, continue to use Preview interpretation → Authorise proposal → Apply governed adapter; conversation alone does not rewrite canonical records.",
+    ],
+    controls: [
+      "Supported intent families include baseline, planning-horizon, scenario, comparison, optimisation, root-cause, demand, materials, procurement, capacity, funding, follow-up, navigation and assessment.",
+      "Product-specific scenario references can target Longitude, Latitude or Altitude demand while preserving other product lines.",
+      "Co-Pilot analysis should cite/derive from governed runtime evidence where available and must not silently overwrite approved BOM, inventory, cost, demand, supplier, finance or production authority.",
+    ],
+    warnings: [
+      "Do not phrase a Co-Pilot recommendation as an approved transaction.",
+      "When Co-Pilot identifies missing evidence, open the owning canonical workspace and resolve it there.",
+    ],
+  },
+  {
     id: "17",
     chapter: "D",
     title: "Traceability & Controlled Print",
@@ -566,7 +810,7 @@ const SECTIONS: readonly ManualSection[] = [
     title: "Training & Screenshot Register",
     purpose: "Operator competency checklist and controlled illustration register for future manual revisions.",
     controls: [
-      "Operator should demonstrate login, role awareness, workspace navigation, order search, Job Card search, shortage review, Master Inventory, PO draft completion, approval vs issuance, GRN, quarantine, FIFO, Traveller, Quality Release, dispatch lineage, invoice, collection, VIBPE workflow operation, traceability and print.",
+      "Operator should demonstrate login, role awareness, workspace navigation, order search, Job Card search, shortage review, Master Inventory, PO draft completion, approval vs issuance, GRN, quarantine, FIFO, Traveller, Quality Release, dispatch lineage, invoice, collection, VIBPE workflow operation, ERP optimization architecture, Procurement Planning, Scenario Studio, Advanced Planning Authority, HiGHS execution, cash/funding interpretation, rerun rules, traceability and print.",
       "Controlled screenshot register S01–S17 covers Login, Command, Action Inbox, VIBPE, Demand & Orders, Inventory, Purchase, Receiving, Job Card, Material Requisition, Traveller, Quality, Operations lineage, Financial Cockpit, Receivables, Traceability/Print and Users & Roles.",
     ],
   },
@@ -575,7 +819,7 @@ const SECTIONS: readonly ManualSection[] = [
     chapter: "E",
     title: "Controlled Document Maintenance",
     purpose: "Keep the manual synchronized with the controlled system rather than allowing documentation drift.",
-    controls: ["Revise when navigation, page names, transaction buttons, approval flow, role permission, Job Card lifecycle, procurement, receiving, Quality release, dispatch, finance lineage, VIBPE, traceability/printing, governance, repository ownership/name, production platform, database transport or deployment-lineage controls materially change."],
+    controls: ["Revise when navigation, page names, transaction buttons, approval flow, role permission, Job Card lifecycle, procurement, receiving, Quality release, dispatch, finance lineage, VIBPE, optimizer model/objective/constraint policy, Scenario Studio controls, cash-governance logic, traceability/printing, governance, repository ownership/name, production platform, database transport or deployment-lineage controls materially change."],
     notes: ["Final operator principle: What happened? Why? What proves it? What does it affect? What happens next? Who has authority? Was it completed? Can the chain be reconstructed?"],
   },
 ];
@@ -606,7 +850,7 @@ function SectionPage({ section }: { section: ManualSection }) {
     <article className="rounded-2xl border border-border bg-surface/60 p-5 shadow-sm md:p-8 print:border-0 print:bg-white print:text-black print:shadow-none">
       <div className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-accent">{section.id} · VYNDI-UM-001 · Rev 1.2</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-accent">{section.id} · VYNDI-UM-001 · Rev 1.3</p>
           <h2 className="mt-2 font-display text-3xl text-fg md:text-4xl print:text-black">{section.title}</h2>
           {section.route ? <p className="mt-2 font-mono text-xs text-cyan-300 print:text-black">{section.route}</p> : null}
         </div>
@@ -646,13 +890,13 @@ function UserManual() {
   }
 
   return (
-    <main className="space-y-5" data-user-manual="vyndi-um-001-rev-1-2">
+    <main className="space-y-5" data-user-manual="vyndi-um-001-rev-1-3">
       <header className="rounded-2xl border border-border bg-gradient-to-br from-surface via-bg-elevated to-bg p-5 md:p-7 print:border-0 print:bg-white print:text-black">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-green">Controlled dossier · VYNDI-UM-001</p>
             <h1 className="mt-2 font-display text-4xl text-accent md:text-5xl print:text-black">User & Operator Manual</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted print:text-black">Revision 1.2 · VYNDI Operating System · VIBPE Co-Pilot 2.0 · baseline 24 September 2026</p>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted print:text-black">Revision 1.3 · VYNDI Operating System · VIBPE Co-Pilot 2.0 · baseline 24 September 2026</p>
           </div>
           <div className="flex flex-wrap gap-2 print:hidden">
             <button type="button" onClick={() => { setQuery(""); setShowAll((value) => !value); }} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg hover:border-accent">{showAll ? "Single section" : "Show all"}</button>
@@ -701,7 +945,7 @@ function UserManual() {
         </section>
       </div>
 
-      <footer className="border-t border-border pt-4 text-center text-[10px] uppercase tracking-[0.14em] text-subtle print:text-black">VYNDI-UM-001 · Revision 1.2 · Controlled User & Operator Manual</footer>
+      <footer className="border-t border-border pt-4 text-center text-[10px] uppercase tracking-[0.14em] text-subtle print:text-black">VYNDI-UM-001 · Revision 1.3 · Controlled User & Operator Manual</footer>
     </main>
   );
 }
