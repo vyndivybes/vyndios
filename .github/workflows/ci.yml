@@ -66,6 +66,10 @@ jobs:
       - name: Deployment target regression gate
         run: node --test scripts/deployment-target-regression.test.mjs
 
+      - name: Single-provider production gate
+        run: npm run check:single-provider
+
+
       - name: Generate route tree and typecheck
         run: npm run typecheck
 
