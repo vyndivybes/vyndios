@@ -1,7 +1,7 @@
 # Build & deploy target
 
 VYNDI production is deployed through **Cloudflare Workers Builds**. The
-canonical Worker is `vyndios`; Vercel is a retired legacy compatibility path
+canonical Worker is `vyndios`; no alternate production deployment adapter is supported
 and must not be treated as release authority. `npm run build` must succeed and
 emit valid Cloudflare-compatible output, and code that works under `npm run dev`
 but breaks the production Worker build is a bug.
@@ -31,7 +31,7 @@ config:
 - pins `vite preview` to loopback `127.0.0.1:8081`, so the built output can
   never be picked up as the user's live preview;
 - keeps the Cloudflare Vite plugin as the production adapter;
-- may retain legacy Nitro/Vercel compatibility code only when it does not affect
+- must not retain alternate deployment compatibility code that can affect
   Cloudflare release behavior;
 - mounts `grokPwaPlugin()`.
 

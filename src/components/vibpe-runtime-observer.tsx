@@ -31,9 +31,9 @@ function target() {
   const hostname = window.location.hostname;
   const provider = hostname.endsWith(".workers.dev")
     ? "cloudflare-production"
-    : hostname.endsWith(".vercel.app")
-      ? "vercel-production"
-      : "production";
+    : hostname.endsWith(".grok-sandbox.com")
+      ? "preview"
+      : "runtime";
   return `${provider}:auto:${hostname}`;
 }
 

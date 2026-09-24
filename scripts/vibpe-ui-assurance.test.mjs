@@ -175,7 +175,8 @@ test("runtime observer stays available for explicit assurance tooling but is not
   assert.match(observer, /capability\.id === "UI-AUTH-SESSION"/);
   assert.match(observer, /location\.pathname/);
   assert.match(observer, /cloudflare-production/);
-  assert.match(observer, /vercel-production/);
+  assert.match(observer, /preview/);
+  assert.match(observer, /runtime/);
   assert.doesNotMatch(observer, /probeAuthenticatedSession/);
   assert.doesNotMatch(observer, /sweepAuthenticatedRoutes/);
   assert.doesNotMatch(observer, /authenticated-route-sweep/);

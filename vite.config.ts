@@ -6,7 +6,6 @@ import { cloudflare } from "@cloudflare/vite-plugin";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import { nitro } from "nitro/vite";
 // @ts-expect-error JS plugin alongside the TS vite config
 import { grokPwaPlugin } from "./scripts/grok-pwa-plugin.mjs";
 // @ts-expect-error JS plugin alongside the TS vite config
@@ -132,10 +131,7 @@ function authPopupPlugin(): Plugin {
   };
 }
 
-export default defineConfig(() => {
-  const isVercel = Boolean(process.env.VERCEL);
-
-  return {
+export default defineConfig(() => ({
     server: {
       host: "0.0.0.0",
       port: 8080,
@@ -149,25 +145,15 @@ export default defineConfig(() => {
     resolve: {
       tsconfigPaths: true,
       alias: [
-        // Cloudflare needs the exact patched ESM loader prepared by
-        // scripts/with-app-env.mjs. Vercel must keep the package name intact so
-        // Nitro can externalize it and let Node resolve its sibling highs.wasm.
-        ...(!isVercel
-          ? [{
-              find: /^highs$/,
-              replacement: join(process.cwd(), "node_modules", "highs", "build", "highs.mjs"),
-            }]
-          : []),
+        // Cloudflare uses the exact patched ESM loader prepared by
+        // scripts/with-app-env.mjs.
+        {
+          find: /^highs$/,
+          replacement: join(process.cwd(), "node_modules", "highs", "build", "highs.mjs"),
+        },
         {
           find: /^@\/lib\/advanced-planning-highs-deployment-runtime$/,
-          replacement: join(
-            process.cwd(),
-            "src",
-            "lib",
-            isVercel
-              ? "advanced-planning-highs-vercel-runtime.ts"
-              : "advanced-planning-highs-deployment-runtime.ts",
-          ),
+          replacement: join(process.cwd(), "src", "lib", "advanced-planning-highs-deployment-runtime.ts"),
         },
       ],
     },
@@ -178,21 +164,14 @@ export default defineConfig(() => {
     optimizeDeps: {
       exclude: ["@electric-sql/pglite"],
     },
-    ...(isVercel ? { ssr: { external: ["highs"] } } : {}),
     plugins: [
-      // Vercel needs a routable Nitro server output. Cloudflare keeps its native
-      // Worker/Hyperdrive adapter everywhere else, including local Stage D.
-      ...(isVercel
-        ? []
-        : [cloudflare({ viteEnvironment: { name: "ssr" } })]),
+      cloudflare({ viteEnvironment: { name: "ssr" } }),
       pgliteBootstrapPlugin(),
       authPopupPlugin(),
       appEnvPlugin(),
       grokPwaPlugin(),
       tailwindcss(),
       tanstackStart(),
-      ...(isVercel ? [nitro({ preset: "vercel", serverDir: "./server" })] : []),
       viteReact(),
     ],
-  };
-});
+}));

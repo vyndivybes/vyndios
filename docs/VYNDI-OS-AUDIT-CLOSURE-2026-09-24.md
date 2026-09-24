@@ -12,24 +12,18 @@
 
 Google Drive is a governed supplementary knowledge source for VIBPE. It does not replace ERP, engineering-release, or transactional authority.
 
-## 2. Retired / non-authoritative infrastructure
+## 2. Single-provider production rule
 
-The following are **not part of the VYNDI production runtime or release authority**:
-
-- **Vercel** — retired hosting path. Legacy compatibility code may remain until separately removed, but Vercel is not a production target, auth origin, release gate, or deployment authority.
-- **Supabase** — retired/inactive historical project. Current VYNDI source has no Supabase runtime dependency. Do not include it in production-readiness audits unless a future code change explicitly reintroduces Supabase.
-- **Netlify** — retired/unused. The obsolete `netlify.toml` and the false `ci:external` fallback claim were removed.
-
-Future audits must not repeatedly reopen these three providers merely because old account resources still exist. Reopen only when repository code, active deployment configuration, or a deliberate architecture decision makes one of them authoritative again.
+VYNDI OS has one production deployment authority: **Cloudflare Workers**. Alternate hosting/database deployment adapters and their production configuration have been removed from the active source tree. Historical records may remain in archived evidence only and have no runtime or release authority.
 
 ## 3. Audit fixes applied
 
 - Wrangler Worker identity changed from legacy `tiger-field-flora-finch` to `vyndios`.
 - Better Auth production trust reduced to the canonical Cloudflare origin plus explicit local/Grok preview origins.
-- Legacy Vercel hosts removed from the production authentication allowlist/trusted-origin list.
+- Production authentication trust reduced to the canonical Cloudflare origin plus explicit local/Grok preview origins.
 - Production smoke/release scripts aligned to the canonical VYNDI Worker origin.
 - CI restored on pull requests to `main`, pushes to `main`, and manual dispatch.
-- Netlify fallback wording/configuration removed.
+- Obsolete alternate-host fallback wording/configuration removed.
 - CODEOWNERS added for high-risk repository surfaces.
 - VIBPE VEDM knowledge pin refreshed to current reviewed VEDM main.
 - VIBPE self-repository records anchored to the last independently audited VYNDI main SHA; runtime exact-SHA authority remains `VYNDI_SOURCE_SHA`.

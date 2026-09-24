@@ -75,14 +75,13 @@ test("browser Web Worker loads pinned HiGHS Wasm and Cloudflare never owns the e
   assert.doesNotMatch(execution, /advanced-planning-highs-deployment-runtime/);
 });
 
-test("Vercel keeps the pinned HiGHS package lazy and external to Nitro SSR bundling", async () => {
+test("production build has one Cloudflare deployment adapter", async () => {
   const vite = await source("vite.config.ts");
-  const runtime = await source("src/lib/advanced-planning-highs-vercel-runtime.ts");
-  assert.match(runtime, /import\("highs"\)/);
-  assert.doesNotMatch(runtime, /generated\/highs\.wasm/);
-  assert.match(vite, /isVercel \? \{ ssr: \{ external: \["highs"\] \} \} : \{\}/);
-  assert.match(vite, /\.\.\.\(!isVercel[\s\S]*find: \/\^highs\$\//);
-  assert.match(vite, /advanced-planning-highs-vercel-runtime\.ts/);
+  const pkg = JSON.parse(await source("package.json"));
+  assert.match(vite, /cloudflare\(\{ viteEnvironment: \{ name: "ssr" \} \}\)/);
+  assert.doesNotMatch(vite, /process\.env\.VERCEL|nitro\/vite|preset: "vercel"/i);
+  assert.equal(pkg.dependencies?.["@vercel/analytics"], undefined);
+  assert.equal(pkg.devDependencies?.nitro, undefined);
 });
 
 test("browser and Worker bundles resolve the governed optimizer to the patched HiGHS ESM entry", async () => {
