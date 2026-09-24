@@ -1,9 +1,10 @@
 # Build & deploy target
 
-You never trigger the deploy yourself, **but the app you build is eventually
-deployed to Vercel** by the platform — so your output must build cleanly under
-Vercel's process. `npm run build` must succeed and emit valid output, and code
-that works under `npm run dev` but breaks a production / SSR build is a bug.
+VYNDI production is deployed through **Cloudflare Workers Builds**. The
+canonical Worker is `vyndios`; Vercel is a retired legacy compatibility path
+and must not be treated as release authority. `npm run build` must succeed and
+emit valid Cloudflare-compatible output, and code that works under `npm run dev`
+but breaks the production Worker build is a bug.
 Watch for dev-only deps, server-only Node APIs run at import time, runtime
 filesystem writes, and hard-coded ports / hosts / secrets.
 
@@ -29,12 +30,11 @@ config:
 - binds the dev port `0.0.0.0:8080`;
 - pins `vite preview` to loopback `127.0.0.1:8081`, so the built output can
   never be picked up as the user's live preview;
-- gates `nitro({ preset: "vercel" })` on `command === "build" || isPreview`, so
-  it never runs in dev — left on in dev, nitro opens a second dev-server port,
-  which breaks the single-port 8080 live preview — but still serves the built
-  output under `vite preview`;
+- keeps the Cloudflare Vite plugin as the production adapter;
+- may retain legacy Nitro/Vercel compatibility code only when it does not affect
+  Cloudflare release behavior;
 - mounts `grokPwaPlugin()`.
 
-If you edit it, preserve both port contracts, the build/preview-gated nitro
-plugin **including its `serverDir: "./server"` option** (without it the deployed
-app loses the Home Screen install page), and `grokPwaPlugin()`.
+If you edit it, preserve both port contracts, Cloudflare production behavior,
+and `grokPwaPlugin()`. Do not re-promote a legacy hosting adapter into release
+authority.
