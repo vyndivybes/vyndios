@@ -5,6 +5,9 @@ on:
     paths:
       - 'src/lib/ibpe-copilot.ts'
       - 'src/lib/ibpe-scenario-lab.ts'
+      - 'src/components/ibpe-copilot.tsx'
+      - 'src/routes/command/knowledge.tsx'
+      - 'src/routes/command/user-manual.tsx'
       - 'src/lib/vibpe-*.ts'
       - 'scripts/vibpe-*.mjs'
       - 'docs/VIBPE-*.md'
@@ -81,6 +84,7 @@ jobs:
           scripts/vibpe-optimiser.test.mjs
           scripts/vibpe-planning.test.mjs
           scripts/vibpe-session-and-knowledge.test.mjs
+          scripts/vibpe-repository-knowledge.test.mjs
           scripts/vibpe-finance-compliance-engineering.test.mjs
           scripts/vibpe-ca-financial-planner.test.mjs
           scripts/vibpe-cycling-performance.test.mjs
