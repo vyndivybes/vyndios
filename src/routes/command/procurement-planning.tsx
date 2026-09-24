@@ -14,14 +14,15 @@ export const Route=createFileRoute("/command/procurement-planning")({
   loader:async()=>{
     try {
       return {
-        blocked: null as string | null,
+        blocked: false as const,
+        blockedMessage: null as string | null,
         ...(await getProcurementPlanningReport()),
         costAuthority: await getProcurementCostAuthorityReport(),
       };
     } catch (error) {
       const message=error instanceof Error?error.message:String(error);
       if(message==="Procurement planning blocked: no approved Integrated Operating Plan exists."){
-        return {blocked:message};
+        return {blocked:true as const,blockedMessage:message};
       }
       throw error;
     }
@@ -45,12 +46,12 @@ function authorityLabel(value:ProcurementCostAuthorityRow["costAuthority"]){
 function ProcurementPlanning(){
   const data=Route.useLoaderData();
   const router=useRouter();
-  if(data.blocked !== null){
+  if(data.blocked){
     return <main className="mx-auto max-w-5xl space-y-6 px-4 py-10 sm:px-6">
       <header><p className="text-[10px] uppercase tracking-[0.22em] text-green">Plan + commitments · governed readiness</p><h1 className="mt-2 text-4xl font-bold text-accent">Procurement Planning</h1></header>
       <Panel title="Planning blocked" kicker="Governance prerequisite">
         <div className="space-y-3 text-sm leading-6 text-muted">
-          <p>{data.blocked}</p>
+          <p>{data.blockedMessage}</p>
           <p>This is a controlled readiness state, not a server failure. Approve an Integrated Operating Plan before procurement demand, valuation, RFQ or PO actions are enabled.</p>
           <Link to="/command/planning" className="inline-flex rounded-lg bg-accent px-4 py-2.5 font-semibold text-bg">Open Integrated Planning</Link>
         </div>
