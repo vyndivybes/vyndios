@@ -153,7 +153,7 @@ missing. Postgres and Better Auth are pre-wired in `src/lib`, **opt-in per app**
   `vite-tanstack-config` preset. Editing? Keep both port contracts, the
   Cloudflare production adapter and `grokPwaPlugin()`
   (`.grok/references/deploy-target.md`).
-- **Never delete or overwrite `public/__grok/`, `server/`, `scripts/grok-pwa-*`**
+- **Never delete or overwrite `public/__grok/` or `scripts/grok-pwa-*`**
   (platform chrome; `?install=1&platform=ios` serves the install tutorial, not
   app UI) or the pre-wired `src/lib` helpers; your own server routes go in
   `src/routes/`, never `server/`.
@@ -195,8 +195,7 @@ don't scaffold from stale priors — and keep each contract:
 
 1. **Never put `og:*` / `twitter:card` in `__root.tsx`** — the PWA injector
    overwrites them on every HTML response.
-2. **Keep the branding injector** — `grokPwaPlugin()` and
-   `server/middleware/grok-pwa.ts` inject
+2. **Keep the branding injector** — `grokPwaPlugin()` injects
    `https://grok.com/grok-app-builder/extensions.js`, the "Created with Grok /
    Remix" pill. Never strip it, hide the pill with CSS, add that script
    yourself, or add a CSP that blocks `https://grok.com`.
