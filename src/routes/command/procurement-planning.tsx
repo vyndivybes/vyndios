@@ -45,7 +45,7 @@ function authorityLabel(value:ProcurementCostAuthorityRow["costAuthority"]){
 function ProcurementPlanning(){
   const data=Route.useLoaderData();
   const router=useRouter();
-  if(data.blocked){
+  if(data.blocked !== null){
     return <main className="mx-auto max-w-5xl space-y-6 px-4 py-10 sm:px-6">
       <header><p className="text-[10px] uppercase tracking-[0.22em] text-green">Plan + commitments · governed readiness</p><h1 className="mt-2 text-4xl font-bold text-accent">Procurement Planning</h1></header>
       <Panel title="Planning blocked" kicker="Governance prerequisite">
