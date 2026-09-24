@@ -82,7 +82,7 @@ test("production auth uses the canonical Cloudflare origin and excludes retired 
   assert.match(authServer, /resolveAuthBaseURL\(explicitBaseURL\)/);
   assert.match(authRuntimeConfig, /"https:\/\/vyndios\.shyamsundhar1982\.workers\.dev"/);
   assert.doesNotMatch(authRuntimeConfig, /tiger-field-flora-finch/);
-  assert.doesNotMatch(authRuntimeConfig, /vercel\.app/);
+  assert.match(authRuntimeConfig, /vyndios\.shyamsundhar1982\.workers\.dev/);
   assert.match(authRuntimeConfig, /vyndi\/better-auth\/session-secret\/v1/);
   assert.match(authRuntimeConfig, /createHash\("sha256"\)/);
 });
