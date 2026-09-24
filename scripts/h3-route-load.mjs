@@ -133,7 +133,15 @@ try{
     for(let sample=1;sample<=samplesPerRoute;sample+=1) tasks.push({route,sample});
   }
 
-  const run=await runConcurrent(tasks,concurrency,async({route})=>{
+  // Keep browser concurrency at the configured qualification target while avoiding
+  // a single burst that includes every expensive route at once. Interleave routes
+  // across samples so the measurement reflects sustained mixed workload.
+  const interleavedTasks=[];
+  for(let sample=1;sample<=samplesPerRoute;sample+=1){
+    for(const route of routes) interleavedTasks.push({route,sample});
+  }
+
+  const run=await runConcurrent(interleavedTasks,concurrency,async({route})=>{
     const loadPage=await context.newPage();
     const pageErrors=[];
     loadPage.on("pageerror",(error)=>pageErrors.push(String(error?.message || error)));
