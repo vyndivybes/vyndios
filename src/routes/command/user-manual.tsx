@@ -52,7 +52,6 @@ const SECTIONS: readonly ManualSection[] = [
       "Cloudflare runtime uses Hyperdrive for production PostgreSQL connectivity and Smart Placement for database-aware Worker placement.",
       "Workers Builds clones vayu-shastr/vyndios, runs npm run build, then deploys with npx wrangler deploy.",
       "Cloudflare WORKERS_CI_COMMIT_SHA is mapped into VYNDI_SOURCE_SHA during the build so governed runtime lineage is derived from the deployed commit rather than manually asserted.",
-      "Vercel is not an authoritative production dependency. A Hobby deployment is not used for the private GitHub organisation repository; any future Vercel use requires a separately approved deployment arrangement.",
     ],
     expected: [
       "For a healthy production deployment, the Cloudflare build commit and runtime VYNDI_SOURCE_SHA refer to the same GitHub main commit.",
@@ -61,7 +60,6 @@ const SECTIONS: readonly ManualSection[] = [
     ],
     warnings: [
       "Do not manually edit VYNDI_SOURCE_SHA to make lineage appear current. Trigger a real Workers Build from the intended GitHub commit.",
-      "Do not treat a blocked or unavailable optional Vercel deployment as a Cloudflare production failure.",
       "Do not rename or replace the production Worker as part of routine repository maintenance without a controlled migration and post-deployment verification.",
     ],
   },
