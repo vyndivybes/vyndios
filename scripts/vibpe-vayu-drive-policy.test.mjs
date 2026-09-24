@@ -11,6 +11,10 @@ test("Vayu Drive excludes secret and credential paths", () => {
     isExcludedVayuDriveEntry({ id: "12D8SfbcnX9y5E9oOa614SE7BUYBbRQEK", name: "google client secret for shyamsundhar1982" }),
     true,
   );
+  assert.equal(
+    isExcludedVayuDriveEntry({ id: "1vA8R9O42GM1DVzj3nI_5ybx63sracrj9", name: "renamed-private-folder" }),
+    true,
+  );
   assert.equal(isExcludedVayuDriveEntry({ id: "safe", name: "OAuth refresh token backup.txt" }), true);
   assert.equal(isExcludedVayuDriveEntry({ id: "safe", name: "Final Master Geometry.html" }), false);
 });
