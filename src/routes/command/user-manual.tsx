@@ -31,11 +31,36 @@ const SECTIONS: readonly ManualSection[] = [
     id: "00",
     chapter: "A",
     title: "Cover & Document Control",
-    purpose: "Controlled operating manual for authorised VYNDI OS users. Document VYNDI-UM-001 · Revision 1.1 · baseline 16 September 2026 · VIBPE Co-Pilot 2.0.",
+    purpose: "Controlled operating manual for authorised VYNDI OS users. Document VYNDI-UM-001 · Revision 1.2 · baseline 24 September 2026 · VIBPE Co-Pilot 2.0.",
     controls: [
       "Classification: Controlled Internal Operating Document.",
       "Intended users: Management, Commercial, Operations, Engineering, QA, Finance, Compliance and Admin.",
-      "Review trigger: material UI, workflow, approval, role, VIBPE or RBAC change.",
+      "Review trigger: material UI, workflow, approval, role, VIBPE, RBAC, production platform or deployment-lineage change.",
+      "Revision 1.2 records the GitHub organisation/repository migration to vayu-shastr/vyndios, Cloudflare production rebuild, verified source-lineage stamping, Hyperdrive runtime and Smart Placement.",
+    ],
+  },
+  {
+    id: "00.1",
+    chapter: "A",
+    title: "Production Platform & Deployment Lineage",
+    purpose: "Identify the authoritative production platform, repository source and deployment-lineage controls used to prove which VYNDI OS source is actually running.",
+    controls: [
+      "Authoritative Git repository: private organisation repository vayu-shastr/vyndios; production branch: main.",
+      "Authoritative production runtime: Cloudflare Worker tiger-field-flora-finch. The legacy Worker name is infrastructure identity only and does not change the VYNDI OS product name.",
+      "Cloudflare runtime uses Hyperdrive for production PostgreSQL connectivity and Smart Placement for database-aware Worker placement.",
+      "Workers Builds clones vayu-shastr/vyndios, runs npm run build, then deploys with npx wrangler deploy.",
+      "Cloudflare WORKERS_CI_COMMIT_SHA is mapped into VYNDI_SOURCE_SHA during the build so governed runtime lineage is derived from the deployed commit rather than manually asserted.",
+      "Vercel is not an authoritative production dependency. A Hobby deployment is not used for the private GitHub organisation repository; any future Vercel use requires a separately approved deployment arrangement.",
+    ],
+    expected: [
+      "For a healthy production deployment, the Cloudflare build commit and runtime VYNDI_SOURCE_SHA refer to the same GitHub main commit.",
+      "Governed Release Readiness should preserve exact deployed-source lineage through governed IBPE, the advanced-planning packet, optimizer execution and append-only audit evidence.",
+      "A GREEN release-closure verdict proves configured technical/governance gates; it is separate from the live business-health score and operating exceptions.",
+    ],
+    warnings: [
+      "Do not manually edit VYNDI_SOURCE_SHA to make lineage appear current. Trigger a real Workers Build from the intended GitHub commit.",
+      "Do not treat a blocked or unavailable optional Vercel deployment as a Cloudflare production failure.",
+      "Do not rename or replace the production Worker as part of routine repository maintenance without a controlled migration and post-deployment verification.",
     ],
   },
   {
@@ -463,7 +488,8 @@ const SECTIONS: readonly ManualSection[] = [
     controls: [
       "Every closure gate must PASS for GREEN; no gate is inferred.",
       "Release Readiness is a verdict/reporting surface, not a button that releases purchases, production units, funds or customer commitments.",
-      "The verdict is derived from runtime, migration, packet lineage, persisted solver execution, cash governance, actor evidence and append-only audit evidence.",
+      "The verdict is derived from runtime, migration, exact deployed-source and packet lineage, persisted solver execution, cash governance, actor evidence and append-only audit evidence.",
+      "For source-lineage PASS, verify that the deployed Cloudflare source SHA is the source carried by the governed IBPE/advanced-planning evidence chain; stale or manually asserted SHA values are not acceptable evidence.",
     ],
     expected: [
       "GREEN: all configured VIBPE optimizer production-closure gates are evidenced.",
@@ -549,7 +575,7 @@ const SECTIONS: readonly ManualSection[] = [
     chapter: "E",
     title: "Controlled Document Maintenance",
     purpose: "Keep the manual synchronized with the controlled system rather than allowing documentation drift.",
-    controls: ["Revise when navigation, page names, transaction buttons, approval flow, role permission, Job Card lifecycle, procurement, receiving, Quality release, dispatch, finance lineage, VIBPE, traceability/printing or governance materially changes."],
+    controls: ["Revise when navigation, page names, transaction buttons, approval flow, role permission, Job Card lifecycle, procurement, receiving, Quality release, dispatch, finance lineage, VIBPE, traceability/printing, governance, repository ownership/name, production platform, database transport or deployment-lineage controls materially change."],
     notes: ["Final operator principle: What happened? Why? What proves it? What does it affect? What happens next? Who has authority? Was it completed? Can the chain be reconstructed?"],
   },
 ];
@@ -580,7 +606,7 @@ function SectionPage({ section }: { section: ManualSection }) {
     <article className="rounded-2xl border border-border bg-surface/60 p-5 shadow-sm md:p-8 print:border-0 print:bg-white print:text-black print:shadow-none">
       <div className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-accent">{section.id} · VYNDI-UM-001 · Rev 1.1</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-accent">{section.id} · VYNDI-UM-001 · Rev 1.2</p>
           <h2 className="mt-2 font-display text-3xl text-fg md:text-4xl print:text-black">{section.title}</h2>
           {section.route ? <p className="mt-2 font-mono text-xs text-cyan-300 print:text-black">{section.route}</p> : null}
         </div>
@@ -620,13 +646,13 @@ function UserManual() {
   }
 
   return (
-    <main className="space-y-5" data-user-manual="vyndi-um-001-rev-1-1">
+    <main className="space-y-5" data-user-manual="vyndi-um-001-rev-1-2">
       <header className="rounded-2xl border border-border bg-gradient-to-br from-surface via-bg-elevated to-bg p-5 md:p-7 print:border-0 print:bg-white print:text-black">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-green">Controlled dossier · VYNDI-UM-001</p>
             <h1 className="mt-2 font-display text-4xl text-accent md:text-5xl print:text-black">User & Operator Manual</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted print:text-black">Revision 1.1 · VYNDI Operating System · VIBPE Co-Pilot 2.0 · baseline 16 September 2026</p>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted print:text-black">Revision 1.2 · VYNDI Operating System · VIBPE Co-Pilot 2.0 · baseline 24 September 2026</p>
           </div>
           <div className="flex flex-wrap gap-2 print:hidden">
             <button type="button" onClick={() => { setQuery(""); setShowAll((value) => !value); }} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg hover:border-accent">{showAll ? "Single section" : "Show all"}</button>
@@ -675,7 +701,7 @@ function UserManual() {
         </section>
       </div>
 
-      <footer className="border-t border-border pt-4 text-center text-[10px] uppercase tracking-[0.14em] text-subtle print:text-black">VYNDI-UM-001 · Revision 1.1 · Controlled User & Operator Manual</footer>
+      <footer className="border-t border-border pt-4 text-center text-[10px] uppercase tracking-[0.14em] text-subtle print:text-black">VYNDI-UM-001 · Revision 1.2 · Controlled User & Operator Manual</footer>
     </main>
   );
 }
