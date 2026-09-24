@@ -1,5 +1,4 @@
 import { createRootRoute, HeadContent, Outlet, Scripts, useRouterState } from "@tanstack/react-router";
-import { Analytics } from "@vercel/analytics/react";
 import {
   VAYU_LEGAL_NAME,
   VAYU_LOGO_PATH,
@@ -144,7 +143,6 @@ function Root() {
         <Outlet />
         <LegalFooter />
         <Scripts />
-        <Analytics />
       </body>
     </html>
   );
