@@ -1,5 +1,5 @@
 param(
-  [string]$BaseUrl = "https://tiger-field-flora-finch.shyamsundhar1982.workers.dev",
+  [string]$BaseUrl = "https://vyndios.shyamsundhar1982.workers.dev",
   [string]$Email,
   [string]$ExpectedSha = "",
   [switch]$Headed,
