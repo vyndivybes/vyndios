@@ -14,9 +14,9 @@ The runtime uses a curated, commit-pinned snapshot in `src/lib/vibpe-repository-
 
 | Source | Pinned commit | Role |
 |---|---|---|
-| `vayu-shastr/veloxis-engineering-design-manual` | `2f8cd66ecca7ac74ad5309915ce004d752bfc776` | controlled engineering/configuration reference |
+| `vayu-shastr/veloxis-engineering-design-manual` | `e275bad3b90a4d75fd09aac6b297e61d0d1ae5e7` | controlled engineering/configuration reference |
 | `vayu-shastr/adv-vibpe` | `3ca30a7891272870190b3f21340102451d7ff94b` | development/reference finance, governance and Co-Pilot doctrine |
-| `vayu-shastr/vyndios` | `d0cae69f7e7a094e0482619e362af5699623d65a` | current operational ERP/optimizer/manual reference at snapshot creation |
+| `vayu-shastr/vyndios` | `89de43701c16776a834b4ba67e38620d670160f7` | last independently audited self-repository evidence anchor; current runtime remains authoritative |
 
 ## Authority classes
 
@@ -78,3 +78,5 @@ When a source repository changes materially:
 7. deploy only after normal repository review and production controls.
 
 A newer date, filename or branch is not by itself proof of authority.
+
+For `vayu-shastr/vyndios` itself, the pin is intentionally the last independently audited main SHA rather than the commit that contains the register. A source file cannot contain its own future commit SHA. Current runtime lineage is carried separately by `VYNDI_SOURCE_SHA` and the release-marker endpoint.
