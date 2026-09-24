@@ -31,13 +31,14 @@ const SECTIONS: readonly ManualSection[] = [
     id: "00",
     chapter: "A",
     title: "Cover & Document Control",
-    purpose: "Controlled operating manual for authorised VYNDI OS users. Document VYNDI-UM-001 · Revision 1.3 · baseline 24 September 2026 · VIBPE Co-Pilot 2.0.",
+    purpose: "Controlled operating manual for authorised VYNDI OS users. Document VYNDI-UM-001 · Revision 1.4 · baseline 24 September 2026 · VIBPE Co-Pilot 2.0.",
     controls: [
       "Classification: Controlled Internal Operating Document.",
       "Intended users: Management, Commercial, Operations, Engineering, QA, Finance, Compliance and Admin.",
       "Review trigger: material UI, workflow, approval, role, VIBPE, RBAC, production platform or deployment-lineage change.",
       "Revision 1.2 records the GitHub organisation/repository migration to vayu-shastr/vyndios, Cloudflare production rebuild, verified source-lineage stamping, Hyperdrive runtime and Smart Placement.",
       "Revision 1.3 adds the complete ERP optimization operating guide: architecture, governed inputs and objectives, Procurement Planning UI, Scenario Studio UI, Advanced Planning Authority/HiGHS interface, cash/funding governance, rerun rules and VIBPE Co-Pilot optimization operations.",
+      "Revision 1.4 adds VIBPE cross-repository knowledge: commit-pinned VEDM engineering authority, ADV finance/governance reference knowledge, current VYNDI optimizer/ERP operations, source-lineage evidence cards and the Repository Knowledge Snapshots register.",
     ],
   },
   {
@@ -742,6 +743,33 @@ const SECTIONS: readonly ManualSection[] = [
     ],
   },
   {
+    id: "16.14",
+    chapter: "C",
+    title: "VIBPE Cross-Repository Knowledge & Authority",
+    route: "/command/knowledge",
+    purpose: "Use VIBPE knowledge from Vāyú engineering, ADV VIBPE and current VYNDI OS while preserving the authority boundary of each source.",
+    steps: [
+      "Open Command → Knowledge and review Repository knowledge snapshots before relying on a cross-repository answer for an engineering, finance, governance or optimizer decision.",
+      "Each repository record shows its authority class, domain, source repository, exact commit SHA and source path. Use Open source when you need to inspect the pinned evidence directly.",
+      "For current bicycle engineering authority, VIBPE resolves the VEDM current configuration before older knowledge-pack wording. The pinned configuration declares VEDM-301 Rev 5.3.9 Candidate E-K75 as the controlling frame-geometry authority; Rev 5.4 FK75 remains preferred front-end development freeze and is not released.",
+      "For finance/accounting knowledge, ADV records are development/reference knowledge unless the same control has been promoted into current VYNDI OS runtime authority.",
+      "For ERP optimization, current VYNDI OS runtime and User Manual Rev 1.4 take precedence over older ADV snapshots. Build/refresh the governed IBPE packet, freeze the advanced-planning packet, clear preparation gates and execute HiGHS only through the explicit Optimizer control.",
+      "When source repositories change materially, update the curated snapshot to the new reviewed commit before describing the new repository state as current inside Co-Pilot.",
+    ],
+    controls: [
+      "Controlled repository reference — may represent authority inside the owning engineering/control repository, but importing the snapshot into VYNDI is read-only and does not create a new approval or transaction.",
+      "Current operational — current VYNDI OS runtime/manual evidence and optimizer workflow.",
+      "Development reference — useful ADV or engineering-method knowledge that cannot silently overwrite current VYNDI/ERP authority.",
+      "Unresolved — evidence may inform investigation but cannot satisfy a release, transaction or master-data gate.",
+      "Current snapshot baselines: VEDM 2f8cd66ecca7; ADV VIBPE 3ca30a789127; VYNDI OS d0cae69f7e7a. These identifiers are provenance, not a substitute for checking a newer reviewed source when the repository changes.",
+    ],
+    warnings: [
+      "Do not treat a newer filename, date or development branch as authority unless the owning repository control record says so.",
+      "Do not let a cross-repository answer overwrite ERP master data, accounting actuals, production transactions or an engineering release.",
+      "Do not use stale repository snapshots after a material source change; refresh the snapshot and rerun the relevant VIBPE regression gate.",
+    ],
+  },
+  {
     id: "17",
     chapter: "D",
     title: "Traceability & Controlled Print",
@@ -896,7 +924,7 @@ function UserManual() {
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-green">Controlled dossier · VYNDI-UM-001</p>
             <h1 className="mt-2 font-display text-4xl text-accent md:text-5xl print:text-black">User & Operator Manual</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted print:text-black">Revision 1.3 · VYNDI Operating System · VIBPE Co-Pilot 2.0 · baseline 24 September 2026</p>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted print:text-black">Revision 1.4 · VYNDI Operating System · VIBPE Co-Pilot 2.0 · baseline 24 September 2026</p>
           </div>
           <div className="flex flex-wrap gap-2 print:hidden">
             <button type="button" onClick={() => { setQuery(""); setShowAll((value) => !value); }} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg hover:border-accent">{showAll ? "Single section" : "Show all"}</button>
