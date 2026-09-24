@@ -173,10 +173,10 @@ export const getBomRevisionPropagationState = createServerFn({ method: "GET" }).
   await requireAdminView();
   const sql = await getSql();
   const [current, impact] = await Promise.all([
-    sql.query<Record<string, unknown>>(
+    sql.query<Record<string, string | number | boolean | null>>(
       `select * from vyndi_bom_revision_current_state order by venture,model_id,bom_revision`,
     ),
-    sql.query<Record<string, unknown>>(
+    sql.query<Record<string, string | number | boolean | null>>(
       `select * from vyndi_bom_revision_job_card_impact
         order by case bom_revision_state
           when 'RELEASED_REVIEW_REQUIRED' then 0
