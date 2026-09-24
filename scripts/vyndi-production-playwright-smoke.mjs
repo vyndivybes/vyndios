@@ -3,7 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { chromium } from "playwright";
 
-const baseUrl = (process.env.VYNDI_TEST_BASE_URL || "https://tiger-field-flora-finch.shyamsundhar1982.workers.dev").replace(/\/$/, "");
+const baseUrl = (process.env.VYNDI_TEST_BASE_URL || "https://vyndios.vayushastr.workers.dev").replace(/\/$/, "");
 const email = process.env.VYNDI_TEST_EMAIL;
 const password = process.env.VYNDI_TEST_PASSWORD;
 const expectedSha = process.env.VYNDI_TEST_EXPECTED_SHA?.trim() || "";

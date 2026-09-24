@@ -234,6 +234,7 @@ export const WORKSPACE_NAVIGATION: Record<CanonicalWorkspaceId, readonly Workspa
       label: "Planning & control",
       items: [
         { to: PLAN_HOME, label: "Integrated Operating Plan" },
+        { to: "/command/finance-assumptions", label: "Forecast Parameters" },
         { to: "/command/finance-control", label: "Budget vs Forecast vs Actual" },
       ],
     },

@@ -47,7 +47,7 @@ const SECTIONS: readonly ManualSection[] = [
     purpose: "Identify the authoritative production platform, repository source and deployment-lineage controls used to prove which VYNDI OS source is actually running.",
     controls: [
       "Authoritative Git repository: private organisation repository vayu-shastr/vyndios; production branch: main.",
-      "Authoritative production runtime: Cloudflare Worker tiger-field-flora-finch. The legacy Worker name is infrastructure identity only and does not change the VYNDI OS product name.",
+      "Authoritative production runtime: Cloudflare Worker vyndios at https://vyndios.vayushastr.workers.dev.",
       "Cloudflare runtime uses Hyperdrive for production PostgreSQL connectivity and Smart Placement for database-aware Worker placement.",
       "Workers Builds clones vayu-shastr/vyndios, runs npm run build, then deploys with npx wrangler deploy.",
       "Cloudflare WORKERS_CI_COMMIT_SHA is mapped into VYNDI_SOURCE_SHA during the build so governed runtime lineage is derived from the deployed commit rather than manually asserted.",

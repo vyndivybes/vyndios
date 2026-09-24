@@ -254,7 +254,7 @@ test("G6: Finance and Governance & Assurance have separate internal navigation c
 test("G6A: all workspace heads use nested business-function navigation", () => {
   const planNavigation = workflow.slice(workflow.indexOf('"plan-sales": ['), workflow.indexOf("engineering: ["));
   for (const section of ["Planning", "Commercial"]) assert.match(planNavigation, new RegExp(section));
-  assert.match(planNavigation, /Business Plan/);
+  assert.match(planNavigation, /Integrated Operating Plan/);
   assert.match(planNavigation, /Demand & Orders/);
 
   const engineeringNavigation = workflow.slice(workflow.indexOf("engineering: ["), workflow.indexOf("operations: ["));
