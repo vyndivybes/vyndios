@@ -430,22 +430,29 @@ function deterministicAnswer(
 }
 
 function shouldSurfaceKnowledgeEvidence(question: string) {
-  return /weekly|status|progress|milestone|design|engineering|geometry|clearance|prototype|manufactur|oem|tooling|incubat|tansam|tancam|launch|readiness|blocker|decision|priority|material change/i.test(question);
+  return /weekly|status|progress|milestone|design|engineering|geometry|clearance|prototype|manufactur|oem|tooling|incubat|tansam|tancam|launch|readiness|blocker|decision|priority|material change|optimizer|optimiser|highs|milp|advanced planning|accounting|trial balance|balance sheet|cash flow statement|fund flow|gst|itc|configuration authority/i.test(question);
 }
 
 function formatKnowledgeEvidence(evidence: VibpeKnowledgeEvidence[]) {
   if (!evidence.length) return "";
-  const items = evidence.slice(0, 4).map((item) => {
+  const items = evidence.slice(0, 5).map((item) => {
     const date = item.reviewDate ? ` · ${item.reviewDate}` : "";
-    const state = item.authority === "unresolved" ? "unresolved" : "advisory evidence";
+    const state = item.authority === "controlled-reference"
+      ? "controlled repository reference"
+      : item.authority === "unresolved"
+        ? "unresolved"
+        : "advisory evidence";
     const tier = item.knowledgeTier ? ` · ${item.knowledgeTier}` : "";
     const path = item.sourcePath ? ` · ${item.sourcePath}` : "";
-    return `• [${state}${tier}] ${item.claimText} — ${item.title}${date}${path}`;
+    const lineage = item.sourceRepository && item.sourceCommit
+      ? ` · ${item.sourceRepository}@${item.sourceCommit.slice(0, 12)}`
+      : "";
+    return `• [${state}${tier}] ${item.claimText} — ${item.title}${date}${lineage}${path}`;
   });
   return [
-    "VIBPE knowledge evidence (governed Drive references; not automatic master authority):",
+    "VIBPE knowledge evidence (commit-pinned repository snapshots + governed Drive references):",
     ...items,
-    "Governance: governed internal/master data and deterministic IBPE truth override any conflicting review statement.",
+    "Governance: a controlled repository reference governs only inside its owning source domain. VYNDI ERP master/transaction truth and deterministic IBPE truth remain unchanged unless the owning workflow explicitly promotes a change.",
   ].join("\n");
 }
 
@@ -454,7 +461,7 @@ function systemPrompt() {
     `You are ${VIBPE_COPILOT_NAME} for Vayu Shastr Private Limited.`,
     "You are an advisory exploration agent sitting on top of a deterministic Integrated Business Planning Engine.",
     "The deterministic IBPE packet is the authority for quantities, cash, MRP, ATP/MSL, capacity, funding and scenario deltas. Never invent or recompute numbers outside the supplied packet.",
-    "Google Drive knowledge evidence, including weekly reviews and the broader Vayu Shastr corpus, is advisory or unresolved context unless separately promoted by an owning governance workflow. It may explain design, dossiers, materials, suppliers, incubation, prototype, launch readiness and programme history, but it must never silently override governed internal/master data or deterministic IBPE transaction truth.",
+    "Knowledge evidence can come from governed Drive sources or commit-pinned Vayu Shastr repositories. A repository snapshot may carry controlled-reference authority inside its owning engineering/control domain, but importing it into VYNDI is read-only and never mutates ERP master data, transactions or release state. Advisory/unresolved sources remain non-governing.",
     "When weekly-review evidence conflicts with governed internal knowledge, use the governed value and identify the review item as historical or unresolved evidence.",
     "If you use weekly-review evidence, preserve its provenance by naming the source review date/title when practical and state unresolved status explicitly.",
     "Always distinguish plan, forecast, committed and actual truth. A scenario is hypothetical forecast analysis and must never be described as an approved plan or actual transaction.",
@@ -621,6 +628,9 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
             sourceUrl: item.externalUrl,
             sourcePath: item.sourcePath,
             knowledgeTier: item.knowledgeTier,
+            sourceRepository: item.sourceRepository,
+            sourceCommit: item.sourceCommit,
+            sourceKind: item.sourceKind,
           })),
         };
         try {

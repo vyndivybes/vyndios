@@ -1,10 +1,17 @@
 import { createHash } from "node:crypto";
 
 export const CLOUDFLARE_PRODUCTION_ORIGIN =
-  "https://vyndios.vayushastr.workers.dev";
+  "https://tiger-field-flora-finch.shyamsundhar1982.workers.dev";
 
 export const AUTH_ALLOWED_HOSTS = [
-  "vyndios.vayushastr.workers.dev",
+  "tiger-field-flora-finch.shyamsundhar1982.workers.dev",
+  "tiger-field-flora-finch.vercel.app",
+  "tiger-field-flora-finch-*.vercel.app",
+  "vindy-architecture.vercel.app",
+  "vindy-architecture-*.vercel.app",
+  "vindy-architecture-the-final3.vercel.app",
+  "vindy-architecture-git-main-the-final3.vercel.app",
+  "vindy-architecture-*-the-final3.vercel.app",
   "*.grok-sandbox.com",
   "localhost:*",
   "127.0.0.1:*",
@@ -13,6 +20,13 @@ export const AUTH_ALLOWED_HOSTS = [
 
 export const AUTH_TRUSTED_ORIGINS = [
   CLOUDFLARE_PRODUCTION_ORIGIN,
+  "https://tiger-field-flora-finch.vercel.app",
+  "https://tiger-field-flora-finch-*.vercel.app",
+  "https://vindy-architecture.vercel.app",
+  "https://vindy-architecture-*.vercel.app",
+  "https://vindy-architecture-the-final3.vercel.app",
+  "https://vindy-architecture-git-main-the-final3.vercel.app",
+  "https://vindy-architecture-*-the-final3.vercel.app",
   "http://localhost:8080",
   "http://127.0.0.1:8080",
   "http://[::1]:8080",

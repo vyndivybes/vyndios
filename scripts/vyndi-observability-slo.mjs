@@ -92,13 +92,29 @@ try {
 
   const login = await context.newPage();
   const loginStarted = Date.now();
-  // Authentication setup is outside the protected-route latency sample; wait for client hydration before submit.
-  const loginResponse = await login.goto(`${baseUrl}/login?returnTo=%2Fcommand`, { waitUntil: "networkidle", timeout: 60_000 });
+  const loginResponse = await login.goto(`${baseUrl}/login?returnTo=%2Fcommand`, { waitUntil: "domcontentloaded", timeout: 60_000 });
   assert.ok(loginResponse?.ok(), `Login page returned HTTP ${loginResponse?.status() ?? "none"}`);
   await login.getByLabel(/Authorised Email/i).fill(email);
   await login.getByLabel(/^Password$/i).fill(password);
-  await login.getByRole("button", { name: /Authorize · Enter Command/i }).click();
-  await login.waitForURL(/\/command(?:\/|$)/, { timeout: 45_000, waitUntil: "domcontentloaded" });
+  // The H2 recovery workflow restores a database that already contains the
+  // disposable validation identity. Better Auth may therefore report
+  // ?created=false while rotating/settling the session. Retry the normal login
+  // flow once before declaring auth failure; do not bypass the protected route.
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    await login.getByRole("button", { name: /Authorize · Enter Command/i }).click();
+    try {
+      await login.waitForURL(/\/command(?:\/|$)/, { timeout: 45_000, waitUntil: "domcontentloaded" });
+      break;
+    } catch (error) {
+      if (attempt === 2) throw error;
+      await login.goto(`${baseUrl}/login?returnTo=%2Fcommand`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+      await login.getByLabel(/Authorised Email/i).fill(email);
+      await login.getByLabel(/^Password$/i).fill(password);
+    }
+  }
+  const probe = await login.goto(`${baseUrl}/command`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+  assert.ok(probe?.ok(), `Post-login Command probe returned HTTP ${probe?.status() ?? "none"}`);
+  assert.doesNotMatch(login.url(), /\/login(?:\?|$)|\/command-login/, "Post-login Command probe did not retain authenticated access");
   report.login = { durationMs: Date.now() - loginStarted, ok: true };
   await login.close();
 
@@ -162,8 +178,7 @@ try {
   report.error = error instanceof Error ? error.stack || error.message : String(error);
   throw error;
 } finally {
-  await writeFile(resolve(evidenceRoot, "slo-report.json"), `${JSON.stringify(report, null, 2)}
-`, "utf8");
+  await writeFile(resolve(evidenceRoot, "slo-report.json"), `${JSON.stringify(report, null, 2)}\n`, "utf8");
   await context.close().catch(() => {});
   await browser.close().catch(() => {});
 }

@@ -8,15 +8,12 @@ import {
   resolveAuthSecret,
 } from "./runtime-config.ts";
 
-test("Cloudflare trusts only the final VYNDI production hostname", () => {
-  assert.ok(AUTH_ALLOWED_HOSTS.includes("vyndios.vayushastr.workers.dev"));
-  assert.ok(AUTH_TRUSTED_ORIGINS.includes(CLOUDFLARE_PRODUCTION_ORIGIN));
-  assert.equal(CLOUDFLARE_PRODUCTION_ORIGIN, "https://vyndios.vayushastr.workers.dev");
-  assert.equal(AUTH_ALLOWED_HOSTS.some((host) => host.includes("shyamsundhar1982.workers.dev")), false);
-  assert.equal(AUTH_ALLOWED_HOSTS.some((host) => host.includes("tiger-field-flora-finch")), false);
-  assert.equal(AUTH_ALLOWED_HOSTS.some((host) => host.includes("vercel.app")), false);
-  assert.equal(AUTH_TRUSTED_ORIGINS.some((origin) => origin.includes("vercel.app")), false);
+test("Cloudflare and the exact Vercel production hostname are allowed", () => {
+  assert.ok(AUTH_ALLOWED_HOSTS.includes("tiger-field-flora-finch.shyamsundhar1982.workers.dev"));
+  assert.ok(AUTH_ALLOWED_HOSTS.includes("tiger-field-flora-finch.vercel.app"));
+  assert.ok(AUTH_TRUSTED_ORIGINS.includes("https://tiger-field-flora-finch.vercel.app"));
 });
+
 test("auth base URL resolves dynamically with Cloudflare as the safe fallback", () => {
   assert.deepEqual(resolveAuthBaseURL(undefined), {
     allowedHosts: [...AUTH_ALLOWED_HOSTS],

@@ -22,26 +22,19 @@ const scenarios: { id: ScenarioId; label: string }[] = [
 ];
 
 function FinancialCockpit() {
-  const approvedPlan = Route.useLoaderData();
-  if (!approvedPlan) {
-    return (
-      <main className="mx-auto max-w-5xl space-y-6">
-        <header className="border-b border-border pb-6">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">Finance · governed readiness</p>
-          <h1 className="mt-1 font-display text-4xl text-accent">Consolidated Finance Overview</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">No approved Integrated Operating Plan is available. Finance remains controlled and does not synthesize forecast, liquidity or profitability from unapproved assumptions.</p>
-        </header>
-        <Panel title="Planning authority required" kicker="Controlled empty state">
-          <p className="text-sm leading-6 text-muted">Approve an Integrated Operating Plan before using the consolidated 36-month financial model.</p>
-          <Link to="/command/planning" className="mt-4 inline-block text-sm font-semibold text-accent hover:text-fg">Open Integrated Operating Plan →</Link>
-        </Panel>
-      </main>
-    );
+  const approvedPlan = Route.useLoaderData() as OperatingPlanSnapshot | null;
+  if(!approvedPlan){
+    return <div className="space-y-6">
+      <header className="border-b border-border pb-6"><p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">Finance · governed readiness</p><h1 className="mt-2 text-4xl font-bold text-accent">Consolidated Finance</h1></header>
+      <Panel title="Finance cockpit blocked" kicker="Governance prerequisite">
+        <div className="space-y-3 text-sm leading-6 text-muted">
+          <p>Consolidated Finance requires an approved Integrated Operating Plan.</p>
+          <p>This is a controlled readiness state, not a server failure. Financial scenarios remain disabled until the plan is approved.</p>
+          <Link to="/command/planning" className="inline-flex rounded-lg bg-accent px-4 py-2.5 font-semibold text-bg">Open Integrated Planning</Link>
+        </div>
+      </Panel>
+    </div>;
   }
-  return <FinancialCockpitReady approvedPlan={approvedPlan} />;
-}
-
-function FinancialCockpitReady({ approvedPlan }: { approvedPlan: OperatingPlanSnapshot }) {
   const [scenario, setScenario] = useState<ScenarioId>(approvedPlan.scenario);
   const [drawStandby, setDrawStandby] = useState(Boolean(approvedPlan.drawStandby));
   const finance = approvedPlan.finance;

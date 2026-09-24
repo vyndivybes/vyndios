@@ -58,7 +58,7 @@ To require a specific deployed source SHA when the target exposes `/api/runtime/
 npm ci
 npx playwright install chromium
 npm run test:golden-order:core
-$env:VYNDI_TEST_BASE_URL="https://vyndios.vayushastr.workers.dev"
+$env:VYNDI_TEST_BASE_URL="https://tiger-field-flora-finch.shyamsundhar1982.workers.dev"
 $env:VYNDI_TEST_EMAIL="YOUR-VYNDI-EMAIL"
 $env:VYNDI_TEST_PASSWORD="YOUR-PASSWORD"
 npm run test:browser:production

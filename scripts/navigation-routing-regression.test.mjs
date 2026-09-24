@@ -46,7 +46,6 @@ test("secondary functions inherit workspace ownership instead of a global mode b
     "/command/procurement",
     "/command/manufacturing",
     "/command/actuals",
-    "/command/finance-assumptions",
     "/command/finance-control",
     "/command/epr-workflow",
     "/command/epr-execution",
@@ -389,7 +388,8 @@ test("G10: route ownership follows business parent rather than historical contex
   assert.doesNotMatch(planNavigation, /finance-assumptions/);
 
   const financeNavigation = workflow.slice(workflow.indexOf("finance: ["), workflow.indexOf("governance: ["));
-  assert.match(financeNavigation, /finance-assumptions/);
+  assert.doesNotMatch(financeNavigation, /finance-assumptions/);
+  assert.match(financeNavigation, /Integrated Operating Plan/);
   assert.match(financeNavigation, /finance-control/);
 
   const governanceNavigation = workflow.slice(workflow.indexOf("governance: ["), workflow.indexOf("admin: ["));

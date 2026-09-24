@@ -186,38 +186,6 @@ function Engineering() {
         </div>
       </header>
 
-      <Panel title="Engineering Workbench Authority" kicker="Design/CAD execution lives in the dedicated engineering repository">
-        <div className="grid gap-3 lg:grid-cols-[1.15fr_.85fr]">
-          <div className="rounded-lg border border-border/80 bg-bg/45 p-4">
-            <p className="text-[9px] font-semibold uppercase tracking-wider text-subtle">Authoritative workbench</p>
-            <p className="mt-1 text-lg font-semibold text-accent">vayu-shastr/design</p>
-            <p className="mt-2 text-xs leading-5 text-muted">
-              STEP viewing, VAEA tube development, datum editing, Kamm-tail/loft geometry, clearance,
-              CLT, failure criteria, laminate development and the local CAD bridge are maintained in the dedicated design repository.
-            </p>
-            <a
-              href="https://github.com/vayu-shastr/design"
-              target="_blank"
-              rel="noreferrer"
-              className="mt-3 inline-flex rounded-md border border-accent/40 bg-accent/10 px-3 py-2 text-xs font-semibold text-accent hover:bg-accent/15"
-            >
-              Open engineering design repository ↗
-            </a>
-          </div>
-          <div className="rounded-lg border border-border/80 bg-bg/45 p-4">
-            <p className="text-[9px] font-semibold uppercase tracking-wider text-subtle">VYNDI OS role</p>
-            <div className="mt-2 space-y-2 text-xs leading-5 text-muted">
-              <p><span className="font-semibold text-fg">Govern:</span> baselines, ECRs, gates and release evidence.</p>
-              <p><span className="font-semibold text-fg">Trace:</span> engineering authority into BOM, manufacturing, quality and validation records.</p>
-              <p><span className="font-semibold text-fg">Do not duplicate:</span> parametric CAD/FEA/laminate design logic.</p>
-            </div>
-            <p className="mt-3 border-t border-border pt-3 text-[10px] leading-4 text-subtle">
-              Frame geometry authority: Rev 5.3.9 E-K75. Preferred front-end development: Rev 5.4 FK75.
-            </p>
-          </div>
-        </div>
-      </Panel>
-
       <Panel title="VEDM Design Authority" kicker="Controlled geometry authority · preferred front-end development">
         <div className="grid gap-3 lg:grid-cols-[1fr_1fr_1.6fr]">
           <div className="rounded-lg border border-border/80 bg-bg/45 p-3">

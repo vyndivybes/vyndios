@@ -11,6 +11,7 @@ import {
   refreshVibpeWeeklyReviewsFromDrive,
 } from "@/lib/vibpe-weekly-review-knowledge";
 import { listVayuShastrKnowledge, refreshVayuShastrDrive } from "@/lib/vibpe-vayu-shastr-drive";
+import { VIBPE_REPOSITORY_KNOWLEDGE, repositoryKnowledgeUrl } from "@/lib/vibpe-repository-knowledge";
 
 export const Route = createFileRoute("/command/knowledge")({ component: Knowledge });
 
@@ -84,12 +85,13 @@ function Knowledge() {
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <Stat label="Records" value={summary.total} />
         <Stat label="Confirmed" value={summary.confirmed} />
         <Stat label="Planned" value={summary.planned} />
         <Stat label="Pending" value={summary.pending} />
         <Stat label="Conflicts" value={summary.conflict} />
+        <Stat label="Repo snapshots" value={VIBPE_REPOSITORY_KNOWLEDGE.length} />
       </div>
 
       <Panel title="Weekly review evidence" kicker={reviewStatus}>
@@ -221,6 +223,51 @@ function Knowledge() {
               )) : (
                 <tr><td className="py-4 text-sm text-subtle" colSpan={6}>{vayuStatus}</td></tr>
               )}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
+
+      <Panel title="Repository knowledge snapshots" kicker={`${VIBPE_REPOSITORY_KNOWLEDGE.length} commit-pinned cross-repository records`}>
+        <div className="mb-4">
+          <p className="max-w-4xl text-sm leading-6 text-muted">
+            VIBPE uses these curated snapshots to answer across Vāyú engineering, ADV VIBPE and current VYNDI OS without performing private-GitHub reads during every production request. Each record is pinned to an exact source commit. Controlled repository references govern only inside their owning source domain and do not mutate ERP master or transaction truth.
+          </p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1100px] text-left text-sm">
+            <thead className="border-b border-line text-xs uppercase tracking-wider text-subtle">
+              <tr>
+                <th className="py-3 pr-4">Authority</th>
+                <th className="py-3 pr-4">Domain</th>
+                <th className="py-3 pr-4">Knowledge</th>
+                <th className="py-3 pr-4">Repository / commit</th>
+                <th className="py-3 pr-4">Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              {VIBPE_REPOSITORY_KNOWLEDGE.map((record) => (
+                <tr key={record.id} className="border-b border-line/60 align-top">
+                  <td className="py-3 pr-4">
+                    <span className="rounded-full border border-line px-2 py-1 text-xs text-fg">{record.authority}</span>
+                  </td>
+                  <td className="py-3 pr-4 text-accent">{record.domain}</td>
+                  <td className="max-w-[520px] py-3 pr-4">
+                    <p className="font-medium text-fg">{record.title}</p>
+                    <p className="mt-1 text-xs leading-5 text-muted">{record.claimText}</p>
+                  </td>
+                  <td className="py-3 pr-4 text-xs text-subtle">
+                    <p>{record.repository}</p>
+                    <p className="mt-1 font-mono">{record.sourceCommit.slice(0, 12)}</p>
+                  </td>
+                  <td className="py-3 pr-4 text-xs">
+                    <a className="text-accent hover:underline" href={repositoryKnowledgeUrl(record)} target="_blank" rel="noreferrer">
+                      {record.sourcePath}
+                    </a>
+                    <p className="mt-1 text-subtle">{record.sourceRevision}</p>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

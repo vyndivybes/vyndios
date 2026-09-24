@@ -69,12 +69,12 @@ function AccountingStatements() {
   }
 
   function currentCsvRows(): Array<[string, number]> {
-    if (statement === "trading") return pack.trading[basis].rows.map((row): [string, number] => [row.label, row.amountInr]).concat([[pack.trading[basis].resultLabel, pack.trading[basis].resultInr]]);
-    if (statement === "profitLoss") return pack.profitLoss[basis].rows.map((row): [string, number] => [row.label, row.amountInr]).concat([[pack.profitLoss[basis].resultLabel, pack.profitLoss[basis].resultInr]]);
-    if (statement === "costAccount") return pack.costAccount.rows.map((row): [string, number] => [row.label, row.amountInr]).concat([
-      ["Recorded total actual cost", pack.costAccount.totalActualCostInr] as [string, number],
-      ["Finished goods value", pack.costAccount.finishedGoodsValueInr] as [string, number],
-      ["WIP value", pack.costAccount.wipValueInr] as [string, number],
+    if (statement === "trading") return pack.trading[basis].rows.map((row) => [row.label, row.amountInr] as [string, number]).concat([[pack.trading[basis].resultLabel, pack.trading[basis].resultInr]]);
+    if (statement === "profitLoss") return pack.profitLoss[basis].rows.map((row) => [row.label, row.amountInr] as [string, number]).concat([[pack.profitLoss[basis].resultLabel, pack.profitLoss[basis].resultInr]]);
+    if (statement === "costAccount") return pack.costAccount.rows.map((row) => [row.label, row.amountInr] as [string, number]).concat([
+      ["Recorded total actual cost", pack.costAccount.totalActualCostInr],
+      ["Finished goods value", pack.costAccount.finishedGoodsValueInr],
+      ["WIP value", pack.costAccount.wipValueInr],
     ]);
     if (statement === "balanceSheet") return [
       ...pack.balanceSheet.assets.map((row) => [`Asset · ${row.label}`, row.amountInr] as [string, number]),
