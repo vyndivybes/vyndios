@@ -47,6 +47,7 @@ export const Route = createFileRoute("/command/engineering")({
       vedmAuthority: data.vedmAuthority,
       baselines: (Array.isArray(data.baselines) ? data.baselines : []).map((row) => baselineView(row as Row)),
       changes: (Array.isArray(data.changes) ? data.changes : []).map((row) => changeView(row as Row)),
+      evidenceReceipts: Array.isArray(data.evidenceReceipts) ? data.evidenceReceipts as Row[] : [],
     };
   },
   component: Engineering,
@@ -164,6 +165,7 @@ function Engineering() {
   const authority = data.vedmAuthority;
   const baselines = data.baselines as Row[];
   const changes = data.changes as Row[];
+  const evidenceReceipts = data.evidenceReceipts as Row[];
   const released = baselines.filter((row) => text(row, "status") === "released").length;
   const openChanges = changes.filter(
     (row) => !["implemented", "rejected"].includes(text(row, "status")),
@@ -214,6 +216,7 @@ function Engineering() {
         <Kpi label="Released" value={String(released)} hint="G04 release evidence" tone={released ? "ok" : "warn"} />
         <Kpi label="ECRs" value={String(changes.length)} hint="Controlled change requests" />
         <Kpi label="Open change" value={String(openChanges)} hint="Requires lifecycle action" tone={openChanges ? "warn" : "ok"} />
+        <Kpi label="Workbench evidence" value={String(evidenceReceipts.length)} hint="Append-only receipts" tone={evidenceReceipts.length ? "ok" : "warn"} />
       </div>
 
       <Panel title="Engineering Baseline Register" kicker="Geometry · material · tooling · drawing · BOM">
@@ -228,6 +231,39 @@ function Engineering() {
           </div>
           {baselines.map((row) => <BaselineRecord key={text(row, "id")} row={row} />)}
         </div>
+      </Panel>
+
+      <Panel title="Workbench Evidence Receipts" kicker="Append-only design-workbench evidence">
+        {evidenceReceipts.length ? (
+          <div className="space-y-2" data-full-view-table="engineering-evidence-receipts">
+            {evidenceReceipts.map((row) => (
+              <article key={text(row, "id")} className="rounded-lg border border-border/80 bg-bg/45 p-3">
+                <div className="grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-[1.1fr_.9fr_.8fr_.8fr]">
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-semibold uppercase tracking-wider text-subtle">Receipt / fingerprint</p>
+                    <p className="mt-1 break-all font-mono text-[10px] text-accent">{text(row, "id")}</p>
+                    <p className="break-all text-[10px] text-muted">{text(row, "fingerprint")}</p>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-semibold uppercase tracking-wider text-subtle">Configuration</p>
+                    <p className="mt-1 break-all text-fg">{text(row, "configuration_id")}</p>
+                    <p className="text-[10px] text-muted">{text(row, "revision")}</p>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-semibold uppercase tracking-wider text-subtle">Readiness</p>
+                    <p className="mt-1 break-words font-semibold text-green">{text(row, "readiness_status") || "OPEN"}</p>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-semibold uppercase tracking-wider text-subtle">Authority</p>
+                    <p className="mt-1 break-words text-muted">{text(row, "release_authority")}</p>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted">No design-workbench evidence packet has been received yet.</p>
+        )}
       </Panel>
 
       <Panel title="Engineering Change Requests" kicker="Attributable controlled lifecycle">

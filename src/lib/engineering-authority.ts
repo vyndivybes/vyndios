@@ -48,7 +48,7 @@ export const listEngineeringAuthority = createServerFn({ method: "GET" }).handle
   await assertSameSiteRequest();
   await requirePermission("view");
   const sql = await getSql();
-  const [baselines, changes] = await Promise.all([
+  const [baselines, changes, evidenceReceipts] = await Promise.all([
     sql`
       select b.*, f.display_name as family_name, v.display_name as variant_name
       from vyndi_engineering_baselines b
@@ -63,11 +63,19 @@ export const listEngineeringAuthority = createServerFn({ method: "GET" }).handle
       left join vyndi_product_variants v on v.variant_id=e.variant_id
       order by e.updated_at desc
     `,
+    sql`
+      select id,fingerprint,schema_id,configuration_id,revision,readiness_status,
+             release_authority,actor_user_id,actor_role,source_origin,received_at
+      from vyndi_engineering_evidence_receipts
+      order by received_at desc
+      limit 25
+    `,
   ]);
   return {
     vedmAuthority: CURRENT_VEDM_AUTHORITY,
     baselines: Array.isArray(baselines) ? [...baselines] : [],
     changes: Array.isArray(changes) ? [...changes] : [],
+    evidenceReceipts: Array.isArray(evidenceReceipts) ? [...evidenceReceipts] : [],
   };
 });
 
