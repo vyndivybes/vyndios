@@ -49,7 +49,7 @@ test("User Manual is a searchable Command reference page without global runtime 
   assert.match(workflow, /label: "Help & Reference"/);
   assert.match(workflow, /to: "\/command\/user-manual", label: "User Manual"/);
   assert.match(manual, /createFileRoute\("\/command\/user-manual"\)/);
-  assert.match(manual, /data-user-manual="vyndi-um-001-rev-1-1"/);
+  assert.match(manual, /data-user-manual="vyndi-um-001-rev-1-4"/);
   assert.match(manual, /User & Operator Manual/);
   assert.match(manual, /Search the manual/);
   assert.match(manual, /Print dossier/);
