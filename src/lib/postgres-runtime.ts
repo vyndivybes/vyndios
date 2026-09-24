@@ -24,7 +24,7 @@ function nonBlank(value: string | undefined): string | undefined {
 /**
  * Pure precedence rule used by both runtime resolution and tests.
  * Hyperdrive must win when the Worker binding is present; DATABASE_URL remains
- * the portable Vercel/Node fallback and local development can still use PGLite.
+ * the portable Node fallback and local development can still use PGLite.
  */
 export function selectPostgresTransport(candidates: TransportCandidates): PostgresTransport | null {
   const hyperdriveConnectionString = nonBlank(candidates.hyperdriveConnectionString);
