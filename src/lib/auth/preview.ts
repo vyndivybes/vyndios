@@ -11,7 +11,7 @@
  * `GROK_AUTH_*` that overrides these (see `server.ts`).
  *
  * These MUST equal the broker's `GROK_PREVIEW_CLIENT_ID` /
- * `GROK_PREVIEW_CLIENT_SECRET` (set in the broker's Vercel env; the broker stores
+ * `GROK_PREVIEW_CLIENT_SECRET` (set in the preview broker environment; the broker stores
  * only the secret's `base64url(SHA-256)` hash). This is a dedicated, low-privilege
  * client (preview-only, `*.grok-sandbox.com`) — rotate it by regenerating the
  * broker env var and this constant together.
