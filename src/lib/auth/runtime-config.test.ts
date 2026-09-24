@@ -4,13 +4,16 @@ import {
   AUTH_ALLOWED_HOSTS,
   AUTH_TRUSTED_ORIGINS,
   CLOUDFLARE_PRODUCTION_ORIGIN,
+  CLOUDFLARE_TRANSITION_ORIGIN,
   resolveAuthBaseURL,
   resolveAuthSecret,
 } from "./runtime-config.ts";
 
-test("Cloudflare is the production auth origin and obsolete Vercel origins are excluded", () => {
+test("Cloudflare transition trusts both current and future account subdomains", () => {
   assert.ok(AUTH_ALLOWED_HOSTS.includes("tiger-field-flora-finch.shyamsundhar1982.workers.dev"));
+  assert.ok(AUTH_ALLOWED_HOSTS.includes("tiger-field-flora-finch.vayushastr.workers.dev"));
   assert.ok(AUTH_TRUSTED_ORIGINS.includes(CLOUDFLARE_PRODUCTION_ORIGIN));
+  assert.ok(AUTH_TRUSTED_ORIGINS.includes(CLOUDFLARE_TRANSITION_ORIGIN));
   assert.equal(AUTH_ALLOWED_HOSTS.some((host) => host.includes("vercel.app")), false);
   assert.equal(AUTH_TRUSTED_ORIGINS.some((origin) => origin.includes("vercel.app")), false);
 });
