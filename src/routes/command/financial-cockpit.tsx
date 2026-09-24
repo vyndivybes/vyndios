@@ -9,8 +9,7 @@ import { getOperatingPlanState, type OperatingPlanSnapshot } from "@/lib/operati
 export const Route = createFileRoute("/command/financial-cockpit")({
   loader: async () => {
     const state = await getOperatingPlanState();
-    if (!state.approved) throw new Error("Consolidated Finance requires an approved Integrated Operating Plan.");
-    return state.approved;
+    return state.approved ?? null;
   },
   component: FinancialCockpit,
 });
@@ -23,7 +22,19 @@ const scenarios: { id: ScenarioId; label: string }[] = [
 ];
 
 function FinancialCockpit() {
-  const approvedPlan = Route.useLoaderData() as OperatingPlanSnapshot;
+  const approvedPlan = Route.useLoaderData() as OperatingPlanSnapshot | null;
+  if(!approvedPlan){
+    return <div className="space-y-6">
+      <header className="border-b border-border pb-6"><p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">Finance · governed readiness</p><h1 className="mt-2 text-4xl font-bold text-accent">Consolidated Finance</h1></header>
+      <Panel title="Finance cockpit blocked" kicker="Governance prerequisite">
+        <div className="space-y-3 text-sm leading-6 text-muted">
+          <p>Consolidated Finance requires an approved Integrated Operating Plan.</p>
+          <p>This is a controlled readiness state, not a server failure. Financial scenarios remain disabled until the plan is approved.</p>
+          <Link to="/command/planning" className="inline-flex rounded-lg bg-accent px-4 py-2.5 font-semibold text-bg">Open Integrated Planning</Link>
+        </div>
+      </Panel>
+    </div>;
+  }
   const [scenario, setScenario] = useState<ScenarioId>(approvedPlan.scenario);
   const [drawStandby, setDrawStandby] = useState(Boolean(approvedPlan.drawStandby));
   const finance = approvedPlan.finance;
