@@ -6,9 +6,17 @@ export const CLOUDFLARE_PRODUCTION_ORIGIN =
 export const CLOUDFLARE_TRANSITION_ORIGIN =
   "https://tiger-field-flora-finch.vayushastr.workers.dev";
 
+export const CLOUDFLARE_RENAMED_CURRENT_ORIGIN =
+  "https://vyndios.shyamsundhar1982.workers.dev";
+
+export const CLOUDFLARE_FINAL_ORIGIN =
+  "https://vyndios.vayushastr.workers.dev";
+
 export const AUTH_ALLOWED_HOSTS = [
   "tiger-field-flora-finch.shyamsundhar1982.workers.dev",
   "tiger-field-flora-finch.vayushastr.workers.dev",
+  "vyndios.shyamsundhar1982.workers.dev",
+  "vyndios.vayushastr.workers.dev",
   "*.grok-sandbox.com",
   "localhost:*",
   "127.0.0.1:*",
@@ -18,6 +26,8 @@ export const AUTH_ALLOWED_HOSTS = [
 export const AUTH_TRUSTED_ORIGINS = [
   CLOUDFLARE_PRODUCTION_ORIGIN,
   CLOUDFLARE_TRANSITION_ORIGIN,
+  CLOUDFLARE_RENAMED_CURRENT_ORIGIN,
+  CLOUDFLARE_FINAL_ORIGIN,
   "http://localhost:8080",
   "http://127.0.0.1:8080",
   "http://[::1]:8080",

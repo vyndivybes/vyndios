@@ -5,15 +5,21 @@ import {
   AUTH_TRUSTED_ORIGINS,
   CLOUDFLARE_PRODUCTION_ORIGIN,
   CLOUDFLARE_TRANSITION_ORIGIN,
+  CLOUDFLARE_RENAMED_CURRENT_ORIGIN,
+  CLOUDFLARE_FINAL_ORIGIN,
   resolveAuthBaseURL,
   resolveAuthSecret,
 } from "./runtime-config.ts";
 
-test("Cloudflare transition trusts both current and future account subdomains", () => {
+test("Cloudflare cutover trusts both Worker names across current and future account subdomains", () => {
   assert.ok(AUTH_ALLOWED_HOSTS.includes("tiger-field-flora-finch.shyamsundhar1982.workers.dev"));
   assert.ok(AUTH_ALLOWED_HOSTS.includes("tiger-field-flora-finch.vayushastr.workers.dev"));
+  assert.ok(AUTH_ALLOWED_HOSTS.includes("vyndios.shyamsundhar1982.workers.dev"));
+  assert.ok(AUTH_ALLOWED_HOSTS.includes("vyndios.vayushastr.workers.dev"));
   assert.ok(AUTH_TRUSTED_ORIGINS.includes(CLOUDFLARE_PRODUCTION_ORIGIN));
   assert.ok(AUTH_TRUSTED_ORIGINS.includes(CLOUDFLARE_TRANSITION_ORIGIN));
+  assert.ok(AUTH_TRUSTED_ORIGINS.includes(CLOUDFLARE_RENAMED_CURRENT_ORIGIN));
+  assert.ok(AUTH_TRUSTED_ORIGINS.includes(CLOUDFLARE_FINAL_ORIGIN));
   assert.equal(AUTH_ALLOWED_HOSTS.some((host) => host.includes("vercel.app")), false);
   assert.equal(AUTH_TRUSTED_ORIGINS.some((origin) => origin.includes("vercel.app")), false);
 });

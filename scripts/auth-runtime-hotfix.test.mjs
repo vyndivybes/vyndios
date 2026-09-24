@@ -78,10 +78,12 @@ test("Better Auth owns the HTTP cookie response without a duplicate TanStack han
   assert.doesNotMatch(authServer, /tanstackStartCookies/);
 });
 
-test("production auth supports the controlled Cloudflare account-subdomain transition", () => {
+test("production auth supports both Worker names throughout the Cloudflare cutover", () => {
   assert.match(authServer, /resolveAuthBaseURL\(explicitBaseURL\)/);
   assert.match(authRuntimeConfig, /"tiger-field-flora-finch\.shyamsundhar1982\.workers\.dev"/);
   assert.match(authRuntimeConfig, /"tiger-field-flora-finch\.vayushastr\.workers\.dev"/);
+  assert.match(authRuntimeConfig, /"vyndios\.shyamsundhar1982\.workers\.dev"/);
+  assert.match(authRuntimeConfig, /"vyndios\.vayushastr\.workers\.dev"/);
   assert.doesNotMatch(authRuntimeConfig, /vercel\.app/);
   assert.match(authRuntimeConfig, /vyndi\/better-auth\/session-secret\/v1/);
   assert.match(authRuntimeConfig, /createHash\("sha256"\)/);
