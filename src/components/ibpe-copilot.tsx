@@ -34,8 +34,10 @@ type RoutedAnswer = {
 
 const suggestions = [
   "What is the biggest constraint to the current 36-month plan?",
-  "Where will cash become critical after recommended procurement?",
+  "What is the current VEDM geometry authority and what remains open before release?",
+  "How do I run the governed ERP optimizer correctly?",
   "Which material shortages need management action first?",
+  "What finance/accounting controls are available from the ADV knowledge baseline?",
   "Find the records related to a Job Card, serial number or PO reference.",
 ];
 
@@ -328,7 +330,7 @@ export function IbpeCopilot() {
                   <div className="min-w-0">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-green">VYNDI Intelligence</p>
                     <h2 className="font-display text-xl font-semibold text-fg">{VIBPE_COPILOT_NAME}</h2>
-                    <p className="mt-1 text-xs leading-5 text-muted">{workspace} · deterministic business truth first, AI explanation second.</p>
+                    <p className="mt-1 text-xs leading-5 text-muted">{workspace} · deterministic business truth first, commit-pinned cross-repo knowledge second, AI explanation last.</p>
                   </div>
                 </div>
                 <button type="button" onClick={() => setOpen(false)} className="flex size-10 items-center justify-center rounded-lg border border-border text-muted transition hover:border-accent/50 hover:text-fg" aria-label="Close"><X className="size-4" /></button>
@@ -336,6 +338,7 @@ export function IbpeCopilot() {
               <div className="mt-3 flex flex-wrap gap-2 text-[10px] uppercase tracking-wider">
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-bg/60 px-2.5 py-1 text-muted"><ShieldCheck className="size-3 text-green" /> Advisory only</span>
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-bg/60 px-2.5 py-1 text-muted"><FileSearch className="size-3 text-accent" /> Vernacular traceability</span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-bg/60 px-2.5 py-1 text-muted"><BrainCircuit className="size-3 text-accent" /> Cross-repo knowledge</span>
                 {scenario ? <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/8 px-2.5 py-1 text-accent"><Sparkles className="size-3" /> {scenario.label}</span> : <span className="rounded-full border border-border bg-bg/60 px-2.5 py-1 text-muted">Governed baseline</span>}
               </div>
             </header>
@@ -345,7 +348,7 @@ export function IbpeCopilot() {
                 <div className="space-y-5">
                   <div className="rounded-xl border border-border bg-surface/35 p-4">
                     <p className="font-medium text-fg">Explore the operating model and trace governed records.</p>
-                    <p className="mt-2 text-sm leading-6 text-muted">Ask about cash, demand, procurement and capacity, or use ordinary shorthand and mixed Tamil-English wording to find an Order, Job Card, Traveller/serial, MR, PO, GRN, Quality Release, Dispatch or Invoice. Partial identifiers are accepted.</p>
+                    <p className="mt-2 text-sm leading-6 text-muted">Ask about cash, demand, procurement, capacity, ERP optimization, finance controls or the current VEDM engineering configuration. VIBPE can also use commit-pinned Vāyú repository evidence and ordinary shorthand / mixed Tamil-English wording to trace an Order, Job Card, Traveller/serial, MR, PO, GRN, Quality Release, Dispatch or Invoice. Partial identifiers are accepted.</p>
                   </div>
                   <div>
                     <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-green">Useful questions</p>
@@ -373,7 +376,7 @@ export function IbpeCopilot() {
                                 <div className="min-w-0">
                                   <p className="truncate text-xs font-semibold text-fg">{evidence.title}</p>
                                   <p className="mt-1 text-[10px] text-subtle">
-                                    {evidence.sourceRevision ? `Rev ${evidence.sourceRevision} · ` : ""}{evidence.authority} · {evidence.reviewDate ?? "undated"}
+                                    {evidence.sourceRevision ? `${evidence.sourceRevision} · ` : ""}{evidence.authority} · {evidence.knowledgeTier ?? evidence.sourceKind} · {evidence.reviewDate ?? "undated"}
                                   </p>
                                 </div>
                                 {evidence.externalUrl ? (
@@ -383,7 +386,12 @@ export function IbpeCopilot() {
                                 ) : null}
                               </div>
                               <p className="mt-2 text-xs leading-5 text-muted">{evidence.claimText}</p>
-                              {evidence.sourcePath ? <p className="mt-2 break-all text-[10px] text-subtle">{evidence.sourcePath}</p> : null}
+                              {evidence.sourceRepository && evidence.sourceCommit ? (
+                                <p className="mt-2 break-all text-[10px] font-medium text-subtle">
+                                  {evidence.sourceRepository}@{evidence.sourceCommit.slice(0, 12)}
+                                </p>
+                              ) : null}
+                              {evidence.sourcePath ? <p className="mt-1 break-all text-[10px] text-subtle">{evidence.sourcePath}</p> : null}
                             </div>
                           ))}
                         </div>
@@ -397,7 +405,7 @@ export function IbpeCopilot() {
                       {message.meta ? <p className="mt-3 text-[10px] text-subtle">{message.meta}</p> : null}
                     </article>
                   ))}
-                  {busy ? <div className="mr-4 rounded-xl border border-border bg-surface/35 p-4 text-sm text-muted">Resolving governed control state, operational status, traceability or analysing the IBPE packet…</div> : null}
+                  {busy ? <div className="mr-4 rounded-xl border border-border bg-surface/35 p-4 text-sm text-muted">Resolving governed control state, cross-repository evidence, operational status, traceability or analysing the IBPE packet…</div> : null}
                   <div ref={endRef} />
                 </div>
               )}
@@ -427,7 +435,7 @@ export function IbpeCopilot() {
                 />
                 <button type="button" disabled={busy || !question.trim()} onClick={() => void ask()} className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-accent text-bg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40" aria-label={`Ask ${VIBPE_COPILOT_NAME}`}><Send className="size-4" /></button>
               </div>
-              <p className="mt-2 text-[10px] leading-4 text-subtle">Read-only governance, operational status and traceability can be queried here; numbered multi-question reviews are routed one question at a time. Authorised transaction workspaces remain the only place to approve or execute business actions.</p>
+              <p className="mt-2 text-[10px] leading-4 text-subtle">Read-only governance, commit-pinned repository knowledge, operational status and traceability can be queried here; numbered multi-question reviews are routed one question at a time. Authorised transaction and engineering-release workspaces remain the only places to approve or execute controlled actions.</p>
             </footer>
           </aside>
         </div>
