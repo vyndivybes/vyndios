@@ -89,6 +89,10 @@ const evidence={
 };
 
 const browser=await chromium.launch({headless:true});
+// Reuse a bounded page pool for the measured workload. Creating/destroying a
+// Chromium page inside each timed sample measures browser lifecycle overhead,
+// not VYNDI route latency, and was dominating the 8s p95 gate on hosted runners.
+const loadPages=[];
 const context=await browser.newContext({viewport:{width:1280,height:800},reducedMotion:"reduce"});
 
 try{
@@ -141,10 +145,13 @@ try{
     for(const route of routes) interleavedTasks.push({route,sample});
   }
 
+  for(let i=0;i<concurrency;i+=1) loadPages.push(await context.newPage());
+  let pageCursor=0;
   const run=await runConcurrent(interleavedTasks,concurrency,async({route})=>{
-    const loadPage=await context.newPage();
+    const loadPage=loadPages[pageCursor++ % loadPages.length];
     const pageErrors=[];
-    loadPage.on("pageerror",(error)=>pageErrors.push(String(error?.message || error)));
+    const onPageError=(error)=>pageErrors.push(String(error?.message || error));
+    loadPage.on("pageerror",onPageError);
     try{
       const response=await loadPage.goto(`${baseUrl}${route}`,{waitUntil:"domcontentloaded",timeout:60_000});
       const status=response?.status() ?? null;
@@ -157,7 +164,7 @@ try{
       assert.deepEqual(pageErrors,[],`${route} emitted browser errors: ${pageErrors.join(" | ")}`);
       return {status};
     }finally{
-      await loadPage.close().catch(()=>{});
+      loadPage.off("pageerror",onPageError);
     }
   });
 
@@ -182,6 +189,7 @@ try{
 }finally{
   await mkdir(dirname(evidencePath),{recursive:true});
   await writeFile(evidencePath,`${JSON.stringify(evidence,null,2)}\n`,"utf8");
+  await Promise.all(loadPages.map((page)=>page.close().catch(()=>{})));
   await context.close().catch(()=>{});
   await browser.close().catch(()=>{});
 }
