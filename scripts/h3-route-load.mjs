@@ -146,9 +146,17 @@ try{
   }
 
   for(let i=0;i<concurrency;i+=1) loadPages.push(await context.newPage());
-  let pageCursor=0;
+  const availablePages=[...loadPages];
+  const waiters=[];
+  const acquirePage=()=>availablePages.length
+    ? Promise.resolve(availablePages.pop())
+    : new Promise((resolve)=>waiters.push(resolve));
+  const releasePage=(page)=>{
+    const waiter=waiters.shift();
+    if(waiter) waiter(page); else availablePages.push(page);
+  };
   const run=await runConcurrent(interleavedTasks,concurrency,async({route})=>{
-    const loadPage=loadPages[pageCursor++ % loadPages.length];
+    const loadPage=await acquirePage();
     const pageErrors=[];
     const onPageError=(error)=>pageErrors.push(String(error?.message || error));
     loadPage.on("pageerror",onPageError);
@@ -165,6 +173,7 @@ try{
       return {status};
     }finally{
       loadPage.off("pageerror",onPageError);
+      releasePage(loadPage);
     }
   });
 
