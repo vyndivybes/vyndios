@@ -163,8 +163,8 @@ missing. Postgres and Better Auth are pre-wired in `src/lib`, **opt-in per app**
   looping on failed installs, and prefer a pure-JS alternative. Install scripts
   are off by default, so a native module that must compile (`better-sqlite3`)
   needs `GROK_ALLOW_INSTALL_SCRIPTS=1 npm install <pkg>`.
-- **VYNDI production is deployed to Cloudflare Workers**. Vercel, Supabase and
-  Netlify are not VYNDI release authorities. Runtime filesystem writes,
+- **VYNDI production is deployed only to Cloudflare Workers**. Do not add alternate
+  hosting or database deployment authorities without an explicit architecture decision. Runtime filesystem writes,
   unsupported server-only Node APIs, dev-only deps and hard-coded
   hosts/ports/secrets remain production defects
   (`.grok/references/deploy-target.md`).
