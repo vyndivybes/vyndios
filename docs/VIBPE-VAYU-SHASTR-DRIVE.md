@@ -50,3 +50,30 @@ Other binaries such as PDF, DOCX, ZIP, raster images and unsupported formats are
 ## Authority
 
 Drive corpus evidence cannot silently overwrite engineering master data, BOM, inventory, supplier master, cost authority, approved plans, transaction state or accounting actuals. Master-data promotion remains a separate controlled action.
+
+
+## Toray material-validation gate
+
+Toray supplier material evidence is governed as a controlled engineering input, not as an automatic production authority.
+
+Before a Rev-1 laminate material basis may move from **provisional** to **supplier-validated**, the engineering record must capture:
+
+- frozen commercial Toray prepreg/material-system identifier;
+- fibre basis;
+- supplier-backed fibre areal weight (FAW);
+- supplier-backed resin content;
+- cured ply thickness (CPT) validated against Toray supplier data and/or the Toray Ply Thickness Calculator;
+- Toray calculator source URL and traceable calculator evidence record ID;
+- calculator verification timestamp;
+- supplier datasheet/reference used for the calculation.
+
+Authoritative Toray supplier sources:
+
+- Datasheets: `https://www.toraytac.com/resources/datasheets`
+- Engineering calculators: `https://www.toraytac.com/resources/Calculators`
+
+The datasheet page is the preferred manufacturer source for identifying the commercial material system and its published supplier properties. Calculator output must be traceable back to the selected material datasheet/reference; calculator evidence must not be treated as a substitute for the underlying supplier datasheet.
+
+A successful supplier-material gate permits only **supplier-validated engineering use**. It does **not** release ply count, laminate strength, frame structure or production. Downstream release continues to require laminate allowables, manufacturing-process controls, FEA/test correlation, coupon/subcomponent validation and applicable ISO 4210 frame/fork validation.
+
+The current provisional ply-thickness assumption must therefore remain explicitly provisional until the selected Toray commercial prepreg system is frozen and this evidence gate is satisfied.
