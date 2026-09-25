@@ -68,7 +68,7 @@ test("R1 includes optimizer benchmark evidence", () => {
 test("R1 strengthens governed knowledge freshness policy", () => {
   assert.ok(existsSync(new URL("./knowledge-freshness-assurance.test.mjs", import.meta.url)));
   const policy = read("scripts/knowledge-freshness-assurance.test.mjs");
-  assert.match(policy, /12 hours|12\s*\*\s*60/i);
+  assert.match(policy, /4 hours|4\s*\*\s*60/i);
   assert.match(policy, /stale/i);
 });
 
