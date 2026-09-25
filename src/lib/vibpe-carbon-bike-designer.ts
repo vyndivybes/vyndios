@@ -23,6 +23,7 @@ export const CARBON_DESIGN_DOMAINS = [
 export function carbonDesignGuardrails(input: CarbonBikeDesignInputs) {
   const notes = [
     "Published fibre datasheets are material-selection references, not laminate or structural design allowables.",
+    "Rev-1 supplier validation requires the frozen commercial prepreg system, supplier-backed FAW/resin content, cured-ply thickness and traceable Toray calculator/datasheet evidence before provisional material data may be promoted.",
     "Production ply books require validated laminate allowables, manufacturing-process controls, FEA/test correlation and formal engineering release.",
     "Do not infer safe wall thickness or ply count from fibre tensile strength alone.",
   ];
