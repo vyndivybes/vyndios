@@ -5,7 +5,7 @@ import test from "node:test";
 const drive = await readFile(new URL("../src/lib/vibpe-vayu-shastr-drive.ts", import.meta.url), "utf8");
 const copilot = await readFile(new URL("../src/lib/ibpe-copilot.ts", import.meta.url), "utf8");
 
-test("Drive knowledge automatically refreshes after a 12 hours freshness horizon", () => {
+test("Drive knowledge automatically refreshes after a 4 hours freshness horizon", () => {
   assert.match(drive, /maxAgeHours\s*=\s*12/);
   assert.match(drive, /maxAgeHours\s*\*\s*60\s*\*\s*60\s*\*\s*1000/);
   assert.match(drive, /reason:\s*"fresh"/);
