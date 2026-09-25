@@ -85,3 +85,6 @@ jobs:
 
       - name: Tests
         run: npm test
+
+      - name: Measurable coverage gate
+        run: npm run test:coverage

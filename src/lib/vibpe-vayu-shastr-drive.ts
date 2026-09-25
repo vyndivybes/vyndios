@@ -329,7 +329,7 @@ export async function syncVayuShastrDrive(role: string) {
   };
 }
 
-export async function refreshVayuShastrDriveIfStale(role: string, maxAgeHours = 12) {
+export async function refreshVayuShastrDriveIfStale(role: string, maxAgeHours = 4) {
   const sql = await getSql();
   const rows = await sql<{ last_ingested_at: string | null }>`
     select last_ingested_at::text from vibpe_knowledge_sources where id = ${VAYU_SHASTR_SOURCE_ID} limit 1
