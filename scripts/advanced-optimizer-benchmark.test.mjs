@@ -1,15 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  ADVANCED_PLANNING_MODEL_VERSION,
-  type AdvancedPlanningConstraintModel,
+  ADVANCED_PLANNING_MODEL_VERSION
 } from "../src/lib/advanced-planning-constraints.ts";
 import {
-  runGovernedAdvancedOptimizer,
-  type AdvancedPlanningOptimizer,
+  runGovernedAdvancedOptimizer
 } from "../src/lib/advanced-planning-optimizer.ts";
 
-function benchmarkModel(): AdvancedPlanningConstraintModel {
+function benchmarkModel() {
   return {
     modelVersion: ADVANCED_PLANNING_MODEL_VERSION,
     horizonPeriods: 1,
@@ -33,7 +31,7 @@ function benchmarkModel(): AdvancedPlanningConstraintModel {
   };
 }
 
-function deterministicOptimizer(): AdvancedPlanningOptimizer {
+function deterministicOptimizer() {
   return {
     metadata: { id: "BENCH", version: "1.0.0", solverClass: "milp", engine: "benchmark", deterministic: true },
     async solve(model) {
@@ -41,7 +39,7 @@ function deterministicOptimizer(): AdvancedPlanningOptimizer {
         status: "optimal",
         objectiveValue: 0,
         objectiveContributions: Object.entries(model.objectiveWeights).map(([objective, weight]) => ({
-          objective: objective as keyof typeof model.objectiveWeights,
+          objective,
           rawValue: 0,
           weight,
           weightedValue: 0,
