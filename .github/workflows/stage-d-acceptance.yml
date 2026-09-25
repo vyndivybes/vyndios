@@ -134,6 +134,20 @@ jobs:
       - name: Protected-route responsive browser acceptance
         run: node scripts/stage-d-browser-acceptance.mjs
 
+      - name: Golden Enterprise cross-workspace journey
+        env:
+          VYNDI_TEST_BASE_URL: ${{ env.STAGE_D_BASE_URL }}
+          VYNDI_TEST_EMAIL: ${{ env.STAGE_D_USER_EMAIL }}
+          VYNDI_TEST_PASSWORD: ${{ env.STAGE_D_USER_PASSWORD }}
+        run: npm run test:golden-enterprise
+
+      - name: Operator UX viewport hardening
+        env:
+          VYNDI_TEST_BASE_URL: ${{ env.STAGE_D_BASE_URL }}
+          VYNDI_TEST_EMAIL: ${{ env.STAGE_D_USER_EMAIL }}
+          VYNDI_TEST_PASSWORD: ${{ env.STAGE_D_USER_PASSWORD }}
+        run: npm run test:ux:production
+
       - name: H1 read-only observability SLO evidence
         env:
           VYNDI_TEST_BASE_URL: ${{ env.STAGE_D_BASE_URL }}
