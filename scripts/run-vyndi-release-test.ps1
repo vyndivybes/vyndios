@@ -1,5 +1,5 @@
 param(
-  [string]$BaseUrl = "https://vyndios.shyamsundhar1982.workers.dev",
+  [string]$BaseUrl = "https://vyndios.vayushastr.workers.dev",
   [string]$Email,
   [string]$ExpectedSha = "",
   [switch]$Headed,

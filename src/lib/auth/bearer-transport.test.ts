@@ -10,5 +10,5 @@ test("bearer transport is limited to preview and loopback acceptance hosts", () 
   assert.equal(isBearerTransportHost("::1"), true);
   assert.equal(isBearerTransportHost("[::1]"), true);
   assert.equal(isBearerTransportHost("example.invalid"), false);
-  assert.equal(isBearerTransportHost("vyndios.shyamsundhar1982.workers.dev"), false);
+  assert.equal(isBearerTransportHost("vyndios.vayushastr.workers.dev"), false);
 });

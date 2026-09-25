@@ -9,8 +9,9 @@ import {
 } from "./runtime-config.ts";
 
 test("only canonical Cloudflare production and local/preview hosts are trusted", () => {
-  assert.ok(AUTH_ALLOWED_HOSTS.includes("vyndios.shyamsundhar1982.workers.dev"));
-  assert.ok(AUTH_TRUSTED_ORIGINS.includes("https://vyndios.shyamsundhar1982.workers.dev"));
+  assert.ok(AUTH_ALLOWED_HOSTS.includes("vyndios.vayushastr.workers.dev"));
+  assert.ok(AUTH_TRUSTED_ORIGINS.includes("https://vyndios.vayushastr.workers.dev"));
+  assert.ok(!AUTH_ALLOWED_HOSTS.some((host) => host.includes("shyamsundhar1982.workers.dev")));
   assert.ok(!AUTH_ALLOWED_HOSTS.some((host) => host.includes("tiger-field-flora-finch")));
 });
 

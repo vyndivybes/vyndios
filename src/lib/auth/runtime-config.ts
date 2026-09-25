@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
 
 export const CLOUDFLARE_PRODUCTION_ORIGIN =
-  "https://vyndios.shyamsundhar1982.workers.dev";
+  "https://vyndios.vayushastr.workers.dev";
 
 export const AUTH_ALLOWED_HOSTS = [
-  "vyndios.shyamsundhar1982.workers.dev",
+  "vyndios.vayushastr.workers.dev",
   "*.grok-sandbox.com",
   "localhost:*",
   "127.0.0.1:*",

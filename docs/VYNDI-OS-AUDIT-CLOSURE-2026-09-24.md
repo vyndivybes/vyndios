@@ -4,7 +4,7 @@
 **Production authority:** Cloudflare Workers  
 **Canonical repository:** `vayu-shastr/vyndios`  
 **Canonical Worker:** `vyndios`  
-**Canonical workers.dev origin:** `https://vyndios.shyamsundhar1982.workers.dev`
+**Canonical workers.dev origin:** `https://vyndios.vayushastr.workers.dev`
 
 ## 1. Canonical production chain
 
