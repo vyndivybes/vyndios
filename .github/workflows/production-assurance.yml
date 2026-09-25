@@ -1,0 +1,50 @@
+name: Production Assurance
+
+on:
+  schedule:
+    - cron: '17 1 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  assurance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      VYNDI_TEST_BASE_URL: ${{ vars.VYNDI_TEST_BASE_URL }}
+      VYNDI_TEST_EMAIL: ${{ secrets.VYNDI_TEST_EMAIL }}
+      VYNDI_TEST_PASSWORD: ${{ secrets.VYNDI_TEST_PASSWORD }}
+      VYNDI_SLO_ENFORCE_LATENCY: "1"
+      VYNDI_SLO_SAMPLE_COUNT: "5"
+      VYNDI_SLO_ROUTE_P95_LIMIT_MS: "4000"
+      VYNDI_SLO_ROUTE_P99_LIMIT_MS: "8000"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Verify production-assurance configuration
+        run: |
+          test -n "$VYNDI_TEST_BASE_URL"
+          test -n "$VYNDI_TEST_EMAIL"
+          test -n "$VYNDI_TEST_PASSWORD"
+      - name: Golden Enterprise read-only journey
+        run: npm run test:golden-enterprise
+      - name: Observe SLO and production telemetry
+        run: npm run observe:slo
+      - name: Operator UX viewport qualification
+        run: npm run test:ux:production
+      - name: Upload production assurance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-assurance-${{ github.run_id }}
+          path: |
+            artifacts/
+            .grok/evidence/
+          retention-days: 30
+          if-no-files-found: warn
