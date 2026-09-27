@@ -681,6 +681,7 @@ export function createVedmR3aSeed(): VedmAuthoritySeed {
     ],
     edges: [
       { from: "VEDM-301-R539-EK75", to: "VEDM-301-R538", relation: "SUPERSEDES" },
+      { from: "VEDM-301-R539-EK75", to: "OBJ-EK75-FRAME-GEOMETRY", relation: "CONTROLS" },
       { from: "VEDM-301-R54-FK75", to: "VEDM-301-R539-EK75", relation: "DERIVES_FROM" },
       { from: "REQ-FRAME-GEOMETRY", to: "OBJ-EK75-FRAME-GEOMETRY", relation: "REQUIRES" },
       { from: "OBJ-EK75-FRAME-GEOMETRY", to: "EVID-EK75-DOSSIER", relation: "EVIDENCED_BY" },
