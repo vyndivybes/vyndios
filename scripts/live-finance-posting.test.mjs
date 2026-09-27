@@ -17,6 +17,8 @@ const founderPaidMigration = read("migrations/0094_founder_paid_expense_authorit
 const authority = read("src/lib/finance/accounting-authority.ts");
 const cashFundingAuthority = read("src/lib/cash-funding-authority.ts");
 const peopleOfficeActualAuthority = read("src/lib/finance/people-office-actual-spend-authority.ts");
+const generalLedger = read("src/lib/finance/general-ledger.ts");
+const financialStatements = read("src/lib/finance/financial-statements.ts");
 const shipmentAuthority = read("src/lib/shipment-authority.ts");
 const salesLedgerAuthority = read("src/lib/sales-ledger-authority.ts");
 const cashRoute = read("src/routes/command/cash.tsx");
@@ -161,6 +163,8 @@ test("founder-paid People and Office spend creates a director payable without mo
   assert.match(peopleOfficeActualAuthority, /postFounderReimbursement/);
   assert.match(peopleOfficeActualRoute, /Founder \/ Director personal funds/);
   assert.match(peopleOfficeActualRoute, /Sole-operator self-approval/);
+  assert.match(generalLedger, /code: "2400", name: "Founder \/ Director Current Account"/);
+  assert.match(financialStatements, /CURRENT_LIABILITY_CODES = \["2000", "2100", "2200", "2400"\]/);
 });
 
 test("sales invoices carry evidenced credit terms without inventing legacy history", () => {
