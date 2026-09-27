@@ -111,3 +111,23 @@ test("R3-A rejects broken graph relationships instead of inferring authority", (
   assert.equal(graph.valid, false);
   assert.ok(graph.issues.some((issue) => issue.code === "BROKEN_AUTHORITY_EDGE"));
 });
+
+test("R3-A seed covers the controlled engineering thread with pinned VEDM provenance", () => {
+  const seed = createVedmR3aSeed();
+  const domains = new Set(seed.nodes.map((node) => node.domain));
+
+  assert.equal(seed.sourceRepository, "vayu-shastr/veloxis-engineering-design-manual");
+  assert.equal(seed.sourceCommit, "49fdac757534c6e42a0c5c29c43a2a6e35d637d2");
+  for (const domain of [
+    "frame_geometry",
+    "cad_step",
+    "drawing_evidence",
+    "material_laminate",
+    "fea_evidence",
+    "cfd_evidence",
+    "validation_test",
+    "bom_interface",
+  ]) {
+    assert.ok(domains.has(domain), `Missing R3-A authority domain ${domain}`);
+  }
+});
