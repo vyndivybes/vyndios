@@ -5,6 +5,7 @@ import {
   approvePeopleOfficeActualExpenditure,
   createPeopleOfficeActualExpenditure,
   listPeopleOfficeActualSpend,
+  postFounderReimbursement,
   postPeopleOfficeActualPayment,
   submitPeopleOfficeActualExpenditure,
 } from "@/lib/finance/people-office-actual-spend-authority";
@@ -28,11 +29,13 @@ function PeopleOfficeActualSpend() {
     assets: Row[];
     expenditures: Row[];
     payments: Row[];
+    founderReimbursements: Row[];
     cashAuthority: Row[];
   };
 
   const [sourceType, setSourceType] = useState<"cost_item" | "asset">("cost_item");
   const [sourceId, setSourceId] = useState("");
+  const [fundingSource, setFundingSource] = useState<"company_bank" | "founder_personal">("company_bank");
   const [planMonth, setPlanMonth] = useState("1");
   const [incurredOn, setIncurredOn] = useState(today());
   const [description, setDescription] = useState("");
@@ -45,20 +48,32 @@ function PeopleOfficeActualSpend() {
   const [paidOn, setPaidOn] = useState(today());
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentEvidence, setPaymentEvidence] = useState("");
+  const [reimbursementExpenditureId, setReimbursementExpenditureId] = useState("");
+  const [reimbursementPlanMonth, setReimbursementPlanMonth] = useState("1");
+  const [reimbursedOn, setReimbursedOn] = useState(today());
+  const [reimbursementAmount, setReimbursementAmount] = useState("");
+  const [reimbursementEvidence, setReimbursementEvidence] = useState("");
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   const sourceRows = sourceType === "cost_item" ? data.costItems : data.assets;
   const openExpenditures = data.expenditures.filter((row) => ["approved", "part_paid"].includes(text(row, "lifecycle_status")));
+  const companyOpenExpenditures = openExpenditures.filter((row) => text(row, "funding_source") !== "founder_personal");
+  const founderOpenExpenditures = openExpenditures.filter((row) => text(row, "funding_source") === "founder_personal");
   const pending = data.expenditures.filter((row) => text(row, "lifecycle_status") === "pending_approval").length;
   const openAmount = openExpenditures.reduce((sum, row) => sum + num(row, "amount_open_inr"), 0);
+  const founderOutstanding = founderOpenExpenditures.reduce((sum, row) => sum + num(row, "amount_open_inr"), 0);
   const totalPaid = data.payments.reduce((sum, row) => sum + num(row, "amount_inr"), 0);
   const latestCash = data.cashAuthority[0];
 
   const selectedPayment = useMemo(
-    () => openExpenditures.find((row) => text(row, "id") === paymentExpenditureId),
-    [openExpenditures, paymentExpenditureId],
+    () => companyOpenExpenditures.find((row) => text(row, "id") === paymentExpenditureId),
+    [companyOpenExpenditures, paymentExpenditureId],
+  );
+  const selectedReimbursement = useMemo(
+    () => founderOpenExpenditures.find((row) => text(row, "id") === reimbursementExpenditureId),
+    [founderOpenExpenditures, reimbursementExpenditureId],
   );
 
   async function refresh() {
@@ -79,9 +94,10 @@ function PeopleOfficeActualSpend() {
           amountInr: Number(amountInr),
           sourceReference,
           notes,
+          fundingSource,
         },
       });
-      setMessage(`${result.id} created as a draft actual expenditure. No cash moved.`);
+      setMessage(`${result.id} created as a draft actual expenditure. ${fundingSource === "founder_personal" ? "Founder / Director personal funds selected; company cash will remain unchanged on approval." : "No cash moved."}`);
       setDescription(""); setAmountInr(""); setSourceReference(""); setNotes("");
       await refresh();
     } catch (cause) {
@@ -89,15 +105,20 @@ function PeopleOfficeActualSpend() {
     } finally { setBusy(""); }
   }
 
-  async function transition(id: string, action: "submit" | "approve") {
+  async function transition(id: string, action: "submit" | "approve", funding = "company_bank") {
     setBusy(`${action}:${id}`); setMessage(""); setError("");
     try {
       if (action === "submit") {
         await submitPeopleOfficeActualExpenditure({ data: { id } });
         setMessage(`${id} submitted for approval. No cash moved.`);
       } else {
-        await approvePeopleOfficeActualExpenditure({ data: { id } });
-        setMessage(`${id} approved and accrued to the General Ledger. Bank cash is unchanged until payment.`);
+        const soleOperatorSelfApproval = funding === "founder_personal";
+        await approvePeopleOfficeActualExpenditure({ data: { id, soleOperatorSelfApproval } });
+        setMessage(
+          funding === "founder_personal"
+            ? `${id} approved with Sole-operator self-approval disclosure. Expense accrued to Founder / Director Current Account 2400; company bank cash unchanged.`
+            : `${id} approved and accrued to the General Ledger. Bank cash is unchanged until payment.`,
+        );
       }
       await refresh();
     } catch (cause) {
@@ -126,24 +147,52 @@ function PeopleOfficeActualSpend() {
     } finally { setBusy(""); }
   }
 
+  async function postReimbursement(event: React.FormEvent) {
+    event.preventDefault();
+    setBusy("reimbursement"); setMessage(""); setError("");
+    try {
+      const result = await postFounderReimbursement({
+        data: {
+          expenditureId: reimbursementExpenditureId,
+          paymentPlanMonth: Number(reimbursementPlanMonth),
+          reimbursedOn,
+          amountInr: Number(reimbursementAmount),
+          evidenceReference: reimbursementEvidence,
+        },
+      });
+      setMessage(`${result.reimbursementId} posted. Founder / Director Current Account 2400 reduced and company Bank 1000/canonical cash updated through M${result.paymentPlanMonth} R${result.actualRevision}; closing cash is ${lakh(result.newClosingCashLakh)}.`);
+      setReimbursementAmount(""); setReimbursementEvidence("");
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Founder reimbursement could not be posted.");
+    } finally { setBusy(""); }
+  }
+
   function selectPayment(row: Row) {
     setPaymentExpenditureId(text(row, "id"));
     setPaymentAmount(String(num(row, "amount_open_inr")));
     setPaymentPlanMonth(String(num(row, "plan_month") || 1));
   }
 
+  function selectReimbursement(row: Row) {
+    setReimbursementExpenditureId(text(row, "id"));
+    setReimbursementAmount(String(num(row, "amount_open_inr")));
+    setReimbursementPlanMonth(String(num(row, "plan_month") || 1));
+  }
+
   return <div className="space-y-6">
     <header className="border-b border-border pb-6">
       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">Finance · transaction-driven expenditure</p>
       <h1 className="mt-1 font-display text-4xl text-accent">People & Office Actual Spend</h1>
-      <p className="mt-2 max-w-5xl text-sm leading-6 text-muted">Planning approval authorises a budget record; it does not spend cash. This console creates the separate actual obligation, posts it to the General Ledger on approval, and moves Bank plus canonical cash only when evidenced payment is posted. Accrual month and payment cash month are controlled separately.</p>
+      <p className="mt-2 max-w-5xl text-sm leading-6 text-muted">Planning approval authorises a budget record; it does not spend cash. This console creates the separate actual obligation and posts it to the General Ledger on approval. Company-paid spend moves Bank plus canonical cash only when evidenced payment is posted. Founder / Director personal funds instead credit Current Account 2400 with zero company-cash movement until a later reimbursement. Accrual month and cash month remain controlled separately.</p>
       <div className="mt-3 flex flex-wrap gap-4 text-sm font-semibold"><Link to="/command/people-office" className="text-accent">People & Office plans →</Link><Link to="/command/accounting" className="text-accent">Accounting →</Link><Link to="/command/cash" className="text-accent">Cash authority →</Link></div>
     </header>
 
-    <div className="grid gap-3 sm:grid-cols-4">
+    <div className="grid gap-3 sm:grid-cols-5">
       <Kpi label="Pending approval" value={String(pending)} hint="Actual obligations awaiting approval" tone={pending ? "warn" : "ok"}/>
       <Kpi label="Open approved obligations" value={inr(openAmount)} hint="Approved / part-paid" tone={openAmount ? "warn" : "ok"}/>
-      <Kpi label="Posted payments" value={inr(totalPaid)} hint={`${data.payments.length} evidenced bank transaction${data.payments.length === 1 ? "" : "s"}`} tone="ok"/>
+      <Kpi label="Posted payments" value={inr(totalPaid)} hint={`${data.payments.length} evidenced company-bank transaction${data.payments.length === 1 ? "" : "s"}`} tone="ok"/>
+      <Kpi label="Founder payable" value={inr(founderOutstanding)} hint="Founder / Director personal funds awaiting reimbursement" tone={founderOutstanding ? "warn" : "ok"}/>
       <Kpi label="Latest canonical cash" value={latestCash ? lakh(num(latestCash, "closing_cash_lakh")) : "—"} hint={latestCash ? `Verified M${num(latestCash, "plan_month")}` : "No verified cash baseline"} tone={latestCash && num(latestCash, "closing_cash_lakh") < 0 ? "danger" : "ok"}/>
     </div>
 
@@ -152,7 +201,7 @@ function PeopleOfficeActualSpend() {
 
     <Panel title="1 · Record actual expenditure" kicker="Draft transaction · no journal and no cash movement">
       <form onSubmit={createActual} className="grid gap-4 lg:grid-cols-12">
-        <label className="lg:col-span-2"><span className="text-[10px] font-semibold uppercase tracking-wider text-muted">Source type</span><select value={sourceType} onChange={(event)=>{ setSourceType(event.target.value as "cost_item" | "asset"); setSourceId(""); }} className="mt-1 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm"><option value="cost_item">Cost item</option><option value="asset">Asset / consumable</option></select></label>
+        <label className="lg:col-span-2"><span className="text-[10px] font-semibold uppercase tracking-wider text-muted">Source type</span><select value={sourceType} onChange={(event)=>{ setSourceType(event.target.value as "cost_item" | "asset"); setSourceId(""); }} className="mt-1 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm"><option value="cost_item">Cost item</option><option value="asset">Asset / consumable</option></select></label><label className="lg:col-span-3"><span className="text-[10px] font-semibold uppercase tracking-wider text-muted">Funding source</span><select value={fundingSource} onChange={(event)=>setFundingSource(event.target.value as "company_bank" | "founder_personal")} className="mt-1 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm"><option value="company_bank">Company bank</option><option value="founder_personal">Founder / Director personal funds</option></select><span className="mt-1 block text-[10px] text-muted">{fundingSource === "founder_personal" ? "Approval creates Cr 2400 Founder / Director Current Account. Company cash stays unchanged." : "Approval creates an obligation; a later evidenced company payment moves Bank 1000."}</span></label>
         <label className="lg:col-span-4"><span className="text-[10px] font-semibold uppercase tracking-wider text-muted">Approved source</span><select required value={sourceId} onChange={(event)=>setSourceId(event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm"><option value="">Select approved source…</option>{sourceRows.map((row)=><option key={text(row,"id")} value={text(row,"id")}>{text(row,"name")} · {text(row,"cost_group","asset_class")}</option>)}</select></label>
         <label className="lg:col-span-2"><span className="text-[10px] font-semibold uppercase tracking-wider text-muted">Accrual plan month</span><input required type="number" min={1} max={36} value={planMonth} onChange={(event)=>setPlanMonth(event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm"/></label>
         <label className="lg:col-span-2"><span className="text-[10px] font-semibold uppercase tracking-wider text-muted">Incurred on</span><input required type="date" value={incurredOn} onChange={(event)=>setIncurredOn(event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm"/></label>
@@ -165,12 +214,12 @@ function PeopleOfficeActualSpend() {
     </Panel>
 
     <Panel title="2 · Actual expenditure register" kicker="Draft → pending approval → accrued obligation → part-paid / paid">
-      <div className="overflow-x-auto"><table className="w-full min-w-[1200px] text-sm"><thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle"><tr><th className="px-3 py-3 text-left">Actual</th><th className="px-3 py-3 text-left">Source</th><th className="px-3 py-3 text-left">Accrual</th><th className="px-3 py-3 text-right">Actual</th><th className="px-3 py-3 text-right">Paid</th><th className="px-3 py-3 text-right">Open</th><th className="px-3 py-3 text-left">Accounting</th><th className="px-3 py-3 text-left">Status / action</th></tr></thead><tbody>{data.expenditures.map((row)=>{ const id=text(row,"id"); const status=text(row,"lifecycle_status"); return <tr key={id} className="border-t border-border/70 align-top"><td className="px-3 py-3"><p className="font-mono text-xs">{id}</p><p className="mt-1 max-w-xs text-xs text-muted">{text(row,"description")}</p></td><td className="px-3 py-3"><p className="font-semibold">{text(row,"source_label")}</p><p className="text-[10px] uppercase text-muted">{text(row,"source_category")}</p></td><td className="px-3 py-3">M{num(row,"plan_month")} · {text(row,"incurred_on")}</td><td className="px-3 py-3 text-right font-semibold tabular-nums">{inr(num(row,"amount_inr"))}</td><td className="px-3 py-3 text-right tabular-nums">{inr(num(row,"amount_paid_inr"))}</td><td className="px-3 py-3 text-right tabular-nums">{inr(num(row,"amount_open_inr"))}</td><td className="px-3 py-3"><p className="font-mono text-xs">Dr {text(row,"debit_account_code")} / Cr {text(row,"liability_account_code")}</p><p className="mt-1 text-[10px] text-muted">Approval accrual; Bank 1000 only on payment</p></td><td className="px-3 py-3"><p className="font-semibold uppercase text-[11px]">{status.replaceAll("_"," ")}</p><div className="mt-2 flex gap-2">{status === "draft" ? <button disabled={busy!==""} onClick={()=>transition(id,"submit")} className="rounded-full border border-border px-3 py-1 text-[10px] font-semibold">Submit</button> : null}{status === "pending_approval" ? <button disabled={busy!==""} onClick={()=>transition(id,"approve")} className="rounded-full border border-accent px-3 py-1 text-[10px] font-semibold text-accent">Approve & accrue</button> : null}{["approved","part_paid"].includes(status) ? <button onClick={()=>selectPayment(row)} className="rounded-full border border-ok/50 px-3 py-1 text-[10px] font-semibold text-ok">Select payment</button> : null}</div></td></tr>;})}</tbody></table>{data.expenditures.length===0 ? <p className="py-5 text-sm text-muted">No actual expenditure transactions have been recorded yet.</p> : null}</div>
+      <div className="overflow-x-auto"><table className="w-full min-w-[1200px] text-sm"><thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle"><tr><th className="px-3 py-3 text-left">Actual</th><th className="px-3 py-3 text-left">Source</th><th className="px-3 py-3 text-left">Accrual</th><th className="px-3 py-3 text-right">Actual</th><th className="px-3 py-3 text-right">Paid</th><th className="px-3 py-3 text-right">Open</th><th className="px-3 py-3 text-left">Accounting</th><th className="px-3 py-3 text-left">Status / action</th></tr></thead><tbody>{data.expenditures.map((row)=>{ const id=text(row,"id"); const status=text(row,"lifecycle_status"); const funding=text(row,"funding_source") || "company_bank"; return <tr key={id} className="border-t border-border/70 align-top"><td className="px-3 py-3"><p className="font-mono text-xs">{id}</p><p className="mt-1 max-w-xs text-xs text-muted">{text(row,"description")}</p></td><td className="px-3 py-3"><p className="font-semibold">{text(row,"source_label")}</p><p className="text-[10px] uppercase text-muted">{text(row,"source_category")}</p><p className="mt-1 text-[10px] font-semibold text-subtle">{funding === "founder_personal" ? "Founder / Director personal funds" : "Company bank"}</p></td><td className="px-3 py-3">M{num(row,"plan_month")} · {text(row,"incurred_on")}</td><td className="px-3 py-3 text-right font-semibold tabular-nums">{inr(num(row,"amount_inr"))}</td><td className="px-3 py-3 text-right tabular-nums">{inr(num(row,"amount_paid_inr"))}</td><td className="px-3 py-3 text-right tabular-nums">{inr(num(row,"amount_open_inr"))}</td><td className="px-3 py-3"><p className="font-mono text-xs">Dr {text(row,"debit_account_code")} / Cr {text(row,"liability_account_code")}</p><p className="mt-1 text-[10px] text-muted">{funding === "founder_personal" ? "Approval accrual · Cr 2400 · company cash unchanged" : "Approval accrual; Bank 1000 only on payment"}</p>{text(row,"governance_marker") ? <p className="mt-1 text-[10px] font-semibold text-accent">{text(row,"governance_marker")}</p> : null}</td><td className="px-3 py-3"><p className="font-semibold uppercase text-[11px]">{status.replaceAll("_"," ")}</p><div className="mt-2 flex gap-2">{status === "draft" ? <button disabled={busy!==""} onClick={()=>transition(id,"submit")} className="rounded-full border border-border px-3 py-1 text-[10px] font-semibold">Submit</button> : null}{status === "pending_approval" ? <button disabled={busy!==""} onClick={()=>transition(id,"approve",funding)} className="rounded-full border border-accent px-3 py-1 text-[10px] font-semibold text-accent">{funding === "founder_personal" ? "Sole-operator self-approval" : "Approve & accrue"}</button> : null}{["approved","part_paid"].includes(status) && funding !== "founder_personal" ? <button onClick={()=>selectPayment(row)} className="rounded-full border border-ok/50 px-3 py-1 text-[10px] font-semibold text-ok">Select payment</button> : null}{["approved","part_paid"].includes(status) && funding === "founder_personal" ? <button onClick={()=>selectReimbursement(row)} className="rounded-full border border-accent/60 px-3 py-1 text-[10px] font-semibold text-accent">Select reimbursement</button> : null}</div></td></tr>;})}</tbody></table>{data.expenditures.length===0 ? <p className="py-5 text-sm text-muted">No actual expenditure transactions have been recorded yet.</p> : null}</div>
     </Panel>
 
     <Panel title="3 · Post evidenced payment" kicker="Dr payable · Cr Bank · revise payment-month canonical cash · feed VIBPE">
       <form onSubmit={postPayment} className="grid gap-4 lg:grid-cols-12">
-        <label className="lg:col-span-4"><span className="text-[10px] font-semibold uppercase tracking-wider text-muted">Approved open obligation</span><select required value={paymentExpenditureId} onChange={(event)=>{ const id=event.target.value; setPaymentExpenditureId(id); const row=openExpenditures.find((item)=>text(item,"id")===id); setPaymentAmount(row ? String(num(row,"amount_open_inr")) : ""); setPaymentPlanMonth(row ? String(num(row,"plan_month")) : "1"); }} className="mt-1 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm"><option value="">Select approved expenditure…</option>{openExpenditures.map((row)=><option key={text(row,"id")} value={text(row,"id")}>{text(row,"source_label")} · accrual M{num(row,"plan_month")} · open {inr(num(row,"amount_open_inr"))}</option>)}</select></label>
+        <label className="lg:col-span-4"><span className="text-[10px] font-semibold uppercase tracking-wider text-muted">Approved open obligation</span><select required value={paymentExpenditureId} onChange={(event)=>{ const id=event.target.value; setPaymentExpenditureId(id); const row=companyOpenExpenditures.find((item)=>text(item,"id")===id); setPaymentAmount(row ? String(num(row,"amount_open_inr")) : ""); setPaymentPlanMonth(row ? String(num(row,"plan_month")) : "1"); }} className="mt-1 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm"><option value="">Select approved expenditure…</option>{companyOpenExpenditures.map((row)=><option key={text(row,"id")} value={text(row,"id")}>{text(row,"source_label")} · accrual M{num(row,"plan_month")} · open {inr(num(row,"amount_open_inr"))}</option>)}</select></label>
         <label className="lg:col-span-2"><span className="text-[10px] font-semibold uppercase tracking-wider text-muted">Payment cash month</span><input required type="number" min={1} max={36} value={paymentPlanMonth} onChange={(event)=>setPaymentPlanMonth(event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm"/></label>
         <label className="lg:col-span-2"><span className="text-[10px] font-semibold uppercase tracking-wider text-muted">Paid on</span><input required type="date" value={paidOn} onChange={(event)=>setPaidOn(event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm"/></label>
         <label className="lg:col-span-2"><span className="text-[10px] font-semibold uppercase tracking-wider text-muted">Amount · INR</span><input required type="number" min="0.01" step="0.01" max={selectedPayment ? num(selectedPayment,"amount_open_inr") : undefined} value={paymentAmount} onChange={(event)=>setPaymentAmount(event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm"/></label>
@@ -179,12 +228,27 @@ function PeopleOfficeActualSpend() {
       </form>
     </Panel>
 
+    <Panel title="4 · Reimburse Founder / Director" kicker="Dr 2400 Founder / Director Current Account · Cr Bank 1000 · revise canonical cash">
+      <form onSubmit={postReimbursement} className="grid gap-4 lg:grid-cols-12">
+        <label className="lg:col-span-4"><span className="text-[10px] font-semibold uppercase tracking-wider text-muted">Founder-paid open expenditure</span><select required value={reimbursementExpenditureId} onChange={(event)=>{ const id=event.target.value; setReimbursementExpenditureId(id); const row=founderOpenExpenditures.find((item)=>text(item,"id")===id); setReimbursementAmount(row ? String(num(row,"amount_open_inr")) : ""); setReimbursementPlanMonth(row ? String(num(row,"plan_month")) : "1"); }} className="mt-1 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm"><option value="">Select founder-paid expenditure…</option>{founderOpenExpenditures.map((row)=><option key={text(row,"id")} value={text(row,"id")}>{text(row,"source_label")} · open founder payable {inr(num(row,"amount_open_inr"))}</option>)}</select></label>
+        <label className="lg:col-span-2"><span className="text-[10px] font-semibold uppercase tracking-wider text-muted">Cash month</span><input required type="number" min={1} max={36} value={reimbursementPlanMonth} onChange={(event)=>setReimbursementPlanMonth(event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm"/></label>
+        <label className="lg:col-span-2"><span className="text-[10px] font-semibold uppercase tracking-wider text-muted">Reimbursed on</span><input required type="date" value={reimbursedOn} onChange={(event)=>setReimbursedOn(event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm"/></label>
+        <label className="lg:col-span-2"><span className="text-[10px] font-semibold uppercase tracking-wider text-muted">Amount · INR</span><input required type="number" min="0.01" step="0.01" max={selectedReimbursement ? num(selectedReimbursement,"amount_open_inr") : undefined} value={reimbursementAmount} onChange={(event)=>setReimbursementAmount(event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm"/></label>
+        <label className="lg:col-span-2"><span className="text-[10px] font-semibold uppercase tracking-wider text-muted">Bank / UTR evidence</span><input required value={reimbursementEvidence} onChange={(event)=>setReimbursementEvidence(event.target.value)} placeholder="Company reimbursement UTR" className="mt-1 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm"/></label>
+        <div className="lg:col-span-12 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-bg-elevated/50 p-3"><p className="max-w-4xl text-xs leading-5 text-muted">This is the only step that reduces company cash for founder-paid spend. The original expense approval did not touch Bank 1000.</p><button disabled={busy!=="" || !selectedReimbursement} className="rounded-full border border-accent/50 bg-accent/10 px-5 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-accent disabled:opacity-50">{busy === "reimbursement" ? "Posting…" : "Post reimbursement"}</button></div>
+      </form>
+    </Panel>
+
     <Panel title="Payment evidence register" kicker="Append-only bank evidence · journal and cash revision lineage">
       <div className="overflow-x-auto"><table className="w-full min-w-[1100px] text-sm"><thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle"><tr><th className="px-3 py-3 text-left">Payment</th><th className="px-3 py-3 text-left">Actual / source</th><th className="px-3 py-3 text-left">Accrual → cash month</th><th className="px-3 py-3 text-left">Paid</th><th className="px-3 py-3 text-right">Amount</th><th className="px-3 py-3 text-left">Evidence</th><th className="px-3 py-3 text-left">Accounting / cash</th></tr></thead><tbody>{data.payments.map((row)=><tr key={text(row,"id")} className="border-t border-border/70"><td className="px-3 py-3 font-mono text-xs">{text(row,"id")}</td><td className="px-3 py-3"><p className="font-semibold">{text(row,"source_label")}</p><p className="text-[10px] text-muted">{text(row,"expenditure_id")}</p></td><td className="px-3 py-3">M{num(row,"accrual_plan_month")} → M{num(row,"plan_month")}</td><td className="px-3 py-3">{text(row,"paid_on")}</td><td className="px-3 py-3 text-right font-semibold tabular-nums">{inr(num(row,"amount_inr"))}</td><td className="px-3 py-3 max-w-sm break-words text-xs">{text(row,"evidence_reference")}</td><td className="px-3 py-3"><p className="font-mono text-xs">{text(row,"journal_id")}</p><p className="mt-1 text-[10px] text-muted">Cash R{num(row,"actual_revision")} → {lakh(num(row,"new_closing_cash_lakh"))}</p></td></tr>)}</tbody></table>{data.payments.length===0 ? <p className="py-5 text-sm text-muted">No People & Office payments have been posted yet.</p> : null}</div>
     </Panel>
 
+    <Panel title="Founder reimbursement register" kicker="Append-only settlement evidence against Current Account 2400">
+      <div className="overflow-x-auto"><table className="w-full min-w-[1100px] text-sm"><thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle"><tr><th className="px-3 py-3 text-left">Reimbursement</th><th className="px-3 py-3 text-left">Actual / source</th><th className="px-3 py-3 text-left">Accrual → cash month</th><th className="px-3 py-3 text-left">Reimbursed</th><th className="px-3 py-3 text-right">Amount</th><th className="px-3 py-3 text-left">Evidence</th><th className="px-3 py-3 text-left">Accounting / cash</th></tr></thead><tbody>{data.founderReimbursements.map((row)=><tr key={text(row,"id")} className="border-t border-border/70"><td className="px-3 py-3 font-mono text-xs">{text(row,"id")}</td><td className="px-3 py-3"><p className="font-semibold">{text(row,"source_label")}</p><p className="text-[10px] text-muted">{text(row,"expenditure_id")}</p></td><td className="px-3 py-3">M{num(row,"accrual_plan_month")} → M{num(row,"plan_month")}</td><td className="px-3 py-3">{text(row,"reimbursed_on")}</td><td className="px-3 py-3 text-right font-semibold tabular-nums">{inr(num(row,"amount_inr"))}</td><td className="px-3 py-3 max-w-sm break-words text-xs">{text(row,"evidence_reference")}</td><td className="px-3 py-3"><p className="font-mono text-xs">Dr 2400 / Cr 1000 · {text(row,"journal_id")}</p><p className="mt-1 text-[10px] text-muted">Cash R{num(row,"actual_revision")} → {lakh(num(row,"new_closing_cash_lakh"))}</p></td></tr>)}</tbody></table>{data.founderReimbursements.length===0 ? <p className="py-5 text-sm text-muted">No founder reimbursements have been posted yet.</p> : null}</div>
+    </Panel>
+
     <Panel title="Controlled accounting map" kicker="Existing VYNDI chart of accounts · no parallel ledger">
-      <div className="grid gap-3 text-sm md:grid-cols-2 lg:grid-cols-3"><p className="rounded-xl border border-border p-3"><strong>Payroll</strong><br/><span className="text-muted">Dr 6100 People / Payroll · Cr 2200 Payroll / Statutory Payable</span></p><p className="rounded-xl border border-border p-3"><strong>Rent / Office</strong><br/><span className="text-muted">Dr 6200 Office / Facility · Cr 2000 Trade Payables</span></p><p className="rounded-xl border border-border p-3"><strong>Statutory / Professional</strong><br/><span className="text-muted">Dr 6300 Professional / Statutory · Cr 2200 Statutory Payable</span></p><p className="rounded-xl border border-border p-3"><strong>Outsourcing</strong><br/><span className="text-muted">Dr 6400 Outsourcing · Cr 2000 Trade Payables</span></p><p className="rounded-xl border border-border p-3"><strong>Office consumable</strong><br/><span className="text-muted">Dr 6200 Office / Facility · Cr 2000 Trade Payables</span></p><p className="rounded-xl border border-border p-3"><strong>Capital equipment</strong><br/><span className="text-muted">Dr 1500 Fixed Assets · Cr 2000 Trade Payables</span></p></div>
+      <div className="grid gap-3 text-sm md:grid-cols-2 lg:grid-cols-3"><p className="rounded-xl border border-border p-3"><strong>Payroll</strong><br/><span className="text-muted">Dr 6100 People / Payroll · Cr 2200 Payroll / Statutory Payable</span></p><p className="rounded-xl border border-border p-3"><strong>Rent / Office</strong><br/><span className="text-muted">Dr 6200 Office / Facility · Cr 2000 Trade Payables</span></p><p className="rounded-xl border border-border p-3"><strong>Statutory / Professional</strong><br/><span className="text-muted">Dr 6300 Professional / Statutory · Cr 2200 Statutory Payable</span></p><p className="rounded-xl border border-border p-3"><strong>Outsourcing</strong><br/><span className="text-muted">Dr 6400 Outsourcing · Cr 2000 Trade Payables</span></p><p className="rounded-xl border border-border p-3"><strong>Office consumable</strong><br/><span className="text-muted">Dr 6200 Office / Facility · Cr 2000 Trade Payables</span></p><p className="rounded-xl border border-border p-3"><strong>Capital equipment</strong><br/><span className="text-muted">Dr 1500 Fixed Assets · Cr 2000 Trade Payables</span></p><p className="rounded-xl border border-accent/40 p-3"><strong>Founder-paid business expense</strong><br/><span className="text-muted">Dr controlled expense / asset · Cr 2400 Founder / Director Current Account. No company cash until reimbursement.</span></p></div>
     </Panel>
   </div>;
 }
