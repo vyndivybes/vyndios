@@ -16,6 +16,7 @@ const num = (row: Row, ...keys: string[]) => { for (const key of keys) if (row[k
 const inr = (value: number) => `₹${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 const lakh = (value: number) => `₹${value.toFixed(2)}L`;
 const today = () => new Date().toISOString().slice(0, 10);
+const evidenceLines = (value: string) => value.split(";").map((part) => part.trim()).filter(Boolean);
 
 export const Route = createFileRoute("/command/accounting/people-office-payments")({
   loader: () => listPeopleOfficeActualSpend(),
@@ -215,6 +216,45 @@ function PeopleOfficeActualSpend() {
 
     <Panel title="2 · Actual expenditure register" kicker="Draft → pending approval → accrued obligation → part-paid / paid">
       <div className="overflow-x-auto"><table className="w-full min-w-[1200px] text-sm"><thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle"><tr><th className="px-3 py-3 text-left">Actual</th><th className="px-3 py-3 text-left">Source</th><th className="px-3 py-3 text-left">Accrual</th><th className="px-3 py-3 text-right">Actual</th><th className="px-3 py-3 text-right">Paid</th><th className="px-3 py-3 text-right">Open</th><th className="px-3 py-3 text-left">Accounting</th><th className="px-3 py-3 text-left">Status / action</th></tr></thead><tbody>{data.expenditures.map((row)=>{ const id=text(row,"id"); const status=text(row,"lifecycle_status"); const funding=text(row,"funding_source") || "company_bank"; return <tr key={id} className="border-t border-border/70 align-top"><td className="px-3 py-3"><p className="font-mono text-xs">{id}</p><p className="mt-1 max-w-xs text-xs text-muted">{text(row,"description")}</p></td><td className="px-3 py-3"><p className="font-semibold">{text(row,"source_label")}</p><p className="text-[10px] uppercase text-muted">{text(row,"source_category")}</p><p className="mt-1 text-[10px] font-semibold text-subtle">{funding === "founder_personal" ? "Founder / Director personal funds" : "Company bank"}</p></td><td className="px-3 py-3">M{num(row,"plan_month")} · {text(row,"incurred_on")}</td><td className="px-3 py-3 text-right font-semibold tabular-nums">{inr(num(row,"amount_inr"))}</td><td className="px-3 py-3 text-right tabular-nums">{inr(num(row,"amount_paid_inr"))}</td><td className="px-3 py-3 text-right tabular-nums">{inr(num(row,"amount_open_inr"))}</td><td className="px-3 py-3"><p className="font-mono text-xs">Dr {text(row,"debit_account_code")} / Cr {text(row,"liability_account_code")}</p><p className="mt-1 text-[10px] text-muted">{funding === "founder_personal" ? "Approval accrual · Cr 2400 · company cash unchanged" : "Approval accrual; Bank 1000 only on payment"}</p>{text(row,"governance_marker") ? <p className="mt-1 text-[10px] font-semibold text-accent">{text(row,"governance_marker")}</p> : null}</td><td className="px-3 py-3"><p className="font-semibold uppercase text-[11px]">{status.replaceAll("_"," ")}</p><div className="mt-2 flex gap-2">{status === "draft" ? <button disabled={busy!==""} onClick={()=>transition(id,"submit")} className="rounded-full border border-border px-3 py-1 text-[10px] font-semibold">Submit</button> : null}{status === "pending_approval" ? <button disabled={busy!==""} onClick={()=>transition(id,"approve",funding)} className="rounded-full border border-accent px-3 py-1 text-[10px] font-semibold text-accent">{funding === "founder_personal" ? "Sole-operator self-approval" : "Approve & accrue"}</button> : null}{["approved","part_paid"].includes(status) && funding !== "founder_personal" ? <button onClick={()=>selectPayment(row)} className="rounded-full border border-ok/50 px-3 py-1 text-[10px] font-semibold text-ok">Select payment</button> : null}{["approved","part_paid"].includes(status) && funding === "founder_personal" ? <button onClick={()=>selectReimbursement(row)} className="rounded-full border border-accent/60 px-3 py-1 text-[10px] font-semibold text-accent">Select reimbursement</button> : null}</div></td></tr>;})}</tbody></table>{data.expenditures.length===0 ? <p className="py-5 text-sm text-muted">No actual expenditure transactions have been recorded yet.</p> : null}</div>
+    </Panel>
+
+    <Panel title="Evidence & traceability register" kicker="Source evidence · reconciliation details · governance · journal lineage">
+      <div className="space-y-3">
+        {data.expenditures.map((row) => {
+          const evidence = evidenceLines(text(row,"notes"));
+          const funding = text(row,"funding_source") || "company_bank";
+          return <article key={text(row,"id")} className="rounded-2xl border border-border bg-bg-elevated/40 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="font-mono text-xs text-accent">{text(row,"id")}</p>
+                <h3 className="mt-1 font-semibold">{text(row,"description")}</h3>
+                <p className="mt-1 text-xs text-muted">{text(row,"source_label")} · {text(row,"incurred_on")} · {inr(num(row,"amount_inr"))}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Governance</p>
+                <p className="mt-1 text-xs font-semibold text-accent">{text(row,"governance_marker") || "Standard controlled approval"}</p>
+                <p className="mt-1 text-[10px] text-muted">{funding === "founder_personal" ? "Founder / Director personal funds" : "Company bank"}</p>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-4 lg:grid-cols-3">
+              <div className="rounded-xl border border-border/70 p-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Evidence source</p>
+                <p className="mt-2 break-words font-mono text-xs">{text(row,"source_reference") || "No source evidence reference recorded"}</p>
+              </div>
+              <div className="rounded-xl border border-border/70 p-3 lg:col-span-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Reconciliation / evidence details</p>
+                {evidence.length ? <ul className="mt-2 space-y-2 text-xs leading-5 text-muted">{evidence.map((item,index)=><li key={`${text(row,"id")}-evidence-${index}`} className="rounded-lg border border-border/50 bg-bg px-3 py-2">{item}</li>)}</ul> : <p className="mt-2 text-xs text-muted">No detailed evidence notes recorded.</p>}
+              </div>
+            </div>
+            <div className="mt-3 grid gap-3 text-xs md:grid-cols-3">
+              <p className="rounded-xl border border-border/70 p-3"><span className="block text-[10px] font-semibold uppercase tracking-wider text-muted">Accounting</span><span className="mt-1 block font-mono">Dr {text(row,"debit_account_code")} / Cr {text(row,"liability_account_code")}</span></p>
+              <p className="rounded-xl border border-border/70 p-3"><span className="block text-[10px] font-semibold uppercase tracking-wider text-muted">Journal lineage</span><span className="mt-1 block break-words font-mono">{text(row,"obligation_journal_id") || "Not yet posted"}</span></p>
+              <p className="rounded-xl border border-border/70 p-3"><span className="block text-[10px] font-semibold uppercase tracking-wider text-muted">Open / paid</span><span className="mt-1 block">{inr(num(row,"amount_open_inr"))} open · {inr(num(row,"amount_paid_inr"))} paid</span></p>
+            </div>
+          </article>;
+        })}
+        {data.expenditures.length===0 ? <p className="py-5 text-sm text-muted">No expenditure evidence is available yet.</p> : null}
+      </div>
     </Panel>
 
     <Panel title="3 · Post evidenced payment" kicker="Dr payable · Cr Bank · revise payment-month canonical cash · feed VIBPE">
