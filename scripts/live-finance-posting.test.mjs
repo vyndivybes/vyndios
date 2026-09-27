@@ -200,7 +200,7 @@ test("customer collection posts explicit cash month into verified canonical cash
   assert.match(salesCreditMigration, /-v_row\.amount_lakh/);
   assert.match(salesCreditMigration, /cash_reversal_revision=v_cash_revision/);
   assert.match(salesCreditMigration, /v_actual\.cogs/);
-  assert.match(salesCreditMigration, /\n {4}null,\n {4}v_actual\.payables/);
+  assert.match(salesCreditMigration, /\r?\n {4}null,\r?\n {4}v_actual\.payables/);
   assert.match(receivablesRoute, /Collection cash month · actual receipt month/);
   assert.match(receivablesRoute, /Dr 1000 Bank \/ Cr 1100 Trade Receivable/);
   assert.match(receivablesRoute, /Canonical cash/);
