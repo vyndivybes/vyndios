@@ -108,7 +108,10 @@ export type AuthorityMutationDecision = {
   reason: "ALLOWED" | "HUMAN_APPROVAL_REQUIRED" | "CONFIGURATION_AUTHORITY_REQUIRED";
 };
 
-export const VEDM_R3A_SOURCE_REPOSITORY = "vayu-shastr/veloxis-engineering-design-manual";\nexport const VEDM_R3A_SOURCE_COMMIT = "49fdac757534c6e42a0c5c29c43a2a6e35d637d2";\n\nconst CONTROLLED_DOMAINS = new Set(["frame_geometry"]);
+export const VEDM_R3A_SOURCE_REPOSITORY = "vayu-shastr/veloxis-engineering-design-manual";
+export const VEDM_R3A_SOURCE_COMMIT = "49fdac757534c6e42a0c5c29c43a2a6e35d637d2";
+
+const CONTROLLED_DOMAINS = new Set(["frame_geometry"]);
 
 function parseDate(value: string | undefined) {
   if (!value) return undefined;
