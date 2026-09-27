@@ -92,7 +92,7 @@ export const createPeopleOfficeActualExpenditure = createServerFn({ method: "POS
     const actor = await requireActor("edit");
     const sql = await getSql();
     const id = `POEXP-${crypto.randomUUID()}`;
-    const rows = await sql.query<{ create_vyndi_people_office_actual_expenditure: string }>(
+    const rows = await sql.query<{ create_vyndi_people_office_actual_expenditure_v2: string }>(
       `select create_vyndi_people_office_actual_expenditure_v2($1,$2,$3,$4,$5::date,$6,$7,$8,$9,$10,$11,$12)`,
       [
         id,
@@ -109,7 +109,7 @@ export const createPeopleOfficeActualExpenditure = createServerFn({ method: "POS
         actor.role,
       ],
     );
-    return { ok: true, id: rows[0]?.create_vyndi_people_office_actual_expenditure ?? id };
+    return { ok: true, id: rows[0]?.create_vyndi_people_office_actual_expenditure_v2 ?? id };
   });
 
 export const submitPeopleOfficeActualExpenditure = createServerFn({ method: "POST" })
