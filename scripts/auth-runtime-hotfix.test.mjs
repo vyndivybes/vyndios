@@ -81,9 +81,9 @@ test("Better Auth owns the HTTP cookie response without a duplicate TanStack han
 
 test("production auth uses the canonical Cloudflare origin and excludes retired hosting", () => {
   assert.match(authServer, /resolveAuthBaseURL\(explicitBaseURL\)/);
-  assert.match(authRuntimeConfig, /"https:\/\/vyndios\.shyamsundhar1982\.workers\.dev"/);
+  assert.match(authRuntimeConfig, /"https:\/\/vyndios\.vayushastr\.workers\.dev"/);
   assert.doesNotMatch(authRuntimeConfig, /tiger-field-flora-finch/);
-  assert.match(authRuntimeConfig, /vyndios\.shyamsundhar1982\.workers\.dev/);
+  assert.match(authRuntimeConfig, /vyndios\.vayushastr\.workers\.dev/);
   assert.match(authRuntimeConfig, /vyndi\/better-auth\/session-secret\/v1/);
   assert.match(authRuntimeConfig, /createHash\("sha256"\)/);
 });
