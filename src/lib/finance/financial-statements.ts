@@ -124,7 +124,7 @@ const EPSILON = 0.01;
 const EXPENSE_CODES = new Set(["5000", "5100", "5200", "6100", "6200", "6300", "6400", "6500", "6600"]);
 const OPERATING_EXPENSE_CODES = ["5100", "5200", "6100", "6200", "6300", "6400", "6500", "6600"];
 const CURRENT_ASSET_CODES = ["1000", "1100", "1200", "1210", "1220", "1300", "1400"];
-const CURRENT_LIABILITY_CODES = ["2000", "2100", "2200"];
+const CURRENT_LIABILITY_CODES = ["2000", "2100", "2200", "2400"];
 
 const round = (value: number) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 const sum = (values: number[]) => round(values.reduce((total, value) => total + Number(value || 0), 0));
