@@ -1,0 +1,28 @@
+name: Main Governance Tripwire
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  verify-pr-lineage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require merged pull-request lineage for main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          count="$(gh api -H 'Accept: application/vnd.github+json'             "/repos/${REPO}/commits/${SHA}/pulls"             --jq '[.[] | select(.merged_at != null)] | length')"
+          if [ "$count" -lt 1 ]; then
+            echo "::error::main commit ${SHA} has no merged pull-request lineage. Enable repository branch protection/rulesets to prevent recurrence."
+            exit 1
+          fi
+          echo "main commit ${SHA} is linked to ${count} merged pull request(s)."

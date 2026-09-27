@@ -19,12 +19,12 @@ const EXPECTED_PACKS = [
   "procurement-recommendations",
 ];
 
-test("QA corpus covers at least four scenarios in all eight governed packs", () => {
-  assert.ok(VIBPE_QA_CASES.length >= 32);
+test("QA corpus covers at least six scenarios in all eight governed packs", () => {
+  assert.ok(VIBPE_QA_CASES.length >= 48);
   const counts = new Map();
   for (const item of VIBPE_QA_CASES) counts.set(item.pack, (counts.get(item.pack) ?? 0) + 1);
   assert.deepEqual([...counts.keys()].sort(), EXPECTED_PACKS);
-  for (const count of counts.values()) assert.ok(count >= 4);
+  for (const count of counts.values()) assert.ok(count >= 6);
 });
 
 test("QA engine classifies all seven requested answer dimensions", () => {

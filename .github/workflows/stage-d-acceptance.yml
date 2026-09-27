@@ -26,6 +26,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Golden Enterprise transactional qualification
+        run: npm run test:golden-enterprise:transaction
+
       - name: Full canonical business and resilience acceptance
         run: >-
           node --experimental-strip-types --test

@@ -35,7 +35,9 @@ jobs:
           test -n "$VYNDI_TEST_BASE_URL"
           test -n "$VYNDI_TEST_EMAIL"
           test -n "$VYNDI_TEST_PASSWORD"
-      - name: Golden Enterprise read-only journey
+      - name: Golden Enterprise transaction qualification
+        run: npm run test:golden-enterprise:transaction
+      - name: Golden Enterprise authenticated production journey
         run: npm run test:golden-enterprise
       - name: Observe SLO and production telemetry
         run: npm run observe:slo

@@ -3,7 +3,7 @@ import { handleAuthRequest } from "@/lib/auth/server";
 import { authRateLimitDecision } from "@/lib/security/rate-limit";
 
 async function handleProtectedAuthPost(request: Request) {
-  const decision = authRateLimitDecision(request);
+  const decision = await authRateLimitDecision(request);
   if (decision && !decision.allowed) {
     return new Response(JSON.stringify({
       error: "Too many authentication attempts. Retry later.",
