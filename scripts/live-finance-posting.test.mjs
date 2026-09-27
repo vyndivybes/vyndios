@@ -151,6 +151,7 @@ test("founder-paid People and Office spend creates a director payable without mo
   assert.match(founderPaidMigration, /funding_source/);
   assert.match(founderPaidMigration, /founder_personal/);
   assert.match(founderPaidMigration, /'2400'/);
+  assert.match(founderPaidMigration, /'6250'/);
   assert.match(founderPaidMigration, /SOLE_OPERATOR_SELF_APPROVAL/);
   assert.match(founderPaidMigration, /create_vyndi_people_office_actual_expenditure_v2/);
   assert.match(founderPaidMigration, /approve_vyndi_people_office_actual_expenditure_v2/);
@@ -164,7 +165,9 @@ test("founder-paid People and Office spend creates a director payable without mo
   assert.match(peopleOfficeActualRoute, /Founder \/ Director personal funds/);
   assert.match(peopleOfficeActualRoute, /Sole-operator self-approval/);
   assert.match(generalLedger, /code: "2400", name: "Founder \/ Director Current Account"/);
+  assert.match(generalLedger, /code: "6250", name: "Travel \/ Business Development Expense"/);
   assert.match(financialStatements, /CURRENT_LIABILITY_CODES = \["2000", "2100", "2200", "2400"\]/);
+  assert.match(financialStatements, /OPERATING_EXPENSE_CODES = \["5100", "5200", "6100", "6200", "6250"/);
 });
 
 test("sales invoices carry evidenced credit terms without inventing legacy history", () => {
