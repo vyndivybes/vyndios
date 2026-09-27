@@ -13,6 +13,7 @@ const spareIdentityMigration = read("migrations/0082_spare_sales_identity_fifo_f
 const accountingSourceAuthorityMigration = read("migrations/0084_accounting_source_authority.sql");
 const actualCogsMigration = read("migrations/0086_actual_job_cost_cogs_chain.sql");
 const toolingRecoveryMigration = read("migrations/0087_tooling_cost_recovery_authority.sql");
+const founderPaidMigration = read("migrations/0094_founder_paid_expense_authority.sql");
 const authority = read("src/lib/finance/accounting-authority.ts");
 const cashFundingAuthority = read("src/lib/cash-funding-authority.ts");
 const peopleOfficeActualAuthority = read("src/lib/finance/people-office-actual-spend-authority.ts");
@@ -142,6 +143,24 @@ test("People and Office payment requires unique evidence and posts Bank plus ver
   assert.match(peopleOfficeActualAuthority, /evidenceReference: reference/);
   assert.match(peopleOfficeActualRoute, /Bank \/ UTR evidence/);
   assert.match(peopleOfficeActualRoute, /does not infer a plan month from the payment date/);
+});
+
+test("founder-paid People and Office spend creates a director payable without moving company cash", () => {
+  assert.match(founderPaidMigration, /funding_source/);
+  assert.match(founderPaidMigration, /founder_personal/);
+  assert.match(founderPaidMigration, /'2400'/);
+  assert.match(founderPaidMigration, /SOLE_OPERATOR_SELF_APPROVAL/);
+  assert.match(founderPaidMigration, /create_vyndi_people_office_actual_expenditure_v2/);
+  assert.match(founderPaidMigration, /approve_vyndi_people_office_actual_expenditure_v2/);
+  assert.doesNotMatch(founderPaidMigration, /founder_personal[\s\S]{0,1200}apply_vyndi_verified_cash_movement/);
+  assert.match(founderPaidMigration, /post_vyndi_founder_reimbursement/);
+  assert.match(founderPaidMigration, /'accountCode','2400','debitInr'/);
+  assert.match(founderPaidMigration, /'accountCode','1000','creditInr'/);
+  assert.match(peopleOfficeActualAuthority, /FOUNDER_PERSONAL/);
+  assert.match(peopleOfficeActualAuthority, /soleOperatorSelfApproval/);
+  assert.match(peopleOfficeActualAuthority, /postFounderReimbursement/);
+  assert.match(peopleOfficeActualRoute, /Founder \/ Director personal funds/);
+  assert.match(peopleOfficeActualRoute, /Sole-operator self-approval/);
 });
 
 test("sales invoices carry evidenced credit terms without inventing legacy history", () => {
