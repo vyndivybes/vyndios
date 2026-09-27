@@ -12,6 +12,8 @@ const reference = z.string().trim().min(3).max(500);
 const money = z.number().finite().positive().max(1_000_000_000_000);
 
 export const PEOPLE_OFFICE_ACTUAL_SOURCE_TYPES = ["cost_item", "asset"] as const;
+export const PEOPLE_OFFICE_FUNDING_SOURCES = ["company_bank", "founder_personal"] as const;
+export const FOUNDER_PERSONAL = "founder_personal" as const;
 
 async function requireView() {
   const role = await getCommandRole();
@@ -32,7 +34,7 @@ async function requireActor(permission: "edit" | "approve") {
 export const listPeopleOfficeActualSpend = createServerFn({ method: "GET" }).handler(async () => {
   await requireView();
   const sql = await getSql();
-  const [costItems, assets, expenditures, payments, cashAuthority] = await Promise.all([
+  const [costItems, assets, expenditures, payments, founderReimbursements, cashAuthority] = await Promise.all([
     sql.query<SqlRow>(`
       select id,name,cost_group,stage,start_month,end_month,one_time_month,source_ref
         from vyndi_people_office_cost_items
@@ -57,13 +59,19 @@ export const listPeopleOfficeActualSpend = createServerFn({ method: "GET" }).han
        order by p.paid_on desc,p.created_at desc,p.id desc
     `),
     sql.query<SqlRow>(`
+      select r.*,e.source_label,e.description,e.plan_month as accrual_plan_month,e.liability_account_code
+        from vyndi_founder_reimbursements r
+        join vyndi_people_office_actual_expenditures e on e.id=r.expenditure_id
+       order by r.reimbursed_on desc,r.created_at desc,r.id desc
+    `),
+    sql.query<SqlRow>(`
       select plan_month,closing_cash_lakh,source_reference,verified
         from vyndi_cash_authority
        where verified=true
        order by plan_month desc
     `),
   ]);
-  return { costItems, assets, expenditures, payments, cashAuthority };
+  return { costItems, assets, expenditures, payments, founderReimbursements, cashAuthority };
 });
 
 export const createPeopleOfficeActualExpenditure = createServerFn({ method: "POST" })
@@ -77,6 +85,7 @@ export const createPeopleOfficeActualExpenditure = createServerFn({ method: "POS
       amountInr: money,
       sourceReference: reference,
       notes: z.string().trim().max(2000).default(""),
+      fundingSource: z.enum(PEOPLE_OFFICE_FUNDING_SOURCES).default("company_bank"),
     }),
   )
   .handler(async ({ data }) => {
@@ -84,7 +93,7 @@ export const createPeopleOfficeActualExpenditure = createServerFn({ method: "POS
     const sql = await getSql();
     const id = `POEXP-${crypto.randomUUID()}`;
     const rows = await sql.query<{ create_vyndi_people_office_actual_expenditure: string }>(
-      `select create_vyndi_people_office_actual_expenditure($1,$2,$3,$4,$5::date,$6,$7,$8,$9,$10,$11)`,
+      `select create_vyndi_people_office_actual_expenditure_v2($1,$2,$3,$4,$5::date,$6,$7,$8,$9,$10,$11,$12)`,
       [
         id,
         data.sourceType,
@@ -95,6 +104,7 @@ export const createPeopleOfficeActualExpenditure = createServerFn({ method: "POS
         data.amountInr,
         data.sourceReference,
         data.notes,
+        data.fundingSource,
         actor.userId,
         actor.role,
       ],
@@ -116,14 +126,15 @@ export const submitPeopleOfficeActualExpenditure = createServerFn({ method: "POS
   });
 
 export const approvePeopleOfficeActualExpenditure = createServerFn({ method: "POST" })
-  .validator(z.object({ id: identifier }))
+  .validator(z.object({ id: identifier, soleOperatorSelfApproval: z.boolean().default(false) }))
   .handler(async ({ data }) => {
     const actor = await requireActor("approve");
     const sql = await getSql();
-    await sql.query(`select approve_vyndi_people_office_actual_expenditure($1,$2,$3)`, [
+    await sql.query(`select approve_vyndi_people_office_actual_expenditure_v2($1,$2,$3,$4)`, [
       data.id,
       actor.userId,
       actor.role,
+      data.soleOperatorSelfApproval,
     ]);
     return { ok: true, id: data.id };
   });
@@ -166,6 +177,52 @@ export const postPeopleOfficeActualPayment = createServerFn({ method: "POST" })
     return {
       ok: true,
       paymentId: posted.payment_id,
+      journalId: posted.journal_id,
+      paymentPlanMonth: data.paymentPlanMonth,
+      newClosingCashLakh: Number(posted.new_closing_cash_lakh),
+      actualRevision: Number(posted.actual_revision),
+      expenditureStatus: posted.expenditure_status,
+    };
+  });
+
+export const postFounderReimbursement = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      expenditureId: identifier,
+      paymentPlanMonth: z.number().int().min(1).max(36),
+      reimbursedOn: z.string().date(),
+      amountInr: money,
+      evidenceReference: reference,
+    }),
+  )
+  .handler(async ({ data }) => {
+    const actor = await requireActor("approve");
+    const sql = await getSql();
+    const id = `FOREIMB-${crypto.randomUUID()}`;
+    const rows = await sql.query<{
+      reimbursement_id: string;
+      journal_id: string;
+      new_closing_cash_lakh: number | string;
+      actual_revision: number | string;
+      expenditure_status: string;
+    }>(
+      `select * from post_vyndi_founder_reimbursement($1,$2,$3,$4::date,$5,$6,$7,$8)`,
+      [
+        id,
+        data.expenditureId,
+        data.paymentPlanMonth,
+        data.reimbursedOn,
+        data.amountInr,
+        data.evidenceReference,
+        actor.userId,
+        actor.role,
+      ],
+    );
+    const posted = rows[0];
+    if (!posted) throw new Error("Founder reimbursement did not return a posted transaction.");
+    return {
+      ok: true,
+      reimbursementId: posted.reimbursement_id,
       journalId: posted.journal_id,
       paymentPlanMonth: data.paymentPlanMonth,
       newClosingCashLakh: Number(posted.new_closing_cash_lakh),
