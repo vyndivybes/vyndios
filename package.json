@@ -45,7 +45,8 @@
     "test:r3:c": "node --experimental-strip-types --test src/lib/engineering-release-readiness.test.ts",
     "test:r3:d": "node --experimental-strip-types --test src/lib/vibpe-authority-reasoning.test.ts",
     "test:r3:e": "node --experimental-strip-types --test src/lib/digital-product-thread.test.ts",
-    "test:r3": "node --test scripts/r3-vedm-authority-api.test.mjs scripts/r3-bcde-integration.test.mjs && node --experimental-strip-types --test src/lib/vedm-authority-graph.test.ts src/lib/governed-engineering-workflow.test.ts src/lib/engineering-release-readiness.test.ts src/lib/vibpe-authority-reasoning.test.ts src/lib/digital-product-thread.test.ts"
+    "test:r3": "node --test scripts/r3-vedm-authority-api.test.mjs scripts/r3-bcde-integration.test.mjs && node --experimental-strip-types --test src/lib/vedm-authority-graph.test.ts src/lib/governed-engineering-workflow.test.ts src/lib/engineering-release-readiness.test.ts src/lib/vibpe-authority-reasoning.test.ts src/lib/digital-product-thread.test.ts",
+    "prebuild": "npm run test:r3"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
