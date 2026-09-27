@@ -8,18 +8,9 @@ alter table vyndi_people_office_actual_expenditures
 alter table vyndi_people_office_actual_expenditures
   add column if not exists governance_marker text;
 
-do $$
-begin
-  if not exists (
-    select 1 from pg_constraint
-     where conname='vyndi_people_office_actual_funding_source_check'
-  ) then
-    alter table vyndi_people_office_actual_expenditures
-      add constraint vyndi_people_office_actual_funding_source_check
-      check (funding_source in ('company_bank','founder_personal'));
-  end if;
-end;
-$$;
+alter table vyndi_people_office_actual_expenditures
+  add constraint vyndi_people_office_actual_funding_source_check
+  check (funding_source in ('company_bank','founder_personal'));
 
 create table if not exists vyndi_founder_reimbursements (
   id text primary key,
