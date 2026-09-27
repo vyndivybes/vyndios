@@ -1,32 +1,40 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  authRateLimitDecision,
-  checkRateLimit,
-  resetRateLimitStateForTests,
+  isSensitiveAuthRequest,
+  rateLimitDecisionFromCount,
+  requestAbuseKey,
 } from "./rate-limit.ts";
 
-test("fixed-window limiter permits the configured budget and then returns retry guidance", () => {
-  resetRateLimitStateForTests();
-  const now = 1_000_000;
-  assert.equal(checkRateLimit("k", { limit: 2, windowMs: 60_000 }, now).allowed, true);
-  assert.equal(checkRateLimit("k", { limit: 2, windowMs: 60_000 }, now + 1).allowed, true);
-  const blocked = checkRateLimit("k", { limit: 2, windowMs: 60_000 }, now + 2);
-  assert.equal(blocked.allowed, false);
-  assert.ok(blocked.retryAfterSeconds > 0);
-  assert.equal(blocked.remaining, 0);
+test("shared limiter permits budget and blocks the next attempt with retry guidance", () => {
+  assert.deepEqual(
+    rateLimitDecisionFromCount({ count: 8, limit: 8, retryAfterSeconds: 12.2, resetAt: 1000 }),
+    { allowed: true, limit: 8, remaining: 0, retryAfterSeconds: 0, resetAt: 1000 },
+  );
+  assert.deepEqual(
+    rateLimitDecisionFromCount({ count: 9, limit: 8, retryAfterSeconds: 12.2, resetAt: 1000 }),
+    { allowed: false, limit: 8, remaining: 0, retryAfterSeconds: 13, resetAt: 1000 },
+  );
 });
 
-test("auth limiter only protects sensitive POST endpoints and resets after the window", () => {
-  resetRateLimitStateForTests();
-  const sensitive = new Request("https://vyndi.test/api/auth/sign-in/email", {
-    method: "POST",
-    headers: { "cf-connecting-ip": "203.0.113.9" },
-  });
-  for (let i = 0; i < 8; i += 1) assert.equal(authRateLimitDecision(sensitive, i)?.allowed, true);
-  assert.equal(authRateLimitDecision(sensitive, 8)?.allowed, false);
-  assert.equal(authRateLimitDecision(sensitive, 60_001)?.allowed, true);
+test("auth limiter protects only sensitive POST endpoints", () => {
+  assert.equal(
+    isSensitiveAuthRequest(new Request("https://vyndi.test/api/auth/sign-in/email", { method: "POST" })),
+    true,
+  );
+  assert.equal(
+    isSensitiveAuthRequest(new Request("https://vyndi.test/api/auth/get-session", { method: "GET" })),
+    false,
+  );
+});
 
-  const sessionRead = new Request("https://vyndi.test/api/auth/get-session", { method: "GET" });
-  assert.equal(authRateLimitDecision(sessionRead, 0), null);
+test("abuse keys are SHA-256 digests and never expose the raw request IP", () => {
+  const key = requestAbuseKey(
+    new Request("https://vyndi.test/api/auth/sign-in/email", {
+      method: "POST",
+      headers: { "cf-connecting-ip": "203.0.113.9" },
+    }),
+  );
+  assert.match(key, /^[a-f0-9]{64}$/);
+  assert.doesNotMatch(key, /203\.0\.113\.9/);
 });
