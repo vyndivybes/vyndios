@@ -8,6 +8,7 @@ import { dirname, join } from "node:path";
 import pg from "pg";
 import { pendingMigrations } from "./migration-plan.mjs";
 import { migrationEnvironmentDecision } from "./migration-environment.mjs";
+import { requireDestructiveMigrationEvidence } from "./migration-risk.mjs";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -68,6 +69,7 @@ async function main() {
     let count = 0;
     for (const { name, path } of pendingMigrations(entries, applied)) {
       const text = await readFile(join(migrationsDir, path), "utf8");
+      requireDestructiveMigrationEvidence({ sql: text, env: process.env, path });
       try {
         await client.query("BEGIN");
         await client.query(text);
