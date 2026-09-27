@@ -4,6 +4,7 @@ import { getSql } from "@/lib/db";
 import { getCommandRole } from "@/lib/command-access";
 import { canPerform, type CommandPermission } from "@/lib/page-access";
 import { CURRENT_VEDM_AUTHORITY } from "@/lib/engineering-current-authority";
+import { compileVedmAuthorityGraph, createVedmR3aSeed } from "@/lib/vedm-authority-graph";
 
 const familySchema = z.enum(["longitude", "latitude", "altitude"]);
 const baselineStatusSchema = z.enum(["draft", "pending_approval", "released", "superseded"]);
@@ -71,8 +72,26 @@ export const listEngineeringAuthority = createServerFn({ method: "GET" }).handle
       limit 25
     `,
   ]);
+  const vedmGraph = compileVedmAuthorityGraph(
+    createVedmR3aSeed(),
+    new Date().toISOString().slice(0, 10),
+  );
   return {
     vedmAuthority: CURRENT_VEDM_AUTHORITY,
+    vedmAuthorityGraph: {
+      schema: vedmGraph.schema,
+      sourceRepository: vedmGraph.sourceRepository,
+      sourceCommit: vedmGraph.sourceCommit,
+      asOfDate: vedmGraph.asOfDate,
+      valid: vedmGraph.valid,
+      releaseReady: vedmGraph.releaseReady,
+      authorityByDomain: Object.fromEntries(
+        Object.entries(vedmGraph.authorityByDomain).filter(([, node]) => Boolean(node)),
+      ),
+      blockingGateIds: vedmGraph.blockingGateIds,
+      issues: vedmGraph.issues,
+      mutationAuthority: "HUMAN_APPROVAL_REQUIRED",
+    },
     baselines: Array.isArray(baselines) ? [...baselines] : [],
     changes: Array.isArray(changes) ? [...changes] : [],
     evidenceReceipts: Array.isArray(evidenceReceipts) ? [...evidenceReceipts] : [],
