@@ -101,7 +101,7 @@ test("R3-B blocks release while blockers remain", () => {
 });
 
 test("R3-B critical release gates cannot be waived and ordinary blockers need independent evidence-backed waiver", () => {
-  const critical = applyEngineeringWaiver(workflow, {
+  const critical = applyEngineeringWaiver({ ...workflow, blockers: ["G5-FEA"] }, {
     blockerId: "G5-FEA",
     blockerClass: "release_critical",
     requestedBy: "user-maker",
