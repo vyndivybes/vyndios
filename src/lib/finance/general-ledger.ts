@@ -29,6 +29,7 @@ export const CORE_CHART_OF_ACCOUNTS: LedgerAccount[] = [
   { code: "5200", name: "Manufacturing Overhead", type: "expense" },
   { code: "6100", name: "People / Payroll Expense", type: "expense" },
   { code: "6200", name: "Office / Facility Expense", type: "expense" },
+  { code: "6250", name: "Travel / Business Development Expense", type: "expense" },
   { code: "6300", name: "Professional / Statutory Expense", type: "expense" },
   { code: "6400", name: "Outsourcing Expense", type: "expense" },
   { code: "6500", name: "Depreciation Expense", type: "expense" },
