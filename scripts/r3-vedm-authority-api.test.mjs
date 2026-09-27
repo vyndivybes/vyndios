@@ -10,6 +10,10 @@ const engineeringAuthority = readFileSync(
   new URL("../src/lib/engineering-authority.ts", import.meta.url),
   "utf8",
 );
+const currentAuthority = readFileSync(
+  new URL("../src/lib/engineering-current-authority.ts", import.meta.url),
+  "utf8",
+);
 
 test("R3-A authority API is authenticated and compiles the pinned VEDM graph", () => {
   assert.match(route, /requireBusinessActor\("view"\)/);
@@ -33,4 +37,10 @@ test("R3-A is surfaced through the existing Engineering authority response", () 
   assert.match(engineeringAuthority, /compileVedmAuthorityGraph/);
   assert.match(engineeringAuthority, /createVedmR3aSeed/);
   assert.match(engineeringAuthority, /vedmAuthorityGraph/);
+});
+
+test("R3-A pins the human-readable current authority summary to the same VEDM source", () => {
+  assert.match(currentAuthority, /VEDM_R3A_SOURCE_REPOSITORY/);
+  assert.match(currentAuthority, /VEDM_R3A_SOURCE_COMMIT/);
+  assert.match(currentAuthority, /authorityGraphSchema:\s*"VYNDI_VEDM_AUTHORITY_GRAPH_V1"/);
 });
