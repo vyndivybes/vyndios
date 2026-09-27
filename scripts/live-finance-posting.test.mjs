@@ -164,6 +164,11 @@ test("founder-paid People and Office spend creates a director payable without mo
   assert.match(peopleOfficeActualAuthority, /postFounderReimbursement/);
   assert.match(peopleOfficeActualRoute, /Founder \/ Director personal funds/);
   assert.match(peopleOfficeActualRoute, /Sole-operator self-approval/);
+  assert.match(peopleOfficeActualRoute, /Evidence & traceability register/);
+  assert.match(peopleOfficeActualRoute, /Evidence source/);
+  assert.match(peopleOfficeActualRoute, /Reconciliation \/ evidence details/);
+  assert.match(peopleOfficeActualRoute, /text\(row,"source_reference"\)/);
+  assert.match(peopleOfficeActualRoute, /evidenceLines\(text\(row,"notes"\)\)/);
   assert.match(generalLedger, /code: "2400", name: "Founder \/ Director Current Account"/);
   assert.match(generalLedger, /code: "6250", name: "Travel \/ Business Development Expense"/);
   assert.match(financialStatements, /CURRENT_LIABILITY_CODES = \["2000", "2100", "2200", "2400"\]/);
