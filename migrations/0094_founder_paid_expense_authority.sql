@@ -49,6 +49,7 @@ as $$
 declare
   v_result text;
   v_liability text;
+  v_debit text;
 begin
   if p_funding_source not in ('company_bank','founder_personal') then
     raise exception 'Unsupported funding source %.',p_funding_source;
@@ -61,10 +62,11 @@ begin
 
   update vyndi_people_office_actual_expenditures
      set funding_source=p_funding_source,
+         debit_account_code=case when p_source_type='cost_item' and p_source_id='office-travel' then '6250' else debit_account_code end,
          liability_account_code=case when p_funding_source='founder_personal' then '2400' else liability_account_code end,
          updated_at=now()
    where id=p_id
-   returning liability_account_code into v_liability;
+   returning debit_account_code,liability_account_code into v_debit,v_liability;
 
   insert into vyndi_audit_events(
     id,entity_type,entity_id,action,actor_user_id,actor_role,source_reference,payload_json)
@@ -73,6 +75,7 @@ begin
     p_actor_user_id,p_actor_role,p_source_reference,
     jsonb_build_object(
       'fundingSource',p_funding_source,
+      'debitAccount',v_debit,
       'liabilityAccount',v_liability,
       'companyCashMoved',false
     )
