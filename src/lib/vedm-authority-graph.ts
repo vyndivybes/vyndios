@@ -196,6 +196,7 @@ export function compileVedmAuthorityGraph(
         : seed.nodes.filter(
             (node) =>
               node.domain === domain &&
+              node.kind === "document_revision" &&
               node.lifecycle === "controlling" &&
               isEffective(node, asOf),
           );
