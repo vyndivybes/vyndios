@@ -6,6 +6,10 @@ const route = readFileSync(
   new URL("../src/routes/api/engineering/authority.ts", import.meta.url),
   "utf8",
 );
+const engineeringAuthority = readFileSync(
+  new URL("../src/lib/engineering-authority.ts", import.meta.url),
+  "utf8",
+);
 
 test("R3-A authority API is authenticated and compiles the pinned VEDM graph", () => {
   assert.match(route, /requireBusinessActor\("view"\)/);
@@ -23,4 +27,10 @@ test("R3-A authority API supports deterministic graph trace without mutation", (
   assert.doesNotMatch(route, /POST\s*:/);
   assert.doesNotMatch(route, /PUT\s*:/);
   assert.doesNotMatch(route, /DELETE\s*:/);
+});
+
+test("R3-A is surfaced through the existing Engineering authority response", () => {
+  assert.match(engineeringAuthority, /compileVedmAuthorityGraph/);
+  assert.match(engineeringAuthority, /createVedmR3aSeed/);
+  assert.match(engineeringAuthority, /vedmAuthorityGraph/);
 });
