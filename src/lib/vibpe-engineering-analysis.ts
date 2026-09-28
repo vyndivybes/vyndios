@@ -47,7 +47,7 @@ export type VibpeEngineeringSnapshot = {
 
 export const VEDM_ENGINEERING_REASONING_SNAPSHOT: VibpeEngineeringSnapshot = {
   sourceRepository: "vayu-shastr/veloxis-engineering-design-manual",
-  sourceCommit: "9ef41eb8afbc75429013bfd73133957ddccf3834",
+  sourceCommit: "b874cde910ce462724b63bac6b7e7f79e7d68785",
   authority: "VEDM-301 Rev 5.3.9 Candidate E-K75",
   frontEndDevelopment: "Rev 5.4 FK75 — preferred VAEA fork/front-end development freeze — NOT RELEASED",
   clearance: {

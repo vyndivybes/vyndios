@@ -20,7 +20,7 @@ export type VibpeRepositoryKnowledgeRecord = {
 };
 
 const VEDM_REPO = "vayu-shastr/veloxis-engineering-design-manual";
-const VEDM_COMMIT = "9ef41eb8afbc75429013bfd73133957ddccf3834";
+const VEDM_COMMIT = "b874cde910ce462724b63bac6b7e7f79e7d68785";
 
 const ADV_REPO = "vayu-shastr/adv-vibpe";
 const ADV_COMMIT = "3ca30a7891272870190b3f21340102451d7ff94b";
