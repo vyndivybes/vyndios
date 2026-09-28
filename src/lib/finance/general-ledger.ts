@@ -21,6 +21,8 @@ export const CORE_CHART_OF_ACCOUNTS: LedgerAccount[] = [
   { code: "2200", name: "Payroll / Statutory Payables", type: "liability" },
   { code: "2300", name: "Debt", type: "liability" },
   { code: "2400", name: "Founder / Director Current Account", type: "liability" },
+  { code: "2450", name: "Third-Party Reimbursements Payable", type: "liability" },
+  { code: "2460", name: "External Support Clearing", type: "liability" },
   { code: "3000", name: "Equity / Capital", type: "equity" },
   { code: "3100", name: "Retained Earnings", type: "equity" },
   { code: "4000", name: "Product Revenue", type: "revenue" },
