@@ -22,7 +22,7 @@ function fakeSql() {
       return row ? [row] : [];
     }
     if (text.includes("insert into vyndi_vibpe_answer_receipts")) {
-      receipts.push({ answer_id: params[0], receipt_json: params[4] });
+      receipts.push({ answer_id: params[0], receipt_json: params[5] });
       return [];
     }
     return [];
@@ -54,6 +54,18 @@ test("answer receipts are persisted as auditable immutable payloads", async () =
     assumptions: [],
     contradictions: [],
     calculations: [],
+    reasoningTrace: [
+      { stage: "classify-intent", status: "completed", detail: "optimisation" },
+      { stage: "decompose-question", status: "completed", detail: "binding constraint question" },
+      { stage: "retrieve-evidence", status: "completed", detail: "solver evidence" },
+      { stage: "identify-conflicts", status: "completed", detail: "none found" },
+      { stage: "declare-assumptions", status: "completed", detail: "none" },
+      { stage: "calculate-or-simulate", status: "completed", detail: "solver receipt" },
+      { stage: "test-constraints", status: "completed", detail: "finite constraints" },
+      { stage: "score-correctness", status: "completed", detail: "five dimensions" },
+      { stage: "state-uncertainty", status: "completed", detail: "confidence 0.9" },
+      { stage: "recommend-controlled-action", status: "completed", detail: "review solver result" },
+    ],
     fiveDimensions: {
       mathematical: { status: "verified", basis: "solver receipt" },
       theoretical: { status: "supported", basis: "finite planning model" },
