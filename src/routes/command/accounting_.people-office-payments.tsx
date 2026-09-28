@@ -141,10 +141,14 @@ function PeopleOfficeActualSpend() {
 
   function openEvidence(targetType: "expenditure" | "external_support", targetId: string) {
     const key = `${targetType}:${targetId}`;
+    const opening = expandedEvidenceKey !== key;
     setEvidenceTargetType(targetType);
     setEvidenceTargetId(targetId);
-    setExpandedEvidenceKey((current) => current === key ? "" : key);
+    setExpandedEvidenceKey(opening ? key : "");
     setEvidenceFile(null);
+    if (opening && targetType === "expenditure" && typeof document !== "undefined") {
+      requestAnimationFrame(() => document.getElementById(`finance-evidence-expenditure-${targetId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }));
+    }
   }
 
   async function uploadEvidence(event: React.FormEvent) {
