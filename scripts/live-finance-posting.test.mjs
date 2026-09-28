@@ -137,9 +137,12 @@ test("manual operating expenses support controlled digital-service entry without
   assert.match(manualExpenseMigration, /digital_services/);
   assert.match(manualExpenseMigration, /Digital services \/ domains & hosting/);
   assert.match(manualExpenseMigration, /'6200'/);
-  assert.match(manualExpenseMigration, /create_vyndi_people_office_actual_expenditure_v3/);
+  assert.match(manualExpenseMigration, /manual_expense_accounting_check/);
+  assert.match(manualExpenseMigration, /liability_account_code='2400'/);
   assert.match(peopleOfficeActualAuthority, /"manual_expense"/);
-  assert.match(peopleOfficeActualAuthority, /create_vyndi_people_office_actual_expenditure_v3/);
+  assert.match(peopleOfficeActualAuthority, /manual_expense_draft_created/);
+  assert.match(peopleOfficeActualAuthority, /Digital services \/ domains & hosting/);
+  assert.match(peopleOfficeActualAuthority, /'6200'/);
   assert.match(peopleOfficeActualRoute, /Manual operating expense/);
   assert.match(peopleOfficeActualRoute, /Digital services \/ domain & hosting/);
   assert.match(peopleOfficeActualRoute, /Amount \(INR\)/);
