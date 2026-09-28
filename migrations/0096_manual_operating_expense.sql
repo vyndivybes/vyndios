@@ -28,7 +28,3 @@ alter table vyndi_people_office_actual_expenditures
       )
     )
   );
-
-comment on constraint vyndi_people_office_manual_expense_accounting_check
-  on vyndi_people_office_actual_expenditures is
-  'Manual operating expense is currently restricted to Digital services / domains & hosting mapped to Dr 6200; liability follows company-bank or founder-personal funding.';
