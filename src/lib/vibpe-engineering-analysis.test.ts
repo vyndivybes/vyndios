@@ -81,6 +81,7 @@ test("prefers the latest accepted governed engineering-evidence receipt over the
     query: async (sql: string) => {
       queryText = sql;
       return [{
+      authority_source_commit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       payload_json: {
         schema: "VYNDI_ENGINEERING_EVIDENCE_V1",
         configurationId: "VEDM-301-EK75",
@@ -117,4 +118,36 @@ test("prefers the latest accepted governed engineering-evidence receipt over the
   assert.match(queryText, /decision=\'accepted\'/);
   assert.match(result.answer ?? "", /6\.250 mm/);
   assert.match(result.answer ?? "", /bbbbbbbbbbbb/);
+});
+
+
+test("rejects an accepted packet whose acceptance pin does not match the packet source", async () => {
+  const fakeSql = {
+    query: async () => [{
+      authority_source_commit: "cccccccccccccccccccccccccccccccccccccccc",
+      payload_json: {
+        schema: "VYNDI_ENGINEERING_EVIDENCE_V1",
+        source: {
+          repository: "vayu-shastr/veloxis-engineering-design-manual",
+          commit: "dddddddddddddddddddddddddddddddddddddddd",
+        },
+        assessment: {
+          authority: "VEDM-301 Rev 5.3.9 Candidate E-K75",
+          analyticalScreens: {
+            denseSteeringSweepMinMm: 1,
+            packagingMm: [1, 1, 1, 1, 1],
+            tsaiWuFi: 0.1,
+            positiveRootStrengthRatio: 2,
+            hashinIndex: 0.1,
+            qualification: "ANALYTICAL_SCREEN_ONLY",
+          },
+          results: [],
+        },
+      },
+    }],
+  };
+  const result = await resolveVibpeEngineeringAnalysis(fakeSql as never, "tyre clearance latest rev");
+  assert.match(result.answer ?? "", /7\.170 mm/);
+  assert.match(result.answer ?? "", /b874cde910ce/);
+  assert.doesNotMatch(result.answer ?? "", /1\.000 mm/);
 });
