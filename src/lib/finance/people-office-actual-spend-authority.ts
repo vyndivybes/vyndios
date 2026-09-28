@@ -102,7 +102,7 @@ async function requireActor(permission: "edit" | "approve") {
 export const listPeopleOfficeActualSpend = createServerFn({ method: "GET" }).handler(async () => {
   await requireView();
   const sql = await getSql();
-  const [costItems, assets, expenditures, payments, founderReimbursements, thirdPartyReimbursements, externalSupportReceipts, expenseEvidenceAttachments, cashAuthority] = await Promise.all([
+  const [costItems, assets, expenditures, payments, founderReimbursements, thirdPartyReimbursements, externalSupportReceipts, evidenceAttachments, cashAuthority] = await Promise.all([
     sql.query<SqlRow>(`
       select id,name,cost_group,stage,start_month,end_month,one_time_month,source_ref
         from vyndi_people_office_cost_items
@@ -146,7 +146,7 @@ export const listPeopleOfficeActualSpend = createServerFn({ method: "GET" }).han
        order by s.received_on desc,s.created_at desc,s.id desc
     `),
     sql.query<SqlRow>(`
-      select id,expenditure_id,document_type,file_name,mime_type,file_size_bytes,
+      select id,expenditure_id,external_support_receipt_id,document_type,file_name,mime_type,file_size_bytes,
              sha256_hex,uploaded_by,uploaded_role,uploaded_at
         from vyndi_expense_evidence_attachments
        order by uploaded_at desc,id desc
@@ -166,7 +166,7 @@ export const listPeopleOfficeActualSpend = createServerFn({ method: "GET" }).han
     founderReimbursements,
     thirdPartyReimbursements,
     externalSupportReceipts,
-    expenseEvidenceAttachments,
+    evidenceAttachments,
     cashAuthority,
   };
 });

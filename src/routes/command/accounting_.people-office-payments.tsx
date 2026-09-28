@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Kpi, Panel } from "@/components/kpi";
 import {
   approvePeopleOfficeActualExpenditure,
@@ -42,7 +42,7 @@ function PeopleOfficeActualSpend() {
     founderReimbursements: Row[];
     thirdPartyReimbursements: Row[];
     externalSupportReceipts: Row[];
-    expenseEvidenceAttachments: Row[];
+    evidenceAttachments: Row[];
     cashAuthority: Row[];
   };
 
@@ -86,7 +86,9 @@ function PeopleOfficeActualSpend() {
   const [supportRepaymentStatus, setSupportRepaymentStatus] = useState<(typeof REPAYMENT_STATUSES)[number]>("undecided");
   const [supportEvidence, setSupportEvidence] = useState("");
   const [supportNotes, setSupportNotes] = useState("");
-  const [evidenceExpenditureId, setEvidenceExpenditureId] = useState("");
+  const [evidenceTargetType, setEvidenceTargetType] = useState<"expenditure" | "external_support">("expenditure");
+  const [evidenceTargetId, setEvidenceTargetId] = useState("");
+  const [expandedEvidenceKey, setExpandedEvidenceKey] = useState("");
   const [evidenceDocumentType, setEvidenceDocumentType] = useState<"invoice" | "receipt" | "payment_evidence" | "statement" | "other">("invoice");
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
   const [busy, setBusy] = useState("");
@@ -130,23 +132,43 @@ function PeopleOfficeActualSpend() {
     await router.invalidate();
   }
 
+  const evidenceFor = (targetType: "expenditure" | "external_support", targetId: string) =>
+    data.evidenceAttachments.filter((row) =>
+      targetType === "expenditure"
+        ? text(row, "expenditure_id") === targetId
+        : text(row, "external_support_receipt_id") === targetId,
+    );
+
+  function openEvidence(targetType: "expenditure" | "external_support", targetId: string) {
+    const key = `${targetType}:${targetId}`;
+    const opening = expandedEvidenceKey !== key;
+    setEvidenceTargetType(targetType);
+    setEvidenceTargetId(targetId);
+    setExpandedEvidenceKey(opening ? key : "");
+    setEvidenceFile(null);
+    if (opening && targetType === "expenditure" && typeof document !== "undefined") {
+      requestAnimationFrame(() => document.getElementById(`finance-evidence-expenditure-${targetId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }));
+    }
+  }
+
   async function uploadEvidence(event: React.FormEvent) {
     event.preventDefault();
-    if (!evidenceExpenditureId || !evidenceFile) return;
+    if (!evidenceTargetId || !evidenceFile) return;
     setBusy("evidence-upload"); setMessage(""); setError("");
     try {
       const form = new FormData();
-      form.set("expenditureId", evidenceExpenditureId);
+      form.set("targetType", evidenceTargetType);
+      form.set("targetId", evidenceTargetId);
       form.set("documentType", evidenceDocumentType);
       form.set("file", evidenceFile);
       const response = await fetch("/api/finance/expense-evidence", { method: "POST", body: form });
       const payload = await response.json() as { ok?: boolean; error?: string; attachmentId?: string; sha256Hex?: string };
       if (!response.ok || !payload.ok) {
         throw new Error(payload.error === "duplicate_evidence"
-          ? "This exact evidence file is already attached to the selected expenditure."
+          ? "This exact evidence file is already attached to this transaction."
           : payload.error || "Evidence upload failed.");
       }
-      setMessage(`${payload.attachmentId} attached. SHA-256 ${payload.sha256Hex}. The accounting approval and journal were not changed.`);
+      setMessage(`${payload.attachmentId} attached. SHA-256 ${payload.sha256Hex}. The accounting transaction was not changed.`);
       setEvidenceFile(null);
       await refresh();
     } catch (cause) {
@@ -154,11 +176,31 @@ function PeopleOfficeActualSpend() {
     } finally { setBusy(""); }
   }
 
-  function selectEvidence(row: Row) {
-    setEvidenceExpenditureId(text(row, "id"));
-    if (typeof document !== "undefined") {
-      requestAnimationFrame(() => document.getElementById("expense-evidence-upload")?.scrollIntoView({ behavior: "smooth", block: "start" }));
-    }
+  function renderEvidenceBundle(targetType: "expenditure" | "external_support", targetId: string) {
+    const key = `${targetType}:${targetId}`;
+    if (expandedEvidenceKey !== key) return null;
+    const attachments = evidenceFor(targetType, targetId);
+    const isSupport = targetType === "external_support";
+    return <div className="mt-3 rounded-2xl border border-accent/30 bg-bg-elevated/60 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div><p className="text-[10px] font-semibold uppercase tracking-wider text-accent">Evidence files</p><p className="mt-1 text-xs text-muted">{attachments.length} file{attachments.length === 1 ? "" : "s"} linked to this {isSupport ? "external support receipt" : "expenditure"}.</p></div>
+        <button type="button" onClick={()=>openEvidence(targetType,targetId)} className="rounded-full border border-border px-3 py-1 text-[10px] font-semibold">Close</button>
+      </div>
+      <form onSubmit={uploadEvidence} className="mt-4 grid gap-3 lg:grid-cols-12">
+        <label className="lg:col-span-3"><span className="text-[10px] font-semibold uppercase tracking-wider text-muted">Document type</span><select value={evidenceDocumentType} onChange={(event)=>setEvidenceDocumentType(event.target.value as "invoice" | "receipt" | "payment_evidence" | "statement" | "other")} className="mt-1 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm"><option value="invoice">Invoice</option><option value="receipt">Receipt</option><option value="payment_evidence">Payment evidence</option><option value="statement">Statement</option><option value="other">Other</option></select></label>
+        <label className="lg:col-span-6"><span className="text-[10px] font-semibold uppercase tracking-wider text-muted">{isSupport ? "Support proof file" : "Evidence file"}</span><input required type="file" accept="application/pdf,image/jpeg,image/png" onChange={(event)=>setEvidenceFile(event.target.files?.[0] ?? null)} className="mt-1 block w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm"/><span className="mt-1 block text-[10px] text-muted">PDF, JPEG or PNG · maximum 5 MB · SHA-256 calculated server-side.</span></label>
+        <div className="lg:col-span-3 flex items-end"><button disabled={busy!=="" || !evidenceFile || evidenceTargetId !== targetId || evidenceTargetType !== targetType} className="w-full rounded-full border border-accent bg-accent/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-accent disabled:opacity-50">{busy === "evidence-upload" ? "Uploading…" : isSupport ? "Attach Proof" : "Attach Evidence"}</button></div>
+      </form>
+      <div className="mt-4 space-y-2">
+        {attachments.map((row)=><div key={text(row,"id")} className="grid gap-3 rounded-xl border border-border/70 bg-bg p-3 text-xs lg:grid-cols-[1.5fr_0.8fr_2fr_auto] lg:items-center">
+          <div><p className="font-semibold">{text(row,"file_name")}</p><p className="mt-1 text-[10px] uppercase text-muted">{text(row,"document_type").replaceAll("_"," ")} · {fileSize(num(row,"file_size_bytes"))}</p></div>
+          <div><p className="text-[10px] text-muted">Uploaded</p><p className="mt-1">{text(row,"uploaded_at")}</p></div>
+          <div><p className="text-[10px] text-muted">SHA-256</p><p className="mt-1 break-all font-mono text-[10px]">{text(row,"sha256_hex")}</p></div>
+          <div className="flex gap-2"><a href={`/api/finance/expense-evidence?attachmentId=${encodeURIComponent(text(row,"id"))}`} target="_blank" rel="noreferrer" className="rounded-full border border-accent/60 px-3 py-1 text-[10px] font-semibold text-accent">Preview</a><a href={`/api/finance/expense-evidence?attachmentId=${encodeURIComponent(text(row,"id"))}&download=1`} className="rounded-full border border-border px-3 py-1 text-[10px] font-semibold">Download</a></div>
+        </div>)}
+        {attachments.length===0 ? <p className="rounded-xl border border-dashed border-border p-3 text-xs text-muted">No proof files attached yet.</p> : null}
+      </div>
+    </div>;
   }
 
   async function createActual(event: React.FormEvent) {
@@ -380,34 +422,17 @@ function PeopleOfficeActualSpend() {
     </Panel>
 
     <Panel title="2 · Actual expenditure register" kicker="Draft → pending approval → accrued obligation → part-paid / paid">
-      <div className="overflow-x-auto"><table className="w-full min-w-[1200px] text-sm"><thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle"><tr><th className="px-3 py-3 text-left">Actual</th><th className="px-3 py-3 text-left">Source</th><th className="px-3 py-3 text-left">Accrual</th><th className="px-3 py-3 text-right">Actual</th><th className="px-3 py-3 text-right">Paid</th><th className="px-3 py-3 text-right">Open</th><th className="px-3 py-3 text-left">Accounting</th><th className="px-3 py-3 text-left">Status / action</th></tr></thead><tbody>{data.expenditures.map((row)=>{ const id=text(row,"id"); const status=text(row,"lifecycle_status"); const funding=text(row,"funding_source") || "company_bank"; return <tr key={id} className="border-t border-border/70 align-top"><td className="px-3 py-3"><p className="font-mono text-xs">{id}</p><p className="mt-1 max-w-xs text-xs text-muted">{text(row,"description")}</p></td><td className="px-3 py-3"><p className="font-semibold">{text(row,"source_label")}</p><p className="text-[10px] uppercase text-muted">{text(row,"source_category")}</p><p className="mt-1 text-[10px] font-semibold text-subtle">{funding === "founder_personal" ? "Founder / Director personal funds" : funding === "third_party" ? `Third party · ${text(row,"third_party_payer_name")} · repayment ${text(row,"third_party_repayment_status").replaceAll("_"," ")}` : "Company bank"}</p></td><td className="px-3 py-3">M{num(row,"plan_month")} · {text(row,"incurred_on")}</td><td className="px-3 py-3 text-right font-semibold tabular-nums">{inr(num(row,"amount_inr"))}</td><td className="px-3 py-3 text-right tabular-nums">{inr(num(row,"amount_paid_inr"))}</td><td className="px-3 py-3 text-right tabular-nums">{inr(num(row,"amount_open_inr"))}</td><td className="px-3 py-3"><p className="font-mono text-xs">Dr {text(row,"debit_account_code")} / Cr {text(row,"liability_account_code")}</p><p className="mt-1 text-[10px] text-muted">{funding === "founder_personal" ? "Approval accrual · Cr 2400 · company cash unchanged" : funding === "third_party" ? (text(row,"third_party_repayment_status") === "required" ? "Approval accrual · Cr 2450 · reimburse only through third-party reimbursement" : "Approval accrual · Cr 2460 External Support Clearing · no automatic income classification") : "Approval accrual; Bank 1000 only on payment"}</p>{text(row,"governance_marker") ? <p className="mt-1 text-[10px] font-semibold text-accent">{text(row,"governance_marker")}</p> : null}</td><td className="px-3 py-3"><p className="font-semibold uppercase text-[11px]">{status.replaceAll("_"," ")}</p><div className="mt-2 flex gap-2">{status === "draft" ? <button disabled={busy!==""} onClick={()=>transition(id,"submit")} className="rounded-full border border-border px-3 py-1 text-[10px] font-semibold">Submit</button> : null}{status === "pending_approval" ? <button disabled={busy!==""} onClick={()=>transition(id,"approve",funding)} className="rounded-full border border-accent px-3 py-1 text-[10px] font-semibold text-accent">{funding === "founder_personal" ? "Sole-operator self-approval" : "Approve & accrue"}</button> : null}{["approved","part_paid"].includes(status) && funding === "company_bank" ? <button onClick={()=>selectPayment(row)} className="rounded-full border border-ok/50 px-3 py-1 text-[10px] font-semibold text-ok">Select payment</button> : null}{["approved","part_paid"].includes(status) && funding === "founder_personal" ? <button onClick={()=>selectReimbursement(row)} className="rounded-full border border-accent/60 px-3 py-1 text-[10px] font-semibold text-accent">Select reimbursement</button> : null}{["approved","part_paid"].includes(status) && funding === "third_party" && text(row,"third_party_repayment_status") === "required" ? <button onClick={()=>selectThirdPartyReimbursement(row)} className="rounded-full border border-accent/60 px-3 py-1 text-[10px] font-semibold text-accent">Select third-party reimbursement</button> : null}{["approved","part_paid"].includes(status) && funding === "third_party" && text(row,"third_party_repayment_status") !== "required" ? <span className="text-[10px] font-semibold text-muted">Pending classification · no reimbursement posted</span> : null}<button type="button" onClick={()=>selectEvidence(row)} className="rounded-full border border-border px-3 py-1 text-[10px] font-semibold">Attach Evidence</button></div></td></tr>;})}</tbody></table>{data.expenditures.length===0 ? <p className="py-5 text-sm text-muted">No actual expenditure transactions have been recorded yet.</p> : null}</div>
-    </Panel>
-
-    <Panel title="Expense evidence attachments" kicker="Append-only invoice / receipt / payment evidence · SHA-256 integrity" >
-      <div id="expense-evidence-upload" className="space-y-5">
-        <form onSubmit={uploadEvidence} className="grid gap-4 lg:grid-cols-12">
-          <label className="lg:col-span-5"><span className="text-[10px] font-semibold uppercase tracking-wider text-muted">Expenditure</span><select required value={evidenceExpenditureId} onChange={(event)=>setEvidenceExpenditureId(event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm"><option value="">Select expenditure…</option>{data.expenditures.map((row)=><option key={text(row,"id")} value={text(row,"id")}>{text(row,"id")} · {text(row,"description")} · {inr(num(row,"amount_inr"))}</option>)}</select></label>
-          <label className="lg:col-span-2"><span className="text-[10px] font-semibold uppercase tracking-wider text-muted">Document type</span><select value={evidenceDocumentType} onChange={(event)=>setEvidenceDocumentType(event.target.value as "invoice" | "receipt" | "payment_evidence" | "statement" | "other")} className="mt-1 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm"><option value="invoice">Invoice</option><option value="receipt">Receipt</option><option value="payment_evidence">Payment evidence</option><option value="statement">Statement</option><option value="other">Other</option></select></label>
-          <label className="lg:col-span-5"><span className="text-[10px] font-semibold uppercase tracking-wider text-muted">Evidence file</span><input required type="file" accept="application/pdf,image/jpeg,image/png" onChange={(event)=>setEvidenceFile(event.target.files?.[0] ?? null)} className="mt-1 block w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm"/><span className="mt-1 block text-[10px] text-muted">PDF, JPEG or PNG · maximum 5 MB · server validates the actual file signature.</span></label>
-          <div className="lg:col-span-12 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-bg-elevated/50 p-3"><p className="max-w-4xl text-xs leading-5 text-muted">Uploading evidence is append-only. It links the document to the expenditure but does <strong>not</strong> alter the approved amount, accounting journal, funding source or cash authority.</p><button disabled={busy!=="" || !evidenceExpenditureId || !evidenceFile} className="rounded-full border border-accent bg-accent/10 px-5 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-accent disabled:opacity-50">{busy === "evidence-upload" ? "Uploading…" : "Upload evidence"}</button></div>
-        </form>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1250px] text-sm">
-            <thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle"><tr><th className="px-3 py-3 text-left">Evidence</th><th className="px-3 py-3 text-left">Expenditure</th><th className="px-3 py-3 text-left">Type / file</th><th className="px-3 py-3 text-left">Uploaded</th><th className="px-3 py-3 text-left">SHA-256</th><th className="px-3 py-3 text-left">Actions</th></tr></thead>
-            <tbody>{data.expenseEvidenceAttachments.map((row)=><tr key={text(row,"id")} className="border-t border-border/70 align-top"><td className="px-3 py-3 font-mono text-xs">{text(row,"id")}</td><td className="px-3 py-3"><p className="font-mono text-xs">{text(row,"expenditure_id")}</p><p className="mt-1 max-w-xs text-[10px] text-muted">{data.expenditures.find((item)=>text(item,"id")===text(row,"expenditure_id")) ? text(data.expenditures.find((item)=>text(item,"id")===text(row,"expenditure_id")) as Row,"description") : ""}</p></td><td className="px-3 py-3"><p className="font-semibold">{text(row,"document_type").replaceAll("_"," ")}</p><p className="mt-1 break-all text-xs text-muted">{text(row,"file_name")} · {fileSize(num(row,"file_size_bytes"))}</p></td><td className="px-3 py-3"><p>{text(row,"uploaded_at")}</p><p className="mt-1 text-[10px] text-muted">{text(row,"uploaded_by")} · {text(row,"uploaded_role")}</p></td><td className="px-3 py-3"><p className="max-w-sm break-all font-mono text-[10px]">{text(row,"sha256_hex")}</p></td><td className="px-3 py-3"><div className="flex flex-wrap gap-2"><a href={`/api/finance/expense-evidence?attachmentId=${encodeURIComponent(text(row,"id"))}`} target="_blank" rel="noreferrer" className="rounded-full border border-accent/60 px-3 py-1 text-[10px] font-semibold text-accent">Preview</a><a href={`/api/finance/expense-evidence?attachmentId=${encodeURIComponent(text(row,"id"))}&download=1`} className="rounded-full border border-border px-3 py-1 text-[10px] font-semibold">Download</a></div></td></tr>)}</tbody>
-          </table>
-          {data.expenseEvidenceAttachments.length===0 ? <p className="py-5 text-sm text-muted">No invoice or supporting files have been attached yet.</p> : null}
-        </div>
-      </div>
+      <div className="overflow-x-auto"><table className="w-full min-w-[1200px] text-sm"><thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle"><tr><th className="px-3 py-3 text-left">Actual</th><th className="px-3 py-3 text-left">Source</th><th className="px-3 py-3 text-left">Accrual</th><th className="px-3 py-3 text-right">Actual</th><th className="px-3 py-3 text-right">Paid</th><th className="px-3 py-3 text-right">Open</th><th className="px-3 py-3 text-left">Accounting</th><th className="px-3 py-3 text-left">Status / action</th></tr></thead><tbody>{data.expenditures.map((row)=>{ const id=text(row,"id"); const status=text(row,"lifecycle_status"); const funding=text(row,"funding_source") || "company_bank"; return <tr key={id} className="border-t border-border/70 align-top"><td className="px-3 py-3"><p className="font-mono text-xs">{id}</p><p className="mt-1 max-w-xs text-xs text-muted">{text(row,"description")}</p></td><td className="px-3 py-3"><p className="font-semibold">{text(row,"source_label")}</p><p className="text-[10px] uppercase text-muted">{text(row,"source_category")}</p><p className="mt-1 text-[10px] font-semibold text-subtle">{funding === "founder_personal" ? "Founder / Director personal funds" : funding === "third_party" ? `Third party · ${text(row,"third_party_payer_name")} · repayment ${text(row,"third_party_repayment_status").replaceAll("_"," ")}` : "Company bank"}</p></td><td className="px-3 py-3">M{num(row,"plan_month")} · {text(row,"incurred_on")}</td><td className="px-3 py-3 text-right font-semibold tabular-nums">{inr(num(row,"amount_inr"))}</td><td className="px-3 py-3 text-right tabular-nums">{inr(num(row,"amount_paid_inr"))}</td><td className="px-3 py-3 text-right tabular-nums">{inr(num(row,"amount_open_inr"))}</td><td className="px-3 py-3"><p className="font-mono text-xs">Dr {text(row,"debit_account_code")} / Cr {text(row,"liability_account_code")}</p><p className="mt-1 text-[10px] text-muted">{funding === "founder_personal" ? "Approval accrual · Cr 2400 · company cash unchanged" : funding === "third_party" ? (text(row,"third_party_repayment_status") === "required" ? "Approval accrual · Cr 2450 · reimburse only through third-party reimbursement" : "Approval accrual · Cr 2460 External Support Clearing · no automatic income classification") : "Approval accrual; Bank 1000 only on payment"}</p>{text(row,"governance_marker") ? <p className="mt-1 text-[10px] font-semibold text-accent">{text(row,"governance_marker")}</p> : null}</td><td className="px-3 py-3"><p className="font-semibold uppercase text-[11px]">{status.replaceAll("_"," ")}</p><div className="mt-2 flex gap-2">{status === "draft" ? <button disabled={busy!==""} onClick={()=>transition(id,"submit")} className="rounded-full border border-border px-3 py-1 text-[10px] font-semibold">Submit</button> : null}{status === "pending_approval" ? <button disabled={busy!==""} onClick={()=>transition(id,"approve",funding)} className="rounded-full border border-accent px-3 py-1 text-[10px] font-semibold text-accent">{funding === "founder_personal" ? "Sole-operator self-approval" : "Approve & accrue"}</button> : null}{["approved","part_paid"].includes(status) && funding === "company_bank" ? <button onClick={()=>selectPayment(row)} className="rounded-full border border-ok/50 px-3 py-1 text-[10px] font-semibold text-ok">Select payment</button> : null}{["approved","part_paid"].includes(status) && funding === "founder_personal" ? <button onClick={()=>selectReimbursement(row)} className="rounded-full border border-accent/60 px-3 py-1 text-[10px] font-semibold text-accent">Select reimbursement</button> : null}{["approved","part_paid"].includes(status) && funding === "third_party" && text(row,"third_party_repayment_status") === "required" ? <button onClick={()=>selectThirdPartyReimbursement(row)} className="rounded-full border border-accent/60 px-3 py-1 text-[10px] font-semibold text-accent">Select third-party reimbursement</button> : null}{["approved","part_paid"].includes(status) && funding === "third_party" && text(row,"third_party_repayment_status") !== "required" ? <span className="text-[10px] font-semibold text-muted">Pending classification · no reimbursement posted</span> : null}<button type="button" onClick={()=>openEvidence("expenditure",id)} className="rounded-full border border-border px-3 py-1 text-[10px] font-semibold">{expandedEvidenceKey === `expenditure:${id}` ? "Close Evidence" : `View Evidence (${evidenceFor("expenditure",id).length})`}</button></div></td></tr>;})}</tbody></table>{data.expenditures.length===0 ? <p className="py-5 text-sm text-muted">No actual expenditure transactions have been recorded yet.</p> : null}</div>
     </Panel>
 
     <Panel title="Evidence & traceability register" kicker="Source evidence · reconciliation details · governance · journal lineage">
       <div className="space-y-3">
         {data.expenditures.map((row) => {
+          const id = text(row,"id");
           const evidence = evidenceLines(text(row,"notes"));
           const funding = text(row,"funding_source") || "company_bank";
-          return <article key={text(row,"id")} className="rounded-2xl border border-border bg-bg-elevated/40 p-4">
+          const attachmentCount = evidenceFor("expenditure",id).length;
+          return <article id={`finance-evidence-expenditure-${id}`} key={id} className="rounded-2xl border border-border bg-bg-elevated/40 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="font-mono text-xs text-accent">{text(row,"id")}</p>
@@ -418,6 +443,7 @@ function PeopleOfficeActualSpend() {
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Governance</p>
                 <p className="mt-1 text-xs font-semibold text-accent">{text(row,"governance_marker") || "Standard controlled approval"}</p>
                 <p className="mt-1 text-[10px] text-muted">{funding === "founder_personal" ? "Founder / Director personal funds" : funding === "third_party" ? `Third party · ${text(row,"third_party_payer_name")} · repayment ${text(row,"third_party_repayment_status").replaceAll("_"," ")}` : "Company bank"}</p>
+                <button type="button" onClick={()=>openEvidence("expenditure",id)} className="mt-2 rounded-full border border-accent/60 px-3 py-1 text-[10px] font-semibold text-accent">{expandedEvidenceKey === `expenditure:${id}` ? "Close Evidence" : `View Evidence (${attachmentCount})`}</button>
               </div>
             </div>
             <div className="mt-4 grid gap-4 lg:grid-cols-3">
@@ -435,6 +461,7 @@ function PeopleOfficeActualSpend() {
               <p className="rounded-xl border border-border/70 p-3"><span className="block text-[10px] font-semibold uppercase tracking-wider text-muted">Journal lineage</span><span className="mt-1 block break-words font-mono">{text(row,"obligation_journal_id") || "Not yet posted"}</span></p>
               <p className="rounded-xl border border-border/70 p-3"><span className="block text-[10px] font-semibold uppercase tracking-wider text-muted">Open / paid</span><span className="mt-1 block">{inr(num(row,"amount_open_inr"))} open · {inr(num(row,"amount_paid_inr"))} paid</span></p>
             </div>
+            {renderEvidenceBundle("expenditure",id)}
           </article>;
         })}
         {data.expenditures.length===0 ? <p className="py-5 text-sm text-muted">No expenditure evidence is available yet.</p> : null}
@@ -505,11 +532,33 @@ function PeopleOfficeActualSpend() {
       <div className="overflow-x-auto"><table className="w-full min-w-[1100px] text-sm"><thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle"><tr><th className="px-3 py-3 text-left">Reimbursement</th><th className="px-3 py-3 text-left">Payer / expense</th><th className="px-3 py-3 text-left">Accrual → cash month</th><th className="px-3 py-3 text-left">Reimbursed</th><th className="px-3 py-3 text-right">Amount</th><th className="px-3 py-3 text-left">Evidence</th><th className="px-3 py-3 text-left">Accounting / cash</th></tr></thead><tbody>{data.thirdPartyReimbursements.map((row)=><tr key={text(row,"id")} className="border-t border-border/70"><td className="px-3 py-3 font-mono text-xs">{text(row,"id")}</td><td className="px-3 py-3"><p className="font-semibold">{text(row,"third_party_payer_name")}</p><p className="text-[10px] text-muted">{text(row,"source_label")} · {text(row,"expenditure_id")}</p></td><td className="px-3 py-3">M{num(row,"accrual_plan_month")} → M{num(row,"plan_month")}</td><td className="px-3 py-3">{text(row,"reimbursed_on")}</td><td className="px-3 py-3 text-right font-semibold tabular-nums">{inr(num(row,"amount_inr"))}</td><td className="px-3 py-3 max-w-sm break-words text-xs">{text(row,"evidence_reference")}</td><td className="px-3 py-3"><p className="font-mono text-xs">Dr 2450 / Cr 1000 · {text(row,"journal_id")}</p><p className="mt-1 text-[10px] text-muted">Cash R{num(row,"actual_revision")} → {lakh(num(row,"new_closing_cash_lakh"))}</p></td></tr>)}</tbody></table>{data.thirdPartyReimbursements.length===0 ? <p className="py-5 text-sm text-muted">No third-party reimbursements have been posted yet.</p> : null}</div>
     </Panel>
 
-    <Panel title="External support register" kicker="Assistance received · repayment status · related expense · classification and cash lineage">
-      <div className="overflow-x-auto"><table className="w-full min-w-[1250px] text-sm"><thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle"><tr><th className="px-3 py-3 text-left">Support</th><th className="px-3 py-3 text-left">Received from</th><th className="px-3 py-3 text-left">Received / destination</th><th className="px-3 py-3 text-right">Amount</th><th className="px-3 py-3 text-left">Purpose / related expense</th><th className="px-3 py-3 text-left">Repayment / classification</th><th className="px-3 py-3 text-left">Evidence / accounting</th></tr></thead><tbody>{data.externalSupportReceipts.map((row)=><tr key={text(row,"id")} className="border-t border-border/70 align-top"><td className="px-3 py-3 font-mono text-xs">{text(row,"id")}</td><td className="px-3 py-3"><p className="font-semibold">{text(row,"received_from")}</p><p className="text-[10px] uppercase text-muted">{text(row,"sender_type")}</p></td><td className="px-3 py-3">{text(row,"received_on")}<p className="mt-1 text-[10px] text-muted">{text(row,"received_into").replaceAll("_"," ")} · M{num(row,"plan_month")}</p></td><td className="px-3 py-3 text-right font-semibold tabular-nums">{inr(num(row,"amount_inr"))}</td><td className="px-3 py-3"><p>{text(row,"purpose")}</p><p className="mt-1 text-[10px] text-muted">{text(row,"related_expenditure_id") ? `${text(row,"related_expenditure_id")} · ${text(row,"related_expenditure_description")}` : "Not linked to an expenditure"}</p></td><td className="px-3 py-3"><p className="font-semibold">{text(row,"repayment_status").replaceAll("_"," ")}</p><p className="mt-1 text-[10px] font-semibold text-accent">{text(row,"accounting_status") === "pending_classification" ? "Pending classification" : text(row,"accounting_status").replaceAll("_"," ")}</p><p className="mt-1 font-mono text-[10px]">Cr {text(row,"liability_account_code")}</p></td><td className="px-3 py-3"><p className="max-w-xs break-words text-xs">{text(row,"evidence_reference")}</p><p className="mt-1 font-mono text-[10px]">{text(row,"journal_id") || "No company-bank journal"}</p>{text(row,"journal_id") ? <p className="mt-1 text-[10px] text-muted">Cash R{num(row,"actual_revision")} → {lakh(num(row,"new_closing_cash_lakh"))}</p> : <p className="mt-1 text-[10px] text-muted">Company cash unchanged</p>}</td></tr>)}</tbody></table>{data.externalSupportReceipts.length===0 ? <p className="py-5 text-sm text-muted">No external support or expense assistance has been recorded yet.</p> : null}</div>
+    <Panel title="External support register" kicker="Assistance received · repayment status · related expense · classification · nested proof">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[1250px] text-sm">
+          <thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle"><tr><th className="px-3 py-3 text-left">Support</th><th className="px-3 py-3 text-left">Received from</th><th className="px-3 py-3 text-left">Received / destination</th><th className="px-3 py-3 text-right">Amount</th><th className="px-3 py-3 text-left">Purpose / related expense</th><th className="px-3 py-3 text-left">Repayment / classification</th><th className="px-3 py-3 text-left">Evidence / accounting</th></tr></thead>
+          <tbody>{data.externalSupportReceipts.map((row)=>{
+            const id=text(row,"id");
+            const attachmentCount=evidenceFor("external_support",id).length;
+            const expanded=expandedEvidenceKey===`external_support:${id}`;
+            return <Fragment key={id}>
+              <tr className="border-t border-border/70 align-top">
+                <td className="px-3 py-3 font-mono text-xs">{id}</td>
+                <td className="px-3 py-3"><p className="font-semibold">{text(row,"received_from")}</p><p className="text-[10px] uppercase text-muted">{text(row,"sender_type")}</p></td>
+                <td className="px-3 py-3">{text(row,"received_on")}<p className="mt-1 text-[10px] text-muted">{text(row,"received_into").replaceAll("_"," ")} · M{num(row,"plan_month")}</p></td>
+                <td className="px-3 py-3 text-right font-semibold tabular-nums">{inr(num(row,"amount_inr"))}</td>
+                <td className="px-3 py-3"><p>{text(row,"purpose")}</p><p className="mt-1 text-[10px] text-muted">{text(row,"related_expenditure_id") ? `${text(row,"related_expenditure_id")} · ${text(row,"related_expenditure_description")}` : "Not linked to an expenditure"}</p></td>
+                <td className="px-3 py-3"><p className="font-semibold">{text(row,"repayment_status").replaceAll("_"," ")}</p><p className="mt-1 text-[10px] font-semibold text-accent">{text(row,"accounting_status") === "pending_classification" ? "Pending classification" : text(row,"accounting_status").replaceAll("_"," ")}</p><p className="mt-1 font-mono text-[10px]">Cr {text(row,"liability_account_code")}</p></td>
+                <td className="px-3 py-3"><p className="max-w-xs break-words text-xs">{text(row,"evidence_reference")}</p><p className="mt-1 font-mono text-[10px]">{text(row,"journal_id") || "No company-bank journal"}</p>{text(row,"journal_id") ? <p className="mt-1 text-[10px] text-muted">Cash R{num(row,"actual_revision")} → {lakh(num(row,"new_closing_cash_lakh"))}</p> : <p className="mt-1 text-[10px] text-muted">Company cash unchanged</p>}<button type="button" onClick={()=>openEvidence("external_support",id)} className="mt-2 rounded-full border border-accent/60 px-3 py-1 text-[10px] font-semibold text-accent">{expanded ? "Close Proof" : attachmentCount ? `View Evidence (${attachmentCount})` : "Attach Proof"}</button></td>
+              </tr>
+              {expanded ? <tr className="border-t border-border/50"><td colSpan={7} className="px-3 pb-4 pt-1">{renderEvidenceBundle("external_support",id)}</td></tr> : null}
+            </Fragment>;
+          })}</tbody>
+        </table>
+        {data.externalSupportReceipts.length===0 ? <p className="py-5 text-sm text-muted">No external support or expense assistance has been recorded yet.</p> : null}
+      </div>
     </Panel>
 
-    <Panel title="Controlled accounting map" kicker="Existing VYNDI chart of accounts · no parallel ledger">
+        <Panel title="Controlled accounting map" kicker="Existing VYNDI chart of accounts · no parallel ledger">
       <div className="grid gap-3 text-sm md:grid-cols-2 lg:grid-cols-3"><p className="rounded-xl border border-border p-3"><strong>Payroll</strong><br/><span className="text-muted">Dr 6100 People / Payroll · Cr 2200 Payroll / Statutory Payable</span></p><p className="rounded-xl border border-border p-3"><strong>Rent / Office</strong><br/><span className="text-muted">Dr 6200 Office / Facility · Cr 2000 Trade Payables</span></p><p className="rounded-xl border border-border p-3"><strong>Travel / Business Development</strong><br/><span className="text-muted">Dr 6250 Travel / Business Development · Cr controlled liability (2400 when founder-paid)</span></p><p className="rounded-xl border border-border p-3"><strong>Statutory / Professional</strong><br/><span className="text-muted">Dr 6300 Professional / Statutory · Cr 2200 Statutory Payable</span></p><p className="rounded-xl border border-border p-3"><strong>Outsourcing</strong><br/><span className="text-muted">Dr 6400 Outsourcing · Cr 2000 Trade Payables</span></p><p className="rounded-xl border border-border p-3"><strong>Office consumable</strong><br/><span className="text-muted">Dr 6200 Office / Facility · Cr 2000 Trade Payables</span></p><p className="rounded-xl border border-border p-3"><strong>Capital equipment</strong><br/><span className="text-muted">Dr 1500 Fixed Assets · Cr 2000 Trade Payables</span></p><p className="rounded-xl border border-accent/40 p-3"><strong>Founder-paid business expense</strong><br/><span className="text-muted">Dr controlled expense / asset · Cr 2400 Founder / Director Current Account. No company cash until reimbursement.</span></p><p className="rounded-xl border border-accent/40 p-3"><strong>Third-party reimbursement payable</strong><br/><span className="text-muted">Dr controlled expense / asset · Cr 2450 Third-Party Reimbursements Payable when repayment is required.</span></p><p className="rounded-xl border border-accent/40 p-3"><strong>External Support Clearing</strong><br/><span className="text-muted">Cr 2460 for No / Undecided third-party help until classification. It is not auto-posted as sales income.</span></p></div>
     </Panel>
   </div>;
