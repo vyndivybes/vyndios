@@ -362,7 +362,7 @@ function PeopleOfficeActualSpend() {
               <div className="text-right">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Governance</p>
                 <p className="mt-1 text-xs font-semibold text-accent">{text(row,"governance_marker") || "Standard controlled approval"}</p>
-                <p className="mt-1 text-[10px] text-muted">{funding === "founder_personal" ? "Founder / Director personal funds" : "Company bank"}</p>
+                <p className="mt-1 text-[10px] text-muted">{funding === "founder_personal" ? "Founder / Director personal funds" : funding === "third_party" ? `Third party · ${text(row,"third_party_payer_name")} · repayment ${text(row,"third_party_repayment_status").replaceAll("_"," ")}` : "Company bank"}</p>
               </div>
             </div>
             <div className="mt-4 grid gap-4 lg:grid-cols-3">
