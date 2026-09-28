@@ -103,7 +103,7 @@ async function requireActor(permission: "edit" | "approve") {
 export const listPeopleOfficeActualSpend = createServerFn({ method: "GET" }).handler(async () => {
   await requireView();
   const sql = await getSql();
-  const [costItems, assets, expenditures, payments, founderReimbursements, cashAuthority] = await Promise.all([
+  const [costItems, assets, expenditures, payments, founderReimbursements, thirdPartyReimbursements, externalSupportReceipts, cashAuthority] = await Promise.all([
     sql.query<SqlRow>(`
       select id,name,cost_group,stage,start_month,end_month,one_time_month,source_ref
         from vyndi_people_office_cost_items
@@ -134,13 +134,35 @@ export const listPeopleOfficeActualSpend = createServerFn({ method: "GET" }).han
        order by r.reimbursed_on desc,r.created_at desc,r.id desc
     `),
     sql.query<SqlRow>(`
+      select r.*,e.source_label,e.description,e.plan_month as accrual_plan_month,
+             e.liability_account_code,e.third_party_payer_name,e.third_party_payer_type
+        from vyndi_third_party_reimbursements r
+        join vyndi_people_office_actual_expenditures e on e.id=r.expenditure_id
+       order by r.reimbursed_on desc,r.created_at desc,r.id desc
+    `),
+    sql.query<SqlRow>(`
+      select s.*,e.description as related_expenditure_description,e.source_label as related_expenditure_source
+        from vyndi_external_support_receipts s
+        left join vyndi_people_office_actual_expenditures e on e.id=s.related_expenditure_id
+       order by s.received_on desc,s.created_at desc,s.id desc
+    `),
+    sql.query<SqlRow>(`
       select plan_month,closing_cash_lakh,source_reference,verified
         from vyndi_cash_authority
        where verified=true
        order by plan_month desc
     `),
   ]);
-  return { costItems, assets, expenditures, payments, founderReimbursements, cashAuthority };
+  return {
+    costItems,
+    assets,
+    expenditures,
+    payments,
+    founderReimbursements,
+    thirdPartyReimbursements,
+    externalSupportReceipts,
+    cashAuthority,
+  };
 });
 
 export const createPeopleOfficeActualExpenditure = createServerFn({ method: "POST" })
