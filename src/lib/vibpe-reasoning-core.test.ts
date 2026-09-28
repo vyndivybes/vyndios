@@ -36,11 +36,15 @@ test("answer receipt carries evidence, assumptions, contradictions and five-dime
       {
         claimId: "C1",
         claim: "Supplier capacity is 100 units/month",
+        claimClass: "capacity",
         source: "supplier-lane",
         revision: "R3",
         effectiveDate: "2026-09-01",
         authority: "governed-internal",
+        supersessionState: "current",
         support: "direct",
+        confidence: 0.95,
+        reviewerStatus: "accepted",
       },
     ],
     assumptions: ["Demand remains at approved-plan level"],
@@ -53,6 +57,18 @@ test("answer receipt carries evidence, assumptions, contradictions and five-dime
       },
     ],
     calculations: [{ label: "capacity gap", expression: "120-100", result: 20, unit: "units" }],
+    reasoningTrace: [
+      { stage: "classify-intent", status: "completed", detail: "assessment" },
+      { stage: "decompose-question", status: "completed", detail: "capacity feasibility" },
+      { stage: "retrieve-evidence", status: "completed", detail: "supplier lane evidence" },
+      { stage: "identify-conflicts", status: "completed", detail: "one unresolved conflict" },
+      { stage: "declare-assumptions", status: "completed", detail: "one assumption" },
+      { stage: "calculate-or-simulate", status: "completed", detail: "capacity gap recomputed" },
+      { stage: "test-constraints", status: "completed", detail: "supplier capacity constraint tested" },
+      { stage: "score-correctness", status: "completed", detail: "five-dimension assessment" },
+      { stage: "state-uncertainty", status: "completed", detail: "confidence calibrated" },
+      { stage: "recommend-controlled-action", status: "completed", detail: "resolve contradiction" },
+    ],
     fiveDimensions,
     confidence: 0.72,
     nextAction: "Resolve supplier-capacity contradiction before approval.",
@@ -62,6 +78,9 @@ test("answer receipt carries evidence, assumptions, contradictions and five-dime
   assert.equal(receipt.fiveDimensions.mathematical.status, "verified");
   assert.equal(receipt.contradictions.length, 1);
   assert.equal(receipt.evidence[0].revision, "R3");
+  assert.equal(receipt.evidence[0].claimClass, "capacity");
+  assert.equal(receipt.evidence[0].supersessionState, "current");
+  assert.equal(receipt.reasoningTrace.length, 10);
   assert.equal(receipt.confidence, 0.72);
 });
 
