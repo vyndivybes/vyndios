@@ -1,8 +1,13 @@
+import { VEDM_R3A_SOURCE_COMMIT, VEDM_R3A_SOURCE_REPOSITORY } from "./vedm-authority-graph";
+
 export const CURRENT_VEDM_AUTHORITY = {
   frameGeometry: "VEDM-301 Rev 5.3.9 Candidate E-K75",
   preferredFrontEnd: "Rev 5.4 FK75",
   status: "PREFERRED VAEA DEVELOPMENT FREEZE — NOT PRODUCTION RELEASE",
-  sourceReference: "VELOXIS VEDM Configuration Rev 0.8 / CL-2026-09-20-020",
+  sourceReference: `${VEDM_R3A_SOURCE_REPOSITORY}@${VEDM_R3A_SOURCE_COMMIT}`,
+  authorityGraphSchema: "VYNDI_VEDM_AUTHORITY_GRAPH_V1",
+  sourceRepository: VEDM_R3A_SOURCE_REPOSITORY,
+  sourceCommit: VEDM_R3A_SOURCE_COMMIT,
   closureReference: "docs/engineering/VELOXIS_VEDM_Rev5.4_FK75_VAEA_Engineering_Closure_2026-09-20.html",
   summary:
     "E-K75 controls frame/rider geometry. FK75 preserves those datums and the +8 mm DT/HT correction while adding the truncated-Kamm fork crown and current closure evidence.",

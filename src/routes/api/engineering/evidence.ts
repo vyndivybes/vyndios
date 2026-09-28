@@ -53,6 +53,8 @@ function parsePacket(payload: Record<string, unknown>) {
   const revision = String(payload.revision ?? "").trim().slice(0, 160);
   const fingerprint = String(payload.fingerprint ?? "").trim().slice(0, 80);
   const releaseAuthority = String(payload.releaseAuthority ?? "").trim().slice(0, 120);
+  const authorityNodeId = payload.authorityNodeId ? String(payload.authorityNodeId).trim().slice(0, 200) : null;
+  const authoritySourceCommit = payload.authoritySourceCommit ? String(payload.authoritySourceCommit).trim().slice(0, 80) : null;
   const readiness = payload.readiness && typeof payload.readiness === "object"
     ? payload.readiness as Record<string, unknown>
     : null;
@@ -64,8 +66,12 @@ function parsePacket(payload: Record<string, unknown>) {
   if (!revision) errors.push("revision_required");
   if (!/^fnv1a32-[0-9a-f]{8}$/i.test(fingerprint)) errors.push("invalid_fingerprint");
   if (releaseAuthority !== "HUMAN_APPROVAL_REQUIRED") errors.push("invalid_release_authority");
+  if (Boolean(authorityNodeId) !== Boolean(authoritySourceCommit)) errors.push("authority_provenance_pair_required");
+  if (authoritySourceCommit && !/^[0-9a-f]{40}$/i.test(authoritySourceCommit)) errors.push("invalid_authority_source_commit");
 
-  return { schema, configurationId, revision, fingerprint, releaseAuthority, readinessStatus, errors };
+  // Receipt ingestion is never evidence acceptance. Human evidence acceptance is
+  // recorded separately by R3-C after maker/checker review.
+  return { schema, configurationId, revision, fingerprint, releaseAuthority, readinessStatus, authorityNodeId, authoritySourceCommit, errors };
 }
 
 export const Route = createFileRoute("/api/engineering/evidence")({
@@ -138,8 +144,9 @@ export const Route = createFileRoute("/api/engineering/evidence")({
         await sql.query(
           `insert into vyndi_engineering_evidence_receipts
             (id,fingerprint,schema_id,configuration_id,revision,readiness_status,
-             release_authority,actor_user_id,actor_role,source_origin,payload_json)
-           values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb)`,
+             release_authority,authority_node_id,authority_source_commit,
+             actor_user_id,actor_role,source_origin,payload_json)
+           values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb)`,
           [
             id,
             parsed.fingerprint,
@@ -148,6 +155,8 @@ export const Route = createFileRoute("/api/engineering/evidence")({
             parsed.revision,
             parsed.readinessStatus,
             parsed.releaseAuthority,
+            parsed.authorityNodeId,
+            parsed.authoritySourceCommit,
             actor.userId,
             actor.role,
             origin,
@@ -164,6 +173,9 @@ export const Route = createFileRoute("/api/engineering/evidence")({
           revision: parsed.revision,
           readinessStatus: parsed.readinessStatus,
           releaseAuthority: parsed.releaseAuthority,
+          authorityNodeId: parsed.authorityNodeId,
+          authoritySourceCommit: parsed.authoritySourceCommit,
+          evidenceAcceptance: "HUMAN_APPROVAL_REQUIRED",
         }, 201);
       },
     },

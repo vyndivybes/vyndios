@@ -4,6 +4,7 @@ import { getSql } from "@/lib/db";
 import { getCommandRole } from "@/lib/command-access";
 import { canPerform, type CommandPermission } from "@/lib/page-access";
 import { CURRENT_VEDM_AUTHORITY } from "@/lib/engineering-current-authority";
+import { compileVedmAuthorityGraph, createVedmR3aSeed } from "@/lib/vedm-authority-graph";
 
 const familySchema = z.enum(["longitude", "latitude", "altitude"]);
 const baselineStatusSchema = z.enum(["draft", "pending_approval", "released", "superseded"]);
@@ -48,7 +49,7 @@ export const listEngineeringAuthority = createServerFn({ method: "GET" }).handle
   await assertSameSiteRequest();
   await requirePermission("view");
   const sql = await getSql();
-  const [baselines, changes, evidenceReceipts] = await Promise.all([
+  const [baselines, changes, evidenceReceipts, workflows, releaseDecisions, threadSnapshots] = await Promise.all([
     sql`
       select b.*, f.display_name as family_name, v.display_name as variant_name
       from vyndi_engineering_baselines b
@@ -65,17 +66,63 @@ export const listEngineeringAuthority = createServerFn({ method: "GET" }).handle
     `,
     sql`
       select id,fingerprint,schema_id,configuration_id,revision,readiness_status,
-             release_authority,actor_user_id,actor_role,source_origin,received_at
+             release_authority,authority_node_id,authority_source_commit,
+             actor_user_id,actor_role,source_origin,received_at
       from vyndi_engineering_evidence_receipts
       order by received_at desc
       limit 25
     `,
+    sql`
+      select id,subject_id,state,criticality,blocker_ids,supersedes_id,successor_id,
+             source_ref,created_by,created_role,record_revision,created_at,updated_at
+      from vyndi_engineering_workflows
+      order by updated_at desc
+      limit 50
+    `,
+    sql`
+      select id,workflow_id,subject_id,release_fingerprint,source_repository,source_commit,
+             as_of_date,controlling_authority_id,releasable,blocker_ids,
+             accepted_evidence_fingerprints,actor_user_id,actor_role,decision,source_ref,created_at
+      from vyndi_engineering_release_decisions
+      order by created_at desc
+      limit 50
+    `,
+    sql`
+      select id,subject_id,source_repository,source_commit,node_count,edge_count,gap_count,
+             actor_user_id,actor_role,source_ref,created_at
+      from vyndi_engineering_thread_snapshots
+      order by created_at desc
+      limit 25
+    `,
   ]);
+  const vedmGraph = compileVedmAuthorityGraph(
+    createVedmR3aSeed(),
+    new Date().toISOString().slice(0, 10),
+  );
   return {
     vedmAuthority: CURRENT_VEDM_AUTHORITY,
+    vedmAuthorityGraph: {
+      schema: vedmGraph.schema,
+      sourceRepository: vedmGraph.sourceRepository,
+      sourceCommit: vedmGraph.sourceCommit,
+      asOfDate: vedmGraph.asOfDate,
+      valid: vedmGraph.valid,
+      releaseReady: vedmGraph.releaseReady,
+      authorityByDomain: Object.fromEntries(
+        Object.entries(vedmGraph.authorityByDomain).filter(([, node]) => Boolean(node)),
+      ),
+      blockingGateIds: vedmGraph.blockingGateIds,
+      issues: vedmGraph.issues,
+      mutationAuthority: "HUMAN_APPROVAL_REQUIRED",
+    },
     baselines: Array.isArray(baselines) ? [...baselines] : [],
     changes: Array.isArray(changes) ? [...changes] : [],
     evidenceReceipts: Array.isArray(evidenceReceipts) ? [...evidenceReceipts] : [],
+    r3Governance: {
+      workflows: Array.isArray(workflows) ? [...workflows] : [],
+      releaseDecisions: Array.isArray(releaseDecisions) ? [...releaseDecisions] : [],
+      threadSnapshots: Array.isArray(threadSnapshots) ? [...threadSnapshots] : [],
+    },
   };
 });
 

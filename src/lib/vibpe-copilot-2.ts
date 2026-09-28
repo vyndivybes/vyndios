@@ -10,6 +10,8 @@ import { tryVibpeTruthContractAnswer } from "@/lib/vibpe-truth-contract";
 import { explainVibpeHorizon } from "@/lib/vibpe-planning";
 import { vibpeBusinessOperatorContext } from "@/lib/vibpe-business-operator";
 import { getVibpeSession, updateVibpeSession } from "@/lib/vibpe-session";
+import { compileVedmAuthorityGraph, createVedmR3aSeed } from "@/lib/vedm-authority-graph";
+import { evaluateVibpeAuthorityContext } from "@/lib/vibpe-authority-reasoning";
 
 export type VibpeCopilot2Result = {
   intent: VibpeScenarioParse["intent"];
@@ -45,6 +47,10 @@ function isKnowledgeQuestion(question: string) {
 
   const explicitIbpeMetric = /\b(capacity shortfall|production capacity|work centre|work center|liquidity|funding|runway|mrp|atp|msl|procurement total|recommended procurement|demand forecast|scenario|baseline health|business health)\b/i.test(q);
   return !explicitIbpeMetric;
+}
+
+function isEngineeringAuthorityKnowledgeQuestion(question: string) {
+  return /engineering authority|design authority|configuration authority|frame|fork|geometry|cad|step|drawing|fea|cfd|laminate|layup|prepreg|toray|iso 4210|release|manufactur|tooling/i.test(question);
 }
 
 function knowledgeAuthorityLabel(evidence: VibpeKnowledgeEvidence[]) {
@@ -107,7 +113,30 @@ function knowledgeAnswer(question: string, evidence: VibpeKnowledgeEvidence[]) {
     `Knowledge-grounded assessment: ${primary.claimText}`,
   ];
 
-  if (asksAuthority) {
+  const engineeringGuard = isEngineeringAuthorityKnowledgeQuestion(question)
+    ? evaluateVibpeAuthorityContext(
+        question,
+        selected.map((item) => ({
+          claimText: item.claimText,
+          authority: item.authority,
+          sourceRepository: item.sourceRepository,
+          sourceCommit: item.sourceCommit,
+          sourcePath: item.sourcePath,
+        })),
+        compileVedmAuthorityGraph(createVedmR3aSeed(), new Date().toISOString().slice(0, 10)),
+      )
+    : null;
+
+  if (engineeringGuard) {
+    lines.push(`Authority guardrail: ${engineeringGuard.answerPrefix}`);
+    lines.push(`Release authority: NO. Assessment: ${engineeringGuard.status.replaceAll("_", " ").toUpperCase()}.`);
+    if (engineeringGuard.issues.length) {
+      lines.push(`Authority issues: ${engineeringGuard.issues.map((issue) => `${issue.code}: ${issue.message}`).join(" ")}`);
+    }
+    if (engineeringGuard.blockingGateIds.length) {
+      lines.push(`Blocking release gates: ${engineeringGuard.blockingGateIds.join(", ")}.`);
+    }
+  } else if (asksAuthority) {
     if (primary.authority === "controlled-reference") {
       lines.push("Authority: CONTROLLED REPOSITORY REFERENCE. The pinned source is the declared authority inside its owning engineering/control domain. This imported snapshot is read-only: it does not create a new approval, mutate ERP master data or bypass the owning release workflow.");
     } else if (selected.some((item) => item.authority === "unresolved")) {
