@@ -15,6 +15,8 @@ import { runVibpeCopilot2 } from "@/lib/vibpe-copilot-2";
 import { retrieveVibpeKnowledgeEvidence, type VibpeKnowledgeEvidence } from "@/lib/vibpe-knowledge-retrieval";
 import { refreshVibpeWeeklyReviewsIfStale } from "@/lib/vibpe-weekly-review-knowledge";
 import { refreshVayuShastrDriveIfStale } from "@/lib/vibpe-vayu-shastr-drive";
+import { buildVibpeAnswerReceipt, deriveVibpeDegradationState, type VibpeSourceState } from "@/lib/vibpe-reasoning-core";
+import { persistVibpeAnswerReceipt } from "@/lib/vibpe-persistence";
 
 export type IbpeCopilotRequest = {
   question: string;
@@ -34,6 +36,8 @@ export type IbpeCopilotResponse = {
   };
   scenarioId?: string;
   knowledgeEvidence?: VibpeKnowledgeEvidence[];
+  reasoningReceiptId?: string;
+  dataMode?: "live" | "partial" | "degraded" | "fixture" | "assumption-dependent";
   advisoryOnly: true;
 };
 
@@ -527,12 +531,16 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
       sourceSha: row.source_sha,
     };
     const questions = splitQuestions(data.question);
+    const runtimeSourceStates: VibpeSourceState[] = [];
     let knowledgeEvidence: VibpeKnowledgeEvidence[] = [];
     try {
       knowledgeEvidence = await retrieveVibpeKnowledgeEvidence(sql, data.question, 10);
-    } catch {
-      // Knowledge evidence is supplementary. A migration/configuration lag must
-      // not make the governed deterministic Co-Pilot unavailable.
+    } catch (error) {
+      runtimeSourceStates.push({
+        source: "knowledge-evidence",
+        status: "unavailable",
+        detail: error instanceof Error ? error.message : "knowledge lookup failed",
+      });
       knowledgeEvidence = [];
     }
     const scenarioCache = new Map<string, Awaited<ReturnType<typeof evaluateScenario>>>();
@@ -580,9 +588,12 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
           sessionKey: actor.userId,
           uiScenario: data.scenario,
         });
-      } catch {
-        // VIBPE 2.0 is advisory: a runtime-specific failure must not take down
-        // the governed deterministic/AI Co-Pilot response path.
+      } catch (error) {
+        runtimeSourceStates.push({
+          source: "vibpe-reasoning",
+          status: "unavailable",
+          detail: error instanceof Error ? error.message : "VIBPE reasoning runtime failed",
+        });
         vibpe2FallbackReason = "runtime-error";
       }
     }
@@ -667,8 +678,12 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
               mode = "ai";
             }
           }
-        } catch {
-          // Deterministic IBPE explanation remains available if the external AI service fails.
+        } catch (error) {
+          runtimeSourceStates.push({
+            source: "external-ai",
+            status: "unavailable",
+            detail: error instanceof Error ? error.message : "external AI request failed",
+          });
         }
       }
     }
@@ -684,6 +699,91 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
       const evidenceText = formatKnowledgeEvidence(surfacedKnowledgeEvidence);
       if (evidenceText && !answer.includes("VIBPE knowledge evidence (governed Drive references; not automatic master authority):")) {
         answer = `${answer}\n\n${evidenceText}`;
+      }
+    }
+
+    const combinedSourceStates = [
+      ...(vibpe2?.dataState?.sources ?? []),
+      ...runtimeSourceStates,
+    ];
+    let dataState = deriveVibpeDegradationState(combinedSourceStates);
+    if (dataState.mode !== "live" && !answer.includes("Degraded-state disclosure:")) {
+      answer = `${answer}\n\n${dataState.disclosure}`;
+    }
+
+    const reasoningReceiptId = `VIBPE-ANS-${crypto.randomUUID()}`;
+    const receipt = buildVibpeAnswerReceipt({
+      answerId: reasoningReceiptId,
+      question: data.question,
+      intent: vibpe2?.intent ?? (executiveAssessment ? "assessment" : "legacy-fallback"),
+      dataMode: dataState.mode,
+      evidence: [
+        {
+          claimId: "IBPE-LINEAGE",
+          claim: "Answer is anchored to the governed IBPE run and approved-plan revision.",
+          source: `IBPE:${row.input_hash.slice(0, 12)}`,
+          revision: String(row.approved_plan_revision),
+          effectiveDate: new Date().toISOString().slice(0, 10),
+          authority: "governed-internal",
+          support: "direct",
+        },
+        ...surfacedKnowledgeEvidence.slice(0, 8).map((item, index) => ({
+          claimId: `KNOW-${index + 1}`,
+          claim: item.claimText,
+          source: item.title,
+          revision: item.sourceRevision,
+          effectiveDate: item.reviewDate,
+          authority: item.authority === "controlled-reference" ? "governed-internal" as const : "external-reference" as const,
+          support: item.authority === "unresolved" ? "unresolved" as const : "direct" as const,
+        })),
+      ],
+      assumptions: vibpe2?.scenario ? [`Scenario: ${vibpe2.scenario.label}`] : [],
+      contradictions: [],
+      calculations: [],
+      fiveDimensions: {
+        mathematical: {
+          status: mode === "deterministic" ? "supported" : "partially-supported",
+          basis: mode === "deterministic"
+            ? "Governed deterministic IBPE/advanced-planning outputs; independent recomputation is required where a claim is not solver-backed."
+            : "AI narrative is subordinate to governed numerical outputs.",
+        },
+        theoretical: {
+          status: "supported",
+          basis: "VYNDI planning and authority contracts define the governing model and truth hierarchy.",
+        },
+        physical: {
+          status: vibpe2?.evidenceMode === "engineering-analysis" ? "requires-simulation" : "insufficient-evidence",
+          basis: vibpe2?.evidenceMode === "engineering-analysis"
+            ? "Engineering conclusions remain bounded by available simulation/test evidence."
+            : "Business-planning answer does not independently establish physical engineering validity.",
+        },
+        practical: {
+          status: "partially-supported",
+          basis: "Operational feasibility depends on live supplier, routing, resource, inventory, cash and approval constraints.",
+        },
+        scientific: {
+          status: vibpe2?.evidenceMode === "engineering-analysis" ? "partially-supported" : "supported",
+          basis: "Evidence lineage and assumptions are explicit; unresolved empirical validation remains open where applicable.",
+        },
+      },
+      confidence: dataState.mode === "live" ? (mode === "deterministic" ? 0.82 : 0.72) : 0.58,
+      nextAction: "Resolve any degraded source or unresolved constraint before relying on this advisory answer for a controlled action.",
+    });
+
+    try {
+      await persistVibpeAnswerReceipt(sql, actor.userId, actor.userId, receipt);
+    } catch (error) {
+      runtimeSourceStates.push({
+        source: "answer-receipt",
+        status: "unavailable",
+        detail: error instanceof Error ? error.message : "receipt persistence failed",
+      });
+      dataState = deriveVibpeDegradationState([
+        ...(vibpe2?.dataState?.sources ?? []),
+        ...runtimeSourceStates,
+      ]);
+      if (!answer.includes("answer-receipt unavailable")) {
+        answer = `${answer}\n\nDegraded-state disclosure: answer-receipt unavailable; the advisory answer was returned but its immutable receipt was not persisted.`;
       }
     }
 
@@ -723,6 +823,8 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
       lineage,
       scenarioId,
       knowledgeEvidence: surfacedKnowledgeEvidence,
+      reasoningReceiptId,
+      dataMode: dataState.mode,
       advisoryOnly: true,
     };
   }));
