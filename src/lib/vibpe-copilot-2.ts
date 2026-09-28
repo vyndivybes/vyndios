@@ -22,6 +22,7 @@ export type VibpeCopilot2Result = {
   comparison?: IbpeScenarioComparison;
   horizonMonths?: number;
   doctrine: string;
+  evidenceMode?: "engineering-analysis" | "repository-knowledge";
   advisoryOnly: true;
 };
 
@@ -400,6 +401,7 @@ export async function runVibpeCopilot2(
       intent: parsed.intent,
       answer: engineeringAnalysis.answer,
       doctrine: vibpeBusinessOperatorContext(),
+      evidenceMode: "engineering-analysis",
       advisoryOnly: true,
     };
   }
@@ -414,6 +416,7 @@ export async function runVibpeCopilot2(
           intent: parsed.intent,
           answer,
           doctrine: vibpeBusinessOperatorContext(),
+          evidenceMode: "repository-knowledge",
           advisoryOnly: true,
         };
       }
