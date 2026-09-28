@@ -154,6 +154,9 @@ test("expense evidence attachments are append-only, hashed, typed and linked to 
   assert.match(expenseEvidenceApi, /5 \* 1024 \* 1024/);
   assert.match(expenseEvidenceApi, /content-disposition/);
   assert.match(expenseEvidenceApi, /attachmentId/);
+  assert.doesNotMatch(expenseEvidenceApi, /node:buffer/);
+  assert.doesNotMatch(expenseEvidenceApi, /Buffer\.from/);
+  assert.match(expenseEvidenceApi, /responseArrayBuffer/);
 
   assert.match(peopleOfficeActualAuthority, /expenseEvidenceAttachments/);
   assert.match(peopleOfficeActualRoute, /Attach Evidence/);
