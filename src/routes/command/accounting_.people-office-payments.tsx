@@ -3,12 +3,20 @@ import { useMemo, useState } from "react";
 import { Kpi, Panel } from "@/components/kpi";
 import {
   approvePeopleOfficeActualExpenditure,
+  createExternalSupportReceipt,
   createPeopleOfficeActualExpenditure,
   listPeopleOfficeActualSpend,
   postFounderReimbursement,
   postPeopleOfficeActualPayment,
+  postThirdPartyReimbursement,
   submitPeopleOfficeActualExpenditure,
 } from "@/lib/finance/people-office-actual-spend-authority";
+import {
+  EXTERNAL_SUPPORT_DESTINATIONS,
+  MANUAL_EXPENSE_CATEGORIES,
+  REPAYMENT_STATUSES,
+  THIRD_PARTY_PAYER_TYPES,
+} from "@/lib/finance/expense-classification";
 
 type Row = Record<string, unknown>;
 const text = (row: Row, ...keys: string[]) => { for (const key of keys) if (row[key] != null) return String(row[key]); return ""; };
