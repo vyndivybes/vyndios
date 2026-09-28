@@ -24,18 +24,10 @@ create table if not exists vyndi_expense_evidence_attachments (
 create index if not exists vyndi_expense_evidence_expenditure_idx
   on vyndi_expense_evidence_attachments(expenditure_id,uploaded_at desc,id);
 
-create or replace function prevent_vyndi_expense_evidence_update_delete()
-returns trigger
-language plpgsql
-as $$
-begin
-  raise exception 'Expense evidence attachments are append-only; UPDATE and DELETE are prohibited.';
-end;
-$$;
+create or replace rule vyndi_expense_evidence_no_update as
+on update to vyndi_expense_evidence_attachments
+do instead nothing;
 
-drop trigger if exists trg_vyndi_expense_evidence_append_only
-  on vyndi_expense_evidence_attachments;
-
-create trigger trg_vyndi_expense_evidence_append_only
-before update or delete on vyndi_expense_evidence_attachments
-for each row execute function prevent_vyndi_expense_evidence_update_delete();
+create or replace rule vyndi_expense_evidence_no_delete as
+on delete to vyndi_expense_evidence_attachments
+do instead nothing;
