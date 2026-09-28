@@ -140,9 +140,20 @@ function PeopleOfficeActualSpend() {
           sourceReference,
           notes,
           fundingSource,
+          thirdPartyPayerName,
+          thirdPartyPayerType,
+          thirdPartyRepaymentStatus,
         },
       });
-      setMessage(`${result.id} created as a draft actual expenditure. ${fundingSource === "founder_personal" ? "Founder / Director personal funds selected; company cash will remain unchanged on approval." : "No cash moved."}`);
+      setMessage(
+        `${result.id} created as a draft actual expenditure. ${
+          fundingSource === "founder_personal"
+            ? "Founder / Director personal funds selected; company cash will remain unchanged on approval."
+            : fundingSource === "third_party"
+              ? "Third-party funding recorded with payer identity and repayment status; company cash remains unchanged."
+              : "No cash moved."
+        }`,
+      );
       setDescription(""); setAmountInr(""); setSourceReference(""); setNotes("");
       await refresh();
     } catch (cause) {
@@ -162,7 +173,9 @@ function PeopleOfficeActualSpend() {
         setMessage(
           funding === "founder_personal"
             ? `${id} approved with Sole-operator self-approval disclosure. Expense accrued to Founder / Director Current Account 2400; company bank cash unchanged.`
-            : `${id} approved and accrued to the General Ledger. Bank cash is unchanged until payment.`,
+            : funding === "third_party"
+              ? `${id} approved as third-party funded. The controlled liability/clearing account is retained; company cash remains unchanged until an authorised reimbursement if required.`
+              : `${id} approved and accrued to the General Ledger. Bank cash is unchanged until payment.`,
         );
       }
       await refresh();
@@ -213,6 +226,60 @@ function PeopleOfficeActualSpend() {
     } finally { setBusy(""); }
   }
 
+  async function postThirdPartyReimbursementEntry(event: React.FormEvent) {
+    event.preventDefault();
+    setBusy("third-party-reimbursement"); setMessage(""); setError("");
+    try {
+      const result = await postThirdPartyReimbursement({
+        data: {
+          expenditureId: thirdPartyReimbursementExpenditureId,
+          paymentPlanMonth: Number(thirdPartyReimbursementPlanMonth),
+          reimbursedOn: thirdPartyReimbursedOn,
+          amountInr: Number(thirdPartyReimbursementAmount),
+          evidenceReference: thirdPartyReimbursementEvidence,
+        },
+      });
+      setMessage(`${result.reimbursementId} posted. Third-Party Reimbursements Payable 2450 reduced and company Bank 1000/canonical cash updated through M${result.paymentPlanMonth} R${result.actualRevision}.`);
+      setThirdPartyReimbursementAmount(""); setThirdPartyReimbursementEvidence("");
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Third-party reimbursement could not be posted.");
+    } finally { setBusy(""); }
+  }
+
+  async function recordExternalSupport(event: React.FormEvent) {
+    event.preventDefault();
+    setBusy("external-support"); setMessage(""); setError("");
+    try {
+      const result = await createExternalSupportReceipt({
+        data: {
+          receivedFrom: supportReceivedFrom,
+          senderType: supportSenderType,
+          receivedOn: supportReceivedOn,
+          amountInr: Number(supportAmount),
+          receivedInto: supportReceivedInto,
+          planMonth: Number(supportPlanMonth),
+          relatedExpenditureId: supportRelatedExpenditureId,
+          purpose: supportPurpose,
+          repaymentStatus: supportRepaymentStatus,
+          evidenceReference: supportEvidence,
+          notes: supportNotes,
+        },
+      });
+      setMessage(
+        `${result.id} recorded. ${
+          result.companyCashMoved
+            ? "Company bank/canonical cash updated with controlled liability or clearing classification."
+            : "No company cash movement was posted; the support remains recorded for classification and traceability."
+        }`,
+      );
+      setSupportReceivedFrom(""); setSupportAmount(""); setSupportPurpose(""); setSupportEvidence(""); setSupportNotes("");
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "External support could not be recorded.");
+    } finally { setBusy(""); }
+  }
+
   function selectPayment(row: Row) {
     setPaymentExpenditureId(text(row, "id"));
     setPaymentAmount(String(num(row, "amount_open_inr")));
@@ -223,6 +290,11 @@ function PeopleOfficeActualSpend() {
     setReimbursementExpenditureId(text(row, "id"));
     setReimbursementAmount(String(num(row, "amount_open_inr")));
     setReimbursementPlanMonth(String(num(row, "plan_month") || 1));
+  }
+  function selectThirdPartyReimbursement(row: Row) {
+    setThirdPartyReimbursementExpenditureId(text(row, "id"));
+    setThirdPartyReimbursementAmount(String(num(row, "amount_open_inr")));
+    setThirdPartyReimbursementPlanMonth(String(num(row, "plan_month") || 1));
   }
 
   return <div className="space-y-6">
