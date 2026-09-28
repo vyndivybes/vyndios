@@ -109,7 +109,7 @@ export type AuthorityMutationDecision = {
 };
 
 export const VEDM_R3A_SOURCE_REPOSITORY = "vayu-shastr/veloxis-engineering-design-manual";
-export const VEDM_R3A_SOURCE_COMMIT = "49fdac757534c6e42a0c5c29c43a2a6e35d637d2";
+export const VEDM_R3A_SOURCE_COMMIT = "9ef41eb8afbc75429013bfd73133957ddccf3834";
 
 const CONTROLLED_DOMAINS = new Set(["frame_geometry"]);
 
@@ -352,7 +352,7 @@ export function evaluateAuthorityMutation(
 
 export function createVedmR3aSeed(): VedmAuthoritySeed {
   const sourceRepository = "vayu-shastr/veloxis-engineering-design-manual";
-  const sourceCommit = "49fdac757534c6e42a0c5c29c43a2a6e35d637d2";
+  const sourceCommit = "9ef41eb8afbc75429013bfd73133957ddccf3834";
 
   return {
     schema: "VYNDI_VEDM_AUTHORITY_GRAPH_V1",
