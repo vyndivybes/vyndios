@@ -34,7 +34,10 @@ export async function hydrateVibpeSession(
 ): Promise<VibpeSessionState> {
   const persisted = await loadPersistedVibpeSession(sql, ownerKey, sessionKey);
   if (persisted) {
-    const normalized = { referencedProducts: [], ...persisted };
+    const normalized: VibpeSessionState = {
+      ...persisted,
+      referencedProducts: persisted.referencedProducts ?? [],
+    };
     sessions.set(sessionKey, normalized);
     return normalized;
   }
