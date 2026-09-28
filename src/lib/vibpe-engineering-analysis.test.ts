@@ -10,7 +10,7 @@ test("clearance question performs engineering interpretation instead of document
   assert.match(result.answer ?? "", /8\.61 \/ 8\.60 \/ 8\.37 \/ 8\.18 \/ 7\.33 mm/);
   assert.match(result.answer ?? "", /PARTIAL/);
   assert.match(result.answer ?? "", /exact downtube-to-tyre BRep/i);
-  assert.match(result.answer ?? "", /9ef41eb8afbc/);
+  assert.match(result.answer ?? "", /b874cde910ce/);
 });
 
 test("composite failure question evaluates current analytical screens", () => {
