@@ -12,7 +12,7 @@ import { vibpeBusinessOperatorContext } from "@/lib/vibpe-business-operator";
 import { getVibpeSession, updateVibpeSession } from "@/lib/vibpe-session";
 import { compileVedmAuthorityGraph, createVedmR3aSeed } from "@/lib/vedm-authority-graph";
 import { evaluateVibpeAuthorityContext } from "@/lib/vibpe-authority-reasoning";
-import { tryVibpeEngineeringAnalysis } from "@/lib/vibpe-engineering-analysis";
+import { resolveVibpeEngineeringAnalysis } from "@/lib/vibpe-engineering-analysis";
 
 export type VibpeCopilot2Result = {
   intent: VibpeScenarioParse["intent"];
@@ -393,7 +393,7 @@ export async function runVibpeCopilot2(
     // existing governed fallbacks when an optional read source is unavailable.
   }
 
-  const engineeringAnalysis = tryVibpeEngineeringAnalysis(question);
+  const engineeringAnalysis = await resolveVibpeEngineeringAnalysis(sql, question);
   if (engineeringAnalysis.handled && engineeringAnalysis.answer) {
     updateVibpeSession(sessionKey, { lastIntent: parsed.intent, lastQuestion: question });
     return {
