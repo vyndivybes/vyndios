@@ -14,6 +14,8 @@ const accountingSourceAuthorityMigration = read("migrations/0084_accounting_sour
 const actualCogsMigration = read("migrations/0086_actual_job_cost_cogs_chain.sql");
 const toolingRecoveryMigration = read("migrations/0087_tooling_cost_recovery_authority.sql");
 const founderPaidMigration = read("migrations/0094_founder_paid_expense_authority.sql");
+const manualExpenseMigration = read("migrations/0096_manual_operating_expense.sql");
+const expenseClassification = read("src/lib/finance/expense-classification.ts");
 const authority = read("src/lib/finance/accounting-authority.ts");
 const cashFundingAuthority = read("src/lib/cash-funding-authority.ts");
 const peopleOfficeActualAuthority = read("src/lib/finance/people-office-actual-spend-authority.ts");
@@ -129,6 +131,63 @@ test("People and Office actual spend keeps planning approval separate from accou
   assert.match(peopleOfficeActualRoute, /Create actual draft/);
   assert.match(peopleOfficeActualRoute, /Approve & accrue/);
   assert.match(peopleOfficeActualRoute, /No cash moved/);
+});
+
+test("manual operating expenses use a controlled multi-category accounting map", () => {
+  for (const category of [
+    "office_facility",
+    "digital_services",
+    "travel_business_dev",
+    "professional_statutory",
+    "outsourcing_external",
+    "manufacturing_overhead",
+    "finance_cost",
+  ]) assert.match(expenseClassification, new RegExp(category));
+
+  for (const account of ["5200", "6200", "6250", "6300", "6400", "6600"]) {
+    assert.match(expenseClassification, new RegExp(account));
+  }
+
+  assert.match(manualExpenseMigration, /manual_expense/);
+  assert.match(manualExpenseMigration, /manual_expense_accounting_check/);
+  assert.match(peopleOfficeActualAuthority, /MANUAL_EXPENSE_CATEGORIES/);
+  assert.match(peopleOfficeActualRoute, /Manual operating expense/);
+  assert.match(peopleOfficeActualRoute, /Expense category/);
+  assert.match(peopleOfficeActualRoute, /Amount \(INR\)/);
+  assert.match(peopleOfficeActualRoute, /Evidence \/ invoice \/ transaction reference/);
+});
+
+test("third-party paid expenses retain payer identity and controlled reimbursement status", () => {
+  assert.match(manualExpenseMigration, /third_party/);
+  assert.match(manualExpenseMigration, /third_party_payer_name/);
+  assert.match(manualExpenseMigration, /third_party_payer_type/);
+  assert.match(manualExpenseMigration, /third_party_repayment_status/);
+  assert.match(manualExpenseMigration, /'2450'/);
+  assert.match(manualExpenseMigration, /'2460'/);
+  assert.match(generalLedger, /2450.*Third-Party Reimbursements Payable/);
+  assert.match(generalLedger, /2460.*External Support Clearing/);
+  assert.match(peopleOfficeActualAuthority, /postThirdPartyReimbursement/);
+  assert.match(peopleOfficeActualRoute, /Third party paid on behalf of company/);
+  assert.match(peopleOfficeActualRoute, /Payer name/);
+  assert.match(peopleOfficeActualRoute, /Repayment expected/);
+  assert.match(peopleOfficeActualRoute, /Post third-party reimbursement/);
+});
+
+test("external support can be recorded without inventing income classification", () => {
+  assert.match(manualExpenseMigration, /vyndi_external_support_receipts/);
+  assert.match(manualExpenseMigration, /pending_classification/);
+  assert.match(manualExpenseMigration, /company_bank/);
+  assert.match(manualExpenseMigration, /founder_personal/);
+  assert.match(manualExpenseMigration, /vendor_direct/);
+  assert.match(peopleOfficeActualAuthority, /createExternalSupportReceipt/);
+  assert.match(peopleOfficeActualAuthority, /external_support_receipt/);
+  assert.match(peopleOfficeActualAuthority, /External Support Clearing/);
+  assert.match(peopleOfficeActualRoute, /External Support \/ Expense Assistance Received/);
+  assert.match(peopleOfficeActualRoute, /Received from/);
+  assert.match(peopleOfficeActualRoute, /Repayment expected/);
+  assert.match(peopleOfficeActualRoute, /Undecided/);
+  assert.match(peopleOfficeActualRoute, /Related expenditure/);
+  assert.match(peopleOfficeActualRoute, /Pending classification/);
 });
 
 test("People and Office payment requires unique evidence and posts Bank plus verified canonical cash", () => {
