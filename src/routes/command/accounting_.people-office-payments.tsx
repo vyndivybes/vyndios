@@ -88,14 +88,23 @@ function PeopleOfficeActualSpend() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  const manualExpenseRows: Row[] = [{ id: "digital_services", name: "Digital services / domain & hosting", cost_group: "office" }];
+  const manualExpenseRows: Row[] = MANUAL_EXPENSE_CATEGORIES.map((category) => ({
+    id: category.id,
+    name: category.label,
+    cost_group: `Dr ${category.debitAccountCode}`,
+  }));
   const sourceRows = sourceType === "cost_item" ? data.costItems : sourceType === "asset" ? data.assets : manualExpenseRows;
   const openExpenditures = data.expenditures.filter((row) => ["approved", "part_paid"].includes(text(row, "lifecycle_status")));
-  const companyOpenExpenditures = openExpenditures.filter((row) => text(row, "funding_source") !== "founder_personal");
+  const companyOpenExpenditures = openExpenditures.filter((row) => text(row, "funding_source") === "company_bank");
   const founderOpenExpenditures = openExpenditures.filter((row) => text(row, "funding_source") === "founder_personal");
+  const thirdPartyRepayableOpenExpenditures = openExpenditures.filter(
+    (row) => text(row, "funding_source") === "third_party" && text(row, "third_party_repayment_status") === "required",
+  );
   const pending = data.expenditures.filter((row) => text(row, "lifecycle_status") === "pending_approval").length;
   const openAmount = openExpenditures.reduce((sum, row) => sum + num(row, "amount_open_inr"), 0);
   const founderOutstanding = founderOpenExpenditures.reduce((sum, row) => sum + num(row, "amount_open_inr"), 0);
+  const thirdPartyOutstanding = thirdPartyRepayableOpenExpenditures.reduce((sum, row) => sum + num(row, "amount_open_inr"), 0);
+  const pendingSupport = data.externalSupportReceipts.filter((row) => text(row, "accounting_status") === "pending_classification").length;
   const totalPaid = data.payments.reduce((sum, row) => sum + num(row, "amount_inr"), 0);
   const latestCash = data.cashAuthority[0];
 
@@ -106,6 +115,10 @@ function PeopleOfficeActualSpend() {
   const selectedReimbursement = useMemo(
     () => founderOpenExpenditures.find((row) => text(row, "id") === reimbursementExpenditureId),
     [founderOpenExpenditures, reimbursementExpenditureId],
+  );
+  const selectedThirdPartyReimbursement = useMemo(
+    () => thirdPartyRepayableOpenExpenditures.find((row) => text(row, "id") === thirdPartyReimbursementExpenditureId),
+    [thirdPartyRepayableOpenExpenditures, thirdPartyReimbursementExpenditureId],
   );
 
   async function refresh() {
