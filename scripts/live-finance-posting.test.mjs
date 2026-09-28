@@ -14,6 +14,7 @@ const accountingSourceAuthorityMigration = read("migrations/0084_accounting_sour
 const actualCogsMigration = read("migrations/0086_actual_job_cost_cogs_chain.sql");
 const toolingRecoveryMigration = read("migrations/0087_tooling_cost_recovery_authority.sql");
 const founderPaidMigration = read("migrations/0094_founder_paid_expense_authority.sql");
+const manualExpenseMigration = read("migrations/0096_manual_operating_expense.sql");
 const authority = read("src/lib/finance/accounting-authority.ts");
 const cashFundingAuthority = read("src/lib/cash-funding-authority.ts");
 const peopleOfficeActualAuthority = read("src/lib/finance/people-office-actual-spend-authority.ts");
@@ -129,6 +130,20 @@ test("People and Office actual spend keeps planning approval separate from accou
   assert.match(peopleOfficeActualRoute, /Create actual draft/);
   assert.match(peopleOfficeActualRoute, /Approve & accrue/);
   assert.match(peopleOfficeActualRoute, /No cash moved/);
+});
+
+test("manual operating expenses support controlled digital-service entry without a pre-existing plan item", () => {
+  assert.match(manualExpenseMigration, /manual_expense/);
+  assert.match(manualExpenseMigration, /digital_services/);
+  assert.match(manualExpenseMigration, /Digital services \/ domains & hosting/);
+  assert.match(manualExpenseMigration, /'6200'/);
+  assert.match(manualExpenseMigration, /create_vyndi_people_office_actual_expenditure_v3/);
+  assert.match(peopleOfficeActualAuthority, /"manual_expense"/);
+  assert.match(peopleOfficeActualAuthority, /create_vyndi_people_office_actual_expenditure_v3/);
+  assert.match(peopleOfficeActualRoute, /Manual operating expense/);
+  assert.match(peopleOfficeActualRoute, /Digital services \/ domain & hosting/);
+  assert.match(peopleOfficeActualRoute, /Amount \(INR\)/);
+  assert.match(peopleOfficeActualRoute, /Evidence \/ invoice \/ transaction reference/);
 });
 
 test("People and Office payment requires unique evidence and posts Bank plus verified canonical cash", () => {
