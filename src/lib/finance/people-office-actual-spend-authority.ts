@@ -11,7 +11,7 @@ const identifier = z.string().trim().min(1).max(160);
 const reference = z.string().trim().min(3).max(500);
 const money = z.number().finite().positive().max(1_000_000_000_000);
 
-export const PEOPLE_OFFICE_ACTUAL_SOURCE_TYPES = ["cost_item", "asset"] as const;
+export const PEOPLE_OFFICE_ACTUAL_SOURCE_TYPES = ["cost_item", "asset", "manual_expense"] as const;
 export const PEOPLE_OFFICE_FUNDING_SOURCES = ["company_bank", "founder_personal"] as const;
 export const FOUNDER_PERSONAL = "founder_personal" as const;
 
@@ -92,8 +92,8 @@ export const createPeopleOfficeActualExpenditure = createServerFn({ method: "POS
     const actor = await requireActor("edit");
     const sql = await getSql();
     const id = `POEXP-${crypto.randomUUID()}`;
-    const rows = await sql.query<{ create_vyndi_people_office_actual_expenditure_v2: string }>(
-      `select create_vyndi_people_office_actual_expenditure_v2($1,$2,$3,$4,$5::date,$6,$7,$8,$9,$10,$11,$12)`,
+    const rows = await sql.query<{ create_vyndi_people_office_actual_expenditure_v3: string }>(
+      `select create_vyndi_people_office_actual_expenditure_v3($1,$2,$3,$4,$5::date,$6,$7,$8,$9,$10,$11,$12)`,
       [
         id,
         data.sourceType,
@@ -109,7 +109,7 @@ export const createPeopleOfficeActualExpenditure = createServerFn({ method: "POS
         actor.role,
       ],
     );
-    return { ok: true, id: rows[0]?.create_vyndi_people_office_actual_expenditure_v2 ?? id };
+    return { ok: true, id: rows[0]?.create_vyndi_people_office_actual_expenditure_v3 ?? id };
   });
 
 export const submitPeopleOfficeActualExpenditure = createServerFn({ method: "POST" })
@@ -130,7 +130,7 @@ export const approvePeopleOfficeActualExpenditure = createServerFn({ method: "PO
   .handler(async ({ data }) => {
     const actor = await requireActor("approve");
     const sql = await getSql();
-    await sql.query(`select approve_vyndi_people_office_actual_expenditure_v2($1,$2,$3,$4)`, [
+    await sql.query(`select approve_vyndi_people_office_actual_expenditure_v3($1,$2,$3,$4)`, [
       data.id,
       actor.userId,
       actor.role,
