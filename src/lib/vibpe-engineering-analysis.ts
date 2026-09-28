@@ -281,11 +281,11 @@ export async function resolveVibpeEngineeringAnalysis(
   if (!fallback.handled) return fallback;
 
   try {
-    const rows = await sql.query<{ payload_json: unknown }>(
-      `select r.payload_json
+    const rows = await sql.query<{ payload_json: unknown; authority_source_commit: string }>(
+      `select r.payload_json,acceptance.authority_source_commit
          from vyndi_engineering_evidence_receipts r
          join lateral (
-           select a.decision
+           select a.decision,a.authority_source_commit
              from vyndi_engineering_evidence_acceptances a
             where a.receipt_fingerprint=r.fingerprint
             order by a.created_at desc,a.id desc
@@ -297,7 +297,9 @@ export async function resolveVibpeEngineeringAnalysis(
     );
     for (const row of rows) {
       const snapshot = engineeringSnapshotFromEvidencePacket(row.payload_json);
-      if (snapshot) return tryVibpeEngineeringAnalysis(question, snapshot);
+      if (snapshot && snapshot.sourceCommit === row.authority_source_commit) {
+        return tryVibpeEngineeringAnalysis(question, snapshot);
+      }
     }
   } catch {
     // The commit-pinned snapshot remains a safe read-only fallback when the
