@@ -151,11 +151,13 @@ export const Route = createFileRoute("/api/finance/expense-evidence")({
         if (!sameOrigin(request)) return json({ ok: false, error: "origin_not_allowed" }, 403);
 
         const form = await request.formData();
-        const expenditureId = String(form.get("expenditureId") ?? "").trim().slice(0, 160);
+        const targetType = String(form.get("targetType") ?? "expenditure").trim();
+        const targetId = String(form.get("targetId") ?? form.get("expenditureId") ?? "").trim().slice(0, 160);
         const documentType = String(form.get("documentType") ?? "").trim();
         const file = form.get("file");
 
-        if (!expenditureId) return json({ ok: false, error: "expenditure_id_required" }, 400);
+        if (!["expenditure", "external_support"].includes(targetType)) return json({ ok: false, error: "invalid_target_type" }, 400);
+        if (!targetId) return json({ ok: false, error: "target_id_required" }, 400);
         if (!DOCUMENT_TYPES.has(documentType)) return json({ ok: false, error: "invalid_document_type" }, 400);
         if (!(file instanceof File)) return json({ ok: false, error: "file_required" }, 400);
         if (file.size <= 0) return json({ ok: false, error: "empty_file" }, 400);
@@ -175,15 +177,25 @@ export const Route = createFileRoute("/api/finance/expense-evidence")({
         const sha256Hex = hex(digest);
         const sql = await getSql();
 
-        const expenditures = await sql.query<{ id: string }>(
-          "select id from vyndi_people_office_actual_expenditures where id=$1",
-          [expenditureId],
-        );
-        if (!expenditures[0]) return json({ ok: false, error: "expenditure_not_found" }, 404);
+        if (targetType === "expenditure") {
+          const expenditures = await sql.query<{ id: string }>(
+            "select id from vyndi_people_office_actual_expenditures where id=$1",
+            [targetId],
+          );
+          if (!expenditures[0]) return json({ ok: false, error: "expenditure_not_found" }, 404);
+        } else {
+          const supports = await sql.query<{ id: string }>(
+            "select id from vyndi_external_support_receipts where id=$1",
+            [targetId],
+          );
+          if (!supports[0]) return json({ ok: false, error: "support_not_found" }, 404);
+        }
 
         const duplicate = await sql.query<{ id: string }>(
-          "select id from vyndi_expense_evidence_attachments where expenditure_id=$1 and sha256_hex=$2",
-          [expenditureId, sha256Hex],
+          targetType === "expenditure"
+            ? "select id from vyndi_expense_evidence_attachments where expenditure_id=$1 and sha256_hex=$2"
+            : "select id from vyndi_expense_evidence_attachments where external_support_receipt_id=$1 and sha256_hex=$2",
+          [targetId, sha256Hex],
         );
         if (duplicate[0]) {
           return json({ ok: false, error: "duplicate_evidence", attachmentId: duplicate[0].id, sha256Hex }, 409);
@@ -193,12 +205,13 @@ export const Route = createFileRoute("/api/finance/expense-evidence")({
         const fileName = safeFilename(file.name);
         await sql.query(
           `insert into vyndi_expense_evidence_attachments(
-             id,expenditure_id,document_type,file_name,mime_type,file_size_bytes,
-             sha256_hex,content_bytes,uploaded_by,uploaded_role)
-           values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+             id,expenditure_id,external_support_receipt_id,document_type,file_name,mime_type,
+             file_size_bytes,sha256_hex,content_bytes,uploaded_by,uploaded_role)
+           values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
           [
             id,
-            expenditureId,
+            targetType === "expenditure" ? targetId : null,
+            targetType === "external_support" ? targetId : null,
             documentType,
             fileName,
             mimeType,
@@ -213,7 +226,10 @@ export const Route = createFileRoute("/api/finance/expense-evidence")({
         return json({
           ok: true,
           attachmentId: id,
-          expenditureId,
+          targetType,
+          targetId,
+          expenditureId: targetType === "expenditure" ? targetId : null,
+          externalSupportReceiptId: targetType === "external_support" ? targetId : null,
           documentType,
           fileName,
           mimeType,
