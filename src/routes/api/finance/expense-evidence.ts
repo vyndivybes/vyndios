@@ -1,4 +1,3 @@
-import { Buffer } from "node:buffer";
 import { createFileRoute } from "@tanstack/react-router";
 import { requireBusinessActor } from "@/lib/business-actor";
 import { UnauthorizedError } from "@/lib/auth/verify.server";
@@ -57,12 +56,36 @@ function safeFilename(value: string) {
   return cleaned || "evidence";
 }
 
-function responseBytes(value: unknown): Uint8Array {
-  if (value instanceof Uint8Array) return value;
-  if (typeof value === "string" && value.startsWith("\\x")) {
-    return new Uint8Array(Buffer.from(value.slice(2), "hex"));
+function hexBytes(value: string): Uint8Array {
+  const hexValue = value.startsWith("\\x") ? value.slice(2) : value;
+  if (hexValue.length % 2 !== 0 || !/^[0-9a-f]*$/i.test(hexValue)) {
+    throw new Error("Invalid bytea hex payload.");
   }
-  return new Uint8Array(Buffer.from(value as never));
+  const bytes = new Uint8Array(hexValue.length / 2);
+  for (let index = 0; index < bytes.length; index += 1) {
+    bytes[index] = Number.parseInt(hexValue.slice(index * 2, index * 2 + 2), 16);
+  }
+  return bytes;
+}
+
+function responseArrayBuffer(value: unknown): ArrayBuffer {
+  let source: Uint8Array;
+
+  if (value instanceof Uint8Array) {
+    source = value;
+  } else if (value instanceof ArrayBuffer) {
+    return value.slice(0);
+  } else if (ArrayBuffer.isView(value)) {
+    source = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  } else if (typeof value === "string" && value.startsWith("\\x")) {
+    source = hexBytes(value);
+  } else {
+    throw new Error("Unsupported expense-evidence byte payload.");
+  }
+
+  const copy = new Uint8Array(source.byteLength);
+  copy.set(source);
+  return copy.buffer;
 }
 
 export const Route = createFileRoute("/api/finance/expense-evidence")({
@@ -99,7 +122,7 @@ export const Route = createFileRoute("/api/finance/expense-evidence")({
         const row = rows[0];
         if (!row) return json({ ok: false, error: "attachment_not_found" }, 404);
 
-        const bytes = responseBytes(row.content_bytes);
+        const bytes = responseArrayBuffer(row.content_bytes);
         const disposition = url.searchParams.get("download") === "1" ? "attachment" : "inline";
         return new Response(bytes, {
           status: 200,
@@ -181,7 +204,7 @@ export const Route = createFileRoute("/api/finance/expense-evidence")({
             mimeType,
             file.size,
             sha256Hex,
-            Buffer.from(bytes),
+            bytes,
             actor.userId,
             actor.role,
           ],
