@@ -74,6 +74,12 @@ test("engineering analysis executes before repository knowledge lookup", () => {
   assert.ok(knowledgeCall > engineeringCall);
 });
 
+test("engineering analysis suppresses generic knowledge evidence append", () => {
+  assert.match(copilot2, /evidenceMode\?: "engineering-analysis" \| "repository-knowledge"/);
+  assert.match(copilot2, /evidenceMode: "engineering-analysis"/);
+  assert.match(productionCopilot, /vibpe2\?\.evidenceMode === "engineering-analysis"/);
+});
+
 test("engineering knowledge questions route before IBPE metric fallback", () => {
   assert.match(copilot2, /function isKnowledgeQuestion/);
   assert.match(copilot2, /fork\|axle/);
