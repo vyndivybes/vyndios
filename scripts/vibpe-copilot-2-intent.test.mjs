@@ -66,6 +66,14 @@ test("VIBPE 2.0 runtime errors fail safely to the governed production fallback",
   assert.match(productionCopilot, /vibpe2FallbackReason: vibpe2FallbackReason \?\? null/);
 });
 
+test("engineering analysis executes before repository knowledge lookup", () => {
+  assert.match(copilot2, /tryVibpeEngineeringAnalysis/);
+  const engineeringCall = copilot2.indexOf("const engineeringAnalysis = tryVibpeEngineeringAnalysis(question)");
+  const knowledgeCall = copilot2.indexOf("retrieveVibpeKnowledgeEvidence(sql, question, 8)");
+  assert.ok(engineeringCall >= 0);
+  assert.ok(knowledgeCall > engineeringCall);
+});
+
 test("engineering knowledge questions route before IBPE metric fallback", () => {
   assert.match(copilot2, /function isKnowledgeQuestion/);
   assert.match(copilot2, /fork\|axle/);
