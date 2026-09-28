@@ -177,43 +177,63 @@ export const createPeopleOfficeActualExpenditure = createServerFn({ method: "POS
       sourceReference: reference,
       notes: z.string().trim().max(2000).default(""),
       fundingSource: z.enum(PEOPLE_OFFICE_FUNDING_SOURCES).default("company_bank"),
+      thirdPartyPayerName: z.string().trim().max(160).default(""),
+      thirdPartyPayerType: z.enum(THIRD_PARTY_PAYER_TYPES).optional(),
+      thirdPartyRepaymentStatus: z.enum(REPAYMENT_STATUSES).optional(),
     }),
   )
   .handler(async ({ data }) => {
     const actor = await requireActor("edit");
     const sql = await getSql();
     const id = `POEXP-${crypto.randomUUID()}`;
-    if (data.sourceType === "manual_expense") {
-      if (data.sourceId !== "digital_services") {
-        throw new Error("Unsupported manual operating expense category.");
+
+    if (data.fundingSource === "third_party") {
+      if (!data.thirdPartyPayerName || !data.thirdPartyPayerType || !data.thirdPartyRepaymentStatus) {
+        throw new Error("Third-party paid expenditure requires payer name, payer type, and repayment status.");
       }
-      const liabilityAccount = data.fundingSource === "founder_personal" ? "2400" : "2000";
+    }
+
+    const directInsert = data.sourceType === "manual_expense" || data.fundingSource === "third_party";
+    if (directInsert) {
+      const source = await resolveDirectSource(sql, data.sourceType, data.sourceId);
+      const repaymentStatus = data.thirdPartyRepaymentStatus;
+      const liabilityAccount =
+        data.fundingSource === "founder_personal" ? "2400"
+        : data.fundingSource === "third_party" && repaymentStatus ? thirdPartyLiabilityAccount(repaymentStatus)
+        : "2000";
+      const governanceMarker = governanceMarkerForFunding(data.fundingSource, repaymentStatus);
+
       const rows = await sql.query<{ id: string }>(
         `with expenditure as (
            insert into vyndi_people_office_actual_expenditures(
              id,source_type,source_id,source_label,source_category,plan_month,incurred_on,description,
              amount_inr,debit_account_code,liability_account_code,lifecycle_status,source_reference,notes,
-             funding_source,created_by)
+             funding_source,governance_marker,third_party_payer_name,third_party_payer_type,
+             third_party_repayment_status,created_by)
            values(
-             $1,'manual_expense','digital_services','Digital services / domains & hosting','office',$2,$3::date,$4,
-             round($5::numeric,2),'6200',$6,'draft',$7,$8,$9,$10)
+             $1,$2,$3,$4,$5,$6,$7::date,$8,round($9::numeric,2),$10,$11,'draft',$12,$13,
+             $14,$15,$16,$17,$18,$19)
            returning id
          ),
          audit as (
            insert into vyndi_audit_events(
              id,entity_type,entity_id,action,actor_user_id,actor_role,source_reference,payload_json)
            select
-             'AUD-'||id||'-DRAFT','people_office_actual_expenditure',id,'manual_expense_draft_created',
-             $10,$11,$7,
+             'AUD-'||id||'-DRAFT','people_office_actual_expenditure',id,
+             case when $2='manual_expense' then 'manual_expense_draft_created' else 'third_party_expense_draft_created' end,
+             $19,$20,$12,
              jsonb_build_object(
-               'sourceType','manual_expense',
-               'sourceId','digital_services',
-               'sourceLabel','Digital services / domains & hosting',
-               'accrualPlanMonth',$2,
-               'amountInr',round($5::numeric,2),
-               'debitAccount','6200',
-               'liabilityAccount',$6,
-               'fundingSource',$9,
+               'sourceType',$2,
+               'sourceId',$3,
+               'sourceLabel',$4,
+               'accrualPlanMonth',$6,
+               'amountInr',round($9::numeric,2),
+               'debitAccount',$10,
+               'liabilityAccount',$11,
+               'fundingSource',$14,
+               'thirdPartyPayerName',nullif($16,''),
+               'thirdPartyPayerType',$17,
+               'thirdPartyRepaymentStatus',$18,
                'companyCashMoved',false
              )
            from expenditure
@@ -222,14 +242,23 @@ export const createPeopleOfficeActualExpenditure = createServerFn({ method: "POS
          select id from expenditure`,
         [
           id,
+          data.sourceType,
+          data.sourceId,
+          source.label,
+          source.category,
           data.planMonth,
           data.incurredOn,
           data.description.trim(),
           data.amountInr,
+          source.debitAccountCode,
           liabilityAccount,
           data.sourceReference.trim(),
           data.notes.trim(),
           data.fundingSource,
+          governanceMarker,
+          data.fundingSource === "third_party" ? data.thirdPartyPayerName : null,
+          data.fundingSource === "third_party" ? data.thirdPartyPayerType : null,
+          data.fundingSource === "third_party" ? data.thirdPartyRepaymentStatus : null,
           actor.userId,
           actor.role,
         ],
