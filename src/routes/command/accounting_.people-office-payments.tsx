@@ -39,12 +39,17 @@ function PeopleOfficeActualSpend() {
     expenditures: Row[];
     payments: Row[];
     founderReimbursements: Row[];
+    thirdPartyReimbursements: Row[];
+    externalSupportReceipts: Row[];
     cashAuthority: Row[];
   };
 
   const [sourceType, setSourceType] = useState<"cost_item" | "asset" | "manual_expense">("cost_item");
   const [sourceId, setSourceId] = useState("");
-  const [fundingSource, setFundingSource] = useState<"company_bank" | "founder_personal">("company_bank");
+  const [fundingSource, setFundingSource] = useState<"company_bank" | "founder_personal" | "third_party">("company_bank");
+  const [thirdPartyPayerName, setThirdPartyPayerName] = useState("");
+  const [thirdPartyPayerType, setThirdPartyPayerType] = useState<(typeof THIRD_PARTY_PAYER_TYPES)[number]>("friend");
+  const [thirdPartyRepaymentStatus, setThirdPartyRepaymentStatus] = useState<(typeof REPAYMENT_STATUSES)[number]>("undecided");
   const [planMonth, setPlanMonth] = useState("1");
   const [incurredOn, setIncurredOn] = useState(today());
   const [description, setDescription] = useState("");
@@ -62,6 +67,23 @@ function PeopleOfficeActualSpend() {
   const [reimbursedOn, setReimbursedOn] = useState(today());
   const [reimbursementAmount, setReimbursementAmount] = useState("");
   const [reimbursementEvidence, setReimbursementEvidence] = useState("");
+  const [thirdPartyReimbursementExpenditureId, setThirdPartyReimbursementExpenditureId] = useState("");
+  const [thirdPartyReimbursementPlanMonth, setThirdPartyReimbursementPlanMonth] = useState("1");
+  const [thirdPartyReimbursedOn, setThirdPartyReimbursedOn] = useState(today());
+  const [thirdPartyReimbursementAmount, setThirdPartyReimbursementAmount] = useState("");
+  const [thirdPartyReimbursementEvidence, setThirdPartyReimbursementEvidence] = useState("");
+
+  const [supportReceivedFrom, setSupportReceivedFrom] = useState("");
+  const [supportSenderType, setSupportSenderType] = useState<(typeof THIRD_PARTY_PAYER_TYPES)[number]>("friend");
+  const [supportReceivedOn, setSupportReceivedOn] = useState(today());
+  const [supportAmount, setSupportAmount] = useState("");
+  const [supportReceivedInto, setSupportReceivedInto] = useState<(typeof EXTERNAL_SUPPORT_DESTINATIONS)[number]>("founder_personal");
+  const [supportPlanMonth, setSupportPlanMonth] = useState("1");
+  const [supportRelatedExpenditureId, setSupportRelatedExpenditureId] = useState("");
+  const [supportPurpose, setSupportPurpose] = useState("");
+  const [supportRepaymentStatus, setSupportRepaymentStatus] = useState<(typeof REPAYMENT_STATUSES)[number]>("undecided");
+  const [supportEvidence, setSupportEvidence] = useState("");
+  const [supportNotes, setSupportNotes] = useState("");
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
