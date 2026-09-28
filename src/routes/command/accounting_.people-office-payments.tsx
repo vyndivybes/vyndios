@@ -25,6 +25,7 @@ const inr = (value: number) => `₹${value.toLocaleString("en-IN", { maximumFrac
 const lakh = (value: number) => `₹${value.toFixed(2)}L`;
 const today = () => new Date().toISOString().slice(0, 10);
 const evidenceLines = (value: string) => value.split(";").map((part) => part.trim()).filter(Boolean);
+const fileSize = (value: number) => value < 1024 ? `${value} B` : value < 1024 * 1024 ? `${(value / 1024).toFixed(1)} KB` : `${(value / (1024 * 1024)).toFixed(2)} MB`;
 
 export const Route = createFileRoute("/command/accounting/people-office-payments")({
   loader: () => listPeopleOfficeActualSpend(),
@@ -41,6 +42,7 @@ function PeopleOfficeActualSpend() {
     founderReimbursements: Row[];
     thirdPartyReimbursements: Row[];
     externalSupportReceipts: Row[];
+    expenseEvidenceAttachments: Row[];
     cashAuthority: Row[];
   };
 
@@ -84,6 +86,9 @@ function PeopleOfficeActualSpend() {
   const [supportRepaymentStatus, setSupportRepaymentStatus] = useState<(typeof REPAYMENT_STATUSES)[number]>("undecided");
   const [supportEvidence, setSupportEvidence] = useState("");
   const [supportNotes, setSupportNotes] = useState("");
+  const [evidenceExpenditureId, setEvidenceExpenditureId] = useState("");
+  const [evidenceDocumentType, setEvidenceDocumentType] = useState<"invoice" | "receipt" | "payment_evidence" | "statement" | "other">("invoice");
+  const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -123,6 +128,37 @@ function PeopleOfficeActualSpend() {
 
   async function refresh() {
     await router.invalidate();
+  }
+
+  async function uploadEvidence(event: React.FormEvent) {
+    event.preventDefault();
+    if (!evidenceExpenditureId || !evidenceFile) return;
+    setBusy("evidence-upload"); setMessage(""); setError("");
+    try {
+      const form = new FormData();
+      form.set("expenditureId", evidenceExpenditureId);
+      form.set("documentType", evidenceDocumentType);
+      form.set("file", evidenceFile);
+      const response = await fetch("/api/finance/expense-evidence", { method: "POST", body: form });
+      const payload = await response.json() as { ok?: boolean; error?: string; attachmentId?: string; sha256Hex?: string };
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error === "duplicate_evidence"
+          ? "This exact evidence file is already attached to the selected expenditure."
+          : payload.error || "Evidence upload failed.");
+      }
+      setMessage(`${payload.attachmentId} attached. SHA-256 ${payload.sha256Hex}. The accounting approval and journal were not changed.`);
+      setEvidenceFile(null);
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Evidence upload failed.");
+    } finally { setBusy(""); }
+  }
+
+  function selectEvidence(row: Row) {
+    setEvidenceExpenditureId(text(row, "id"));
+    if (typeof document !== "undefined") {
+      requestAnimationFrame(() => document.getElementById("expense-evidence-upload")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    }
   }
 
   async function createActual(event: React.FormEvent) {
