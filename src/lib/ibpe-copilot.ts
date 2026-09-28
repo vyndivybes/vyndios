@@ -677,7 +677,9 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
       answer = `${answer}\n\n${knowledgeRefreshWarning}`;
     }
 
-    const surfacedKnowledgeEvidence = shouldSurfaceKnowledgeEvidence(data.question) ? knowledgeEvidence : [];
+    const surfacedKnowledgeEvidence = vibpe2?.evidenceMode === "engineering-analysis"
+      ? []
+      : shouldSurfaceKnowledgeEvidence(data.question) ? knowledgeEvidence : [];
     if (surfacedKnowledgeEvidence.length) {
       const evidenceText = formatKnowledgeEvidence(surfacedKnowledgeEvidence);
       if (evidenceText && !answer.includes("VIBPE knowledge evidence (governed Drive references; not automatic master authority):")) {
