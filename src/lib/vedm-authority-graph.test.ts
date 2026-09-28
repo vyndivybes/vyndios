@@ -117,7 +117,7 @@ test("R3-A seed covers the controlled engineering thread with pinned VEDM proven
   const domains = new Set(seed.nodes.map((node) => node.domain));
 
   assert.equal(seed.sourceRepository, "vayu-shastr/veloxis-engineering-design-manual");
-  assert.equal(seed.sourceCommit, "49fdac757534c6e42a0c5c29c43a2a6e35d637d2");
+  assert.equal(seed.sourceCommit, "b874cde910ce462724b63bac6b7e7f79e7d68785");
   for (const domain of [
     "frame_geometry",
     "cad_step",

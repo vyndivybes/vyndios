@@ -12,6 +12,7 @@ import { vibpeBusinessOperatorContext } from "@/lib/vibpe-business-operator";
 import { getVibpeSession, updateVibpeSession } from "@/lib/vibpe-session";
 import { compileVedmAuthorityGraph, createVedmR3aSeed } from "@/lib/vedm-authority-graph";
 import { evaluateVibpeAuthorityContext } from "@/lib/vibpe-authority-reasoning";
+import { resolveVibpeEngineeringAnalysis } from "@/lib/vibpe-engineering-analysis";
 
 export type VibpeCopilot2Result = {
   intent: VibpeScenarioParse["intent"];
@@ -21,6 +22,7 @@ export type VibpeCopilot2Result = {
   comparison?: IbpeScenarioComparison;
   horizonMonths?: number;
   doctrine: string;
+  evidenceMode?: "engineering-analysis" | "repository-knowledge";
   advisoryOnly: true;
 };
 
@@ -392,6 +394,18 @@ export async function runVibpeCopilot2(
     // existing governed fallbacks when an optional read source is unavailable.
   }
 
+  const engineeringAnalysis = await resolveVibpeEngineeringAnalysis(sql, question);
+  if (engineeringAnalysis.handled && engineeringAnalysis.answer) {
+    updateVibpeSession(sessionKey, { lastIntent: parsed.intent, lastQuestion: question });
+    return {
+      intent: parsed.intent,
+      answer: engineeringAnalysis.answer,
+      doctrine: vibpeBusinessOperatorContext(),
+      evidenceMode: "engineering-analysis",
+      advisoryOnly: true,
+    };
+  }
+
   if (isKnowledgeQuestion(question)) {
     try {
       const evidence = await retrieveVibpeKnowledgeEvidence(sql, question, 8);
@@ -402,6 +416,7 @@ export async function runVibpeCopilot2(
           intent: parsed.intent,
           answer,
           doctrine: vibpeBusinessOperatorContext(),
+          evidenceMode: "repository-knowledge",
           advisoryOnly: true,
         };
       }
