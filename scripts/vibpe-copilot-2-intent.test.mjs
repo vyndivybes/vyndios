@@ -67,8 +67,8 @@ test("VIBPE 2.0 runtime errors fail safely to the governed production fallback",
 });
 
 test("engineering analysis executes before repository knowledge lookup", () => {
-  assert.match(copilot2, /tryVibpeEngineeringAnalysis/);
-  const engineeringCall = copilot2.indexOf("const engineeringAnalysis = tryVibpeEngineeringAnalysis(question)");
+  assert.match(copilot2, /resolveVibpeEngineeringAnalysis/);
+  const engineeringCall = copilot2.indexOf("const engineeringAnalysis = await resolveVibpeEngineeringAnalysis(sql, question)");
   const knowledgeCall = copilot2.indexOf("retrieveVibpeKnowledgeEvidence(sql, question, 8)");
   assert.ok(engineeringCall >= 0);
   assert.ok(knowledgeCall > engineeringCall);
