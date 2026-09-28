@@ -137,6 +137,7 @@ test("People and Office actual spend keeps planning approval separate from accou
 });
 
 // Cloudflare Workers build guard: evidence transport stays Web-API native.
+// Nested evidence is transaction-scoped; this comment also forces the Cloudflare preview after the stale assertion fix.
 test("finance evidence nests by transaction and supports external-support proof", () => {
   assert.match(nestedEvidenceMigration, /external_support_receipt_id/);
   assert.match(nestedEvidenceMigration, /vyndi_external_support_receipts/);
