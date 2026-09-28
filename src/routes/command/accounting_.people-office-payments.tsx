@@ -42,7 +42,7 @@ function PeopleOfficeActualSpend() {
     founderReimbursements: Row[];
     thirdPartyReimbursements: Row[];
     externalSupportReceipts: Row[];
-    expenseEvidenceAttachments: Row[];
+    evidenceAttachments: Row[];
     cashAuthority: Row[];
   };
 
@@ -86,7 +86,9 @@ function PeopleOfficeActualSpend() {
   const [supportRepaymentStatus, setSupportRepaymentStatus] = useState<(typeof REPAYMENT_STATUSES)[number]>("undecided");
   const [supportEvidence, setSupportEvidence] = useState("");
   const [supportNotes, setSupportNotes] = useState("");
-  const [evidenceExpenditureId, setEvidenceExpenditureId] = useState("");
+  const [evidenceTargetType, setEvidenceTargetType] = useState<"expenditure" | "external_support">("expenditure");
+  const [evidenceTargetId, setEvidenceTargetId] = useState("");
+  const [expandedEvidenceKey, setExpandedEvidenceKey] = useState("");
   const [evidenceDocumentType, setEvidenceDocumentType] = useState<"invoice" | "receipt" | "payment_evidence" | "statement" | "other">("invoice");
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
   const [busy, setBusy] = useState("");
@@ -130,23 +132,39 @@ function PeopleOfficeActualSpend() {
     await router.invalidate();
   }
 
+  const evidenceFor = (targetType: "expenditure" | "external_support", targetId: string) =>
+    data.evidenceAttachments.filter((row) =>
+      targetType === "expenditure"
+        ? text(row, "expenditure_id") === targetId
+        : text(row, "external_support_receipt_id") === targetId,
+    );
+
+  function openEvidence(targetType: "expenditure" | "external_support", targetId: string) {
+    const key = `${targetType}:${targetId}`;
+    setEvidenceTargetType(targetType);
+    setEvidenceTargetId(targetId);
+    setExpandedEvidenceKey((current) => current === key ? "" : key);
+    setEvidenceFile(null);
+  }
+
   async function uploadEvidence(event: React.FormEvent) {
     event.preventDefault();
-    if (!evidenceExpenditureId || !evidenceFile) return;
+    if (!evidenceTargetId || !evidenceFile) return;
     setBusy("evidence-upload"); setMessage(""); setError("");
     try {
       const form = new FormData();
-      form.set("expenditureId", evidenceExpenditureId);
+      form.set("targetType", evidenceTargetType);
+      form.set("targetId", evidenceTargetId);
       form.set("documentType", evidenceDocumentType);
       form.set("file", evidenceFile);
       const response = await fetch("/api/finance/expense-evidence", { method: "POST", body: form });
       const payload = await response.json() as { ok?: boolean; error?: string; attachmentId?: string; sha256Hex?: string };
       if (!response.ok || !payload.ok) {
         throw new Error(payload.error === "duplicate_evidence"
-          ? "This exact evidence file is already attached to the selected expenditure."
+          ? "This exact evidence file is already attached to this transaction."
           : payload.error || "Evidence upload failed.");
       }
-      setMessage(`${payload.attachmentId} attached. SHA-256 ${payload.sha256Hex}. The accounting approval and journal were not changed.`);
+      setMessage(`${payload.attachmentId} attached. SHA-256 ${payload.sha256Hex}. The accounting transaction was not changed.`);
       setEvidenceFile(null);
       await refresh();
     } catch (cause) {
@@ -154,11 +172,31 @@ function PeopleOfficeActualSpend() {
     } finally { setBusy(""); }
   }
 
-  function selectEvidence(row: Row) {
-    setEvidenceExpenditureId(text(row, "id"));
-    if (typeof document !== "undefined") {
-      requestAnimationFrame(() => document.getElementById("expense-evidence-upload")?.scrollIntoView({ behavior: "smooth", block: "start" }));
-    }
+  function renderEvidenceBundle(targetType: "expenditure" | "external_support", targetId: string) {
+    const key = `${targetType}:${targetId}`;
+    if (expandedEvidenceKey !== key) return null;
+    const attachments = evidenceFor(targetType, targetId);
+    const isSupport = targetType === "external_support";
+    return <div className="mt-3 rounded-2xl border border-accent/30 bg-bg-elevated/60 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div><p className="text-[10px] font-semibold uppercase tracking-wider text-accent">Evidence files</p><p className="mt-1 text-xs text-muted">{attachments.length} file{attachments.length === 1 ? "" : "s"} linked to this {isSupport ? "external support receipt" : "expenditure"}.</p></div>
+        <button type="button" onClick={()=>openEvidence(targetType,targetId)} className="rounded-full border border-border px-3 py-1 text-[10px] font-semibold">Close</button>
+      </div>
+      <form onSubmit={uploadEvidence} className="mt-4 grid gap-3 lg:grid-cols-12">
+        <label className="lg:col-span-3"><span className="text-[10px] font-semibold uppercase tracking-wider text-muted">Document type</span><select value={evidenceDocumentType} onChange={(event)=>setEvidenceDocumentType(event.target.value as "invoice" | "receipt" | "payment_evidence" | "statement" | "other")} className="mt-1 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm"><option value="invoice">Invoice</option><option value="receipt">Receipt</option><option value="payment_evidence">Payment evidence</option><option value="statement">Statement</option><option value="other">Other</option></select></label>
+        <label className="lg:col-span-6"><span className="text-[10px] font-semibold uppercase tracking-wider text-muted">{isSupport ? "Support proof file" : "Evidence file"}</span><input required type="file" accept="application/pdf,image/jpeg,image/png" onChange={(event)=>setEvidenceFile(event.target.files?.[0] ?? null)} className="mt-1 block w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm"/><span className="mt-1 block text-[10px] text-muted">PDF, JPEG or PNG · maximum 5 MB · SHA-256 calculated server-side.</span></label>
+        <div className="lg:col-span-3 flex items-end"><button disabled={busy!=="" || !evidenceFile || evidenceTargetId !== targetId || evidenceTargetType !== targetType} className="w-full rounded-full border border-accent bg-accent/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-accent disabled:opacity-50">{busy === "evidence-upload" ? "Uploading…" : isSupport ? "Attach Proof" : "Attach Evidence"}</button></div>
+      </form>
+      <div className="mt-4 space-y-2">
+        {attachments.map((row)=><div key={text(row,"id")} className="grid gap-3 rounded-xl border border-border/70 bg-bg p-3 text-xs lg:grid-cols-[1.5fr_0.8fr_2fr_auto] lg:items-center">
+          <div><p className="font-semibold">{text(row,"file_name")}</p><p className="mt-1 text-[10px] uppercase text-muted">{text(row,"document_type").replaceAll("_"," ")} · {fileSize(num(row,"file_size_bytes"))}</p></div>
+          <div><p className="text-[10px] text-muted">Uploaded</p><p className="mt-1">{text(row,"uploaded_at")}</p></div>
+          <div><p className="text-[10px] text-muted">SHA-256</p><p className="mt-1 break-all font-mono text-[10px]">{text(row,"sha256_hex")}</p></div>
+          <div className="flex gap-2"><a href={`/api/finance/expense-evidence?attachmentId=${encodeURIComponent(text(row,"id"))}`} target="_blank" rel="noreferrer" className="rounded-full border border-accent/60 px-3 py-1 text-[10px] font-semibold text-accent">Preview</a><a href={`/api/finance/expense-evidence?attachmentId=${encodeURIComponent(text(row,"id"))}&download=1`} className="rounded-full border border-border px-3 py-1 text-[10px] font-semibold">Download</a></div>
+        </div>)}
+        {attachments.length===0 ? <p className="rounded-xl border border-dashed border-border p-3 text-xs text-muted">No proof files attached yet.</p> : null}
+      </div>
+    </div>;
   }
 
   async function createActual(event: React.FormEvent) {
