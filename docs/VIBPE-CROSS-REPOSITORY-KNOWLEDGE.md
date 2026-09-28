@@ -14,7 +14,7 @@ The runtime uses a curated, commit-pinned snapshot in `src/lib/vibpe-repository-
 
 | Source | Pinned commit | Role |
 |---|---|---|
-| `vayu-shastr/veloxis-engineering-design-manual` | `e275bad3b90a4d75fd09aac6b297e61d0d1ae5e7` | controlled engineering/configuration reference |
+| `vayu-shastr/veloxis-engineering-design-manual` | `9ef41eb8afbc75429013bfd73133957ddccf3834` | controlled engineering/configuration reference |
 | `vayu-shastr/adv-vibpe` | `3ca30a7891272870190b3f21340102451d7ff94b` | development/reference finance, governance and Co-Pilot doctrine |
 | `vayu-shastr/vyndios` | `89de43701c16776a834b4ba67e38620d670160f7` | last independently audited self-repository evidence anchor; current runtime remains authoritative |
 
