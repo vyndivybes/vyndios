@@ -7,6 +7,7 @@ const workflow = readFileSync(new URL("../src/lib/operating-workflow.ts", import
 const manual = readFileSync(new URL("../src/routes/command/user-manual.tsx", import.meta.url), "utf8");
 const traceability = readFileSync(new URL("../src/components/traceability-document-centre-v2.tsx", import.meta.url), "utf8");
 const theme = readFileSync(new URL("../src/tansam-vyndi-theme.css", import.meta.url), "utf8");
+const accountingAlias = readFileSync(new URL("../src/routes/command/accounting_.$legacy.tsx", import.meta.url), "utf8");
 
 test("global Command search is a governed universal entry point without runtime DOM indexing", () => {
   assert.match(shell, /function CommandSearch\(/);
@@ -28,6 +29,13 @@ test("global Command search is a governed universal entry point without runtime 
   assert.doesNotMatch(shell, /createTreeWalker/);
   assert.doesNotMatch(shell, /document\.body\.innerText/);
   assert.doesNotMatch(shell, /document\.querySelectorAll/);
+});
+
+test("Finance navigation exposes canonical People & Office Actual Spend and legacy human-readable URLs recover", () => {
+  assert.match(workflow, /to: "\/command\/accounting\/people-office-payments", label: "People & Office Actual Spend"/);
+  assert.match(accountingAlias, /createFileRoute\("\/command\/accounting\/\$legacy"\)/);
+  assert.match(accountingAlias, /People & Office Actual Spend/);
+  assert.match(accountingAlias, /redirect\(\{ to: "\/command\/accounting\/people-office-payments", replace: true \}\)/);
 });
 
 test("free-text Command searches hand off to the existing permission-aware Traceability Centre", () => {
