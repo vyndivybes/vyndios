@@ -92,8 +92,62 @@ export const createPeopleOfficeActualExpenditure = createServerFn({ method: "POS
     const actor = await requireActor("edit");
     const sql = await getSql();
     const id = `POEXP-${crypto.randomUUID()}`;
-    const rows = await sql.query<{ create_vyndi_people_office_actual_expenditure_v3: string }>(
-      `select create_vyndi_people_office_actual_expenditure_v3($1,$2,$3,$4,$5::date,$6,$7,$8,$9,$10,$11,$12)`,
+    if (data.sourceType === "manual_expense") {
+      if (data.sourceId !== "digital_services") {
+        throw new Error("Unsupported manual operating expense category.");
+      }
+      const liabilityAccount = data.fundingSource === "founder_personal" ? "2400" : "2000";
+      const rows = await sql.query<{ id: string }>(
+        `with expenditure as (
+           insert into vyndi_people_office_actual_expenditures(
+             id,source_type,source_id,source_label,source_category,plan_month,incurred_on,description,
+             amount_inr,debit_account_code,liability_account_code,lifecycle_status,source_reference,notes,
+             funding_source,created_by)
+           values(
+             $1,'manual_expense','digital_services','Digital services / domains & hosting','office',$2,$3::date,$4,
+             round($5::numeric,2),'6200',$6,'draft',$7,$8,$9,$10)
+           returning id
+         ),
+         audit as (
+           insert into vyndi_audit_events(
+             id,entity_type,entity_id,action,actor_user_id,actor_role,source_reference,payload_json)
+           select
+             'AUD-'||id||'-DRAFT','people_office_actual_expenditure',id,'manual_expense_draft_created',
+             $10,$11,$7,
+             jsonb_build_object(
+               'sourceType','manual_expense',
+               'sourceId','digital_services',
+               'sourceLabel','Digital services / domains & hosting',
+               'accrualPlanMonth',$2,
+               'amountInr',round($5::numeric,2),
+               'debitAccount','6200',
+               'liabilityAccount',$6,
+               'fundingSource',$9,
+               'companyCashMoved',false
+             )
+           from expenditure
+           returning id
+         )
+         select id from expenditure`,
+        [
+          id,
+          data.planMonth,
+          data.incurredOn,
+          data.description.trim(),
+          data.amountInr,
+          liabilityAccount,
+          data.sourceReference.trim(),
+          data.notes.trim(),
+          data.fundingSource,
+          actor.userId,
+          actor.role,
+        ],
+      );
+      return { ok: true, id: rows[0]?.id ?? id };
+    }
+
+    const rows = await sql.query<{ create_vyndi_people_office_actual_expenditure_v2: string }>(
+      `select create_vyndi_people_office_actual_expenditure_v2($1,$2,$3,$4,$5::date,$6,$7,$8,$9,$10,$11,$12)`,
       [
         id,
         data.sourceType,
@@ -109,7 +163,7 @@ export const createPeopleOfficeActualExpenditure = createServerFn({ method: "POS
         actor.role,
       ],
     );
-    return { ok: true, id: rows[0]?.create_vyndi_people_office_actual_expenditure_v3 ?? id };
+    return { ok: true, id: rows[0]?.create_vyndi_people_office_actual_expenditure_v2 ?? id };
   });
 
 export const submitPeopleOfficeActualExpenditure = createServerFn({ method: "POST" })
@@ -130,7 +184,7 @@ export const approvePeopleOfficeActualExpenditure = createServerFn({ method: "PO
   .handler(async ({ data }) => {
     const actor = await requireActor("approve");
     const sql = await getSql();
-    await sql.query(`select approve_vyndi_people_office_actual_expenditure_v3($1,$2,$3,$4)`, [
+    await sql.query(`select approve_vyndi_people_office_actual_expenditure_v2($1,$2,$3,$4)`, [
       data.id,
       actor.userId,
       actor.role,
