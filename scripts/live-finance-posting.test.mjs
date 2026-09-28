@@ -164,6 +164,8 @@ test("founder-paid People and Office spend creates a director payable without mo
   assert.match(peopleOfficeActualAuthority, /postFounderReimbursement/);
   assert.match(peopleOfficeActualRoute, /Founder \/ Director personal funds/);
   assert.match(peopleOfficeActualRoute, /Sole-operator self-approval/);
+  assert.match(peopleOfficeActualRoute, /Expense & Reimbursement Register/);
+  assert.doesNotMatch(peopleOfficeActualRoute, /People & Office Actual Spend/);
   assert.match(peopleOfficeActualRoute, /Evidence & traceability register/);
   assert.match(peopleOfficeActualRoute, /Evidence source/);
   assert.match(peopleOfficeActualRoute, /Reconciliation \/ evidence details/);

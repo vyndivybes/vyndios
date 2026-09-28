@@ -184,7 +184,7 @@ function PeopleOfficeActualSpend() {
   return <div className="space-y-6">
     <header className="border-b border-border pb-6">
       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">Finance · transaction-driven expenditure</p>
-      <h1 className="mt-1 font-display text-4xl text-accent">People & Office Actual Spend</h1>
+      <h1 className="mt-1 font-display text-4xl text-accent">Expense & Reimbursement Register</h1>
       <p className="mt-2 max-w-5xl text-sm leading-6 text-muted">Planning approval authorises a budget record; it does not spend cash. This console creates the separate actual obligation and posts it to the General Ledger on approval. Company-paid spend moves Bank plus canonical cash only when evidenced payment is posted. Founder / Director personal funds instead credit Current Account 2400 with zero company-cash movement until a later reimbursement. Accrual month and cash month remain controlled separately.</p>
       <div className="mt-3 flex flex-wrap gap-4 text-sm font-semibold"><Link to="/command/people-office" className="text-accent">People & Office plans →</Link><Link to="/command/accounting" className="text-accent">Accounting →</Link><Link to="/command/cash" className="text-accent">Cash authority →</Link></div>
     </header>

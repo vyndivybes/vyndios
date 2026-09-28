@@ -30,6 +30,11 @@ test("global Command search is a governed universal entry point without runtime 
   assert.doesNotMatch(shell, /document\.querySelectorAll/);
 });
 
+test("Finance navigation exposes the canonical Expense & Reimbursement Register", () => {
+  assert.match(workflow, /to: "\/command\/accounting\/people-office-payments", label: "Expense & Reimbursement Register"/);
+  assert.doesNotMatch(workflow, /label: "People & Office Actual Spend"/);
+});
+
 test("free-text Command searches hand off to the existing permission-aware Traceability Centre", () => {
   assert.match(traceability, /window\.addEventListener\("vyndi:traceability-search"/);
   assert.match(traceability, /DIRECT_SEARCH_SENTINEL/);
