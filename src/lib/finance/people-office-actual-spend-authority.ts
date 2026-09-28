@@ -2,7 +2,16 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireBusinessActor } from "@/lib/business-actor";
 import { getCommandRole } from "@/lib/command-access";
-import { getSql, type SqlRow } from "@/lib/db";
+import { getSql, type Sql, type SqlRow } from "@/lib/db";
+import {
+  EXTERNAL_SUPPORT_DESTINATIONS,
+  MANUAL_EXPENSE_CATEGORIES,
+  REPAYMENT_STATUSES,
+  THIRD_PARTY_PAYER_TYPES,
+  manualExpenseCategory,
+  thirdPartyLiabilityAccount,
+  type RepaymentStatus,
+} from "@/lib/finance/expense-classification";
 import { canPerform } from "@/lib/page-access";
 import { getRouteMeta } from "@/lib/page-metadata";
 
@@ -12,8 +21,68 @@ const reference = z.string().trim().min(3).max(500);
 const money = z.number().finite().positive().max(1_000_000_000_000);
 
 export const PEOPLE_OFFICE_ACTUAL_SOURCE_TYPES = ["cost_item", "asset", "manual_expense"] as const;
-export const PEOPLE_OFFICE_FUNDING_SOURCES = ["company_bank", "founder_personal"] as const;
+export const PEOPLE_OFFICE_FUNDING_SOURCES = ["company_bank", "founder_personal", "third_party"] as const;
 export const FOUNDER_PERSONAL = "founder_personal" as const;
+
+
+type SourceAuthority = {
+  label: string;
+  category: string;
+  debitAccountCode: string;
+};
+
+async function resolveDirectSource(sql: Sql, sourceType: "cost_item" | "asset" | "manual_expense", sourceId: string): Promise<SourceAuthority> {
+  if (sourceType === "manual_expense") {
+    const category = manualExpenseCategory(sourceId);
+    if (!category) throw new Error("Unsupported manual operating expense category.");
+    return {
+      label: category.label,
+      category: category.sourceCategory,
+      debitAccountCode: category.debitAccountCode,
+    };
+  }
+
+  if (sourceType === "cost_item") {
+    const rows = await sql.query<SqlRow>(
+      `select id,name,cost_group from vyndi_people_office_cost_items where id=$1 and lifecycle_status='approved'`,
+      [sourceId],
+    );
+    const row = rows[0];
+    if (!row) throw new Error("Actual cost requires an approved People & Office cost item.");
+    const category = String(row.cost_group ?? "");
+    const debitAccountCode = sourceId === "office-travel"
+      ? "6250"
+      : category === "payroll" ? "6100"
+      : category === "office" ? "6200"
+      : category === "statutory" ? "6300"
+      : category === "outsourcing" ? "6400"
+      : "";
+    if (!debitAccountCode) throw new Error(`No controlled accounting map exists for source ${sourceId}.`);
+    return { label: String(row.name ?? sourceId), category, debitAccountCode };
+  }
+
+  const rows = await sql.query<SqlRow>(
+    `select id,name,asset_class from vyndi_people_office_assets where id=$1 and lifecycle_status='approved'`,
+    [sourceId],
+  );
+  const row = rows[0];
+  if (!row) throw new Error("Actual asset spend requires an approved People & Office asset item.");
+  const category = String(row.asset_class ?? "");
+  return {
+    label: String(row.name ?? sourceId),
+    category,
+    debitAccountCode: category === "office_admin" ? "1500" : "6200",
+  };
+}
+
+function governanceMarkerForFunding(fundingSource: string, repaymentStatus?: RepaymentStatus) {
+  if (fundingSource === "third_party") {
+    return repaymentStatus === "required"
+      ? "THIRD_PARTY_REIMBURSEMENT_REQUIRED"
+      : "EXTERNAL_SUPPORT_PENDING_CLASSIFICATION";
+  }
+  return null;
+}
 
 async function requireView() {
   const role = await getCommandRole();
