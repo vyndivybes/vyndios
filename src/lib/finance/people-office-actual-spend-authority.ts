@@ -8,7 +8,6 @@ import {
   MANUAL_EXPENSE_CATEGORIES,
   REPAYMENT_STATUSES,
   THIRD_PARTY_PAYER_TYPES,
-  manualExpenseCategory,
   thirdPartyLiabilityAccount,
   type RepaymentStatus,
 } from "@/lib/finance/expense-classification";
@@ -33,7 +32,7 @@ type SourceAuthority = {
 
 async function resolveDirectSource(sql: Sql, sourceType: "cost_item" | "asset" | "manual_expense", sourceId: string): Promise<SourceAuthority> {
   if (sourceType === "manual_expense") {
-    const category = manualExpenseCategory(sourceId);
+    const category = MANUAL_EXPENSE_CATEGORIES.find((item) => item.id === sourceId);
     if (!category) throw new Error("Unsupported manual operating expense category.");
     return {
       label: category.label,
