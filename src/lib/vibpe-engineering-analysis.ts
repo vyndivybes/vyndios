@@ -1,3 +1,5 @@
+import type { Sql } from "@/lib/db";
+
 export type VibpeEngineeringCaseId =
   | "ENG-CLEARANCE-001"
   | "ENG-COMPOSITE-SCREEN-001"
@@ -268,4 +270,32 @@ export function tryVibpeEngineeringAnalysis(
   if (isClearanceQuestion(q)) return result(source, "ENG-CLEARANCE-001", "PARTIAL", clearanceAnswer(source));
   if (isMaterialReadinessQuestion(q)) return result(source, "ENG-MATERIAL-READINESS-001", "INCONCLUSIVE", materialAnswer(source));
   return { handled: false };
+}
+
+
+export async function resolveVibpeEngineeringAnalysis(
+  sql: Sql,
+  question: string,
+): Promise<VibpeEngineeringAnalysisResult> {
+  const fallback = tryVibpeEngineeringAnalysis(question);
+  if (!fallback.handled) return fallback;
+
+  try {
+    const rows = await sql.query<{ payload_json: unknown }>(
+      `select payload_json
+         from vyndi_engineering_evidence_receipts
+        where schema_id='VYNDI_ENGINEERING_EVIDENCE_V1'
+        order by received_at desc
+        limit 20`,
+    );
+    for (const row of rows) {
+      const snapshot = engineeringSnapshotFromEvidencePacket(row.payload_json);
+      if (snapshot) return tryVibpeEngineeringAnalysis(question, snapshot);
+    }
+  } catch {
+    // The commit-pinned snapshot remains a safe read-only fallback when the
+    // evidence ledger is unavailable or no current VEDM assessment is ingested.
+  }
+
+  return fallback;
 }
