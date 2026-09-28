@@ -227,7 +227,7 @@ export const WORKSPACE_NAVIGATION: Record<CanonicalWorkspaceId, readonly Workspa
       label: "Accounting & statements",
       items: [
         { to: "/command/accounting", label: "Accounting Workbench" },
-        { to: "/command/accounting/people-office-payments", label: "People & Office Actual Spend" },
+        { to: "/command/accounting/people-office-payments", label: "Expense & Reimbursement Register" },
         { to: "/command/accounting-statements", label: "Financial Statements" },
       ],
     },
