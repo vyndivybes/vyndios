@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { Sql } from "./db.ts";
+import type { Sql, SqlRow } from "./db.ts";
 import {
   loadPersistedVibpeSession,
   persistVibpeAnswerReceipt,
@@ -12,20 +12,20 @@ function fakeSql() {
   const sessionRows = new Map<string, Record<string, unknown>>();
   const receipts: Record<string, unknown>[] = [];
   const sql = (async () => []) as unknown as Sql;
-  sql.query = async (text: string, params: unknown[] = []) => {
+  sql.query = async <T = SqlRow>(text: string, params: unknown[] = []): Promise<T[]> => {
     if (text.includes("insert into vyndi_vibpe_decision_sessions")) {
       sessionRows.set(String(params[0]), { state_json: params[2] });
-      return [];
+      return [] as T[];
     }
     if (text.includes("from vyndi_vibpe_decision_sessions")) {
       const row = sessionRows.get(String(params[0]));
-      return row ? [row] : [];
+      return (row ? [row] : []) as T[];
     }
     if (text.includes("insert into vyndi_vibpe_answer_receipts")) {
       receipts.push({ answer_id: params[0], receipt_json: params[5] });
-      return [];
+      return [] as T[];
     }
-    return [];
+    return [] as T[];
   };
   return { sql, receipts };
 }
