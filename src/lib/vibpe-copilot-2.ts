@@ -374,9 +374,8 @@ export async function runVibpeCopilot2(
         intent: parsed.intent,
         answer: withDisclosure(governanceAnswer),
         doctrine: vibpeBusinessOperatorContext(),
-        dataState: currentDataState(),
       dataState: currentDataState(),
-    advisoryOnly: true,
+      advisoryOnly: true,
       };
     }
   } catch (error) {
@@ -395,9 +394,8 @@ export async function runVibpeCopilot2(
         intent: parsed.intent,
         answer: withDisclosure(operationalAnswer),
         doctrine: vibpeBusinessOperatorContext(),
-        dataState: currentDataState(),
       dataState: currentDataState(),
-    advisoryOnly: true,
+      advisoryOnly: true,
       };
     }
   } catch (error) {
@@ -416,9 +414,8 @@ export async function runVibpeCopilot2(
         intent: parsed.intent,
         answer: withDisclosure(truthContractAnswer),
         doctrine: vibpeBusinessOperatorContext(),
-        dataState: currentDataState(),
       dataState: currentDataState(),
-    advisoryOnly: true,
+      advisoryOnly: true,
       };
     }
   } catch (error) {
@@ -438,8 +435,7 @@ export async function runVibpeCopilot2(
       doctrine: vibpeBusinessOperatorContext(),
       evidenceMode: "engineering-analysis",
       dataState: currentDataState(),
-      dataState: currentDataState(),
-    advisoryOnly: true,
+      advisoryOnly: true,
     };
   }
 
@@ -454,9 +450,8 @@ export async function runVibpeCopilot2(
           answer: withDisclosure(answer),
           doctrine: vibpeBusinessOperatorContext(),
           evidenceMode: "repository-knowledge",
-          dataState: currentDataState(),
       dataState: currentDataState(),
-    advisoryOnly: true,
+      advisoryOnly: true,
         };
       }
     } catch (error) {
@@ -475,8 +470,7 @@ export async function runVibpeCopilot2(
       answer: withDisclosure(parsed.conversationalReply),
       doctrine: vibpeBusinessOperatorContext(),
       dataState: currentDataState(),
-      dataState: currentDataState(),
-    advisoryOnly: true,
+      advisoryOnly: true,
     };
   }
 
@@ -490,8 +484,7 @@ export async function runVibpeCopilot2(
       scenarioResult: target,
       doctrine: vibpeBusinessOperatorContext(),
       dataState: currentDataState(),
-      dataState: currentDataState(),
-    advisoryOnly: true,
+      advisoryOnly: true,
     };
   }
 
@@ -511,8 +504,7 @@ export async function runVibpeCopilot2(
       horizonMonths,
       doctrine: vibpeBusinessOperatorContext(),
       dataState: currentDataState(),
-      dataState: currentDataState(),
-    advisoryOnly: true,
+      advisoryOnly: true,
     };
   }
 
@@ -535,8 +527,7 @@ export async function runVibpeCopilot2(
       horizonMonths: parsed.horizonMonths,
       doctrine: vibpeBusinessOperatorContext(),
       dataState: currentDataState(),
-      dataState: currentDataState(),
-    advisoryOnly: true,
+      advisoryOnly: true,
     };
   }
 
