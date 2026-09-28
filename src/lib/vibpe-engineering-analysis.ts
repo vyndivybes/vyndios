@@ -282,10 +282,17 @@ export async function resolveVibpeEngineeringAnalysis(
 
   try {
     const rows = await sql.query<{ payload_json: unknown }>(
-      `select payload_json
-         from vyndi_engineering_evidence_receipts
-        where schema_id='VYNDI_ENGINEERING_EVIDENCE_V1'
-        order by received_at desc
+      `select r.payload_json
+         from vyndi_engineering_evidence_receipts r
+         join lateral (
+           select a.decision
+             from vyndi_engineering_evidence_acceptances a
+            where a.receipt_fingerprint=r.fingerprint
+            order by a.created_at desc,a.id desc
+            limit 1
+         ) acceptance on acceptance.decision='accepted'
+        where r.schema_id='VYNDI_ENGINEERING_EVIDENCE_V1'
+        order by r.received_at desc
         limit 20`,
     );
     for (const row of rows) {
