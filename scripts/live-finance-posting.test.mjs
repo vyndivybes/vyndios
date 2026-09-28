@@ -15,6 +15,8 @@ const actualCogsMigration = read("migrations/0086_actual_job_cost_cogs_chain.sql
 const toolingRecoveryMigration = read("migrations/0087_tooling_cost_recovery_authority.sql");
 const founderPaidMigration = read("migrations/0094_founder_paid_expense_authority.sql");
 const manualExpenseMigration = read("migrations/0096_manual_operating_expense.sql");
+const expenseEvidenceMigration = read("migrations/0097_expense_evidence_attachments.sql");
+const expenseEvidenceApi = read("src/routes/api/finance/expense-evidence.ts");
 const expenseClassification = read("src/lib/finance/expense-classification.ts");
 const authority = read("src/lib/finance/accounting-authority.ts");
 const cashFundingAuthority = read("src/lib/cash-funding-authority.ts");
@@ -131,6 +133,34 @@ test("People and Office actual spend keeps planning approval separate from accou
   assert.match(peopleOfficeActualRoute, /Create actual draft/);
   assert.match(peopleOfficeActualRoute, /Approve & accrue/);
   assert.match(peopleOfficeActualRoute, /No cash moved/);
+});
+
+test("expense evidence attachments are append-only, hashed, typed and linked to expenditure", () => {
+  assert.match(expenseEvidenceMigration, /vyndi_expense_evidence_attachments/);
+  assert.match(expenseEvidenceMigration, /sha256_hex/);
+  assert.match(expenseEvidenceMigration, /content_bytes bytea/);
+  assert.match(expenseEvidenceMigration, /document_type/);
+  assert.match(expenseEvidenceMigration, /invoice/);
+  assert.match(expenseEvidenceMigration, /receipt/);
+  assert.match(expenseEvidenceMigration, /payment_evidence/);
+  assert.match(expenseEvidenceMigration, /statement/);
+  assert.match(expenseEvidenceMigration, /prevent.*update.*delete|append.only/is);
+
+  assert.match(expenseEvidenceApi, /request\.formData\(\)/);
+  assert.match(expenseEvidenceApi, /crypto\.subtle\.digest\("SHA-256"/);
+  assert.match(expenseEvidenceApi, /application\/pdf/);
+  assert.match(expenseEvidenceApi, /image\/jpeg/);
+  assert.match(expenseEvidenceApi, /image\/png/);
+  assert.match(expenseEvidenceApi, /5 \* 1024 \* 1024/);
+  assert.match(expenseEvidenceApi, /content-disposition/);
+  assert.match(expenseEvidenceApi, /attachmentId/);
+
+  assert.match(peopleOfficeActualAuthority, /expenseEvidenceAttachments/);
+  assert.match(peopleOfficeActualRoute, /Attach Evidence/);
+  assert.match(peopleOfficeActualRoute, /Invoice/);
+  assert.match(peopleOfficeActualRoute, /Preview/);
+  assert.match(peopleOfficeActualRoute, /Download/);
+  assert.match(peopleOfficeActualRoute, /SHA-256/);
 });
 
 test("manual operating expenses use a controlled multi-category accounting map", () => {
