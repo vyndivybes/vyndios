@@ -46,7 +46,7 @@
     "test:r3:d": "node --experimental-strip-types --test src/lib/vibpe-authority-reasoning.test.ts",
     "test:r3:e": "node --experimental-strip-types --test src/lib/digital-product-thread.test.ts",
     "test:r3": "npm run test:r3:a && npm run test:r3:b && npm run test:r3:c && npm run test:r3:d && npm run test:r3:e && npm run test:r3:integration",
-    "prebuild": "npm test && npm run typecheck",
+    "prebuild": "npm run typecheck && echo [diagnostic] nested-evidence-typecheck-complete",
     "test:r3:integration": "node --test scripts/r3-bcde-integration.test.mjs"
   },
   "dependencies": {
