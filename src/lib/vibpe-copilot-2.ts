@@ -9,7 +9,8 @@ import { tryOperationalDataAnswer } from "@/lib/vibpe-operational-queries";
 import { tryVibpeTruthContractAnswer } from "@/lib/vibpe-truth-contract";
 import { explainVibpeHorizon } from "@/lib/vibpe-planning";
 import { vibpeBusinessOperatorContext } from "@/lib/vibpe-business-operator";
-import { getVibpeSession, updateVibpeSession } from "@/lib/vibpe-session";
+import { getVibpeSession, hydrateVibpeSession, updatePersistedVibpeSession } from "@/lib/vibpe-session";
+import { deriveVibpeDegradationState, type VibpeDegradationState, type VibpeSourceState } from "@/lib/vibpe-reasoning-core";
 import { compileVedmAuthorityGraph, createVedmR3aSeed } from "@/lib/vedm-authority-graph";
 import { evaluateVibpeAuthorityContext } from "@/lib/vibpe-authority-reasoning";
 import { resolveVibpeEngineeringAnalysis } from "@/lib/vibpe-engineering-analysis";
@@ -23,6 +24,7 @@ export type VibpeCopilot2Result = {
   horizonMonths?: number;
   doctrine: string;
   evidenceMode?: "engineering-analysis" | "repository-knowledge";
+  dataState?: VibpeDegradationState;
   advisoryOnly: true;
 };
 
@@ -339,70 +341,105 @@ export async function runVibpeCopilot2(
   sql: Sql,
   question: string,
   governedBaseline: IntegratedPlanningResult,
-  options: { sessionKey?: string; uiScenario?: IbpeScenarioRequest } = {},
+  options: { sessionKey?: string; ownerKey?: string; uiScenario?: IbpeScenarioRequest } = {},
 ): Promise<VibpeCopilot2Result> {
   const parsed = parseVibpeIntent(question);
   const sessionKey = options.sessionKey ?? "default";
-  const session = getVibpeSession(sessionKey);
+  const ownerKey = options.ownerKey ?? sessionKey;
+  const sourceStates: VibpeSourceState[] = [];
+  let session = getVibpeSession(sessionKey);
+  try {
+    session = await hydrateVibpeSession(sql, ownerKey, sessionKey);
+    sourceStates.push({ source: "decision-context", status: "live" });
+  } catch (error) {
+    sourceStates.push({
+      source: "decision-context",
+      status: "unavailable",
+      detail: error instanceof Error ? error.message : "persistence read failed",
+    });
+  }
   const priorScenario = session.activeScenario ?? options.uiScenario;
+  const currentDataState = () => deriveVibpeDegradationState(sourceStates);
+  const withDisclosure = (answer?: string) => {
+    if (!answer) return answer;
+    const state = currentDataState();
+    return state.mode === "live" ? answer : `${answer}\n\n${state.disclosure}`;
+  };
 
   try {
     const governanceAnswer = await tryGovernanceDataAnswer(sql, question);
     if (governanceAnswer) {
-      updateVibpeSession(sessionKey, { lastIntent: parsed.intent, lastQuestion: question });
+      await updatePersistedVibpeSession(sql, ownerKey, sessionKey, { lastIntent: parsed.intent, lastQuestion: question });
       return {
         intent: parsed.intent,
-        answer: governanceAnswer,
+        answer: withDisclosure(governanceAnswer),
         doctrine: vibpeBusinessOperatorContext(),
-        advisoryOnly: true,
+        dataState: currentDataState(),
+      dataState: currentDataState(),
+    advisoryOnly: true,
       };
     }
-  } catch {
-    // Cross-workspace governance/health queries are read-only. If a governed
-    // source is temporarily unavailable, continue through normal VIBPE routing.
+  } catch (error) {
+    sourceStates.push({
+      source: "governance",
+      status: "unavailable",
+      detail: error instanceof Error ? error.message : "governance query failed",
+    });
   }
 
   try {
     const operationalAnswer = await tryOperationalDataAnswer(sql, question);
     if (operationalAnswer) {
-      updateVibpeSession(sessionKey, { lastIntent: parsed.intent, lastQuestion: question });
+      await updatePersistedVibpeSession(sql, ownerKey, sessionKey, { lastIntent: parsed.intent, lastQuestion: question });
       return {
         intent: parsed.intent,
-        answer: operationalAnswer,
+        answer: withDisclosure(operationalAnswer),
         doctrine: vibpeBusinessOperatorContext(),
-        advisoryOnly: true,
+        dataState: currentDataState(),
+      dataState: currentDataState(),
+    advisoryOnly: true,
       };
     }
-  } catch {
-    // Operational lookup is supplementary to the governed IBPE packet. If a
-    // view is temporarily unavailable, continue through normal VIBPE routing.
+  } catch (error) {
+    sourceStates.push({
+      source: "operational",
+      status: "unavailable",
+      detail: error instanceof Error ? error.message : "operational query failed",
+    });
   }
 
   try {
     const truthContractAnswer = await tryVibpeTruthContractAnswer(sql, question, governedBaseline);
     if (truthContractAnswer) {
-      updateVibpeSession(sessionKey, { lastIntent: parsed.intent, lastQuestion: question });
+      await updatePersistedVibpeSession(sql, ownerKey, sessionKey, { lastIntent: parsed.intent, lastQuestion: question });
       return {
         intent: parsed.intent,
-        answer: truthContractAnswer,
+        answer: withDisclosure(truthContractAnswer),
         doctrine: vibpeBusinessOperatorContext(),
-        advisoryOnly: true,
+        dataState: currentDataState(),
+      dataState: currentDataState(),
+    advisoryOnly: true,
       };
     }
-  } catch {
-    // Truth-contract routing is read-only and may not weaken or block the
-    // existing governed fallbacks when an optional read source is unavailable.
+  } catch (error) {
+    sourceStates.push({
+      source: "truth-contract",
+      status: "unavailable",
+      detail: error instanceof Error ? error.message : "truth-contract query failed",
+    });
   }
 
   const engineeringAnalysis = await resolveVibpeEngineeringAnalysis(sql, question);
   if (engineeringAnalysis.handled && engineeringAnalysis.answer) {
-    updateVibpeSession(sessionKey, { lastIntent: parsed.intent, lastQuestion: question });
+    await updatePersistedVibpeSession(sql, ownerKey, sessionKey, { lastIntent: parsed.intent, lastQuestion: question });
     return {
       intent: parsed.intent,
-      answer: engineeringAnalysis.answer,
+      answer: withDisclosure(engineeringAnalysis.answer),
       doctrine: vibpeBusinessOperatorContext(),
       evidenceMode: "engineering-analysis",
-      advisoryOnly: true,
+      dataState: currentDataState(),
+      dataState: currentDataState(),
+    advisoryOnly: true,
     };
   }
 
@@ -411,66 +448,77 @@ export async function runVibpeCopilot2(
       const evidence = await retrieveVibpeKnowledgeEvidence(sql, question, 8);
       const answer = knowledgeAnswer(question, evidence);
       if (answer) {
-        updateVibpeSession(sessionKey, { lastIntent: parsed.intent, lastQuestion: question });
+        await updatePersistedVibpeSession(sql, ownerKey, sessionKey, { lastIntent: parsed.intent, lastQuestion: question });
         return {
           intent: parsed.intent,
-          answer,
+          answer: withDisclosure(answer),
           doctrine: vibpeBusinessOperatorContext(),
           evidenceMode: "repository-knowledge",
-          advisoryOnly: true,
+          dataState: currentDataState(),
+      dataState: currentDataState(),
+    advisoryOnly: true,
         };
       }
-    } catch {
-      // Knowledge retrieval is supplementary. If unavailable, continue to the
-      // normal deterministic IBPE path instead of making Co-Pilot unavailable.
+    } catch (error) {
+      sourceStates.push({
+        source: "knowledge",
+        status: "unavailable",
+        detail: error instanceof Error ? error.message : "knowledge retrieval failed",
+      });
     }
   }
 
   if (parsed.intent === "conversation") {
-    updateVibpeSession(sessionKey, { lastIntent: parsed.intent, lastQuestion: question });
+    await updatePersistedVibpeSession(sql, ownerKey, sessionKey, { lastIntent: parsed.intent, lastQuestion: question });
     return {
       intent: parsed.intent,
-      answer: parsed.conversationalReply,
+      answer: withDisclosure(parsed.conversationalReply),
       doctrine: vibpeBusinessOperatorContext(),
-      advisoryOnly: true,
+      dataState: currentDataState(),
+      dataState: currentDataState(),
+    advisoryOnly: true,
     };
   }
 
   if (parsed.intent === "follow-up") {
     const target = await resolvePriorScenario(sql, governedBaseline, priorScenario);
-    updateVibpeSession(sessionKey, { lastIntent: parsed.intent, lastQuestion: question });
+    await updatePersistedVibpeSession(sql, ownerKey, sessionKey, { lastIntent: parsed.intent, lastQuestion: question });
     return {
       intent: parsed.intent,
-      answer: followUpAnswer(target),
+      answer: withDisclosure(followUpAnswer(target)),
       scenario: priorScenario,
       scenarioResult: target,
       doctrine: vibpeBusinessOperatorContext(),
-      advisoryOnly: true,
+      dataState: currentDataState(),
+      dataState: currentDataState(),
+    advisoryOnly: true,
     };
   }
 
   if (parsed.intent === "planning-horizon") {
     const horizonMonths = parsed.horizonMonths ?? session.planningHorizonMonths ?? 6;
     const target = await resolvePriorScenario(sql, governedBaseline, priorScenario);
-    updateVibpeSession(sessionKey, {
+    await updatePersistedVibpeSession(sql, ownerKey, sessionKey, {
       planningHorizonMonths: horizonMonths,
       lastIntent: parsed.intent,
       lastQuestion: question,
     });
     return {
       intent: parsed.intent,
-      answer: explainVibpeHorizon(target, horizonMonths),
+      answer: withDisclosure(explainVibpeHorizon(target, horizonMonths)),
       scenario: priorScenario,
       scenarioResult: target,
       horizonMonths,
       doctrine: vibpeBusinessOperatorContext(),
-      advisoryOnly: true,
+      dataState: currentDataState(),
+      dataState: currentDataState(),
+    advisoryOnly: true,
     };
   }
 
   if (parsed.scenario) {
     const packet = await evaluateScenario(sql, parsed.scenario);
-    updateVibpeSession(sessionKey, {
+    await updatePersistedVibpeSession(sql, ownerKey, sessionKey, {
       previousScenario: priorScenario,
       activeScenario: packet.scenario,
       planningHorizonMonths: parsed.horizonMonths ?? session.planningHorizonMonths,
@@ -480,26 +528,29 @@ export async function runVibpeCopilot2(
     });
     return {
       intent: parsed.intent,
-      answer: scenarioAnswer(packet.scenario, packet.result, packet.comparison),
+      answer: withDisclosure(scenarioAnswer(packet.scenario, packet.result, packet.comparison)),
       scenario: packet.scenario,
       scenarioResult: packet.result,
       comparison: packet.comparison,
       horizonMonths: parsed.horizonMonths,
       doctrine: vibpeBusinessOperatorContext(),
-      advisoryOnly: true,
+      dataState: currentDataState(),
+      dataState: currentDataState(),
+    advisoryOnly: true,
     };
   }
 
   const answer = intentAnswer(parsed.intent, question, governedBaseline);
-  updateVibpeSession(sessionKey, {
+  await updatePersistedVibpeSession(sql, ownerKey, sessionKey, {
     referencedProducts: parsed.referencedProducts,
     lastIntent: parsed.intent,
     lastQuestion: question,
   });
   return {
     intent: parsed.intent,
-    answer,
+    answer: withDisclosure(answer),
     doctrine: vibpeBusinessOperatorContext(),
+    dataState: currentDataState(),
     advisoryOnly: true,
   };
 }
