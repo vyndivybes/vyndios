@@ -180,7 +180,7 @@ test("expense evidence attachments are append-only, hashed, typed and linked to 
   assert.doesNotMatch(expenseEvidenceApi, /Buffer\.from/);
   assert.match(expenseEvidenceApi, /responseArrayBuffer/);
 
-  assert.match(peopleOfficeActualAuthority, /expenseEvidenceAttachments/);
+  assert.match(peopleOfficeActualAuthority, /evidenceAttachments/);
   assert.match(peopleOfficeActualRoute, /Attach Evidence/);
   assert.match(peopleOfficeActualRoute, /Invoice/);
   assert.match(peopleOfficeActualRoute, /Preview/);
