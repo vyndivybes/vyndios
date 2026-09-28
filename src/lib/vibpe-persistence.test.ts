@@ -1,0 +1,81 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import type { Sql, SqlRow } from "./db.ts";
+import {
+  loadPersistedVibpeSession,
+  persistVibpeAnswerReceipt,
+  persistVibpeSession,
+} from "./vibpe-persistence.ts";
+import { buildVibpeAnswerReceipt } from "./vibpe-reasoning-core.ts";
+
+function fakeSql() {
+  const sessionRows = new Map<string, Record<string, unknown>>();
+  const receipts: Record<string, unknown>[] = [];
+  const sql = (async () => []) as unknown as Sql;
+  sql.query = async <T = SqlRow>(text: string, params: unknown[] = []): Promise<T[]> => {
+    if (text.includes("insert into vyndi_vibpe_decision_sessions")) {
+      sessionRows.set(String(params[0]), { state_json: params[2] });
+      return [] as T[];
+    }
+    if (text.includes("from vyndi_vibpe_decision_sessions")) {
+      const row = sessionRows.get(String(params[0]));
+      return (row ? [row] : []) as T[];
+    }
+    if (text.includes("insert into vyndi_vibpe_answer_receipts")) {
+      receipts.push({ answer_id: params[0], receipt_json: params[5] });
+      return [] as T[];
+    }
+    return [] as T[];
+  };
+  return { sql, receipts };
+}
+
+test("VIBPE decision context persists outside process-local memory", async () => {
+  const { sql } = fakeSql();
+  await persistVibpeSession(sql, "user-1", "session-1", {
+    referencedProducts: ["altitude"],
+    lastIntent: "assessment",
+    assumptions: ["Toray production system remains open"],
+  });
+  const restored = await loadPersistedVibpeSession(sql, "user-1", "session-1");
+  assert.deepEqual(restored?.referencedProducts, ["altitude"]);
+  assert.equal(restored?.lastIntent, "assessment");
+  assert.deepEqual(restored?.assumptions, ["Toray production system remains open"]);
+});
+
+test("answer receipts are persisted as auditable immutable payloads", async () => {
+  const { sql, receipts } = fakeSql();
+  const receipt = buildVibpeAnswerReceipt({
+    answerId: "ans-42",
+    question: "What is binding?",
+    intent: "optimisation",
+    dataMode: "live",
+    evidence: [],
+    assumptions: [],
+    contradictions: [],
+    calculations: [],
+    reasoningTrace: [
+      { stage: "classify-intent", status: "completed", detail: "optimisation" },
+      { stage: "decompose-question", status: "completed", detail: "binding constraint question" },
+      { stage: "retrieve-evidence", status: "completed", detail: "solver evidence" },
+      { stage: "identify-conflicts", status: "completed", detail: "none found" },
+      { stage: "declare-assumptions", status: "completed", detail: "none" },
+      { stage: "calculate-or-simulate", status: "completed", detail: "solver receipt" },
+      { stage: "test-constraints", status: "completed", detail: "finite constraints" },
+      { stage: "score-correctness", status: "completed", detail: "five dimensions" },
+      { stage: "state-uncertainty", status: "completed", detail: "confidence 0.9" },
+      { stage: "recommend-controlled-action", status: "completed", detail: "review solver result" },
+    ],
+    fiveDimensions: {
+      mathematical: { status: "verified", basis: "solver receipt" },
+      theoretical: { status: "supported", basis: "finite planning model" },
+      physical: { status: "insufficient-evidence", basis: "not applicable to business plan" },
+      practical: { status: "supported", basis: "governed constraints" },
+      scientific: { status: "supported", basis: "deterministic model" },
+    },
+    confidence: 0.9,
+  });
+  await persistVibpeAnswerReceipt(sql, "user-1", "session-1", receipt);
+  assert.equal(receipts.length, 1);
+  assert.equal(receipts[0].answer_id, "ans-42");
+});
