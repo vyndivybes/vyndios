@@ -12,6 +12,7 @@ import { vibpeBusinessOperatorContext } from "@/lib/vibpe-business-operator";
 import { getVibpeSession, updateVibpeSession } from "@/lib/vibpe-session";
 import { compileVedmAuthorityGraph, createVedmR3aSeed } from "@/lib/vedm-authority-graph";
 import { evaluateVibpeAuthorityContext } from "@/lib/vibpe-authority-reasoning";
+import { tryVibpeEngineeringAnalysis } from "@/lib/vibpe-engineering-analysis";
 
 export type VibpeCopilot2Result = {
   intent: VibpeScenarioParse["intent"];
@@ -390,6 +391,17 @@ export async function runVibpeCopilot2(
   } catch {
     // Truth-contract routing is read-only and may not weaken or block the
     // existing governed fallbacks when an optional read source is unavailable.
+  }
+
+  const engineeringAnalysis = tryVibpeEngineeringAnalysis(question);
+  if (engineeringAnalysis.handled && engineeringAnalysis.answer) {
+    updateVibpeSession(sessionKey, { lastIntent: parsed.intent, lastQuestion: question });
+    return {
+      intent: parsed.intent,
+      answer: engineeringAnalysis.answer,
+      doctrine: vibpeBusinessOperatorContext(),
+      advisoryOnly: true,
+    };
   }
 
   if (isKnowledgeQuestion(question)) {
