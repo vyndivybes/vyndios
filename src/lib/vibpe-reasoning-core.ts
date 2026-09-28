@@ -23,11 +23,15 @@ export type VibpeFiveDimensionAssessment = {
 export type VibpeEvidenceClaim = {
   claimId: string;
   claim: string;
+  claimClass: string;
   source: string;
   revision?: string;
   effectiveDate?: string;
   authority: "governed-internal" | "scenario-assumption" | "external-reference" | "model-inference";
+  supersessionState: "current" | "superseded" | "unknown";
   support: "direct" | "derived" | "contradicting" | "unresolved";
+  confidence?: number;
+  reviewerStatus?: "unreviewed" | "accepted" | "corrected" | "rejected";
 };
 
 export type VibpeContradiction = {
@@ -83,6 +87,24 @@ export function deriveVibpeDegradationState(sources: VibpeSourceState[]): VibpeD
   };
 }
 
+export type VibpeReasoningStage =
+  | "classify-intent"
+  | "decompose-question"
+  | "retrieve-evidence"
+  | "identify-conflicts"
+  | "declare-assumptions"
+  | "calculate-or-simulate"
+  | "test-constraints"
+  | "score-correctness"
+  | "state-uncertainty"
+  | "recommend-controlled-action";
+
+export type VibpeReasoningTraceEntry = {
+  stage: VibpeReasoningStage;
+  status: "completed" | "skipped" | "blocked";
+  detail: string;
+};
+
 export type VibpeAnswerReceipt = {
   schema: "vibpe-answer-receipt/v1";
   answerId: string;
@@ -94,6 +116,7 @@ export type VibpeAnswerReceipt = {
   assumptions: string[];
   contradictions: VibpeContradiction[];
   calculations: VibpeCalculationReceipt[];
+  reasoningTrace: VibpeReasoningTraceEntry[];
   fiveDimensions: VibpeFiveDimensionAssessment;
   confidence: number;
   nextAction?: string;
