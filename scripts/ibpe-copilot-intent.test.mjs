@@ -79,7 +79,7 @@ test("VIBPE Co-Pilot 2 returns intent-specific governed answers instead of an em
   assert.match(copilot2, /intent === "funding"/);
   assert.match(copilot2, /intent === "baseline" \|\| intent === "assessment"/);
   assert.match(copilot2, /const answer = intentAnswer\(parsed\.intent, question, governedBaseline\)/);
-  assert.match(copilot2, /answer,/);
+  assert.match(copilot2, /answer: withDisclosure\\(answer\\)/);
 });
 
 test("VIBPE evaluates committed-demand production feasibility across materials and capacity", () => {
