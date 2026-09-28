@@ -1,3 +1,4 @@
+-- Cloudflare preview gate: transaction-nested finance evidence.
 -- Extend append-only finance evidence to external support and nest evidence by transaction.
 -- Existing expenditure evidence remains intact.
 
