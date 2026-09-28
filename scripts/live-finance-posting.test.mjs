@@ -142,6 +142,10 @@ test("finance evidence nests by transaction and supports external-support proof"
   assert.match(nestedEvidenceMigration, /external_support_receipt_id/);
   assert.match(nestedEvidenceMigration, /vyndi_external_support_receipts/);
   assert.match(nestedEvidenceMigration, /finance_evidence_exactly_one_target/);
+  assert.match(
+    nestedEvidenceMigration,
+    /drop constraint if exists vyndi_expense_evidence_attachment_expenditure_id_sha256_hex_key/i,
+  );
   assert.match(nestedEvidenceMigration, /where expenditure_id is not null/i);
   assert.match(nestedEvidenceMigration, /where external_support_receipt_id is not null/i);
 

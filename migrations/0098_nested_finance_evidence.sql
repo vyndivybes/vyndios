@@ -13,6 +13,9 @@ alter table vyndi_expense_evidence_attachments
   drop constraint if exists vyndi_expense_evidence_attachments_expenditure_id_sha256_hex_key;
 
 alter table vyndi_expense_evidence_attachments
+  drop constraint if exists vyndi_expense_evidence_attachment_expenditure_id_sha256_hex_key;
+
+alter table vyndi_expense_evidence_attachments
   drop constraint if exists vyndi_finance_evidence_exactly_one_target;
 
 alter table vyndi_expense_evidence_attachments
