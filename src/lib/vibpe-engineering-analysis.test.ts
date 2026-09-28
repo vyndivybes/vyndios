@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { tryVibpeEngineeringAnalysis } from "./vibpe-engineering-analysis.ts";
+import { engineeringSnapshotFromEvidencePacket, tryVibpeEngineeringAnalysis } from "./vibpe-engineering-analysis.ts";
 
 test("clearance question performs engineering interpretation instead of document lookup", () => {
   const result = tryVibpeEngineeringAnalysis("how good is the downtube and tyre clearance in the latest rev");
@@ -36,4 +36,40 @@ test("five-dimension correctness question returns dimension-specific evidence st
 test("ordinary business question is not hijacked by engineering analysis", () => {
   const result = tryVibpeEngineeringAnalysis("what is our current cash runway?");
   assert.equal(result.handled, false);
+});
+
+
+test("normalizes a governed VEDM evidence packet and uses it in the answer", () => {
+  const snapshot = engineeringSnapshotFromEvidencePacket({
+    schema: "VYNDI_ENGINEERING_EVIDENCE_V1",
+    configurationId: "VEDM-301-EK75",
+    revision: "VEDM-301 Rev 5.3.9 Candidate E-K75",
+    source: {
+      repository: "vayu-shastr/veloxis-engineering-design-manual",
+      commit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    },
+    assessment: {
+      authority: "VEDM-301 Rev 5.3.9 Candidate E-K75 (frame geometry)",
+      analyticalScreens: {
+        denseSteeringSweepMinMm: 6.5,
+        packagingMm: [8.1, 8.0, 7.9, 7.8, 7.2],
+        tsaiWuFi: 0.7,
+        positiveRootStrengthRatio: 1.3,
+        hashinIndex: 0.4,
+        qualification: "ANALYTICAL_SCREEN_ONLY",
+      },
+      results: [
+        { dimension: "theoretical", status: "PARTIAL" },
+        { dimension: "mathematical", status: "PARTIAL" },
+        { dimension: "physical", status: "PARTIAL" },
+        { dimension: "practical", status: "INCONCLUSIVE" },
+        { dimension: "scientific", status: "PARTIAL" },
+      ],
+      releaseDisposition: "NO-GO — MATERIAL-01 open",
+    },
+  });
+  assert.ok(snapshot);
+  const result = tryVibpeEngineeringAnalysis("how good is tyre clearance?", snapshot ?? undefined);
+  assert.match(result.answer ?? "", /6\.500 mm/);
+  assert.match(result.answer ?? "", /aaaaaaaaaaaa/);
 });
