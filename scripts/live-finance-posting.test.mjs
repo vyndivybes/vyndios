@@ -16,6 +16,7 @@ const toolingRecoveryMigration = read("migrations/0087_tooling_cost_recovery_aut
 const founderPaidMigration = read("migrations/0094_founder_paid_expense_authority.sql");
 const manualExpenseMigration = read("migrations/0096_manual_operating_expense.sql");
 const expenseEvidenceMigration = read("migrations/0097_expense_evidence_attachments.sql");
+const nestedEvidenceMigration = read("migrations/0098_nested_finance_evidence.sql");
 const expenseEvidenceApi = read("src/routes/api/finance/expense-evidence.ts");
 const expenseClassification = read("src/lib/finance/expense-classification.ts");
 const authority = read("src/lib/finance/accounting-authority.ts");
@@ -136,6 +137,26 @@ test("People and Office actual spend keeps planning approval separate from accou
 });
 
 // Cloudflare Workers build guard: evidence transport stays Web-API native.
+test("finance evidence nests by transaction and supports external-support proof", () => {
+  assert.match(nestedEvidenceMigration, /external_support_receipt_id/);
+  assert.match(nestedEvidenceMigration, /vyndi_external_support_receipts/);
+  assert.match(nestedEvidenceMigration, /finance_evidence_exactly_one_target/);
+  assert.match(nestedEvidenceMigration, /where expenditure_id is not null/i);
+  assert.match(nestedEvidenceMigration, /where external_support_receipt_id is not null/i);
+
+  assert.match(expenseEvidenceApi, /targetType/);
+  assert.match(expenseEvidenceApi, /external_support/);
+  assert.match(expenseEvidenceApi, /external_support_receipt_id/);
+  assert.match(expenseEvidenceApi, /support_not_found/);
+
+  assert.match(peopleOfficeActualAuthority, /evidenceAttachments/);
+  assert.match(peopleOfficeActualRoute, /View Evidence/);
+  assert.match(peopleOfficeActualRoute, /Attach Proof/);
+  assert.match(peopleOfficeActualRoute, /Evidence files/);
+  assert.match(peopleOfficeActualRoute, /external_support/);
+  assert.doesNotMatch(peopleOfficeActualRoute, /title="Expense evidence attachments"/);
+});
+
 test("expense evidence attachments are append-only, hashed, typed and linked to expenditure", () => {
   assert.match(expenseEvidenceMigration, /vyndi_expense_evidence_attachments/);
   assert.match(expenseEvidenceMigration, /sha256_hex/);
