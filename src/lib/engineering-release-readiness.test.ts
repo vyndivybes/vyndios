@@ -17,8 +17,8 @@ function closedGraph() {
 }
 
 const evidence: ReleaseEvidenceReceipt[] = [
-  { fingerprint: "ev-a", nodeId: "EVID-EK75-DOSSIER", sourceCommit: "49fdac757534c6e42a0c5c29c43a2a6e35d637d2", status: "accepted" },
-  { fingerprint: "ev-b", nodeId: "EVID-FK75-NATIVE-FEA", sourceCommit: "49fdac757534c6e42a0c5c29c43a2a6e35d637d2", status: "accepted" },
+  { fingerprint: "ev-a", nodeId: "EVID-EK75-DOSSIER", sourceCommit: "9ef41eb8afbc75429013bfd73133957ddccf3834", status: "accepted" },
+  { fingerprint: "ev-b", nodeId: "EVID-FK75-NATIVE-FEA", sourceCommit: "9ef41eb8afbc75429013bfd73133957ddccf3834", status: "accepted" },
 ];
 
 test("R3-C refuses release while any authority graph gate remains open", () => {
