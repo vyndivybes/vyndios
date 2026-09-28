@@ -75,9 +75,12 @@ test("normalizes a governed VEDM evidence packet and uses it in the answer", () 
 });
 
 
-test("prefers the latest governed engineering-evidence receipt over the built-in snapshot", async () => {
+test("prefers the latest accepted governed engineering-evidence receipt over the built-in snapshot", async () => {
+  let queryText = "";
   const fakeSql = {
-    query: async () => [{
+    query: async (sql: string) => {
+      queryText = sql;
+      return [{
       payload_json: {
         schema: "VYNDI_ENGINEERING_EVIDENCE_V1",
         configurationId: "VEDM-301-EK75",
@@ -105,10 +108,13 @@ test("prefers the latest governed engineering-evidence receipt over the built-in
           ],
         },
       },
-    }],
+    }];
+    },
   };
   const result = await resolveVibpeEngineeringAnalysis(fakeSql as never, "tyre clearance latest rev");
   assert.equal(result.handled, true);
+  assert.match(queryText, /vyndi_engineering_evidence_acceptances/);
+  assert.match(queryText, /decision=\'accepted\'/);
   assert.match(result.answer ?? "", /6\.250 mm/);
   assert.match(result.answer ?? "", /bbbbbbbbbbbb/);
 });
