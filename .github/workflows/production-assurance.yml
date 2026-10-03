@@ -39,6 +39,8 @@ jobs:
         run: npm run test:golden-enterprise:transaction
       - name: Golden Enterprise authenticated production journey
         run: npm run test:golden-enterprise
+      - name: Full protected-route Playwright smoke
+        run: npm run test:browser:production
       - name: Observe SLO and production telemetry
         run: npm run observe:slo
       - name: Operator UX viewport qualification
