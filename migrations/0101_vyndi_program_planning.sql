@@ -80,12 +80,17 @@ create table if not exists vyndi_program_dependencies (
 create or replace view vyndi_program_plan_authority as
 select
   t.*,
-  d.predecessor_id,
-  d.lag_days as predecessor_lag_days,
-  d.source_reference as dependency_source_reference
+  coalesce(jsonb_agg(
+    jsonb_build_object(
+      'predecessorId',d.predecessor_id,
+      'lagDays',d.lag_days,
+      'sourceReference',d.source_reference
+    )
+  ) filter (where d.predecessor_id is not null),'[]'::jsonb) as predecessors
 from vyndi_program_tasks t
 left join vyndi_program_dependencies d
-  on d.program_id=t.program_id and d.successor_id=t.id;
+  on d.program_id=t.program_id and d.successor_id=t.id
+group by t.id;
 
 comment on table vyndi_program_tasks is
   'Governed program tasks/work packages. Duration, owners, dates, evidence, risk links, effort and cost are explicit planning inputs, not inferred facts.';
@@ -93,5 +98,3 @@ comment on table vyndi_program_dependencies is
   'Governed finish-to-start task relationships used by deterministic critical-path calculation.';
 comment on view vyndi_program_plan_authority is
   'Canonical program-plan read model. Critical path is calculated in application logic from persisted tasks and dependencies; probabilistic forecasts are not produced by this view.';
-
--- package-b-build-retrigger
