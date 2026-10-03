@@ -146,7 +146,7 @@ try {
     }
 
     if (route === "/command") {
-      const productIntelligenceLink = page.getByRole("link", { name: /Product Intelligence/i });
+      const productIntelligenceLink = page.getByRole("link", { name: /^Product Intelligence →$/i });
       await productIntelligenceLink.waitFor({ state: "visible", timeout: 10_000 });
       const href = await productIntelligenceLink.getAttribute("href");
       assert.equal(href, "/command/intelligence", "Command Centre Product Intelligence link targets the wrong route");
