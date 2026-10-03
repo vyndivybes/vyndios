@@ -80,22 +80,17 @@ create table if not exists vyndi_program_dependencies (
 create or replace view vyndi_program_plan_authority as
 select
   t.*,
-  coalesce(
-    (
-      select jsonb_agg(
-        jsonb_build_object(
-          'predecessorId',d.predecessor_id,
-          'lagDays',d.lag_days,
-          'sourceReference',d.source_reference
-        )
-        order by d.predecessor_id,d.successor_id
-      )
-      from vyndi_program_dependencies d
-      where d.program_id=t.program_id and d.successor_id=t.id
-    ),
-    '[]'::jsonb
-  ) as predecessors
-from vyndi_program_tasks t;
+  coalesce(jsonb_agg(
+    jsonb_build_object(
+      'predecessorId',d.predecessor_id,
+      'lagDays',d.lag_days,
+      'sourceReference',d.source_reference
+    )
+  ) filter (where d.predecessor_id is not null),'[]'::jsonb) as predecessors
+from vyndi_program_tasks t
+left join vyndi_program_dependencies d
+  on d.program_id=t.program_id and d.successor_id=t.id
+group by t.id;
 
 comment on table vyndi_program_tasks is
   'Governed program tasks/work packages. Duration, owners, dates, evidence, risk links, effort and cost are explicit planning inputs, not inferred facts.';
