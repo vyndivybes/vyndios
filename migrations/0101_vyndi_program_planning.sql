@@ -93,3 +93,5 @@ comment on table vyndi_program_dependencies is
   'Governed finish-to-start task relationships used by deterministic critical-path calculation.';
 comment on view vyndi_program_plan_authority is
   'Canonical program-plan read model. Critical path is calculated in application logic from persisted tasks and dependencies; probabilistic forecasts are not produced by this view.';
+
+-- package-b-build-retrigger
