@@ -63,3 +63,5 @@ test("Playwright smoke includes Integrated Operating Plan", () => {
   assert.match(smoke, /"\/command\/planning"/);
   assert.match(smoke, /Integrated Operating Plan/);
 });
+
+// package-b-cloudflare-retrigger
