@@ -22,14 +22,37 @@ if (parsedBase.protocol !== "https:" && !["localhost", "127.0.0.1"].includes(par
 
 const protectedRoutes = [
   "/command",
+  "/command/ibpe-operating-workspace",
+  "/command/ibpe-operating-workspace/authority",
+  "/command/ibpe-operating-workspace/optimizer",
+  "/command/ibpe-operating-workspace/outputs",
+  "/command/ibpe-operating-workspace/assurance",
+  "/command/ibpe-operating-workspace/release",
+  "/command/intelligence",
+  "/command/scenarios",
+  "/command/cash",
+  "/command/engineering",
   "/command/sales",
   "/command/inventory",
   "/command/operations",
   "/command/quality",
   "/command/actuals",
   "/command/financial-cockpit",
-  "/command/ibpe-operating-workspace/assurance",
 ];
+
+const routeEvidence = new Map([
+  ["/command", /Command Centre|Command/i],
+  ["/command/ibpe-operating-workspace", /IBPE|VIBPE|planning/i],
+  ["/command/ibpe-operating-workspace/authority", /Authority|Planning/i],
+  ["/command/ibpe-operating-workspace/optimizer", /Optimizer|Optimiser/i],
+  ["/command/ibpe-operating-workspace/outputs", /Outputs|Evidence/i],
+  ["/command/ibpe-operating-workspace/assurance", /Assurance|evidence/i],
+  ["/command/ibpe-operating-workspace/release", /Release Readiness|release/i],
+  ["/command/intelligence", /Product Intelligence/i],
+  ["/command/scenarios", /Scenario/i],
+  ["/command/cash", /Cash|Working Capital/i],
+  ["/command/engineering", /Engineering/i],
+]);
 
 await mkdir(evidenceRoot, { recursive: true });
 
@@ -114,6 +137,18 @@ try {
       `${route} rendered a fatal error`,
     );
     assert.deepEqual(pageErrors, [], `${route} emitted browser errors: ${pageErrors.join(" | ")}`);
+
+    const expectedEvidence = routeEvidence.get(route);
+    if (expectedEvidence) {
+      assert.match(body, expectedEvidence, `${route} did not render its expected page evidence`);
+    }
+
+    if (route === "/command") {
+      const productIntelligenceLink = page.getByRole("link", { name: /Product Intelligence/i });
+      await productIntelligenceLink.waitFor({ state: "visible", timeout: 10_000 });
+      const href = await productIntelligenceLink.getAttribute("href");
+      assert.equal(href, "/command/intelligence", "Command Centre Product Intelligence link targets the wrong route");
+    }
 
     if (route === "/command/sales") {
       assert.match(body, /Create bicycle demand \/ order/i, "Commercial order entry surface is missing");

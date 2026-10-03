@@ -134,6 +134,13 @@ jobs:
       - name: Seed disposable individual acceptance identity
         run: node scripts/stage-d-seed-user.mjs
 
+      - name: Full VIBPE protected-route Playwright smoke
+        env:
+          VYNDI_TEST_BASE_URL: ${{ env.STAGE_D_BASE_URL }}
+          VYNDI_TEST_EMAIL: ${{ env.STAGE_D_USER_EMAIL }}
+          VYNDI_TEST_PASSWORD: ${{ env.STAGE_D_USER_PASSWORD }}
+        run: npm run test:browser:production
+
       - name: Protected-route responsive browser acceptance
         run: node scripts/stage-d-browser-acceptance.mjs
 
