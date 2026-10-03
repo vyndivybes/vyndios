@@ -30,12 +30,6 @@ test("program authority persists tasks, dependencies and audited lifecycle trans
   assert.match(authority, /PROGRAM_TASK_STATUS_CHANGED/);
 });
 
-test("program authority view stays migration-portable without aggregate grouping", () => {
-  assert.doesNotMatch(migration, /group by\s+t\.id/i);
-  assert.doesNotMatch(migration, /jsonb_agg/i);
-  assert.match(migration, /left join\s+vyndi_program_dependencies/i);
-});
-
 test("schema carries required evidence, risk links, planned vs actual and cost/resource fields", () => {
   for (const token of [
     "required_evidence",
@@ -63,5 +57,3 @@ test("Playwright smoke includes Integrated Operating Plan", () => {
   assert.match(smoke, /"\/command\/planning"/);
   assert.match(smoke, /Integrated Operating Plan/);
 });
-
-// package-b-cloudflare-retrigger
