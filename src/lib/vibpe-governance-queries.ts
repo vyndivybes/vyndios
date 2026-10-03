@@ -58,8 +58,8 @@ const clean = (value: unknown) => String(value ?? "").trim();
 export function isTraceabilityExceptionQuestion(question: string) {
   const q = question.toLowerCase();
   return /\b(job\s*cards?|orders?|demand)\b/.test(q)
-    && /traceab|lineage|originat/.test(q)
-    && /without|missing|incomplete|broken|gap|not\s+(?:linked|traceable)|orphan/.test(q);
+    && (/traceab|lineage|originat|trace.*back/.test(q)
+      || /revision/.test(q) && /changed|stale|release/.test(q));
 }
 
 export function isGovernanceOperatingStatusQuestion(question: string) {
@@ -86,27 +86,29 @@ async function traceabilityExceptionAnswer(sql: Sql) {
       from epr_production_job_cards c
       left join vyndi_sales_orders o
         on o.id=c.sales_order_id
-       and o.revision=c.sales_order_revision
      order by c.created_at,c.id
   `);
 
-  const incomplete = rows.filter((row) => !clean(row.sales_order_id) || !clean(row.matched_order_id));
+  const incomplete = rows.filter((row) => !clean(row.sales_order_id) || !clean(row.matched_order_id)
+    || n(row.sales_order_revision) !== n(row.matched_order_revision));
   if (!incomplete.length) {
     return [
       `Traceability exception check: PASS — 0 of ${rows.length} job cards lack their originating governed order link.`,
-      "Every current job card resolves to an exact sales-order ID and sales-order revision.",
-      "Scope: originating demand/order lineage only. Downstream Traveller, Quality, Dispatch, Invoice and Collection completion are evaluated separately as workflow progression."
+      "Every current job card resolves to its originating sales order and current sales-order revision. A later revision makes prior execution lineage stale: hold affected execution for controlled review, not automatic re-authorisation.",
+      "Controlled next action: review originating confirmed demand/order lineage before execution. Scope: originating demand/order lineage only. Downstream Traveller, Quality, Dispatch, Invoice and Collection completion are evaluated separately as workflow progression."
     ].join("\n\n");
   }
 
   const details = incomplete.slice(0, 12).map((row) => {
-    const reason = !clean(row.sales_order_id) ? "missing sales-order ID" : `sales order/revision ${clean(row.sales_order_id)} R${Number(row.sales_order_revision ?? 0)} not found`;
+    const reason = !clean(row.sales_order_id) ? "missing sales-order ID"
+      : !clean(row.matched_order_id) ? `sales order ${clean(row.sales_order_id)} not found`
+        : `stale revision R${n(row.sales_order_revision)}; current sales order is R${n(row.matched_order_revision)}`;
     return `${clean(row.job_card_id)} (${clean(row.product_label) || "product not labelled"}) — ${reason}`;
   });
   return [
     `Traceability exception check: FAIL — ${incomplete.length} of ${rows.length} job cards lack complete originating order lineage.`,
     details.join("; "),
-    "Controlled next action: repair the job-card → sales-order ID/revision lineage before relying on downstream genealogy or audit evidence."
+    "Controlled next action: hold affected execution and review/correct the job-card → current sales-order ID/revision lineage before relying on downstream genealogy or audit evidence. VIBPE is advisory only; re-authorisation remains in the owning workspace."
   ].join("\n\n");
 }
 
