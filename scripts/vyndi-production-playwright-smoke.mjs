@@ -143,6 +143,13 @@ try {
       assert.match(body, expectedEvidence, `${route} did not render its expected page evidence`);
     }
 
+    if (route === "/command") {
+      const productIntelligenceLink = page.getByRole("link", { name: /Product Intelligence/i });
+      await productIntelligenceLink.waitFor({ state: "visible", timeout: 10_000 });
+      const href = await productIntelligenceLink.getAttribute("href");
+      assert.equal(href, "/command/intelligence", "Command Centre Product Intelligence link targets the wrong route");
+    }
+
     if (route === "/command/sales") {
       assert.match(body, /Create bicycle demand \/ order/i, "Commercial order entry surface is missing");
       await page.getByRole("button", { name: /Add demand \/ order|Sign in to create order/i }).first().waitFor({
