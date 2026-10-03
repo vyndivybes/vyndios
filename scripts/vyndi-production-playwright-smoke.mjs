@@ -32,6 +32,7 @@ const protectedRoutes = [
   "/command/scenarios",
   "/command/cash",
   "/command/engineering",
+  "/command/risk",
   "/command/sales",
   "/command/inventory",
   "/command/operations",
@@ -52,6 +53,7 @@ const routeEvidence = new Map([
   ["/command/scenarios", /Scenario/i],
   ["/command/cash", /Cash|Working Capital/i],
   ["/command/engineering", /Engineering/i],
+  ["/command/risk", /Risk Register|VYNDI Risk Engine/i],
 ]);
 
 await mkdir(evidenceRoot, { recursive: true });
