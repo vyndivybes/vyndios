@@ -96,6 +96,16 @@ export const routeRegistry: Record<string, RouteMeta> = {
     "Command",
     { navHidden: true },
   ),
+  "/command/intelligence": meta(
+    "/command/intelligence",
+    "Product Intelligence",
+    "observe",
+    "command",
+    "founder",
+    "keep",
+    "Command",
+    { navHidden: true },
+  ),
   "/command/management-intelligence": meta(
     "/command/management-intelligence",
     "Management Intelligence",
