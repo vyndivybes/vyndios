@@ -6,7 +6,10 @@ const session = await readFile(new URL("../src/lib/vibpe-session.ts", import.met
 const knowledge = await readFile(new URL("../src/lib/vibpe-external-knowledge.ts", import.meta.url), "utf8");
 
 test("VIBPE advisory session state is explicitly non-governing", () => {
-  assert.match(session, /Runtime-local advisory state only/);
+  assert.match(session, /loadPersistedVibpeSession/);
+  assert.match(session, /persistVibpeSession/);
+  assert.match(session, /remains non-transactional/);
+  assert.match(session, /procurement commitments stay in owning services/);
   assert.match(session, /activeScenario/);
   assert.match(session, /planningHorizonMonths/);
 });

@@ -160,9 +160,9 @@ async function businessHealthAnswer(sql: Sql) {
 
 function isCommittedDemandFeasibilityQuestion(question: string) {
   const q = question.toLowerCase().replace(/\s+/g, " ").trim();
-  const asksCommitted = /\b(committed|confirmed)\b|customer\s+orders?/.test(q);
-  const asksDemand = /\b(demand|orders?|units?|commitments?)\b/.test(q);
-  const asksFeasibility = /\bcan\b[^?.]{0,80}\b(produce|produced|make|build|fulfil|fulfill|deliver)\b|\bproducible\b|production\s+feasibility|meet[^?.]{0,40}\bdemand\b|cover[^?.]{0,40}\bdemand\b/.test(q);
+  const asksCommitted = /\b(committed|confirmed)\b|customer\s+orders?|released\s+material\s+reservation/.test(q);
+  const asksDemand = /\b(demand|orders?|units?|commitments?|reservation)\b/.test(q);
+  const asksFeasibility = /\b(feasible|feasibility|producible|produced)\b|\bcan\b[^?.]{0,80}\b(produce|make|build|fulfil|fulfill|deliver|promise)\b|meet[^?.]{0,40}\bdemand\b|cover[^?.]{0,40}\bdemand\b/.test(q);
   return asksCommitted && asksDemand && asksFeasibility;
 }
 
@@ -254,6 +254,7 @@ async function committedDemandFeasibilityAnswer(sql: Sql) {
     lines.push("Conclusion: current governed evidence shows no committed-material or modeled capacity blocker. Final production release still depends on the owning production/quality gates.");
   }
 
+  lines.push("Authority: VIBPE is advisory only; customer delivery promises and production release require human approval in their owning workspaces.");
   lines.push("Evidence: confirmed sales orders → current-revision job cards → live committed procurement requirements → inventory/ATP/open-PO evidence, with capacity from the latest governed IBPE run. The broader reconciled planning shortage is intentionally not presented as committed-demand shortage.");
   return lines.join("\n\n");
 }
@@ -335,7 +336,7 @@ async function committedProcurementPriorityAnswer(sql: Sql) {
 
 function isOperationalReconciliationQuestion(question: string) {
   const q = question.toLowerCase();
-  const asksReconcile = /reconcil|match|align|consistent|tie out|ties out/.test(q);
+  const asksReconcile = /reconcil|cross[- ]check|match|align|consistent|tie out|ties out/.test(q);
   const operationalTerms = [
     /inventory|reservation|reserved/,
     /procure|requirement|mrp|purchase/,

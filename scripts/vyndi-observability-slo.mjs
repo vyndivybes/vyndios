@@ -94,6 +94,9 @@ try {
   const loginStarted = Date.now();
   const loginResponse = await login.goto(`${baseUrl}/login?returnTo=%2Fcommand`, { waitUntil: "domcontentloaded", timeout: 60_000 });
   assert.ok(loginResponse?.ok(), `Login page returned HTTP ${loginResponse?.status() ?? "none"}`);
+  // The server-rendered form is visible before React installs onSubmit.
+  // Cinematic readiness is set by a mounted effect; wait before entering credentials.
+  await login.locator(".vy-login.is-cinematic").waitFor({ state: "visible", timeout: 30_000 });
   await login.getByLabel(/Authorised Email/i).fill(email);
   await login.getByLabel(/^Password$/i).fill(password);
   // The H2 recovery workflow restores a database that already contains the
@@ -108,7 +111,10 @@ try {
     } catch (error) {
       if (attempt === 2) throw error;
       await login.goto(`${baseUrl}/login?returnTo=%2Fcommand`, { waitUntil: "domcontentloaded", timeout: 60_000 });
-      await login.getByLabel(/Authorised Email/i).fill(email);
+      // The server-rendered form is visible before React installs onSubmit.
+  // Cinematic readiness is set by a mounted effect; wait before entering credentials.
+  await login.locator(".vy-login.is-cinematic").waitFor({ state: "visible", timeout: 30_000 });
+  await login.getByLabel(/Authorised Email/i).fill(email);
       await login.getByLabel(/^Password$/i).fill(password);
     }
   }

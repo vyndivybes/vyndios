@@ -78,6 +78,7 @@ function CommandCentre() {
           <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">Start here for what needs attention now, where the fulfillment chain stands, which decision is waiting, and where to act. Detailed transactions remain in their owning workspaces.</p>
         </div>
         <div className="flex flex-wrap gap-3 text-sm font-semibold">
+          {accessible("/command/intelligence") && <WorkLink to="/command/intelligence" className="text-accent hover:text-fg">Product Intelligence →</WorkLink>}
           {accessible("/command/decision-inbox") && <WorkLink to="/command/decision-inbox" className="text-accent hover:text-fg">Action Inbox →</WorkLink>}
           {accessible("/command/control-tower") && <WorkLink to="/command/control-tower" className="text-accent hover:text-fg">ERP Reports →</WorkLink>}
           {accessible("/command/ibpe-operating-workspace") && <WorkLink to="/command/ibpe-operating-workspace" className="text-accent hover:text-fg">VIBPE Workspace →</WorkLink>}

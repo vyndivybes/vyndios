@@ -146,20 +146,21 @@ function makeFixtureSql() {
     if (q.includes("from vyndi_vibpe_assurance_exceptions_all")) {
       return [{ critical_count: 0, top_gate: null, top_type: null }];
     }
-    if (q.includes("from vyndi_report_procurement_net_requirement") || q.includes("join vyndi_report_procurement_net_requirement")) {
-      return [
-        { sku: "FRAME-M", physical_qty: 0, committed_reserved_qty: 0, atp_qty: 0, open_po_qty: 2 },
-        { sku: "GROUPSET", physical_qty: 0, committed_reserved_qty: 0, atp_qty: 0, open_po_qty: 0 },
-      ];
-    }
+    // Match the full reconciliation projection before its embedded inventory view.
     if (q.includes("with jc as") && q.includes("job_reserved") && q.includes("net_committed_shortage")) {
       return [
         { sku: "FRAME-M", open_required: 2, job_reserved: 0, job_shortage: 2, issued_qty: 0, committed_requirement: 2, procurement_reserved: 0, net_committed_shortage: 2, physical_qty: 0, report_reserved: 0, atp_qty: 0, open_po_qty: 2, open_job_cards: 1 },
         { sku: "GROUPSET", open_required: 1, job_reserved: 0, job_shortage: 1, issued_qty: 0, committed_requirement: 1, procurement_reserved: 0, net_committed_shortage: 1, physical_qty: 0, report_reserved: 0, atp_qty: 0, open_po_qty: 0, open_job_cards: 1 },
       ];
     }
+    if (q.includes("from vyndi_report_procurement_net_requirement") || q.includes("join vyndi_report_procurement_net_requirement")) {
+      return [
+        { sku: "FRAME-M", physical_qty: 0, committed_reserved_qty: 0, atp_qty: 0, open_po_qty: 2 },
+        { sku: "GROUPSET", physical_qty: 0, committed_reserved_qty: 0, atp_qty: 0, open_po_qty: 0 },
+      ];
+    }
     if (q.includes("from vyndi_vibpe_job_card_lineage") || (q.includes("epr_production_job_cards") && q.includes("sales_order"))) {
-      return [{ sales_order_id: "SO-QA-001", sales_order_revision: 1, revision: 1, job_card_id: "JC-QA-001", job_card_status: "released", origin_status: "linked", broken_origin: false }];
+      return [{ sales_order_id: "SO-QA-001", sales_order_revision: 1, matched_order_id: "SO-QA-001", matched_order_revision: 1, order_status: "confirmed", revision: 1, job_card_id: "JC-QA-001", job_card_status: "released", origin_status: "linked", broken_origin: false }];
     }
     if (q.includes("from epr_production_job_cards") && q.includes("epr_travellers")) {
       return [{ sales_order_id: "SO-QA-001", job_card_id: "JC-QA-001", job_card_status: "released", shortage_qty: 3, traveller_count: 0 }];

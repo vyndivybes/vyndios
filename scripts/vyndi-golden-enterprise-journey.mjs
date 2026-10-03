@@ -49,6 +49,9 @@ const context = await browser.newContext({ viewport: { width: 1440, height: 900 
 try {
   const login = await context.newPage();
   await login.goto(`${baseUrl}/login?returnTo=%2Fcommand`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+  // The server-rendered form is visible before React installs onSubmit.
+  // Cinematic readiness is set by a mounted effect; wait before entering credentials.
+  await login.locator(".vy-login.is-cinematic").waitFor({ state: "visible", timeout: 30_000 });
   await login.getByLabel(/Authorised Email/i).fill(email);
   await login.getByLabel(/^Password$/i).fill(password);
   await login.getByRole("button", { name: /Authorize · Enter Command/i }).click();

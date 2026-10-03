@@ -14,10 +14,10 @@ const releaseScript = read("scripts/run-vyndi-release-test.ps1");
 
 test("Cloudflare remains the VYNDI production deployment authority while legacy adapters stay build-compatible", () => {
   assert.equal(wrangler.name, "vyndios");
-  assert.match(authRuntime, /https:\/\/vyndios\.shyamsundhar1982\.workers\.dev/);
+  assert.match(authRuntime, /https:\/\/vyndios\.vayushastr\.workers\.dev/);
   assert.doesNotMatch(authRuntime, /tiger-field-flora-finch/);
-  assert.match(productionSmoke, /vyndios\.shyamsundhar1982\.workers\.dev/);
-  assert.match(releaseScript, /vyndios\.shyamsundhar1982\.workers\.dev/);
+  assert.match(productionSmoke, /vyndios\.vayushastr\.workers\.dev/);
+  assert.match(releaseScript, /vyndios\.vayushastr\.workers\.dev/);
   assert.equal(pkg.devDependencies["@cloudflare/vite-plugin"], "1.54.7");
   assert.equal(pkg.devDependencies?.nitro, undefined);
 
