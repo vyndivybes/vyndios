@@ -200,6 +200,49 @@ export const updateProgramTask = createServerFn({ method: "POST" })
     return { ok: true, id: data.id, revision };
   });
 
+export const transitionProgramTaskStatus = createServerFn({ method: "POST" })
+  .validator(z.object({
+    id: z.string().trim().min(1).max(120),
+    status: taskStatus,
+    actualStart: z.string().trim().max(10).default(""),
+    actualFinish: z.string().trim().max(10).default(""),
+    sourceReference: z.string().trim().min(1).max(500),
+  }))
+  .handler(async ({ data }) => {
+    const actor = await requireBusinessActor("edit");
+    const { sql } = await loadRows();
+    const current = await sql<{ record_revision: number | string; status: string }>`
+      select record_revision,status from vyndi_program_tasks
+       where id=${data.id} and program_id=${PROGRAM_ID} limit 1
+    `;
+    if (!current[0]) throw new Error("Program task not found.");
+    if (data.status === "complete" && !data.actualFinish) {
+      throw new Error("Completed program tasks require an actual finish date.");
+    }
+    const revision = Number(current[0].record_revision) + 1;
+    await sql`
+      update vyndi_program_tasks
+         set status=${data.status},
+             actual_start=coalesce(${data.actualStart || null}::date,actual_start),
+             actual_finish=case when ${data.status}='complete' then ${data.actualFinish || null}::date else actual_finish end,
+             source_reference=${data.sourceReference},record_revision=${revision},
+             updated_by=${actor.userId},updated_at=now()
+       where id=${data.id} and program_id=${PROGRAM_ID}
+    `;
+    await sql`
+      insert into vyndi_audit_events (
+        id,entity_type,entity_id,entity_revision,action,actor_user_id,actor_role,
+        source_reference,payload_json,correlation_id,previous_state,new_state
+      ) values (
+        ${crypto.randomUUID()},'program_task',${data.id},${revision},'PROGRAM_TASK_STATUS_CHANGED',
+        ${actor.userId},${actor.role},${data.sourceReference},
+        ${JSON.stringify({ actualStart: data.actualStart || null, actualFinish: data.actualFinish || null })}::jsonb,
+        ${`PROGRAM|${PROGRAM_ID}|${data.id}`},${current[0].status},${data.status}
+      )
+    `;
+    return { ok: true, id: data.id, revision, status: data.status };
+  });
+
 export const createProgramDependency = createServerFn({ method: "POST" })
   .validator(z.object({
     predecessorId: z.string().trim().min(1).max(120),
