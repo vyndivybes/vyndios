@@ -115,7 +115,7 @@ test("prefers the latest accepted governed engineering-evidence receipt over the
   const result = await resolveVibpeEngineeringAnalysis(fakeSql as never, "tyre clearance latest rev");
   assert.equal(result.handled, true);
   assert.match(queryText, /vyndi_engineering_evidence_acceptances/);
-  assert.match(queryText, /decision=\'accepted\'/);
+  assert.match(queryText, /decision='accepted'/);
   assert.match(result.answer ?? "", /6\.250 mm/);
   assert.match(result.answer ?? "", /bbbbbbbbbbbb/);
 });
