@@ -1,6 +1,7 @@
 import type { Sql } from "@/lib/db";
 import { compileVedmAuthorityGraph, createVedmR3aSeed } from "@/lib/vedm-authority-graph";
 import { deriveVedmRisk } from "@/lib/vyndi-risk-model";
+import { buildProgramNetwork, type ProgramTaskInput } from "@/lib/program-planning-model";
 
 type ActiveActionRow = {
   id: string;
@@ -78,6 +79,11 @@ export function isOverallRagHealthQuestion(question: string) {
 export function isRiskIntelligenceQuestion(question: string) {
   const q = question.toLowerCase();
   return /risk\s+register|engineering\s+risk|evidence\s+risk|configuration\s+risk|fmea|rpn|highest\s+risk|top\s+risk|risk\s+exposure|why.*risk/.test(q);
+}
+
+export function isProgramPlanningQuestion(question: string) {
+  const q = question.toLowerCase();
+  return /critical\s+path|program\s+plan|programme\s+plan|gate\s+dependenc|blocked\s+task|work\s+package|what.*delay.*(?:program|programme|release)|what.*block.*(?:program|programme|release)/.test(q);
 }
 
 async function traceabilityExceptionAnswer(sql: Sql) {
@@ -401,6 +407,66 @@ async function overallRagHealthAnswer(sql: Sql) {
   ].join("\n\n");
 }
 
+async function programPlanningAnswer(sql: Sql) {
+  const tasks = await sql.query<Record<string, unknown>>(`
+    select id,title,domain,work_package,owner,status,duration_days,planned_start,planned_finish,
+           actual_start,actual_finish,gate_id,required_evidence,risk_ids,confidence,
+           technical_maturity,source_reference
+      from vyndi_program_tasks
+     where program_id='VYNDI-MASTER-PROGRAM'
+     order by id
+  `);
+  const dependencies = await sql.query<Record<string, unknown>>(`
+    select predecessor_id,successor_id,lag_days
+      from vyndi_program_dependencies
+     where program_id='VYNDI-MASTER-PROGRAM'
+     order by predecessor_id,successor_id
+  `);
+  if (!tasks.length) {
+    return "Program planning is enabled, but no governed program tasks have been entered yet. Add explicit tasks, durations and dependencies in Integrated Operating Plan before VIBPE calculates a critical path.";
+  }
+
+  const network = buildProgramNetwork(
+    tasks.map((row) => ({
+      id: clean(row.id),
+      title: clean(row.title),
+      durationDays: n(row.duration_days),
+      status: clean(row.status) as ProgramTaskInput["status"],
+    })),
+    dependencies.map((row) => ({
+      predecessorId: clean(row.predecessor_id),
+      successorId: clean(row.successor_id),
+      lagDays: n(row.lag_days),
+    })),
+  );
+
+  if (!network.valid) {
+    return `Program network is not authoritative because its dependency graph is invalid: ${network.issues.map((issue) => issue.message).join(" ")}`;
+  }
+
+  const critical = network.criticalPath.map((id) => {
+    const row = tasks.find((task) => clean(task.id) === id);
+    const schedule = network.taskById[id];
+    return `${id} ${clean(row?.title)} [${clean(row?.status)}] — ${n(row?.duration_days)}d, slack ${schedule?.slackDays ?? 0}d`;
+  });
+  const blocked = tasks
+    .filter((row) => clean(row.status) === "blocked")
+    .map((row) => `${clean(row.id)} ${clean(row.title)}${clean(row.gate_id) ? ` (gate ${clean(row.gate_id)})` : ""}`);
+  const unowned = tasks.filter((row) => !clean(row.owner)).map((row) => clean(row.id));
+  const evidenceGates = tasks
+    .filter((row) => clean(row.gate_id))
+    .map((row) => `${clean(row.id)} → ${clean(row.gate_id)} [${clean(row.status)}]`);
+
+  return [
+    `Governed program network: ${tasks.length} tasks, ${dependencies.length} dependencies, deterministic critical duration ${network.projectDurationDays ?? 0} days.`,
+    `Critical path: ${critical.length ? critical.join(" → ") : "none"}.`,
+    `Blocked tasks: ${blocked.length ? blocked.join("; ") : "none"}.`,
+    `Evidence gates: ${evidenceGates.length ? evidenceGates.join("; ") : "none linked"}.`,
+    `Ownership gaps: ${unowned.length ? unowned.join(", ") : "none"}.`,
+    "Control rule: this is deterministic CPM from explicit persisted durations and dependencies. VIBPE does not infer P50/P80/P95 dates here; probabilistic forecasting requires the later governed Forecast Engine."
+  ].join("\n\n");
+}
+
 async function riskIntelligenceAnswer(sql: Sql) {
   const risks = await sql.query<Record<string, unknown>>(`
     select id,risk,domain,likelihood,impact,status,mitigation,owner,due_on,
@@ -440,5 +506,6 @@ export async function tryGovernanceDataAnswer(sql: Sql, question: string) {
   if (isGovernanceOperatingStatusQuestion(question)) return governanceOperatingStatusAnswer(sql);
   if (isOverallRagHealthQuestion(question)) return overallRagHealthAnswer(sql);
   if (isRiskIntelligenceQuestion(question)) return riskIntelligenceAnswer(sql);
+  if (isProgramPlanningQuestion(question)) return programPlanningAnswer(sql);
   return undefined;
 }
