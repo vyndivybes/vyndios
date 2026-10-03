@@ -3,11 +3,12 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
-const [page, authority, migration, model] = await Promise.all([
+const [page, authority, migration, model, vibpe] = await Promise.all([
   read("src/routes/command/intelligence.tsx"),
   read("src/lib/readiness-authority.ts"),
   read("migrations/0102_vyndi_readiness_engine.sql"),
   read("src/lib/readiness-model.ts"),
+  read("src/lib/vibpe-governance-queries.ts"),
 ]);
 
 test("Product Intelligence shows readiness confidence and risk as separate measures", () => {
@@ -38,4 +39,12 @@ test("readiness evidence registry preserves state confidence authority provenanc
 test("composite VPRI remains disabled until governed weights exist", () => {
   assert.match(model, /overallReadinessPct: null/);
   assert.match(model, /governed weighting/);
+});
+
+
+test("VIBPE explains readiness while preserving the composite-index boundary", () => {
+  assert.match(vibpe, /isReadinessIntelligenceQuestion/);
+  assert.match(vibpe, /Evidence completeness:/);
+  assert.match(vibpe, /Evidence confidence:/);
+  assert.match(vibpe, /Composite VPRI: WITHHELD/);
 });
