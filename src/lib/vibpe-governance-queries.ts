@@ -94,7 +94,7 @@ async function traceabilityExceptionAnswer(sql: Sql) {
   if (!incomplete.length) {
     return [
       `Traceability exception check: PASS — 0 of ${rows.length} job cards lack their originating governed order link.`,
-      "Every current job card resolves to its originating sales order and current sales-order revision. A later revision makes prior execution lineage stale: hold affected execution for controlled review, not automatic re-authorisation.",
+      "Every current job card resolves to its originating sales-order ID and sales-order revision, matching the current order revision. A later revision makes prior execution lineage stale: hold affected execution for controlled review, not automatic re-authorisation.",
       "Controlled next action: review originating confirmed demand/order lineage before execution. Scope: originating demand/order lineage only. Downstream Traveller, Quality, Dispatch, Invoice and Collection completion are evaluated separately as workflow progression."
     ].join("\n\n");
   }
