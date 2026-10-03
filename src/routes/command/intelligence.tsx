@@ -13,16 +13,16 @@ function Intelligence() {
   return <div className="space-y-6">
     <header className="flex flex-col gap-4 border-b border-border pb-6 lg:flex-row lg:items-end lg:justify-between">
       <div>
-        <p className="text-[11px] uppercase tracking-[0.2em] text-green">VYNDI intelligence layer · deterministic v1</p>
+        <p className="text-[11px] uppercase tracking-[0.2em] text-green">VYNDI intelligence layer · illustrative preview · not live data</p>
         <h1 className="mt-1 font-display text-4xl text-accent">Product Intelligence</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">One operating view for readiness, confidence, risk, evidence and forecast. Every signal is labelled by provenance; VIBPE remains advisory and does not invent probabilities.</p>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">Development preview only. All scores, dates, gate states and scenario impacts below are sample values, not calculated forecasts or verified VEDM evidence. Live-data integration is not yet implemented.</p>
       </div>
       <Link to="/command" className="text-sm font-semibold text-accent hover:text-fg">Command Centre <ArrowRight className="ml-1 inline size-4" /></Link>
     </header>
 
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-      <Kpi label="Product readiness" value={s.readiness + "%"} hint="Required work complete" tone={readinessTone(s.readiness)} />
-      <Kpi label="Confidence" value={s.confidence + "%"} hint="Evidence strength" tone={readinessTone(s.confidence)} />
+      <Kpi label="Product readiness" value={s.readiness + "%"} hint="Required work complete" tone={readinessTone(s.readiness) === "green" ? "ok" : readinessTone(s.readiness) === "red" ? "danger" : "warn"} />
+      <Kpi label="Confidence" value={s.confidence + "%"} hint="Evidence strength" tone={readinessTone(s.confidence) === "green" ? "ok" : readinessTone(s.confidence) === "red" ? "danger" : "warn"} />
       <Kpi label="Risk exposure" value={s.riskExposure + "%"} hint="Unresolved exposure" tone="warn" />
       <Kpi label="Evidence coverage" value={s.evidenceCoverage + "%"} hint="VEDM-linked evidence" tone="warn" />
       <Kpi label="Config integrity" value={s.configurationIntegrity + "%"} hint="Revision consistency" tone="ok" />
@@ -38,7 +38,7 @@ function Intelligence() {
         <div className="mt-5 rounded-xl border border-border p-4"><div className="flex items-center gap-2 text-xs font-semibold text-fg"><GitBranch className="size-4 text-accent" /> Critical path</div><div className="mt-3 flex flex-wrap gap-2">{s.criticalPath.map((item, i) => <span key={item} className="rounded-full border border-border px-3 py-1.5 text-xs text-muted">{i + 1}. {item}</span>)}</div></div>
       </Panel>
       <Panel title="Control posture" kicker="Readiness ≠ confidence ≠ risk">
-        <div className="space-y-4 text-sm"><div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 size-5 text-green" /><p className="text-muted">Configuration integrity is high, but material authority remains the release constraint.</p></div><div className="flex items-start gap-3"><Sparkles className="mt-0.5 size-5 text-accent" /><p className="text-muted">Forecasts are derived from governed inputs and three-point planning estimates in this first slice.</p></div><div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 size-5 text-warn" /><p className="text-muted">No risk is accepted solely because its score is low; evidence confidence is evaluated separately.</p></div></div>
+        <div className="space-y-4 text-sm"><div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 size-5 text-green" /><p className="text-muted">Configuration integrity is high, but material authority remains the release constraint.</p></div><div className="flex items-start gap-3"><Sparkles className="mt-0.5 size-5 text-accent" /><p className="text-muted">Forecast dates shown here are illustrative only. No probabilistic schedule engine is connected yet.</p></div><div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 size-5 text-warn" /><p className="text-muted">No risk is accepted solely because its score is low; evidence confidence is evaluated separately.</p></div></div>
       </Panel>
     </div>
 
