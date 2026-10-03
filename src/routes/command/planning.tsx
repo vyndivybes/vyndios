@@ -3,12 +3,14 @@ import { useState } from "react";
 import { GovernedLifecycle } from "@/components/governed-lifecycle";
 import { Kpi, Panel } from "@/components/kpi";
 import { PlanningStudio } from "@/components/planning-studio";
+import { ProgramGatePlan } from "@/components/program-gate-plan";
 import { COMPANY, TRANCHES } from "@/lib/data/company";
 import { getCommandRole } from "@/lib/command-access";
 import { listEngineeringAuthority } from "@/lib/engineering-authority";
 import { getProcurementPlanningReport } from "@/lib/procurement-authority";
 import { approveOperatingPlan, getOperatingPlanState, submitOperatingPlan } from "@/lib/operating-plan-authority";
 import { canPerform } from "@/lib/page-access";
+import { getProgramPlanningState } from "@/lib/program-planning-authority";
 import {
   DEFAULT_APPROVED_OPERATING_PLAN,
   calendarMonthForPlanMonth,
@@ -18,13 +20,14 @@ import {
 
 export const Route = createFileRoute("/command/planning")({
   loader: async () => {
-    const [role, plan, engineering, procurement] = await Promise.all([
+    const [role, plan, engineering, procurement, program] = await Promise.all([
       getCommandRole(),
       getOperatingPlanState(),
       listEngineeringAuthority(),
       getProcurementPlanningReport(),
+      getProgramPlanningState(),
     ]);
-    return { role, plan, engineering, procurement };
+    return { role, plan, engineering, procurement, program };
   },
   component: MasterPlan,
 });
@@ -50,7 +53,7 @@ const ROADMAP_META = [
 const capitalLadder = TRANCHES.filter((t) => t.id !== "STBY").reduce((s, t) => s + t.amount, 0);
 
 function MasterPlan() {
-  const { role, plan, engineering, procurement } = Route.useLoaderData();
+  const { role, plan, engineering, procurement, program } = Route.useLoaderData();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -201,6 +204,8 @@ function MasterPlan() {
     </Panel>
 
     <PlanningStudio role={role} approvedFinance={plan.approved?.finance ?? null} draftFinance={plan.draft?.finance ?? null} draftId={plan.draft?.id ?? null} engineeringCoverage={engineeringCoverage} realityBlockers={realityBlockers} />
+
+    <ProgramGatePlan role={role} state={program} />
 
     <nav className="overflow-x-auto rounded-xl border border-border bg-surface/40 p-1"><div className="flex min-w-max gap-1">{PLAN_TABS.map((tab) => <Link key={tab.label} to={tab.to as never} className={`rounded-lg px-4 py-2 text-xs font-semibold ${tab.to === "/command/planning" ? "bg-accent text-accent-fg" : "text-muted hover:bg-bg/60 hover:text-fg"}`}>{tab.label}</Link>)}</div></nav>
 
