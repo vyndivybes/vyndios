@@ -1,4 +1,6 @@
 import type { Sql } from "@/lib/db";
+import { compileVedmAuthorityGraph, createVedmR3aSeed } from "@/lib/vedm-authority-graph";
+import { deriveVedmRisk } from "@/lib/vyndi-risk-model";
 
 type ActiveActionRow = {
   id: string;
@@ -71,6 +73,11 @@ export function isGovernanceOperatingStatusQuestion(question: string) {
 export function isOverallRagHealthQuestion(question: string) {
   const q = question.toLowerCase();
   return /overall\s+health|current\s+health|health\s+of\s+vyndi|green.*amber.*red|red.*amber.*green|rag\s+(?:status|health)/.test(q);
+}
+
+export function isRiskIntelligenceQuestion(question: string) {
+  const q = question.toLowerCase();
+  return /risk\s+register|engineering\s+risk|evidence\s+risk|configuration\s+risk|fmea|rpn|highest\s+risk|top\s+risk|risk\s+exposure|why.*risk/.test(q);
 }
 
 async function traceabilityExceptionAnswer(sql: Sql) {
@@ -394,9 +401,44 @@ async function overallRagHealthAnswer(sql: Sql) {
   ].join("\n\n");
 }
 
+async function riskIntelligenceAnswer(sql: Sql) {
+  const risks = await sql.query<Record<string, unknown>>(`
+    select id,risk,domain,likelihood,impact,status,mitigation,owner,due_on,
+           exposure_score,fmea_rpn,severity,occurrence,detection,evidence_confidence,
+           dependency_impact,affected_objects,evidence_links,provenance_class,source_reference
+      from vyndi_risk_intelligence
+     where status<>'closed'
+     order by exposure_score desc nulls last,fmea_rpn desc nulls last,id
+     limit 20
+  `);
+  const graph = compileVedmAuthorityGraph(createVedmR3aSeed(), new Date().toISOString().slice(0, 10));
+  const derived = graph.issues.map(deriveVedmRisk);
+
+  const canonical = risks.slice(0, 8).map((row) => {
+    const confidence = row.evidence_confidence == null ? "unrated" : `${Math.round(Number(row.evidence_confidence) * 100)}%`;
+    const rpn = row.fmea_rpn == null ? "FMEA not rated" : `RPN ${Number(row.fmea_rpn)}`;
+    const affected = Array.isArray(row.affected_objects) && row.affected_objects.length
+      ? ` affected ${row.affected_objects.map(String).join(", ")}`
+      : "";
+    return `${clean(row.id)} [${clean(row.domain) || "operational"}] ${clean(row.likelihood)}×${clean(row.impact)} exposure ${n(row.exposure_score)}; ${rpn}; evidence confidence ${confidence}; ${clean(row.risk)}.${affected}`;
+  });
+
+  const derivedLines = derived.slice(0, 8).map((risk) =>
+    `${risk.id} [${risk.domain}] ${risk.impact} impact; probability not inferred; ${risk.message}`
+  );
+
+  return [
+    `VYNDI Risk status: ${risks.length} active canonical risk${risks.length === 1 ? "" : "s"}; ${derived.length} current VEDM-derived evidence/configuration signal${derived.length === 1 ? "" : "s"}.`,
+    canonical.length ? `Highest governed risks: ${canonical.join(" | ")}` : "No active canonical risks are recorded.",
+    derivedLines.length ? `VEDM-derived signals: ${derivedLines.join(" | ")}` : "No current VEDM authority/evidence issue is derived.",
+    "Control rule: likelihood/impact and FMEA inputs come only from governed entries. VYNDI does not invent probability; evidence confidence and provenance remain separate from risk exposure. Lifecycle acceptance/closure stays with authorised humans."
+  ].join("\n\n");
+}
+
 export async function tryGovernanceDataAnswer(sql: Sql, question: string) {
   if (isTraceabilityExceptionQuestion(question)) return traceabilityExceptionAnswer(sql);
   if (isGovernanceOperatingStatusQuestion(question)) return governanceOperatingStatusAnswer(sql);
   if (isOverallRagHealthQuestion(question)) return overallRagHealthAnswer(sql);
+  if (isRiskIntelligenceQuestion(question)) return riskIntelligenceAnswer(sql);
   return undefined;
 }
