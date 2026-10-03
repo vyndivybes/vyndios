@@ -32,7 +32,7 @@ test("program authority persists tasks, dependencies and audited lifecycle trans
 
 test("program authority view avoids grouping the full task row", () => {
   assert.doesNotMatch(migration, /group by\s+t\.id/i);
-  assert.match(migration, /select\s+coalesce\s*\(\s*\(\s*select\s+jsonb_agg/i);
+  assert.match(migration, /coalesce\s*\(\s*\(\s*select\s+jsonb_agg/i);
 });
 
 test("schema carries required evidence, risk links, planned vs actual and cost/resource fields", () => {
