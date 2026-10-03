@@ -24,12 +24,14 @@ function procurementPlanningQuestion(question: string) {
   const q = normalized(question);
   const procurement = /\b(procure|procurement|purchase|buy|replenish|po|purchase order)\b/.test(q);
   const planning = /\b(recommendation|recommended|planning|plan|automatically|automatic|create|commit|approve)\b/.test(q);
-  return procurement && planning;
+  return procurement && planning
+    || /\bsuppliers?\b/.test(q) && /\b(trade-off|compare|comparison|either|two)\b/.test(q);
 }
 
 function productionTraceabilityAuthorityQuestion(question: string) {
   const q = normalized(question);
-  const record = /\b(job card|job-card|traveller|traveler)\b/.test(q);
+  const record = /\b(job card|job-card|traveller|traveler)\b/.test(q)
+    || /\b(job|serial|dispatch)\b/.test(q) && /\b(quality|release)\b/.test(q);
   const authority = /\b(complete|completed|completion|finished|releasable|release|released|quality|production complete)\b/.test(q);
   return record && authority;
 }
@@ -55,7 +57,7 @@ function planningFundingAnswer(result: IntegratedPlanningResult, question: strin
     `Incremental funding need is ${money(result.funding.incrementalFundingNeedLakh)}; first post-recommendation liquidity breach is ${firstBreach ? `M${firstBreach}` : "not present in the modeled horizon"}.`,
     "Truth class: these are IBPE planning/scenario outputs. They are not the canonical current cash ledger, bank balance, or evidence that funding has been approved or received. Canonical cash remains transaction/ledger authority in Finance.",
     asksLedger
-      ? "Answer to the ledger question: no — VIBPE must not substitute modeled free liquidity for current ledger cash or bank truth."
+      ? "Answer to the ledger question: current reconciled ledger cash, not forecast surplus, governs today’s payment decision, subject to cash controls and human approval. If bank/ledger cash and modeled liquidity mismatch, surface and review the difference; do not silently reconcile it or invent a ledger balance."
       : "Use the planning figures for management decisions only after reconciling current Finance ledger evidence.",
     asksAutoCommit
       ? "Authority: VIBPE cannot automatically commit or approve funding. A human must approve funding through the owning Finance/governance authority."
@@ -78,6 +80,7 @@ function planningProcurementAnswer(result: IntegratedPlanningResult, question: s
       ? `Priority planning recommendations: ${purchases.map((row) => `${row.sku} M${row.period}: buy ${qty(row.recommendedPurchaseQty)}${row.purchaseCostLakh != null ? ` (${money(row.purchaseCostLakh)})` : ""}${row.recommendationIsLate ? ", inside lead time" : ""}`).join("; ")}.`
       : "No planning purchase recommendation is active in the governed packet.",
     "Truth class: this is a governed IBPE planning recommendation, not an approved supplier commitment, issued purchase order, receipt, or inventory transaction.",
+    "Supplier-lane trade-off: compare approved, effective SKU-specific lane evidence for landed cost, lead time, reliability, capacity and payment terms against the shortage due date and funding controls. This planning packet does not establish those supplier-lane metrics; no winning supplier or approval should be inferred without reviewing that evidence.",
     asksAuto
       ? "Authority: VIBPE cannot automatically create, approve, issue or commit a PO. A human must act through the owning Procurement authority and supplier/finance controls."
       : "Authority: advisory only; PO creation/approval remains in the owning Procurement workspace with human authority.",
@@ -88,7 +91,7 @@ function planningProcurementAnswer(result: IntegratedPlanningResult, question: s
 function productionTraceabilityAuthorityAnswer() {
   return [
     "Job-card / Traveller authority: a released job card or an existing Traveller is execution and traceability evidence; it is not proof that production is complete or releasable.",
-    "Completion truth requires the applicable operation/material/evidence records to be complete. Quality/release truth remains governed by the owning Quality and Production Release controls, including unresolved NCR/CAPA or other release blockers.",
+    "Dispatch cannot proceed while any serial lacks final quality release. Job completion is not serialized release authority. Completion truth requires the applicable operation/material/evidence records to be complete. Quality/release truth remains governed by the owning Quality and Production Release controls, including unresolved NCR/CAPA or other release blockers.",
     "Authority: VIBPE is advisory only and cannot convert a job-card/Traveller state into production release. Human-authorised owning workspaces remain controlling.",
     "Controlled next action: review the Traveller genealogy, operation/material completion, quality evidence and formal release-readiness gate before treating the unit as complete or releasable.",
   ].join("\n\n");
@@ -142,9 +145,18 @@ export async function tryVibpeTruthContractAnswer(
   question: string,
   governedBaseline: IntegratedPlanningResult,
 ) {
+  const q = normalized(question);
+  if (/\b(stock|inventory|receipt)\b/.test(q) && /\b(quarantined?|usable|reserved|available to promise)\b/.test(q)) {
+    return [
+      "Current inventory authority: physical stock is not automatically available to promise. Active reservations reduce free availability; if all usable physical stock is reserved, no free stock remains for a new promise.",
+      "A quarantined goods receipt must not count as usable stock for committed production until the owning Quality/Inventory controls release it. Receipt existence alone is not usable availability.",
+      "No SKU, receipt or current reservation ledger evidence is supplied by this question; these are control rules, not a verified stock balance. Review current reservation, receipt disposition and usable availability evidence before any commitment.",
+      "Authority: VIBPE is advisory only; disposition changes and customer promises require human approval in their owning workspaces.",
+    ].join("\n\n");
+  }
   if (productionTraceabilityAuthorityQuestion(question)) return productionTraceabilityAuthorityAnswer();
   if (actualVsPlanQuestion(question)) return actualVsPlanAnswer(sql, governedBaseline);
-  if (fundingOrLiquidityQuestion(question)) return planningFundingAnswer(governedBaseline, question);
+  if (cashLedgerAuthorityQuestion(question) || fundingOrLiquidityQuestion(question)) return planningFundingAnswer(governedBaseline, question);
   if (procurementPlanningQuestion(question)) return planningProcurementAnswer(governedBaseline, question);
   return undefined;
 }
