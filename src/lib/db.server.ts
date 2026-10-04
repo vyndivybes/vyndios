@@ -43,52 +43,127 @@ const bundledMigrations=import.meta.glob("/migrations/*.sql",{
 
 type Run = <T>(text: string, params: unknown[]) => Promise<T[]>;
 
+export class RuntimeSchemaMigrationError extends Error {
+  migrationName:string|null;
+  sqlState:string|null;
+  stage:"connect"|"bootstrap"|"apply"|"unlock";
+
+  constructor(input:{
+    stage:"connect"|"bootstrap"|"apply"|"unlock";
+    migrationName?:string|null;
+    sqlState?:string|null;
+    cause?:unknown;
+  }){
+    const migrationPart=input.migrationName?": "+input.migrationName:"";
+    const statePart=input.sqlState?" ["+input.sqlState+"]":"";
+    super("Runtime schema migration failed during "+input.stage+migrationPart+statePart,{cause:input.cause});
+    this.name="RuntimeSchemaMigrationError";
+    this.stage=input.stage;
+    this.migrationName=input.migrationName??null;
+    this.sqlState=input.sqlState??null;
+  }
+}
+
+function sqlStateOf(error:unknown):string|null{
+  if(!error||typeof error!=="object") return null;
+  const code=(error as {code?:unknown}).code;
+  return typeof code==="string"&&code.trim()?code.trim():null;
+}
+
+export function safeRuntimeSchemaMigrationFailure(error:unknown){
+  if(error instanceof RuntimeSchemaMigrationError){
+    return {stage:error.stage,migrationName:error.migrationName,sqlState:error.sqlState};
+  }
+  return {stage:"unknown" as const,migrationName:null,sqlState:sqlStateOf(error)};
+}
+
 async function ensureHyperdriveSchemaReady(transport: PostgresTransport):Promise<void>{
   if(transport.source!=="hyperdrive") return;
+
   globalRef.__hyperdriveMigrationReady__ ??= (async()=>{
     const { Client }=await import("pg");
     const client=new Client({connectionString:transport.connectionString});
-    await client.connect();
-    let inTransaction=false;
+
     try{
-      await client.query("BEGIN");
-      inTransaction=true;
-      await client.query("select pg_advisory_xact_lock($1,$2)",[1982,1505]);
-      await client.query(
-        "create table if not exists _migrations (name text primary key, applied_at timestamptz not null default now())",
-      );
-      const appliedRows=await client.query<{name:string}>("select name from _migrations");
-      const plan=planRuntimeSchemaMigrations({
-        transportSource:"hyperdrive",
-        migrations:bundledMigrations,
-        applied:appliedRows.rows.map((row)=>row.name),
-      });
-      if(!plan.allowed&&plan.blocked.length){
-        const detail=plan.blocked.map((row)=>row.name+" ["+row.classes.join(", ")+"]").join("; ");
-        throw new Error("Runtime Hyperdrive migration blocked by destructive migration policy: "+detail);
+      try{
+        await client.connect();
+      }catch(error){
+        throw new RuntimeSchemaMigrationError({stage:"connect",cause:error,sqlState:sqlStateOf(error)});
       }
-      for(const migration of plan.pending){
-        if(!migration.sql.trim()) throw new Error("Runtime Hyperdrive migration is empty: "+migration.name);
-        await client.query(migration.sql);
-        await client.query("insert into _migrations(name) values($1) on conflict(name) do nothing",[migration.name]);
+
+      for(;;){
+        let inTransaction=false;
+        let migrationName:string|null=null;
+        try{
+          await client.query("BEGIN");
+          inTransaction=true;
+          await client.query("select pg_advisory_xact_lock($1,$2)",[1982,1505]);
+          await client.query(
+            "create table if not exists _migrations (name text primary key, applied_at timestamptz not null default now())",
+          );
+
+          const appliedRows=await client.query<{name:string}>("select name from _migrations");
+          const plan=planRuntimeSchemaMigrations({
+            transportSource:"hyperdrive",
+            migrations:bundledMigrations,
+            applied:appliedRows.rows.map((row)=>row.name),
+          });
+
+          if(!plan.allowed&&plan.blocked.length){
+            const first=plan.blocked[0]!;
+            throw new RuntimeSchemaMigrationError({
+              stage:"apply",
+              migrationName:first.name,
+              sqlState:"DESTRUCTIVE_BLOCKED",
+              cause:new Error(first.classes.join(", ")),
+            });
+          }
+
+          const migration=plan.pending[0];
+          if(!migration){
+            await client.query("COMMIT");
+            inTransaction=false;
+            break;
+          }
+
+          migrationName=migration.name;
+          if(!migration.sql.trim()){
+            throw new RuntimeSchemaMigrationError({
+              stage:"apply",
+              migrationName,
+              sqlState:"EMPTY_MIGRATION",
+            });
+          }
+
+          await client.query(migration.sql);
+          await client.query(
+            "insert into _migrations(name) values($1) on conflict(name) do nothing",
+            [migration.name],
+          );
+          await client.query("COMMIT");
+          inTransaction=false;
+          console.log("[db] runtime Hyperdrive reconciliation applied "+migration.name);
+        }catch(error){
+          if(inTransaction){
+            try{await client.query("ROLLBACK");}catch{}
+          }
+          if(error instanceof RuntimeSchemaMigrationError) throw error;
+          throw new RuntimeSchemaMigrationError({
+            stage:migrationName?"apply":"bootstrap",
+            migrationName,
+            sqlState:sqlStateOf(error),
+            cause:error,
+          });
+        }
       }
-      await client.query("COMMIT");
-      inTransaction=false;
-      if(plan.pending.length){
-        console.log("[db] runtime Hyperdrive reconciliation applied "+plan.pending.length+" migration(s): "+plan.pending.map((row)=>row.name).join(", "));
-      }
-    }catch(error){
-      if(inTransaction){
-        try{await client.query("ROLLBACK");}catch{}
-      }
-      throw error;
     }finally{
-      await client.end();
+      try{await client.end();}catch{}
     }
   })().catch((error)=>{
     globalRef.__hyperdriveMigrationReady__=undefined;
     throw error;
   });
+
   await globalRef.__hyperdriveMigrationReady__;
 }
 
@@ -105,6 +180,30 @@ export async function readRuntimeSchemaMigrationStatus(sql:Sql){
     latestExpectedMigration:expected.at(-1)??null,
     latestAppliedMigration:appliedExpected.at(-1)??null,
   };
+}
+
+export async function getRuntimeSchemaDiagnosticServer(){
+  const transport=await resolvePostgresTransport();
+  try{
+    if(!transport){
+      const sql=await createPgliteSql();
+      return {ok:true,source:"pglite" as const,...await readRuntimeSchemaMigrationStatus(sql),failure:null};
+    }
+    if(transport.source==="hyperdrive") await ensureHyperdriveSchemaReady(transport);
+    const sql=await createPostgresSql(transport);
+    return {ok:true,source:transport.source,...await readRuntimeSchemaMigrationStatus(sql),failure:null};
+  }catch(error){
+    return {
+      ok:false,
+      source:transport?.source??"pglite",
+      expectedMigrationCount:expectedRuntimeMigrationNames(bundledMigrations).length,
+      appliedMigrationCount:null,
+      pendingMigrationCount:null,
+      latestExpectedMigration:expectedRuntimeMigrationNames(bundledMigrations).at(-1)??null,
+      latestAppliedMigration:null,
+      failure:safeRuntimeSchemaMigrationFailure(error),
+    };
+  }
 }
 
 function toSql(run: Run): Sql {

@@ -65,3 +65,9 @@ export const getSchemaMigrationStatus = createServerOnlyFn(async () => {
   const sql=await getSqlServer();
   return readRuntimeSchemaMigrationStatus(sql);
 });
+
+export const getRuntimeSchemaDiagnostic = createServerOnlyFn(async () => {
+  await syncCloudflareRuntimeEnv();
+  const { getRuntimeSchemaDiagnosticServer } = await import("./db.server.ts");
+  return getRuntimeSchemaDiagnosticServer();
+});
