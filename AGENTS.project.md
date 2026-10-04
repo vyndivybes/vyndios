@@ -8,9 +8,15 @@ Before auditing, simplifying, implementing, verifying, or deploying business-sys
 
 `docs/VYNDI-BUSINESS-OPERATOR.md`
 
-The repository skill entrypoint is:
+The repository business-operator skill entrypoint is:
 
 `.grok/skills/vyndi-business-operator/SKILL.md`
+
+The mandatory engineering-status verification skill is:
+
+`.grok/skills/vyndi-evidence-verification/SKILL.md`
+
+Read and apply the evidence-verification skill **before reporting status, before calling any gate passed/green/ready, before merge qualification, before deployment claims, and before production-completion claims**. It is the repository authority for evidence-backed engineering status language and stacked-PR qualification.
 
 Treat the operator document as the canonical repository-specific business operating standard. Platform/build instructions in the root `AGENTS.md` remain in force and must not be removed or weakened.
 
