@@ -2,9 +2,16 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, AlertTriangle, GitBranch, ShieldCheck } from "lucide-react";
 import { Kpi, Panel } from "@/components/kpi";
 import { getGovernedIntelligence } from "@/lib/intelligence-data";
+import { getReadinessIntelligenceState } from "@/lib/readiness-authority";
 
 export const Route = createFileRoute("/command/intelligence")({
-  loader: async () => getGovernedIntelligence(),
+  loader: async () => {
+    const [data, readiness] = await Promise.all([
+      getGovernedIntelligence(),
+      getReadinessIntelligenceState(),
+    ]);
+    return { data, readiness };
+  },
   component: Intelligence,
 });
 
@@ -13,7 +20,8 @@ const money = (value: number) => `₹${number(value)} lakh`;
 const severityTone = (severity: string) => severity === "critical" || severity === "high" ? "text-danger" : "text-warn";
 
 function Intelligence() {
-  const data = Route.useLoaderData();
+  const { data, readiness } = Route.useLoaderData();
+  const readinessPct = (value: number | null) => value == null ? "Not rated" : `${number(value)}%`;
   return <div className="space-y-6">
     <header className="flex flex-col gap-4 border-b border-border pb-6 lg:flex-row lg:items-end lg:justify-between">
       <div>
@@ -23,6 +31,31 @@ function Intelligence() {
       </div>
       <Link to="/command/ibpe-operating-workspace" className="text-sm font-semibold text-accent hover:text-fg">IBPE Workspace <ArrowRight className="ml-1 inline size-4" /></Link>
     </header>
+
+    <section className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <Kpi label="Program readiness" value={readinessPct(readiness.assessment.taskReadinessPct)} hint={`${readiness.assessment.dispositionedTaskCount}/${readiness.assessment.requiredTaskCount} governed tasks dispositioned`} />
+        <Kpi label="Evidence completeness" value={readinessPct(readiness.assessment.evidenceCompletenessPct)} hint={`${readiness.assessment.sufficientEvidenceCount}/${readiness.assessment.applicableEvidenceCount} required evidence sufficient`} tone={readiness.assessment.evidenceCompletenessPct === 100 ? "ok" : "warn"} />
+        <Kpi label="Evidence confidence" value={readinessPct(readiness.assessment.evidenceConfidencePct)} hint={`Rated coverage ${readinessPct(readiness.assessment.evidenceConfidenceCoveragePct)}`} tone={readiness.assessment.evidenceConfidencePct == null ? "warn" : "ok"} />
+        <Kpi label="Active risks" value={String(readiness.assessment.activeRiskCount)} hint={readiness.assessment.highestRiskExposureScore == null ? "Exposure unrated" : `Highest governed exposure ${readiness.assessment.highestRiskExposureScore}/9`} tone={readiness.assessment.activeRiskCount ? "warn" : "ok"} />
+        <Kpi label="Configuration blockers" value={String(readiness.assessment.configurationBlockers)} hint="VEDM authority graph" tone={readiness.assessment.configurationBlockers ? "danger" : "ok"} />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+        <Panel title="Readiness by domain" kicker="Task completion only · no composite weighting">
+          {Object.keys(readiness.assessment.domainReadiness).length ? <div className="grid gap-2 sm:grid-cols-2">{Object.entries(readiness.assessment.domainReadiness).map(([domain, item]) => <div key={domain} className="rounded-lg border border-border p-3"><div className="flex items-center justify-between gap-3"><span className="text-xs font-semibold uppercase text-fg">{domain}</span><span className="text-sm font-semibold text-accent">{readinessPct(item.readinessPct)}</span></div><p className="mt-1 text-[10px] text-muted">{item.dispositionedTasks}/{item.requiredTasks} governed tasks dispositioned</p></div>)}</div> : <p className="text-sm text-muted">No governed program tasks entered yet. Program readiness remains unrated rather than inferred.</p>}
+        </Panel>
+        <Panel title="VPRI governance boundary" kicker="Readiness · Confidence · Risk remain separate">
+          <p className="text-sm leading-6 text-muted">{readiness.assessment.overallReadinessReason}</p>
+          <p className="mt-3 text-xs text-subtle">Composite VPRI: <strong className="text-warn">WITHHELD</strong>. A single percentage will only be activated after controlled weights exist for the agreed maturity dimensions.</p>
+          <div className="mt-4 flex flex-wrap gap-3 text-xs font-semibold text-accent"><Link to="/command/planning">Program & Gate Plan →</Link><Link to="/command/risk">Risk Engine →</Link><Link to="/command/engineering">Engineering Authority →</Link></div>
+        </Panel>
+      </div>
+
+      <Panel title="Controlled engineering evidence" kicker={`VEDM ${readiness.source.vedmCommit.slice(0,8)} · required release evidence only`}>
+        {readiness.vedmEvidence.length ? <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-xs"><thead className="border-b border-border uppercase tracking-wider text-subtle"><tr><th className="px-3 py-2">Evidence</th><th className="px-3 py-2">Domain</th><th className="px-3 py-2">State</th><th className="px-3 py-2">Confidence</th><th className="px-3 py-2">Source</th></tr></thead><tbody>{readiness.vedmEvidence.map((item) => <tr key={item.id} className="border-t border-border/70"><td className="px-3 py-3"><p className="font-semibold text-fg">{item.title}</p><p className="font-mono text-[10px] text-subtle">{item.id}</p></td><td className="px-3 py-3 text-muted">{item.domain}</td><td className={`px-3 py-3 font-semibold ${item.evidenceState === "sufficient" ? "text-green" : "text-warn"}`}>{item.evidenceState}</td><td className="px-3 py-3 text-muted">Not inferred</td><td className="max-w-sm break-words px-3 py-3 text-[10px] text-subtle">{item.sourceReference}</td></tr>)}</tbody></table></div> : <p className="text-sm text-muted">No controlled VEDM evidence nodes are currently in the required-release set.</p>}
+      </Panel>
+    </section>
 
     {!data.available ? <Panel title="Governed snapshot required" kicker="No values inferred">
       <p className="text-sm text-muted">{data.reason}</p>

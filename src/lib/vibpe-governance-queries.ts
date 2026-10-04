@@ -2,6 +2,7 @@ import type { Sql } from "@/lib/db";
 import { compileVedmAuthorityGraph, createVedmR3aSeed } from "@/lib/vedm-authority-graph";
 import { deriveVedmRisk } from "@/lib/vyndi-risk-model";
 import { buildProgramNetwork, type ProgramTaskInput } from "@/lib/program-planning-model";
+import { buildReadinessAssessment } from "@/lib/readiness-model";
 
 type ActiveActionRow = {
   id: string;
@@ -84,6 +85,11 @@ export function isRiskIntelligenceQuestion(question: string) {
 export function isProgramPlanningQuestion(question: string) {
   const q = question.toLowerCase();
   return /critical\s+path|program\s+plan|programme\s+plan|gate\s+dependenc|blocked\s+task|work\s+package|what.*delay.*(?:program|programme|release)|what.*block.*(?:program|programme|release)/.test(q);
+}
+
+export function isReadinessIntelligenceQuestion(question: string) {
+  const q = question.toLowerCase();
+  return /product\s+readiness|program\s+readiness|programme\s+readiness|evidence\s+confidence|readiness\s+by\s+domain|\bvpri\b/.test(q);
 }
 
 async function traceabilityExceptionAnswer(sql: Sql) {
@@ -467,6 +473,82 @@ async function programPlanningAnswer(sql: Sql) {
   ].join("\n\n");
 }
 
+async function readinessIntelligenceAnswer(sql: Sql) {
+  const [tasks, evidence, risks] = await Promise.all([
+    sql.query<Record<string, unknown>>(
+      `select id,domain,status from vyndi_program_tasks
+        where program_id='VYNDI-MASTER-PROGRAM' order by id`,
+    ),
+    sql.query<Record<string, unknown>>(
+      `select id,domain,evidence_state,confidence,required from vyndi_readiness_evidence
+        where program_id='VYNDI-MASTER-PROGRAM' order by domain,id`,
+    ),
+    sql.query<Record<string, unknown>>(
+      `select id,exposure_score,status from vyndi_risk_intelligence
+        where status<>'closed' order by exposure_score desc,id`,
+    ),
+  ]);
+
+  const graph = compileVedmAuthorityGraph(createVedmR3aSeed(), new Date().toISOString().slice(0,10));
+  const requiredEvidenceIds = new Set(
+    [...graph.nodeById.values()]
+      .filter((node) => node.kind === "release_gate")
+      .flatMap((node) => node.requiredEvidenceIds ?? []),
+  );
+  const vedmEvidence = [...graph.nodeById.values()]
+    .filter((node) => node.kind === "evidence" && requiredEvidenceIds.has(node.id))
+    .map((node) => ({
+      id: node.id,
+      domain: node.domain,
+      state: node.evidenceState === "sufficient" ? "sufficient" as const
+        : node.evidenceState === "not_applicable" ? "not_applicable" as const
+          : "insufficient" as const,
+      confidence: null,
+      required: true,
+    }));
+  const configurationBlockers = graph.issues.filter(
+    (issue) => classifyVedmIssueDomain(issue.code) === "configuration" && issue.severity !== "warning",
+  ).length;
+
+  const assessment = buildReadinessAssessment({
+    tasks: tasks.map((row) => ({
+      id: clean(row.id),
+      domain: clean(row.domain) || "program",
+      status: clean(row.status),
+      readinessRequired: true,
+    })),
+    evidence: [
+      ...evidence.map((row) => ({
+        id: clean(row.id),
+        domain: clean(row.domain),
+        state: clean(row.evidence_state) as "sufficient"|"insufficient"|"unrated"|"not_applicable",
+        confidence: row.confidence == null ? null : n(row.confidence),
+        required: Boolean(row.required),
+      })),
+      ...vedmEvidence,
+    ],
+    activeRisks: risks.map((row) => ({
+      id: clean(row.id),
+      exposureScore: row.exposure_score == null ? null : n(row.exposure_score),
+      status: clean(row.status),
+    })),
+    configurationBlockers,
+  });
+
+  const pct = (value: number | null) => value == null ? "unrated" : `${value.toFixed(1)}%`;
+  const domains = Object.entries(assessment.domainReadiness)
+    .map(([domain, item]) => `${domain} ${pct(item.readinessPct)} (${item.dispositionedTasks}/${item.requiredTasks})`);
+
+  return [
+    `Program readiness: ${pct(assessment.taskReadinessPct)} — ${assessment.dispositionedTaskCount}/${assessment.requiredTaskCount} governed tasks dispositioned.`,
+    `Evidence completeness: ${pct(assessment.evidenceCompletenessPct)} — ${assessment.sufficientEvidenceCount}/${assessment.applicableEvidenceCount} required evidence items sufficient.`,
+    `Evidence confidence: ${pct(assessment.evidenceConfidencePct)} with rated coverage ${pct(assessment.evidenceConfidenceCoveragePct)}. Missing confidence is left unrated, not inferred.`,
+    `Risk: ${assessment.activeRiskCount} active canonical risks; highest governed exposure ${assessment.highestRiskExposureScore ?? "unrated"}/9; configuration blockers ${assessment.configurationBlockers}.`,
+    `Domain readiness: ${domains.length ? domains.join("; ") : "no governed program tasks entered"}.`,
+    `Composite VPRI: WITHHELD. ${assessment.overallReadinessReason}`,
+  ].join("\n\n");
+}
+
 async function riskIntelligenceAnswer(sql: Sql) {
   const risks = await sql.query<Record<string, unknown>>(`
     select id,risk,domain,likelihood,impact,status,mitigation,owner,due_on,
@@ -507,5 +589,6 @@ export async function tryGovernanceDataAnswer(sql: Sql, question: string) {
   if (isOverallRagHealthQuestion(question)) return overallRagHealthAnswer(sql);
   if (isRiskIntelligenceQuestion(question)) return riskIntelligenceAnswer(sql);
   if (isProgramPlanningQuestion(question)) return programPlanningAnswer(sql);
+  if (isReadinessIntelligenceQuestion(question)) return readinessIntelligenceAnswer(sql);
   return undefined;
 }
