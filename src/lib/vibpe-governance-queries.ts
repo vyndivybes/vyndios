@@ -4,6 +4,7 @@ import { deriveVedmRisk } from "@/lib/vyndi-risk-model";
 import { buildProgramNetwork, type ProgramTaskInput } from "@/lib/program-planning-model";
 import { buildReadinessAssessment } from "@/lib/readiness-model";
 import { analyzeEngineeringImpact } from "@/lib/impact-propagation-model";
+import { buildProgramForecast, type ForecastTask } from "@/lib/forecast-model";
 
 type ActiveActionRow = {
   id: string;
@@ -96,6 +97,11 @@ export function isReadinessIntelligenceQuestion(question: string) {
 export function isEngineeringImpactQuestion(question: string) {
   const q = question.toLowerCase();
   return /impact\s+analysis|downstream\s+impact|what\s+happens\s+if|what.*(?:affected|invalidated|stale)|which.*(?:evidence|gate).*affected/.test(q);
+}
+
+export function isProgramForecastQuestion(question: string) {
+  const q = question.toLowerCase();
+  return /schedule\s+forecast|program\s+forecast|programme\s+forecast|cost\s+forecast|\bp50\b|\bp80\b|\bp95\b/.test(q);
 }
 
 async function traceabilityExceptionAnswer(sql: Sql) {
@@ -479,6 +485,61 @@ async function programPlanningAnswer(sql: Sql) {
   ].join("\n\n");
 }
 
+async function programForecastAnswer(sql: Sql) {
+  const latest=await sql.query<Record<string,unknown>>(
+    `select id,method,result_json,source_reference,created_at
+       from vyndi_program_forecast_runs
+      where program_id='VYNDI-MASTER-PROGRAM'
+      order by created_at desc,id desc limit 1`,
+  );
+  if(latest[0]){
+    const result=latest[0].result_json as ReturnType<typeof buildProgramForecast>;
+    const schedule=result.schedule.available
+      ? `P50 ${result.schedule.p50Days}d · P80 ${result.schedule.p80Days}d · P95 ${result.schedule.p95Days}d; expected critical path ${result.schedule.criticalPath.join(" → ")}.`
+      : `WITHHELD — schedule coverage ${result.schedule.coveragePct}% (${result.schedule.reason})`;
+    const cost=result.cost.available
+      ? `P50 ₹${result.cost.p50Lakh}L · P80 ₹${result.cost.p80Lakh}L · P95 ₹${result.cost.p95Lakh}L.`
+      : `WITHHELD — cost coverage ${result.cost.coveragePct}% (${result.cost.reason})`;
+    return [
+      `Latest governed Program Forecast: ${clean(latest[0].id)} · ${clean(latest[0].method)} · source ${clean(latest[0].source_reference)}.`,
+      `Schedule: ${schedule}`,
+      `Cost: ${cost}`,
+      "Method boundary: PERT-normal approximation only. Critical-path switching and task/cost correlation are not modeled; these quantiles are planning evidence, not promised dates or approved budgets. Monte Carlo remains a later governed engine."
+    ].join("\n\n");
+  }
+
+  const [tasks,deps]=await Promise.all([
+    sql.query<Record<string,unknown>>(
+      `select id,optimistic_days,most_likely_days,pessimistic_days,cost_forecast_required,
+              cost_optimistic_lakh,cost_most_likely_lakh,cost_pessimistic_lakh
+         from vyndi_program_tasks where program_id='VYNDI-MASTER-PROGRAM' order by id`,
+    ),
+    sql.query<Record<string,unknown>>(
+      `select predecessor_id,successor_id,lag_days
+         from vyndi_program_dependencies where program_id='VYNDI-MASTER-PROGRAM'
+         order by predecessor_id,successor_id`,
+    ),
+  ]);
+  const live=buildProgramForecast({
+    tasks:tasks.map((row)=>({
+      id:clean(row.id),
+      optimisticDays:row.optimistic_days==null?null:n(row.optimistic_days),
+      mostLikelyDays:row.most_likely_days==null?null:n(row.most_likely_days),
+      pessimisticDays:row.pessimistic_days==null?null:n(row.pessimistic_days),
+      costForecastRequired:Boolean(row.cost_forecast_required),
+      costOptimisticLakh:row.cost_optimistic_lakh==null?null:n(row.cost_optimistic_lakh),
+      costMostLikelyLakh:row.cost_most_likely_lakh==null?null:n(row.cost_most_likely_lakh),
+      costPessimisticLakh:row.cost_pessimistic_lakh==null?null:n(row.cost_pessimistic_lakh),
+    })) as ForecastTask[],
+    dependencies:deps.map((row)=>({
+      predecessorId:clean(row.predecessor_id),
+      successorId:clean(row.successor_id),
+      lagDays:n(row.lag_days),
+    })),
+  });
+  return `No governed Program Forecast run has been captured. Current input coverage is schedule ${live.schedule.coveragePct}% and cost ${live.cost.coveragePct}%. VIBPE withholds P50/P80/P95 until an authorised forecast snapshot is captured from Planning.`;
+}
+
 async function engineeringImpactAnswer(sql: Sql, question: string) {
   const graph=compileVedmAuthorityGraph(createVedmR3aSeed(),new Date().toISOString().slice(0,10));
   const q=question.toLowerCase();
@@ -637,5 +698,6 @@ export async function tryGovernanceDataAnswer(sql: Sql, question: string) {
   if (isProgramPlanningQuestion(question)) return programPlanningAnswer(sql);
   if (isReadinessIntelligenceQuestion(question)) return readinessIntelligenceAnswer(sql);
   if (isEngineeringImpactQuestion(question)) return engineeringImpactAnswer(sql, question);
+  if (isProgramForecastQuestion(question)) return programForecastAnswer(sql);
   return undefined;
 }

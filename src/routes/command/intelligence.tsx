@@ -3,14 +3,16 @@ import { ArrowRight, AlertTriangle, GitBranch, ShieldCheck } from "lucide-react"
 import { Kpi, Panel } from "@/components/kpi";
 import { getGovernedIntelligence } from "@/lib/intelligence-data";
 import { getReadinessIntelligenceState } from "@/lib/readiness-authority";
+import { getProgramForecastState } from "@/lib/forecast-authority";
 
 export const Route = createFileRoute("/command/intelligence")({
   loader: async () => {
-    const [data, readiness] = await Promise.all([
+    const [data, readiness, forecast] = await Promise.all([
       getGovernedIntelligence(),
       getReadinessIntelligenceState(),
+      getProgramForecastState(),
     ]);
-    return { data, readiness };
+    return { data, readiness, forecast };
   },
   component: Intelligence,
 });
@@ -20,7 +22,7 @@ const money = (value: number) => `₹${number(value)} lakh`;
 const severityTone = (severity: string) => severity === "critical" || severity === "high" ? "text-danger" : "text-warn";
 
 function Intelligence() {
-  const { data, readiness } = Route.useLoaderData();
+  const { data, readiness, forecast } = Route.useLoaderData();
   const readinessPct = (value: number | null) => value == null ? "Not rated" : `${number(value)}%`;
   return <div className="space-y-6">
     <header className="flex flex-col gap-4 border-b border-border pb-6 lg:flex-row lg:items-end lg:justify-between">
@@ -56,6 +58,21 @@ function Intelligence() {
         {readiness.vedmEvidence.length ? <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-xs"><thead className="border-b border-border uppercase tracking-wider text-subtle"><tr><th className="px-3 py-2">Evidence</th><th className="px-3 py-2">Domain</th><th className="px-3 py-2">State</th><th className="px-3 py-2">Confidence</th><th className="px-3 py-2">Source</th></tr></thead><tbody>{readiness.vedmEvidence.map((item) => <tr key={item.id} className="border-t border-border/70"><td className="px-3 py-3"><p className="font-semibold text-fg">{item.title}</p><p className="font-mono text-[10px] text-subtle">{item.id}</p></td><td className="px-3 py-3 text-muted">{item.domain}</td><td className={`px-3 py-3 font-semibold ${item.evidenceState === "sufficient" ? "text-green" : "text-warn"}`}>{item.evidenceState}</td><td className="px-3 py-3 text-muted">Not inferred</td><td className="max-w-sm break-words px-3 py-3 text-[10px] text-subtle">{item.sourceReference}</td></tr>)}</tbody></table></div> : <p className="text-sm text-muted">No controlled VEDM evidence nodes are currently in the required-release set.</p>}
       </Panel>
     </section>
+
+    <Panel title="Program forecast" kicker={forecast.latest ? `Captured ${forecast.latest.method}` : "No governed forecast run captured"}>
+      {forecast.latest ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+        <Kpi label="Schedule P50" value={forecast.latest.result.schedule.p50Days == null ? "WITHHELD" : `${forecast.latest.result.schedule.p50Days} d`} hint="From program start"/>
+        <Kpi label="Schedule P80" value={forecast.latest.result.schedule.p80Days == null ? "WITHHELD" : `${forecast.latest.result.schedule.p80Days} d`} hint="Planning quantile"/>
+        <Kpi label="Schedule P95" value={forecast.latest.result.schedule.p95Days == null ? "WITHHELD" : `${forecast.latest.result.schedule.p95Days} d`} hint="Planning quantile"/>
+        <Kpi label="Cost P50" value={forecast.latest.result.cost.p50Lakh == null ? "WITHHELD" : money(forecast.latest.result.cost.p50Lakh)} hint="Governed cost inputs"/>
+        <Kpi label="Cost P80" value={forecast.latest.result.cost.p80Lakh == null ? "WITHHELD" : money(forecast.latest.result.cost.p80Lakh)} hint="Planning quantile"/>
+        <Kpi label="Cost P95" value={forecast.latest.result.cost.p95Lakh == null ? "WITHHELD" : money(forecast.latest.result.cost.p95Lakh)} hint="Planning quantile"/>
+        <p className="sm:col-span-2 xl:col-span-6 text-xs text-muted">Source {forecast.latest.sourceReference} · captured {forecast.latest.createdAt}. PERT-normal approximation only; critical-path switching and correlation are not modeled. Monte Carlo remains a later governed engine.</p>
+      </div> : <div className="text-sm text-muted">
+        <p>Schedule coverage {number(forecast.live.schedule.coveragePct)}% · cost coverage {number(forecast.live.cost.coveragePct)}%. Quantiles remain withheld until a governed forecast run is captured from complete three-point inputs.</p>
+        <Link to="/command/planning" className="mt-3 inline-block text-xs font-semibold text-accent">Open Program Forecast →</Link>
+      </div>}
+    </Panel>
 
     {!data.available ? <Panel title="Governed snapshot required" kicker="No values inferred">
       <p className="text-sm text-muted">{data.reason}</p>
