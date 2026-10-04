@@ -10,6 +10,7 @@ import { buildAssetMaintenanceIntelligence } from "@/lib/asset-maintenance-model
 import { buildEnterpriseDigitalThreadFromSql } from "@/lib/enterprise-digital-thread-authority";
 import { buildForecastLearningFromSql } from "@/lib/forecast-learning-authority";
 import { buildEngineeringChangeControlFromSql } from "@/lib/engineering-change-control-authority";
+import { buildEngineeringPdmStateFromSql } from "@/lib/engineering-pdm-authority";
 
 type ActiveActionRow = {
   id: string;
@@ -97,6 +98,11 @@ export function isProgramPlanningQuestion(question: string) {
 export function isReadinessIntelligenceQuestion(question: string) {
   const q = question.toLowerCase();
   return /product\s+readiness|program\s+readiness|programme\s+readiness|evidence\s+confidence|readiness\s+by\s+domain|\bvpri\b/.test(q);
+}
+
+export function isEngineeringPdmQuestion(question: string) {
+  const q = question.toLowerCase();
+  return /engineering\s+pdm|controlled\s+document|document\s+revision|document\s+checksum|sha-?256|document.*where[-\s]used|where[-\s]used.*document|configuration\s+manifest|released\s+manifest|superseded\s+document/.test(q);
 }
 
 export function isEngineeringChangeControlQuestion(question: string) {
@@ -791,6 +797,44 @@ async function programForecastAnswer(sql: Sql) {
   return `No governed Program Forecast run has been captured. Current input coverage is schedule ${live.schedule.coveragePct}% and cost ${live.cost.coveragePct}%. VIBPE withholds P50/P80/P95 until an authorised forecast snapshot is captured from Planning.`;
 }
 
+async function engineeringPdmAnswer(sql: Sql, question: string) {
+  const state=await buildEngineeringPdmStateFromSql(sql);
+  const q=question.toLowerCase();
+  const selected=state.revisions.find((row)=>
+    q.includes(row.id.toLowerCase()) ||
+    q.includes(row.documentNumber.toLowerCase()) ||
+    q.includes(row.contentSha256.toLowerCase())
+  );
+
+  if(!selected){
+    const released=state.revisions.filter((row)=>row.status==="released").slice(0,10);
+    return [
+      "Engineering PDM: "+state.summary.documentCount+" controlled document master(s), "+state.summary.revisionCount+" revision(s), "+state.summary.releasedRevisionCount+" current released revision(s), "+state.summary.supersededRevisionCount+" superseded revision(s), "+state.summary.manifestCount+" released configuration manifest(s).",
+      released.length
+        ? "Current released revisions: "+released.map((row)=>row.documentNumber+" "+row.revisionCode+" · SHA-256 "+row.contentSha256).join(" | ")
+        : "No released controlled document revision exists yet.",
+      state.manifests.length
+        ? "Latest configuration manifest: "+state.manifests[0]!.id+" · baseline "+state.manifests[0]!.baselineId+" · "+state.manifests[0]!.documentCount+" document(s) · fingerprint "+state.manifests[0]!.configurationFingerprint+"."
+        : "No released configuration manifest is frozen yet.",
+      "Name a document number, revision ID or SHA-256 for exact lifecycle and where-used detail.",
+      "Authority boundary: VYNDI governs document identity, revision, checksum and relationships; binary storage remains at the recorded source URI."
+    ].join("\n\n");
+  }
+
+  const whereUsed=selected.whereUsed.length
+    ? selected.whereUsed.map((item)=>item.relation+" · "+item.targetType+" · "+item.targetId).join(" | ")
+    : "none represented";
+  return [
+    "Controlled document "+selected.documentNumber+" revision "+selected.revisionCode+" ["+selected.status+"] · revision ID "+selected.id+".",
+    "SHA-256: "+selected.contentSha256+". File: "+selected.fileName+" · "+selected.mediaType+" · "+selected.fileSizeBytes+" bytes.",
+    "Source URI: "+selected.sourceUri+". Evidence reference: "+selected.sourceRef+".",
+    "Where-used: "+whereUsed+".",
+    selected.supersedesRevisionId ? "Supersedes: "+selected.supersedesRevisionId+"." : "Supersedes: none represented.",
+    selected.supersededByRevisionId ? "Superseded by: "+selected.supersededByRevisionId+"." : "Superseded by: none represented.",
+    "Authority boundary: VIBPE is read-only. It does not approve/release a revision, alter SHA-256 evidence, change where-used links or freeze a configuration manifest."
+  ].join("\n\n");
+}
+
 async function engineeringChangeControlAnswer(sql: Sql, question: string) {
   const state=await buildEngineeringChangeControlFromSql(sql);
   const q=question.toLowerCase();
@@ -1135,6 +1179,7 @@ export async function tryGovernanceDataAnswer(sql: Sql, question: string) {
   if (isEngineeringScenarioQuestion(question)) return engineeringScenarioAnswer(sql);
   if (isManufacturingQualityIntelligenceQuestion(question)) return manufacturingQualityIntelligenceAnswer(sql);
   if (isMonteCarloQuestion(question)) return monteCarloAnswer(sql);
+  if (isEngineeringPdmQuestion(question)) return engineeringPdmAnswer(sql, question);
   if (isEngineeringChangeControlQuestion(question)) return engineeringChangeControlAnswer(sql, question);
   if (isEngineeringImpactQuestion(question)) return engineeringImpactAnswer(sql, question);
   if (isProgramForecastQuestion(question)) return programForecastAnswer(sql);

@@ -2,9 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Kpi, Panel } from "@/components/kpi";
 import { EngineeringImpactPanel } from "@/components/engineering-impact-panel";
 import { EngineeringChangeControlPanel } from "@/components/engineering-change-control-panel";
+import { EngineeringPdmPanel } from "@/components/engineering-pdm-panel";
 import { listEngineeringAuthority } from "@/lib/engineering-authority";
 import { getEngineeringImpactState } from "@/lib/impact-propagation-authority";
 import { getEngineeringChangeControlState } from "@/lib/engineering-change-control-authority";
+import { getEngineeringPdmState } from "@/lib/engineering-pdm-authority";
 
 type Row = Record<string, unknown>;
 
@@ -46,14 +48,16 @@ function changeView(row: Row): Row {
 export const Route = createFileRoute("/command/engineering")({
   ssr: "data-only",
   loader: async () => {
-    const [data, impact, changeControl] = await Promise.all([
+    const [data, impact, changeControl, pdm] = await Promise.all([
       listEngineeringAuthority(),
       getEngineeringImpactState(),
       getEngineeringChangeControlState(),
+      getEngineeringPdmState(),
     ]);
     return {
       impact,
       changeControl,
+      pdm,
       vedmAuthority: data.vedmAuthority,
       baselines: (Array.isArray(data.baselines) ? data.baselines : []).map((row) => baselineView(row as Row)),
       changes: (Array.isArray(data.changes) ? data.changes : []).map((row) => changeView(row as Row)),
@@ -224,6 +228,8 @@ function Engineering() {
       <EngineeringImpactPanel state={data.impact} />
 
       <EngineeringChangeControlPanel state={data.changeControl} />
+
+      <EngineeringPdmPanel state={data.pdm} />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi label="Baselines" value={String(baselines.length)} hint="Canonical records" />
