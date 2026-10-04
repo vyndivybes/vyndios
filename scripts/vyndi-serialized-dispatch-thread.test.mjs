@@ -80,3 +80,34 @@ test("Enterprise Digital Thread consumes exact shipment allocations and withhold
 test("aggregate test gate includes serialized dispatch closure",()=>{
   assert.match(pkg,/vyndi-serialized-dispatch-thread\.test\.mjs/);
 });
+
+
+test("dispatch register preserves the legacy CREATE OR REPLACE VIEW column contract and appends new serialization fields",()=>{
+  const viewStart=migration.indexOf("create or replace view vyndi_dispatch_register as");
+  const viewEnd=migration.indexOf("comment on view vyndi_dispatch_register",viewStart);
+  const view=migration.slice(viewStart,viewEnd);
+  const legacy=[
+    "s.id as shipment_id",
+    "s.sales_order_id",
+    "o.revision as sales_order_revision",
+    "s.job_card_id",
+    "s.plan_month",
+    "s.units",
+    "s.status",
+    "s.owner_workspace",
+    "s.source_reference",
+    "s.posted_by",
+    "s.posted_at",
+    "current_quality_release_count",
+    "i.id as invoice_id",
+    "i.status as invoice_status",
+    "i.amount_lakh as invoice_amount_lakh",
+  ];
+  let cursor=-1;
+  for(const token of legacy){
+    const next=view.indexOf(token,cursor+1);
+    assert.ok(next>cursor,`legacy dispatch view column order changed at ${token}`);
+    cursor=next;
+  }
+  assert.ok(view.indexOf("s.serial_allocation_required",cursor)>cursor,"new serialization columns must be appended after legacy columns");
+});

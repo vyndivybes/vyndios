@@ -382,8 +382,15 @@ select
   s.status,
   s.owner_workspace,
   s.source_reference,
-  s.serial_allocation_required,
+  s.posted_by,
+  s.posted_at,
   coalesce(q.current_quality_release_count,0)::int as current_quality_release_count,
+  i.id as invoice_id,
+  i.status as invoice_status,
+  i.amount_lakh as invoice_amount_lakh,
+  -- CREATE OR REPLACE VIEW in PostgreSQL requires existing columns to keep
+  -- their names and ordinal positions. Package M fields are append-only here.
+  s.serial_allocation_required,
   coalesce(a.allocated_serial_count,0)::int as allocated_serial_count,
   coalesce(a.current_released_serial_count,0)::int as current_released_serial_count,
   coalesce(a.serial_numbers,'') as serial_numbers,
@@ -395,10 +402,7 @@ select
   case
     when not s.serial_allocation_required then false
     else coalesce(a.current_released_serial_count,0)=s.units
-  end as release_coverage_complete,
-  i.id as invoice_id,
-  i.status as invoice_status,
-  i.amount_lakh as invoice_amount_lakh
+  end as release_coverage_complete
 from vyndi_shipments s
 join vyndi_sales_orders o on o.id=s.sales_order_id
 left join lateral (
