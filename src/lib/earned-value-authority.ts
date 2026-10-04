@@ -9,6 +9,20 @@ import { buildEarnedValueSnapshot, type EarnedValueTaskInput } from "@/lib/earne
 const PROGRAM_ID = "VYNDI-MASTER-PROGRAM";
 
 type Row = Record<string, unknown>;
+type SerializableScalar = string | number | boolean | null;
+type SerializableRow = Record<string, SerializableScalar>;
+
+function toSerializableRow(row: Row): SerializableRow {
+  const entries = Object.entries(row).map(([key, value]) => {
+    if (value == null) return [key, null] as const;
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      return [key, value] as const;
+    }
+    if (value instanceof Date) return [key, value.toISOString()] as const;
+    return [key, JSON.stringify(value)] as const;
+  });
+  return Object.fromEntries(entries) as SerializableRow;
+}
 
 async function requireView() {
   const role = await getCommandRole();
@@ -59,7 +73,7 @@ async function loadBasis(asOfDate: string) {
         result: latestRows[0].result_json as ReturnType<typeof buildEarnedValueSnapshot>,
       }
     : null;
-  return { sql, taskRows: [...taskRows], tasks, live, latest };
+  return { sql, taskRows: taskRows.map(toSerializableRow), tasks, live, latest };
 }
 
 export const getEarnedValueState = createServerFn({ method: "GET" }).handler(async () => {

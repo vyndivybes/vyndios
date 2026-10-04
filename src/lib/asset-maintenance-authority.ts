@@ -8,6 +8,20 @@ import { buildAssetMaintenanceIntelligence } from "@/lib/asset-maintenance-model
 
 type Sql = Awaited<ReturnType<typeof getSql>>;
 type Row = Record<string, unknown>;
+type SerializableScalar = string | number | boolean | null;
+type SerializableRow = Record<string, SerializableScalar>;
+
+function toSerializableRow(row: Row): SerializableRow {
+  const entries = Object.entries(row).map(([key, value]) => {
+    if (value == null) return [key, null] as const;
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      return [key, value] as const;
+    }
+    if (value instanceof Date) return [key, value.toISOString()] as const;
+    return [key, JSON.stringify(value)] as const;
+  });
+  return Object.fromEntries(entries) as SerializableRow;
+}
 
 async function requireView() {
   const role = await getCommandRole();
@@ -145,7 +159,7 @@ async function loadState() {
     })),
   });
 
-  return { sql, assets: [...assets], plans: [...plans], workOrders: [...workOrders], parts: [...parts], intelligence };
+  return { sql, assets: assets.map(toSerializableRow), plans: plans.map(toSerializableRow), workOrders: workOrders.map(toSerializableRow), parts: parts.map(toSerializableRow), intelligence };
 }
 
 export const getAssetMaintenanceState = createServerFn({ method: "GET" }).handler(async () => {

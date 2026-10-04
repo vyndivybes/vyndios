@@ -56,3 +56,10 @@ test("aggregate repository test command includes Package K static and model test
   assert.match(pkg,/vyndi-earned-value-intelligence\.test\.mjs/);
   assert.match(pkg,/earned-value-model\.test\.ts/);
 });
+
+
+test("Earned Value GET state returns serializable task rows instead of Record<string, unknown>",()=>{
+  assert.match(authority,/type SerializableRow/);
+  assert.match(authority,/toSerializableRow/);
+  assert.match(authority,/taskRows: taskRows\.map\(toSerializableRow\)/);
+});

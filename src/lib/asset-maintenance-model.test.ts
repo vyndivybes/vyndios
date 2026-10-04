@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildAssetMaintenanceIntelligence } from "./asset-maintenance-model.ts";
+import { buildAssetMaintenanceIntelligence, type AssetMaintenanceAsset } from "./asset-maintenance-model.ts";
 
-const asset=(id:string,overrides:Record<string,unknown>={})=>({
+const asset=(id:string,overrides:Partial<AssetMaintenanceAsset>={}):AssetMaintenanceAsset=>({
   id,
   assetTag:id,
   equipmentType:"test-rig",

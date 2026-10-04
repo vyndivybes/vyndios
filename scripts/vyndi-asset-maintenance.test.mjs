@@ -73,3 +73,14 @@ test("aggregate test gate includes Package L model and integration tests",()=>{
   assert.match(pkg,/vyndi-asset-maintenance\.test\.mjs/);
   assert.match(pkg,/asset-maintenance-model\.test\.ts/);
 });
+
+
+test("Asset maintenance GET state crosses the server boundary with JSON-serializable rows",()=>{
+  assert.match(authority,/type SerializableRow/);
+  assert.match(authority,/toSerializableRow/);
+  assert.match(authority,/assets: .*toSerializableRow/);
+  assert.match(authority,/plans: .*toSerializableRow/);
+  assert.match(authority,/workOrders: .*toSerializableRow/);
+  assert.match(authority,/parts: .*toSerializableRow/);
+  assert.doesNotMatch(authority,/return \{ sql, assets: \[\.\.\.assets\], plans: \[\.\.\.plans\], workOrders: \[\.\.\.workOrders\], parts: \[\.\.\.parts\]/);
+});
