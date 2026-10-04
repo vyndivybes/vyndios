@@ -13,7 +13,7 @@ const viewports = [
   { name: "desktop-1180", width: 1180, height: 820 },
   { name: "mobile-390", width: 390, height: 844 },
 ];
-const routes = ["/command", "/command/intelligence", "/command/planning", "/command/engineering", "/command/risk", "/command/ibpe-operating-workspace/optimizer", "/command/ibpe-operating-workspace/release", "/command/sales", "/command/inventory", "/command/operations", "/command/financial-cockpit"];
+const routes = ["/command", "/command/intelligence", "/command/planning", "/command/engineering", "/command/scenarios", "/command/risk", "/command/ibpe-operating-workspace/optimizer", "/command/ibpe-operating-workspace/release", "/command/sales", "/command/inventory", "/command/operations", "/command/financial-cockpit"];
 const evidenceRoot = resolve(process.env.VYNDI_UX_EVIDENCE_DIR || "artifacts/operator-ux-hardening");
 await mkdir(evidenceRoot, { recursive: true });
 

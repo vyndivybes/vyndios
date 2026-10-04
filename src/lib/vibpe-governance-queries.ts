@@ -104,6 +104,11 @@ export function isProgramForecastQuestion(question: string) {
   return /schedule\s+forecast|program\s+forecast|programme\s+forecast|cost\s+forecast|\bp50\b|\bp80\b|\bp95\b/.test(q);
 }
 
+export function isEngineeringScenarioQuestion(question: string) {
+  const q = question.toLowerCase();
+  return /engineering\s+scenario|latest\s+engineering\s+scenario|scenario\s+(?:impact|delta).*engineering|engineering.*scenario\s+(?:impact|delta)/.test(q);
+}
+
 async function traceabilityExceptionAnswer(sql: Sql) {
   const rows = await sql.query<Record<string, unknown>>(`
     select c.id as job_card_id,
@@ -485,6 +490,44 @@ async function programPlanningAnswer(sql: Sql) {
   ].join("\n\n");
 }
 
+async function engineeringScenarioAnswer(sql: Sql) {
+  const rows=await sql.query<Record<string,unknown>>(
+    `select id,scenario_name,source_node_id,target_task_id,source_commit,
+            assumption_json,baseline_json,scenario_json,impact_json,
+            linked_program_tasks,linked_risks,source_reference,created_at
+       from vyndi_engineering_scenario_runs
+      order by created_at desc,id desc limit 1`,
+  );
+  const row=rows[0];
+  if(!row){
+    return "No governed Engineering Scenario has been captured yet. Use Scenario Analysis → Engineering Scenario Engine to select a controlled source node and capture advisory scenario evidence.";
+  }
+  const baseline=row.baseline_json as ReturnType<typeof buildProgramForecast>;
+  const scenario=row.scenario_json as ReturnType<typeof buildProgramForecast>;
+  const impact=row.impact_json as ReturnType<typeof analyzeEngineeringImpact>;
+  const scheduleDelta=
+    baseline.schedule.available&&scenario.schedule.available&&
+    baseline.schedule.p50Days!=null&&scenario.schedule.p50Days!=null
+      ? Math.round((scenario.schedule.p50Days-baseline.schedule.p50Days)*10)/10
+      : null;
+  const costDelta=
+    baseline.cost.available&&scenario.cost.available&&
+    baseline.cost.p50Lakh!=null&&scenario.cost.p50Lakh!=null
+      ? Math.round((scenario.cost.p50Lakh-baseline.cost.p50Lakh)*10)/10
+      : null;
+  const tasks=Array.isArray(row.linked_program_tasks)?row.linked_program_tasks as Record<string,unknown>[]:[];
+  const risks=Array.isArray(row.linked_risks)?row.linked_risks as Record<string,unknown>[]:[];
+
+  return [
+    `Latest Engineering Scenario: ${clean(row.scenario_name)} — source node ${clean(row.source_node_id)}${clean(row.target_task_id)?`, target task ${clean(row.target_task_id)}`:""}.`,
+    `Technical propagation: ${impact.affectedNodes.length} affected graph node(s), ${impact.evidenceSuspectCount} evidence item(s) suspect, ${impact.releaseGateReviewCount} release gate(s) requiring review.`,
+    `Schedule P50 delta: ${scheduleDelta==null?"WITHHELD":`${scheduleDelta>=0?"+":""}${scheduleDelta} days`}. Cost P50 delta: ${costDelta==null?"WITHHELD":`${costDelta>=0?"+":""}₹${costDelta}L`}.`,
+    `Linked program tasks: ${tasks.length?tasks.map((item)=>clean(item.id)).join(", "):"none"}. Linked active risks: ${risks.length?risks.map((item)=>clean(item.id)).join(", "):"none"}.`,
+    `Evidence: ${clean(row.id)} · VEDM ${clean(row.source_commit).slice(0,8)} · source ${clean(row.source_reference)}.`,
+    "Control rule: this is advisory scenario evidence. It does not mutate approved planning, engineering configuration, risk acceptance, budgets or transaction ledgers."
+  ].join("\n\n");
+}
+
 async function programForecastAnswer(sql: Sql) {
   const latest=await sql.query<Record<string,unknown>>(
     `select id,method,result_json,source_reference,created_at
@@ -697,6 +740,7 @@ export async function tryGovernanceDataAnswer(sql: Sql, question: string) {
   if (isRiskIntelligenceQuestion(question)) return riskIntelligenceAnswer(sql);
   if (isProgramPlanningQuestion(question)) return programPlanningAnswer(sql);
   if (isReadinessIntelligenceQuestion(question)) return readinessIntelligenceAnswer(sql);
+  if (isEngineeringScenarioQuestion(question)) return engineeringScenarioAnswer(sql);
   if (isEngineeringImpactQuestion(question)) return engineeringImpactAnswer(sql, question);
   if (isProgramForecastQuestion(question)) return programForecastAnswer(sql);
   return undefined;

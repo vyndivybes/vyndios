@@ -3,10 +3,15 @@ import { useMemo, useState } from "react";
 import { Activity, ArrowRight, Banknote, Boxes, Gauge, GitCompareArrows, Play, RefreshCcw, ShieldCheck, Sparkles, TimerReset, TrendingUp } from "lucide-react";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Kpi, Panel } from "@/components/kpi";
+import { EngineeringScenarioPanel } from "@/components/engineering-scenario-panel";
 import { VIBPE_COPILOT_NAME } from "@/lib/ibpe-brand";
 import { runIbpeScenario, type IbpeScenarioPacket, type IbpeScenarioRequest } from "@/lib/ibpe-scenario-lab";
+import { getEngineeringScenarioState } from "@/lib/engineering-scenario-authority";
 
-export const Route = createFileRoute("/command/scenarios")({ component: ScenarioStudio });
+export const Route = createFileRoute("/command/scenarios")({
+  loader: async () => getEngineeringScenarioState(),
+  component: ScenarioStudio,
+});
 
 const money = (value: number) => `₹${value.toFixed(1)}L`;
 const signedMoney = (value: number) => `${value >= 0 ? "+" : "−"}₹${Math.abs(value).toFixed(1)}L`;
@@ -54,6 +59,7 @@ function SliderField({ label, value, min, max, step, suffix, onChange, icon: Ico
 }
 
 function ScenarioStudio() {
+  const engineeringScenario = Route.useLoaderData();
   const [scenario, setScenario] = useState<IbpeScenarioRequest>(DEFAULT_SCENARIO);
   const [packet, setPacket] = useState<IbpeScenarioPacket | null>(null);
   const [history, setHistory] = useState<IbpeScenarioPacket[]>([]);
@@ -112,6 +118,8 @@ function ScenarioStudio() {
         <Link to="/command/finance-control" className="rounded-lg border border-border px-3 py-2 text-sm text-muted transition hover:border-accent/45 hover:text-fg">Budget vs Forecast vs Actual</Link>
       </div>
     </header>
+
+    <EngineeringScenarioPanel state={engineeringScenario} />
 
     <section>
       <div className="mb-3 flex items-center justify-between gap-4"><div><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-green">Starting points</p><h2 className="mt-1 font-display text-xl font-semibold text-fg">Fast scenario presets</h2></div><button type="button" onClick={() => setScenario(DEFAULT_SCENARIO)} className="inline-flex items-center gap-2 text-sm text-accent hover:text-fg"><RefreshCcw className="size-4" />Reset</button></div>
