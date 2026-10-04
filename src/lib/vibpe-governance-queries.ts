@@ -9,6 +9,7 @@ import { buildDecisionIntelligenceFromSql } from "@/lib/decision-intelligence-au
 import { buildAssetMaintenanceIntelligence } from "@/lib/asset-maintenance-model";
 import { buildEnterpriseDigitalThreadFromSql } from "@/lib/enterprise-digital-thread-authority";
 import { buildForecastLearningFromSql } from "@/lib/forecast-learning-authority";
+import { buildEngineeringChangeControlFromSql } from "@/lib/engineering-change-control-authority";
 
 type ActiveActionRow = {
   id: string;
@@ -96,6 +97,11 @@ export function isProgramPlanningQuestion(question: string) {
 export function isReadinessIntelligenceQuestion(question: string) {
   const q = question.toLowerCase();
   return /product\s+readiness|program\s+readiness|programme\s+readiness|evidence\s+confidence|readiness\s+by\s+domain|\bvpri\b/.test(q);
+}
+
+export function isEngineeringChangeControlQuestion(question: string) {
+  const q = question.toLowerCase();
+  return /\beco\b|\becn\b|engineering\s+change\s+order|engineering\s+change\s+notice|change\s+effectivity|engineering.*where[-\s]used|where[-\s]used.*(?:engineering|bom|sku)|ecr.*(?:implementation|effectivity|eco|ecn)/.test(q);
 }
 
 export function isEngineeringImpactQuestion(question: string) {
@@ -785,6 +791,53 @@ async function programForecastAnswer(sql: Sql) {
   return `No governed Program Forecast run has been captured. Current input coverage is schedule ${live.schedule.coveragePct}% and cost ${live.cost.coveragePct}%. VIBPE withholds P50/P80/P95 until an authorised forecast snapshot is captured from Planning.`;
 }
 
+async function engineeringChangeControlAnswer(sql: Sql, question: string) {
+  const state=await buildEngineeringChangeControlFromSql(sql);
+  const q=question.toLowerCase();
+  const selected=state.changeOrders.find((eco)=>{
+    if(q.includes(eco.id.toLowerCase())||q.includes(eco.ecrId.toLowerCase())) return true;
+    if(eco.notice&&(q.includes(eco.notice.id.toLowerCase())||q.includes(eco.notice.noticeNumber.toLowerCase()))) return true;
+    return eco.whereUsed.mappings.some((row)=>q.includes(clean(row.sku).toLowerCase()));
+  });
+
+  if(!selected){
+    const open=state.changeOrders.filter((eco)=>!["released","rejected"].includes(eco.status)).slice(0,8);
+    return [
+      "PLM change control: "+state.summary.ecoCount+" ECO(s), "+state.summary.openEcoCount+" open, "+state.summary.releasedEcnCount+" released ECN(s), "+state.summary.effectivityRuleCount+" governed effectivity rule(s).",
+      open.length
+        ? "Open ECOs: "+open.map((eco)=>eco.id+" ["+eco.status+"] · "+eco.ecrId+" → "+eco.targetRevisionCode).join(" | ")
+        : "No open ECO currently requires lifecycle action.",
+      "Where-used evidence currently references "+state.summary.impactedJobCardCount+" distinct non-cancelled Job Card(s) across represented ECR affected SKUs.",
+      "Name an ECO, ECN, ECR or affected SKU for exact effectivity, baseline comparison and where-used detail.",
+      "Authority boundary: ECR owns the requested change; ECO owns implementation/effectivity; ECN is the immutable implementation release. Baseline and BOM release remain separate authorities."
+    ].join("\n\n");
+  }
+
+  const effectivity=selected.effectivity.length
+    ? selected.effectivity.map((rule)=>rule.type==="date"
+        ? rule.type+" "+String(rule.effectiveFrom)+" → "+String(rule.effectiveTo??"open")
+        : rule.type+" "+String(rule.valueFrom??"")+" → "+String(rule.valueTo??"exact")).join("; ")
+    : "WITHHELD — no governed effectivity rule";
+  const comparison=selected.comparison;
+  const diff=comparison
+    ? "Baseline comparison: "+comparison.changedFields.length+" field change(s); BOM added "+comparison.addedBomLines.length+", removed "+comparison.removedBomLines.length+", quantity/unit changed "+comparison.changedBomLines.length+"."
+    : "Baseline comparison is unavailable because both source and target baseline evidence are not represented.";
+  const whereUsed=selected.whereUsed;
+  return [
+    "Engineering change "+selected.id+" ["+selected.status+"] implements "+selected.ecrId+" for "+selected.familyCode+(selected.variantId?" / "+selected.variantId:"")+" → target revision "+selected.targetRevisionCode+".",
+    "Effectivity: "+effectivity+".",
+    diff,
+    "Where-used: "+whereUsed.mappings.length+" BOM mapping reference(s), "+whereUsed.jobCards.length+" frozen/current Job Card mapping reference(s), "+whereUsed.purchaseOrders.length+" non-cancelled Purchase Order reference(s).",
+    whereUsed.jobCards.length
+      ? "Affected Job Cards: "+whereUsed.jobCards.slice(0,12).map((row)=>clean(row.job_card_id)+" ["+clean(row.job_card_status)+"] · "+clean(row.sku)+" · BOM "+(clean(row.bom_revision)||"unrecorded")).join(" | ")
+      : "No non-cancelled Job Card currently consumes the ECR affected SKUs.",
+    selected.notice
+      ? "ECN: "+selected.notice.noticeNumber+" released "+selected.notice.releasedAt+" · evidence "+selected.notice.sourceReference+"."
+      : "ECN: not released.",
+    "Authority boundary: VIBPE reports governed PLM evidence only. It does not approve an ECO, change effectivity, release a baseline/BOM, or issue an ECN."
+  ].join("\n\n");
+}
+
 async function engineeringImpactAnswer(sql: Sql, question: string) {
   const graph=compileVedmAuthorityGraph(createVedmR3aSeed(),new Date().toISOString().slice(0,10));
   const q=question.toLowerCase();
@@ -1082,6 +1135,7 @@ export async function tryGovernanceDataAnswer(sql: Sql, question: string) {
   if (isEngineeringScenarioQuestion(question)) return engineeringScenarioAnswer(sql);
   if (isManufacturingQualityIntelligenceQuestion(question)) return manufacturingQualityIntelligenceAnswer(sql);
   if (isMonteCarloQuestion(question)) return monteCarloAnswer(sql);
+  if (isEngineeringChangeControlQuestion(question)) return engineeringChangeControlAnswer(sql, question);
   if (isEngineeringImpactQuestion(question)) return engineeringImpactAnswer(sql, question);
   if (isProgramForecastQuestion(question)) return programForecastAnswer(sql);
   return undefined;
