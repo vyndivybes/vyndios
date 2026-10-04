@@ -45,8 +45,9 @@ test("aggregate test gate includes Hyperdrive schema parity regression",()=>{
 
 
 test("runtime Hyperdrive migrator uses a transaction-scoped lock per migration and rechecks the ledger",()=>{
-  assert.match(dbServer,/pg_advisory_lock/);
-  assert.match(dbServer,/for\(const migration of plan\.pending\)/);
+  assert.match(dbServer,/pg_advisory_xact_lock/);
+  assert.match(dbServer,/for\(;;\)/);
+  assert.match(dbServer,/plan\.pending\[0\]/);
   assert.match(dbServer,/await client\.query\("BEGIN"\)/);
   assert.match(dbServer,/insert into _migrations\(name\)/i);
   assert.match(dbServer,/await client\.query\("COMMIT"\)/);
