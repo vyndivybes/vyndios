@@ -47,7 +47,8 @@
     "test:r3:e": "node --experimental-strip-types --test src/lib/digital-product-thread.test.ts",
     "test:r3": "npm run test:r3:a && npm run test:r3:b && npm run test:r3:c && npm run test:r3:d && npm run test:r3:e && npm run test:r3:integration",
     "prebuild": "npm test && npm run typecheck",
-    "test:r3:integration": "node --test scripts/r3-bcde-integration.test.mjs"
+    "test:r3:integration": "node --test scripts/r3-bcde-integration.test.mjs",
+    "test:production:acceptance": "node scripts/final-production-acceptance.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
