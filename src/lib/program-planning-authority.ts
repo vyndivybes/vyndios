@@ -50,14 +50,56 @@ const taskInput = z.object({
   sourceReference: z.string().trim().min(1).max(500),
 });
 
-type TaskRow = Record<string, unknown>;
+type ProgramRow = {
+  id: string;
+  title: string;
+  description: string;
+  status: "draft" | "active" | "on_hold" | "closed";
+  source_reference: string;
+  record_revision: number;
+  updated_by: string;
+  updated_at: string | Date;
+};
+type TaskRow = {
+  id: string;
+  program_id: string;
+  title: string;
+  domain: string;
+  work_package: string;
+  owner: string | null;
+  status: ProgramTaskInput["status"];
+  duration_days: number;
+  planned_start: string | null;
+  planned_finish: string | null;
+  actual_start: string | null;
+  actual_finish: string | null;
+  gate_id: string | null;
+  required_inputs: string[];
+  required_evidence: string[];
+  risk_ids: string[];
+  estimated_effort_hours: number | string | null;
+  actual_effort_hours: number | string | null;
+  cost_lakh: number | string | null;
+  confidence: number | string | null;
+  technical_maturity: number | null;
+  source_reference: string;
+  record_revision: number;
+  updated_by: string;
+  updated_at: string | Date;
+};
 type DependencyRow = {
   predecessor_id: string;
   successor_id: string;
   lag_days: number | string;
+  source_reference: string;
+  created_by: string;
+  created_at: string | Date;
 };
 
-function networkFromRows(tasks: TaskRow[], dependencies: DependencyRow[]) {
+function networkFromRows(
+  tasks: TaskRow[],
+  dependencies: Pick<DependencyRow, "predecessor_id" | "successor_id" | "lag_days">[],
+) {
   const modelTasks: ProgramTaskInput[] = tasks.map((row) => ({
     id: String(row.id),
     title: String(row.title),
@@ -74,7 +116,7 @@ function networkFromRows(tasks: TaskRow[], dependencies: DependencyRow[]) {
 
 async function loadRows() {
   const sql = await getSql();
-  const programs = await sql<Record<string, unknown>>`
+  const programs = await sql<ProgramRow>`
     select * from vyndi_programs where id=${PROGRAM_ID} limit 1
   `;
   const tasks = await sql<TaskRow>`
