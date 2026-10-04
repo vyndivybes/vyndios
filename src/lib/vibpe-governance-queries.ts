@@ -8,6 +8,7 @@ import { buildProgramForecast, type ForecastTask } from "@/lib/forecast-model";
 import { buildDecisionIntelligenceFromSql } from "@/lib/decision-intelligence-authority";
 import { buildAssetMaintenanceIntelligence } from "@/lib/asset-maintenance-model";
 import { buildEnterpriseDigitalThreadFromSql } from "@/lib/enterprise-digital-thread-authority";
+import { buildForecastLearningFromSql } from "@/lib/forecast-learning-authority";
 
 type ActiveActionRow = {
   id: string;
@@ -105,6 +106,11 @@ export function isEngineeringImpactQuestion(question: string) {
 export function isProgramForecastQuestion(question: string) {
   const q = question.toLowerCase();
   return /schedule\s+forecast|program\s+forecast|programme\s+forecast|cost\s+forecast|\bp50\b|\bp80\b|\bp95\b/.test(q);
+}
+
+export function isForecastLearningQuestion(question: string) {
+  const q = question.toLowerCase();
+  return /forecast\s+(?:accuracy|learning|performance)|\bwape\b|forecast\s+bias|plan\s+attainment|forecast\s+attainment|forecast\s+value\s+added|\bfva\b/.test(q);
 }
 
 export function isEarnedValueQuestion(question: string) {
@@ -854,6 +860,28 @@ async function readinessIntelligenceAnswer(sql: Sql) {
   ].join("\n\n");
 }
 
+async function forecastLearningAnswer(sql: Sql) {
+  const result=await buildForecastLearningFromSql(sql);
+  const metric=(value:number|null)=>value==null?"WITHHELD":value.toFixed(2)+"%";
+  if(!result.available){
+    return [
+      "Forecast Learning: WITHHELD.",
+      result.reason,
+      "Eligible closed periods: "+result.closedPeriods+" · product-period samples: "+result.samples+".",
+      "VYNDI does not score hindsight forecasts: only immutable vintages captured before the target calendar period started can enter WAPE, bias, attainment or Forecast Value Added.",
+      "Authority boundary: learning is advisory. It does not rewrite the approved operating plan, Commercial orders, Production, Procurement, Inventory or Finance actuals."
+    ].join("\n\n");
+  }
+  return [
+    "Forecast Learning from "+result.closedPeriods+" governed closed period(s): WAPE "+metric(result.wapePct)+" · bias "+metric(result.biasPct)+".",
+    "Attainment: approved plan "+metric(result.planAttainmentPct)+" · governed forecast "+metric(result.forecastAttainmentPct)+".",
+    "Forecast Value Added: "+result.fvaUnits.toFixed(2)+" unit-error improvement · "+metric(result.fvaPct)+". Positive FVA means the governed forecast reduced absolute error versus the approved-plan baseline.",
+    "Volume evidence: plan "+result.planUnits.toFixed(2)+" · forecast "+result.forecastUnits.toFixed(2)+" · actual "+result.actualUnits.toFixed(2)+" units.",
+    "Method boundary: WAPE uses actual units as denominator; positive bias means over-forecast. Only pre-period vintages and latest governed close revisions are eligible.",
+    "Authority boundary: forecast learning is advisory and never auto-adjusts approved plans or transaction truth."
+  ].join("\n\n");
+}
+
 async function enterpriseDigitalThreadAnswer(sql: Sql, question: string) {
   const result=await buildEnterpriseDigitalThreadFromSql(sql,question);
   if(!result.matched){
@@ -1000,6 +1028,7 @@ export async function tryGovernanceDataAnswer(sql: Sql, question: string) {
   if (isTraceabilityExceptionQuestion(question)) return traceabilityExceptionAnswer(sql);
   if (isGovernanceOperatingStatusQuestion(question)) return governanceOperatingStatusAnswer(sql);
   if (isOverallRagHealthQuestion(question)) return overallRagHealthAnswer(sql);
+  if (isForecastLearningQuestion(question)) return forecastLearningAnswer(sql);
   if (isEnterpriseDigitalThreadQuestion(question)) return enterpriseDigitalThreadAnswer(sql, question);
   if (isAssetMaintenanceQuestion(question)) return assetMaintenanceAnswer(sql);
   if (isEarnedValueQuestion(question)) return earnedValueAnswer(sql);

@@ -8,18 +8,21 @@ import { getMonteCarloState } from "@/lib/monte-carlo-authority";
 import { getDecisionIntelligenceState } from "@/lib/decision-intelligence-authority";
 import { getEarnedValueState } from "@/lib/earned-value-authority";
 import { EnterpriseDigitalThreadPanel } from "@/components/enterprise-digital-thread-panel";
+import { ForecastLearningPanel } from "@/components/forecast-learning-panel";
+import { getForecastLearningState } from "@/lib/forecast-learning-authority";
 
 export const Route = createFileRoute("/command/intelligence")({
   loader: async () => {
-    const [data, readiness, forecast, monteCarlo, decision, earnedValue] = await Promise.all([
+    const [data, readiness, forecast, monteCarlo, decision, earnedValue, forecastLearning] = await Promise.all([
       getGovernedIntelligence(),
       getReadinessIntelligenceState(),
       getProgramForecastState(),
       getMonteCarloState(),
       getDecisionIntelligenceState(),
       getEarnedValueState(),
+      getForecastLearningState(),
     ]);
-    return { data, readiness, forecast, monteCarlo, decision, earnedValue };
+    return { data, readiness, forecast, monteCarlo, decision, earnedValue, forecastLearning };
   },
   component: Intelligence,
 });
@@ -29,7 +32,7 @@ const money = (value: number) => `₹${number(value)} lakh`;
 const severityTone = (severity: string) => severity === "critical" || severity === "high" ? "text-danger" : "text-warn";
 
 function Intelligence() {
-  const { data, readiness, forecast, monteCarlo, decision, earnedValue } = Route.useLoaderData();
+  const { data, readiness, forecast, monteCarlo, decision, earnedValue, forecastLearning } = Route.useLoaderData();
   const readinessPct = (value: number | null) => value == null ? "Not rated" : `${number(value)}%`;
   return <div className="space-y-6">
     <header className="flex flex-col gap-4 border-b border-border pb-6 lg:flex-row lg:items-end lg:justify-between">
@@ -67,6 +70,8 @@ function Intelligence() {
     </section>
 
     <EnterpriseDigitalThreadPanel />
+
+    <section aria-label="Forecast Learning"><ForecastLearningPanel state={forecastLearning} allowActions={false} /></section>
 
     <Panel title="Earned Value" kicker={earnedValue.latest ? "Captured " + earnedValue.latest.method + " · as of " + earnedValue.latest.asOfDate : "No immutable EVM snapshot captured"}>
       {earnedValue.latest ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-8">
