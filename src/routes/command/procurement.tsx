@@ -2,24 +2,27 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Panel, Kpi } from "@/components/kpi";
 import { InventoryWorkspaceNav } from "@/components/inventory-workspace-nav";
 import { SupplierRiskPanel } from "@/components/supplier-risk-panel";
+import { SupplierPerformancePanel } from "@/components/supplier-performance-panel";
 import { getInventoryMslWarnings } from "@/lib/inventory-authority";
 import { getConfiguredDemandShortages } from "@/lib/production-job-card";
 import { getSupplierRiskIntelligence } from "@/lib/supplier-risk-authority";
+import { getSupplierPerformanceState } from "@/lib/supplier-performance-authority";
 
 export const Route = createFileRoute("/command/procurement")({
   loader: async () => {
-    const [warnings,demandShortages,supplierRisk]=await Promise.all([
+    const [warnings,demandShortages,supplierRisk,supplierPerformance]=await Promise.all([
       getInventoryMslWarnings(),
       getConfiguredDemandShortages(),
       getSupplierRiskIntelligence(),
+      getSupplierPerformanceState(),
     ]);
-    return { warnings,demandShortages,supplierRisk };
+    return { warnings,demandShortages,supplierRisk,supplierPerformance };
   },
   component: Procurement,
 });
 
 function Procurement() {
-  const { warnings, demandShortages, supplierRisk } = Route.useLoaderData();
+  const { warnings, demandShortages, supplierRisk, supplierPerformance } = Route.useLoaderData();
   const critical = warnings.filter((x: any) => x.status === "critical").length;
   const low = warnings.filter((x: any) => x.status === "low").length;
   const shortage = warnings.reduce((sum: number, x: any) => sum + Number(x.shortage_quantity), 0);
@@ -73,6 +76,8 @@ function Procurement() {
       </div>
 
       <div className="mt-6"><SupplierRiskPanel state={supplierRisk} /></div>
+
+      <div className="mt-6"><SupplierPerformancePanel state={supplierPerformance} /></div>
 
       <Panel
         title="MSL replenishment queue"

@@ -143,6 +143,11 @@ export function isManufacturingQualityIntelligenceQuestion(question: string) {
   return /quality\s+forecast|defect\s+probab|yield\s+(?:forecast|estimate)|process\s+capability|\bcpk\b|\bcp\b|manufacturing\s+quality\s+intelligence/.test(q);
 }
 
+export function isSupplierPerformanceQuestion(question: string) {
+  const q = question.toLowerCase();
+  return /supplier\s+performance|supplier\s+scorecard|\botif\b|supplier\s+ppm|supplier\s+(?:ncr|capa)|supplier\s+responsiveness|supplier\s+traceability|supplier\s+cost\s+variance/.test(q);
+}
+
 export function isSupplierRiskIntelligenceQuestion(question: string) {
   const q = question.toLowerCase();
   return /supplier\s+risk|single[-\s]source|supplier\s+reliability|late[-\s]delivery\s+probab|lead[-\s]time\s+drift|incoming\s+supplier\s+quality/.test(q);
@@ -532,6 +537,42 @@ async function programPlanningAnswer(sql: Sql) {
     `Ownership gaps: ${unowned.length ? unowned.join(", ") : "none"}.`,
     "Control rule: this is deterministic CPM from explicit persisted durations and dependencies. VIBPE does not infer P50/P80/P95 dates here; probabilistic forecasting requires the later governed Forecast Engine."
   ].join("\n\n");
+}
+
+async function supplierPerformanceAnswer(sql: Sql) {
+  const rows=await sql.query<Record<string,unknown>>(
+    \`select id,result_json,source_reference,created_at
+       from vyndi_supplier_performance_runs
+      order by created_at desc,id desc limit 1\`,
+  );
+  const row=rows[0];
+  if(!row){
+    return "No governed Supplier Performance snapshot has been captured. Use Procurement → Supplier Performance & Quality Scorecard to review canonical PO/GRN/QMS/invoice/response evidence and capture a scorecard snapshot before VIBPE reports supplier performance.";
+  }
+  const result=row.result_json as {
+    summary:{
+      supplierCount:number;suppliersWithOtifEvidence:number;suppliersWithQualityEvidence:number;
+      suppliersWithCostEvidence:number;suppliersWithTraceabilityEvidence:number;suppliersWithResponseEvidence:number;
+      openNcrCount:number;openCapaCount:number;overdueCapaCount:number;
+    };
+    suppliers:Array<{
+      supplierId:string;supplierName:string;completedOrderCount:number;otifPct:number|null;rejectPpm:number|null;
+      acceptanceYieldPct:number|null;openNcrCount:number;openCapaCount:number;overdueCapaCount:number;
+      capaEffectivenessEvidencePct:number|null;costVariancePct:number|null;traceabilityCompletenessPct:number|null;
+      meanResponseHours:number|null;medianResponseHours:number|null;evidenceCoveragePct:number;attention:string[];
+    }>;
+  };
+  const top=result.suppliers.slice(0,8).map((item)=>
+    \`\${item.supplierName} (\${item.supplierId}) — OTIF \${item.otifPct==null?"WITHHELD":item.otifPct+"%"}; PPM \${item.rejectPpm==null?"WITHHELD":Math.round(item.rejectPpm)}; yield \${item.acceptanceYieldPct==null?"WITHHELD":item.acceptanceYieldPct+"%"}; open NCR/CAPA \${item.openNcrCount}/\${item.openCapaCount}; cost variance \${item.costVariancePct==null?"WITHHELD":item.costVariancePct+"%"}; traceability \${item.traceabilityCompletenessPct==null?"WITHHELD":item.traceabilityCompletenessPct+"%"}; mean response \${item.meanResponseHours==null?"WITHHELD":item.meanResponseHours+"h"}; evidence \${item.evidenceCoveragePct}%.\`
+  );
+  return [
+    \`Latest governed Supplier Performance scorecard: \${clean(row.id)} · \${result.summary.supplierCount} active supplier(s).\`,
+    \`Evidence coverage by dimension: OTIF \${result.summary.suppliersWithOtifEvidence}; incoming quality \${result.summary.suppliersWithQualityEvidence}; invoice cost \${result.summary.suppliersWithCostEvidence}; traceability \${result.summary.suppliersWithTraceabilityEvidence}; responsiveness \${result.summary.suppliersWithResponseEvidence}.\`,
+    \`Corrective-action burden: \${result.summary.openNcrCount} open supplier-linked NCR; \${result.summary.openCapaCount} open CAPA; \${result.summary.overdueCapaCount} overdue CAPA.\`,
+    top.length?\`Supplier detail: \${top.join(" | ")}\`:"No active supplier performance rows are represented.",
+    \`Evidence: \${clean(row.source_reference)} · captured \${clean(row.created_at)}.\`,
+    "Boundary: VYNDI does not collapse these dimensions into an invented weighted supplier score. Supplier Risk remains a separate probabilistic/lane-risk authority; this scorecard reports observed supplier-level operating performance."
+  ].join("\\n\\n");
 }
 
 async function supplierRiskIntelligenceAnswer(sql: Sql) {
@@ -1033,6 +1074,7 @@ export async function tryGovernanceDataAnswer(sql: Sql, question: string) {
   if (isAssetMaintenanceQuestion(question)) return assetMaintenanceAnswer(sql);
   if (isEarnedValueQuestion(question)) return earnedValueAnswer(sql);
   if (isDecisionIntelligenceQuestion(question)) return decisionIntelligenceAnswer(sql);
+  if (isSupplierPerformanceQuestion(question)) return supplierPerformanceAnswer(sql);
   if (isSupplierRiskIntelligenceQuestion(question)) return supplierRiskIntelligenceAnswer(sql);
   if (isRiskIntelligenceQuestion(question)) return riskIntelligenceAnswer(sql);
   if (isProgramPlanningQuestion(question)) return programPlanningAnswer(sql);
