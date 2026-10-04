@@ -46,7 +46,7 @@ export function compareEngineeringDocumentRevisions(from:ControlledEngineeringRe
 export function buildEngineeringDocumentWhereUsed(revisionId:string,links:EngineeringDocumentLink[]){
   const targets=links
     .filter((link)=>link.revisionId===revisionId)
-    .sort((a,b)=>a.targetType.localeCompare(b.targetType)||a.targetId.localeCompare(b.targetId)||a.relation.localeCompare(b.relation));
+    .sort((a,b)=>a.targetId.localeCompare(b.targetId)||a.targetType.localeCompare(b.targetType)||a.relation.localeCompare(b.relation));
   return {revisionId,targets};
 }
 
