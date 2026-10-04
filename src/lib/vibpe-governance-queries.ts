@@ -1,8 +1,9 @@
 import type { Sql } from "@/lib/db";
 import { compileVedmAuthorityGraph, createVedmR3aSeed } from "@/lib/vedm-authority-graph";
-import { classifyVedmIssueDomain, deriveVedmRisk } from "@/lib/vyndi-risk-model";
+import { deriveVedmRisk } from "@/lib/vyndi-risk-model";
 import { buildProgramNetwork, type ProgramTaskInput } from "@/lib/program-planning-model";
 import { buildReadinessAssessment } from "@/lib/readiness-model";
+import { analyzeEngineeringImpact } from "@/lib/impact-propagation-model";
 
 type ActiveActionRow = {
   id: string;
@@ -90,6 +91,11 @@ export function isProgramPlanningQuestion(question: string) {
 export function isReadinessIntelligenceQuestion(question: string) {
   const q = question.toLowerCase();
   return /product\s+readiness|program\s+readiness|programme\s+readiness|evidence\s+confidence|readiness\s+by\s+domain|\bvpri\b/.test(q);
+}
+
+export function isEngineeringImpactQuestion(question: string) {
+  const q = question.toLowerCase();
+  return /impact\s+analysis|downstream\s+impact|what\s+happens\s+if|what.*(?:affected|invalidated|stale)|which.*(?:evidence|gate).*affected/.test(q);
 }
 
 async function traceabilityExceptionAnswer(sql: Sql) {
@@ -473,6 +479,46 @@ async function programPlanningAnswer(sql: Sql) {
   ].join("\n\n");
 }
 
+async function engineeringImpactAnswer(sql: Sql, question: string) {
+  const graph=compileVedmAuthorityGraph(createVedmR3aSeed(),new Date().toISOString().slice(0,10));
+  const q=question.toLowerCase();
+  const source=[...graph.nodeById.keys()]
+    .sort((a,b)=>b.length-a.length)
+    .find((id)=>q.includes(id.toLowerCase()));
+  if(!source){
+    return "Engineering impact analysis is available, but the question does not identify a controlled Engineering Graph node ID. Name the source node (for example a VEDM authority/evidence/object ID) or use Engineering → Impact Analysis to select it. VIBPE will not guess the changed configuration.";
+  }
+  const impact=analyzeEngineeringImpact(graph,source);
+  if(!impact.valid) return impact.issues.join(" ");
+
+  const impactedIds=new Set([source,...impact.affectedNodes.map((node)=>node.id)]);
+  const [tasks,risks]=await Promise.all([
+    sql.query<Record<string,unknown>>(
+      `select id,title,status,required_inputs,required_evidence from vyndi_program_tasks
+        where program_id='VYNDI-MASTER-PROGRAM' order by id`,
+    ),
+    sql.query<Record<string,unknown>>(
+      `select id,risk,status,affected_objects,exposure_score from vyndi_risk_intelligence
+        where status<>'closed' order by exposure_score desc nulls last,id`,
+    ),
+  ]);
+  const arr=(value:unknown)=>Array.isArray(value)?value.map(String):[];
+  const taskImpact=tasks.filter((row)=>[
+    ...arr(row.required_inputs),...arr(row.required_evidence),
+  ].some((id)=>impactedIds.has(id)));
+  const riskImpact=risks.filter((row)=>arr(row.affected_objects).some((id)=>impactedIds.has(id)));
+
+  return [
+    `Engineering impact source: ${source} — ${impact.sourceNode?.title ?? "controlled node"}.`,
+    `Graph propagation: ${impact.affectedNodes.length} downstream node(s); ${impact.engineeringObjectIds.length} engineering object(s) require review/refresh; ${impact.evidenceSuspectCount} evidence item(s) become suspect; ${impact.releaseGateReviewCount} release gate(s) require review.`,
+    `Affected evidence: ${impact.evidenceIds.length?impact.evidenceIds.join(", "):"none represented"}.`,
+    `Affected release gates: ${impact.releaseGateIds.length?impact.releaseGateIds.join(", "):"none represented"}.`,
+    `Linked program tasks: ${taskImpact.length?taskImpact.map((row)=>`${clean(row.id)} [${clean(row.status)}]`).join(", "):"none"}.`,
+    `Linked active risks: ${riskImpact.length?riskImpact.map((row)=>`${clean(row.id)} exposure ${row.exposure_score??"unrated"}/9`).join(", "):"none"}.`,
+    "Control rule: this is advisory impact assessment only. It marks review obligations; it does not approve a change, supersede evidence, or release engineering authority."
+  ].join("\n\n");
+}
+
 async function readinessIntelligenceAnswer(sql: Sql) {
   const [tasks, evidence, risks] = await Promise.all([
     sql.query<Record<string, unknown>>(
@@ -590,5 +636,6 @@ export async function tryGovernanceDataAnswer(sql: Sql, question: string) {
   if (isRiskIntelligenceQuestion(question)) return riskIntelligenceAnswer(sql);
   if (isProgramPlanningQuestion(question)) return programPlanningAnswer(sql);
   if (isReadinessIntelligenceQuestion(question)) return readinessIntelligenceAnswer(sql);
+  if (isEngineeringImpactQuestion(question)) return engineeringImpactAnswer(sql, question);
   return undefined;
 }

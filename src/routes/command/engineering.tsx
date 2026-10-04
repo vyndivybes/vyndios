@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Kpi, Panel } from "@/components/kpi";
+import { EngineeringImpactPanel } from "@/components/engineering-impact-panel";
 import { listEngineeringAuthority } from "@/lib/engineering-authority";
+import { getEngineeringImpactState } from "@/lib/impact-propagation-authority";
 
 type Row = Record<string, unknown>;
 
@@ -42,8 +44,12 @@ function changeView(row: Row): Row {
 export const Route = createFileRoute("/command/engineering")({
   ssr: "data-only",
   loader: async () => {
-    const data = await listEngineeringAuthority();
+    const [data, impact] = await Promise.all([
+      listEngineeringAuthority(),
+      getEngineeringImpactState(),
+    ]);
     return {
+      impact,
       vedmAuthority: data.vedmAuthority,
       baselines: (Array.isArray(data.baselines) ? data.baselines : []).map((row) => baselineView(row as Row)),
       changes: (Array.isArray(data.changes) ? data.changes : []).map((row) => changeView(row as Row)),
@@ -210,6 +216,8 @@ function Engineering() {
           <p className="mt-1 text-xs leading-5 text-muted">{authority.releaseBlockers.join(" · ")}</p>
         </div>
       </Panel>
+
+      <EngineeringImpactPanel state={data.impact} />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi label="Baselines" value={String(baselines.length)} hint="Canonical records" />
