@@ -140,6 +140,35 @@ async function ensureSeeds(sql: Sql) {
   await globalRef.__masterInventorySeedPromise__;
 }
 
+export const getMasterInventoryItems = createServerFn({ method: "GET" }).handler(async () => {
+  await requireInventoryView();
+  const sql = await getSql();
+  await ensureSeeds(sql);
+  return sql.query<MasterInventoryItemRecord>(`
+    with fifo as (
+      select sku,vyndi_canonical_unit(unit) as unit,count(*)::int as lot_count,
+             coalesce(sum(quantity_remaining * unit_cost_inr),0) as stock_value_inr,
+             max(received_at)::date::text as last_received_on
+        from epr_inventory_fifo_layers
+       where quantity_remaining>0
+       group by sku,vyndi_canonical_unit(unit)
+    )
+    select i.id,i.ledger_id,i.sku,i.name,i.category,i.unit,i.minimum_stock_level,i.planned_monthly_use,
+           coalesce(atp.physical_quantity,0) as available_quantity,
+           coalesce(atp.reserved_quantity,0) as reserved_quantity,
+           coalesce(atp.available_to_promise,0) as available_to_promise,
+           coalesce(f.stock_value_inr,0) as stock_value_inr,
+           coalesce(f.lot_count,0)::int as lot_count,
+           f.last_received_on,
+           i.updated_at::text as updated_at
+      from master_inventory_items i
+      left join vyndi_inventory_available_to_promise atp on atp.sku=i.sku and atp.unit=vyndi_canonical_unit(i.unit)
+      left join fifo f on f.sku=i.sku and f.unit=vyndi_canonical_unit(i.unit)
+     where i.active=true
+     order by i.ledger_id,i.category,i.name,i.sku
+  `);
+});
+
 export const getMasterInventoryData = createServerFn({ method: "GET" }).handler(async () => {
   await requireInventoryView();
   const sql = await getSql();

@@ -22,7 +22,7 @@ import {
   type StockHealth,
 } from "@/lib/master-ledger";
 import {
-  getMasterInventoryData,
+  getMasterInventoryItems,
   saveMasterInventoryEntry,
   type MasterInventoryItemRecord,
 } from "@/lib/master-inventory";
@@ -30,8 +30,8 @@ import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/command/inventory")({
   loader: async () => {
-    const [inventory, role] = await Promise.all([getMasterInventoryData(), getCommandRole()]);
-    return { ...inventory, role };
+    const [items, role] = await Promise.all([getMasterInventoryItems(), getCommandRole()]);
+    return { items, role };
   },
   component: MasterInventory,
 });

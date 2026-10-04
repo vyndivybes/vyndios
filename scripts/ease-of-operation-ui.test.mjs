@@ -43,7 +43,7 @@ test("Master Inventory full-view register preserves operating fields and audit a
   for (const label of ["Item", "Ledger", "Available", "MSL", "Health", "Plan / mo", "36-mo forecast", "Audit"]) {
     assert.ok(inventorySource.includes(label), `missing stock-health field: ${label}`);
   }
-  assert.ok(inventorySource.includes("getMasterInventoryData"));
+  assert.ok(inventorySource.includes("getMasterInventoryItems"));
   assert.ok(inventorySource.includes("saveMasterInventoryEntry"));
   assert.ok(inventorySource.includes("/command/inventory-ledgers/$ledger"));
   assert.ok(inventorySource.includes("sku: item.sku"));
@@ -180,4 +180,14 @@ test("Operations initial GET defers heavyweight dispatch and quality registers",
   assert.doesNotMatch(loader, /listDispatchSerialCandidates\(\)/);
   assert.match(operationsSource, /loadDispatchRegister/);
   assert.match(operationsSource, /loadQualityAuthority/);
+});
+
+
+test("Master Inventory initial GET does not reconstruct FIFO lot audit history", () => {
+  const loaderStart = inventorySource.indexOf("loader: async () =>");
+  const loaderEnd = inventorySource.indexOf("component: MasterInventory", loaderStart);
+  assert.ok(loaderStart >= 0 && loaderEnd > loaderStart);
+  const loader = inventorySource.slice(loaderStart, loaderEnd);
+  assert.doesNotMatch(loader, /getMasterInventoryData\(\)/);
+  assert.match(loader, /getMasterInventoryItems\(\)/);
 });
