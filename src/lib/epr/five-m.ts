@@ -53,6 +53,9 @@ export const startControlledOperation = createServerFn({ method: "POST" })
     if (!traveller[0]) throw new Error("Traveller not found.");
 
     await sql.query(`insert into epr_operation_controls (id,traveller_id,operation_id,operator_id,qualification_id,equipment_id,method_id,started_at,status) values ($1,$2,$3,$4,$5,$6,$7,now(),'open')`, [crypto.randomUUID(), data.travellerId, data.operationId, data.operatorId, data.qualificationId, data.equipmentId ?? null, data.methodId]);
+    if (data.equipmentId) {
+      await sql.query(`update epr_equipment set status='in_use' where id=$1 and status='available'`, [data.equipmentId]);
+    }
     await sql.query(`insert into epr_audit_events (id,venture,entity_type,entity_id,action,actor,payload_json) select $1,venture,'operation_control',$2,'started',$3,$4 from epr_travellers where id=$5`, [crypto.randomUUID(), data.operationId, actor, JSON.stringify(data), data.travellerId]);
     return { ok: true };
   });
@@ -85,4 +88,93 @@ export const recordControlledParameter = createServerFn({ method: "POST" })
     const traveller = await sql.query<{ venture: "carbon" | "aluminium" }>(`select venture from epr_travellers where id=$1`, [data.travellerId]);
     await sql.query(`insert into epr_audit_events (id,venture,entity_type,entity_id,action,actor,payload_json) values ($1,$2,'process_parameter',$3,'recorded',$4,$5)`, [crypto.randomUUID(),traveller[0]?.venture ?? "carbon",parameterId,actor,JSON.stringify(data)]);
     return { ok: true, parameterId };
+  });
+
+
+export const blockControlledOperation = createServerFn({ method: "POST" })
+  .validator(z.object({
+    travellerId: id,
+    operationId: id,
+    reason: z.string().trim().min(3).max(1000),
+  }))
+  .handler(async ({ data }) => {
+    const actor = await admin();
+    const sql = await getSql();
+    const rows = await sql.query<{ id:string;equipment_id:string|null;status:string }>(
+      `select id,equipment_id,status from epr_operation_controls where operation_id=$1 and traveller_id=$2 limit 1`,
+      [data.operationId,data.travellerId],
+    );
+    const control=rows[0];
+    if(!control) throw new Error("Controlled operation record not found.");
+    if(control.status!=="open") throw new Error("Only an open controlled operation may be blocked.");
+
+    await sql.query(
+      `update epr_operation_controls set completed_at=now(),status='blocked' where id=$1 and status='open'`,
+      [control.id],
+    );
+    if(control.equipment_id){
+      await sql.query(
+        `update epr_equipment set status='quarantined' where id=$1 and status in ('available','in_use')`,
+        [control.equipment_id],
+      );
+    }
+    await sql.query(
+      `insert into epr_audit_events (id,venture,entity_type,entity_id,action,actor,payload_json)
+       select $1,venture,'operation_control',$2,'blocked',$3,$4
+         from epr_travellers where id=$5`,
+      [crypto.randomUUID(),data.operationId,actor,JSON.stringify({travellerId:data.travellerId,operationId:data.operationId,equipmentId:control.equipment_id,reason:data.reason}),data.travellerId],
+    );
+    return {ok:true,status:"blocked" as const,equipmentId:control.equipment_id};
+  });
+
+export const completeControlledOperation = createServerFn({ method: "POST" })
+  .validator(z.object({
+    travellerId: id,
+    operationId: id,
+  }))
+  .handler(async ({ data }) => {
+    const actor = await admin();
+    const sql = await getSql();
+    const rows = await sql.query<{ id:string;equipment_id:string|null;status:string }>(
+      `select id,equipment_id,status from epr_operation_controls where operation_id=$1 and traveller_id=$2 limit 1`,
+      [data.operationId,data.travellerId],
+    );
+    const control=rows[0];
+    if(!control) throw new Error("Controlled operation record not found.");
+    if(control.status!=="open") throw new Error("Only an open controlled operation may be completed.");
+
+    const failures=await sql.query<{count:string}>(
+      `select count(*)::text as count from epr_process_parameters where operation_id=$1 and traveller_id=$2 and result='fail'`,
+      [data.operationId,data.travellerId],
+    );
+    if(Number(failures[0]?.count??0)>0) {
+      throw new Error("Controlled operation cannot complete while failed process parameters remain unresolved.");
+    }
+
+    await sql.query(
+      `update epr_operation_controls set completed_at=now(),status='completed' where id=$1 and status='open'`,
+      [control.id],
+    );
+
+    if(control.equipment_id){
+      await sql.query(
+        `update epr_equipment
+            set status=case
+              when (calibration_required=true and (calibration_due_at is null or calibration_due_at<=now()))
+                or (maintenance_due_at is not null and maintenance_due_at<=now())
+              then 'quarantined'
+              else 'available'
+            end
+          where id=$1 and status='in_use'`,
+        [control.equipment_id],
+      );
+    }
+
+    await sql.query(
+      `insert into epr_audit_events (id,venture,entity_type,entity_id,action,actor,payload_json)
+       select $1,venture,'operation_control',$2,'completed',$3,$4
+         from epr_travellers where id=$5`,
+      [crypto.randomUUID(),data.operationId,actor,JSON.stringify({travellerId:data.travellerId,operationId:data.operationId,equipmentId:control.equipment_id}),data.travellerId],
+    );
+    return {ok:true,status:"completed" as const};
   });

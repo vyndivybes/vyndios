@@ -6,6 +6,7 @@ import { buildReadinessAssessment } from "@/lib/readiness-model";
 import { analyzeEngineeringImpact } from "@/lib/impact-propagation-model";
 import { buildProgramForecast, type ForecastTask } from "@/lib/forecast-model";
 import { buildDecisionIntelligenceFromSql } from "@/lib/decision-intelligence-authority";
+import { buildAssetMaintenanceIntelligence } from "@/lib/asset-maintenance-model";
 
 type ActiveActionRow = {
   id: string;
@@ -108,6 +109,11 @@ export function isProgramForecastQuestion(question: string) {
 export function isEarnedValueQuestion(question: string) {
   const q = question.toLowerCase();
   return /earned\s+value|\bevm\b|cost\s+performance\s+index|schedule\s+performance\s+index|\bcpi\b|\bspi\b|planned\s+value|actual\s+cost|estimate\s+at\s+completion|\beac\b|\betc\b|\bvac\b|\btcpi\b/.test(q);
+}
+
+export function isAssetMaintenanceQuestion(question: string) {
+  const q = question.toLowerCase();
+  return /asset\s+maintenance|equipment\s+maintenance|maintenance\s+work\s+orders?|preventive\s+maintenance|corrective\s+maintenance|overdue\s+maintenance|calibration\s+due|\bmtbf\b|\bmttr\b|equipment\s+availability|\boee\b/.test(q);
 }
 
 export function isEngineeringScenarioQuestion(question: string) {
@@ -842,6 +848,52 @@ async function readinessIntelligenceAnswer(sql: Sql) {
   ].join("\n\n");
 }
 
+async function assetMaintenanceAnswer(sql: Sql) {
+  const [assets, workOrders, operatingRows] = await Promise.all([
+    sql.query<Record<string, unknown>>(
+      "select id,asset_tag,equipment_type,status,criticality,maintenance_due_at,calibration_required,calibration_due_at from epr_equipment order by asset_tag"
+    ),
+    sql.query<Record<string, unknown>>(
+      "select id,equipment_id,work_order_type,status,started_at,completed_at,downtime_started_at,downtime_ended_at from vyndi_maintenance_work_orders order by opened_at desc,id desc"
+    ),
+    sql.query<{equipment_id:string;hours:number|string}>(
+      "select equipment_id,coalesce(sum(extract(epoch from (completed_at-started_at))/3600.0),0) as hours from epr_operation_controls where equipment_id is not null and started_at is not null and completed_at is not null group by equipment_id order by equipment_id"
+    ),
+  ]);
+  const result=buildAssetMaintenanceIntelligence({
+    asOf:new Date().toISOString(),
+    assets:assets.map((row)=>({
+      id:clean(row.id),
+      assetTag:clean(row.asset_tag),
+      equipmentType:clean(row.equipment_type),
+      status:clean(row.status) as "available"|"in_use"|"maintenance"|"quarantined"|"retired",
+      criticality:(clean(row.criticality)||"medium") as "low"|"medium"|"high"|"critical",
+      maintenanceDueAt:row.maintenance_due_at==null?null:clean(row.maintenance_due_at),
+      calibrationRequired:Boolean(row.calibration_required),
+      calibrationDueAt:row.calibration_due_at==null?null:clean(row.calibration_due_at),
+    })),
+    operatingHours:operatingRows.map((row)=>({equipmentId:row.equipment_id,hours:n(row.hours)})),
+    workOrders:workOrders.map((row)=>({
+      id:clean(row.id),
+      equipmentId:clean(row.equipment_id),
+      type:clean(row.work_order_type) as "preventive"|"corrective"|"inspection"|"calibration",
+      status:clean(row.status) as "draft"|"scheduled"|"in_progress"|"completed"|"cancelled",
+      startedAt:row.started_at==null?null:clean(row.started_at),
+      completedAt:row.completed_at==null?null:clean(row.completed_at),
+      downtimeStartedAt:row.downtime_started_at==null?null:clean(row.downtime_started_at),
+      downtimeEndedAt:row.downtime_ended_at==null?null:clean(row.downtime_ended_at),
+    })),
+  });
+  const metric=(value:number|null,suffix="")=>value==null?"WITHHELD":value.toFixed(1)+suffix;
+  return [
+    "Asset & Maintenance Intelligence: "+result.totalAssets+" active asset(s) · "+result.releaseBlockedAssetCount+" execution-blocked · "+result.openWorkOrderCount+" open maintenance work order(s).",
+    "Reliability: MTBF "+metric(result.mtbfHours," h")+" · MTTR "+metric(result.mttrHours," h")+" · observed availability "+metric(result.observedAvailabilityPct,"%")+" · captured downtime "+result.downtimeHours.toFixed(1)+" h.",
+    "Due controls: overdue maintenance "+(result.overdueMaintenanceAssetIds.join(", ")||"none")+" · overdue calibration "+(result.overdueCalibrationAssetIds.join(", ")||"none")+" · missing calibration due date "+(result.missingCalibrationDueAssetIds.join(", ")||"none")+".",
+    "OEE WITHHELD. VYNDI does not publish OEE until governed planned-production-time, performance-loss and quality-loss evidence exist at the same production grain.",
+    "Authority boundary: epr_equipment remains the canonical equipment identity. Maintenance intelligence does not bypass calibration, maintenance-due, equipment-status or return-to-service gates."
+  ].join("\n\n");
+}
+
 async function earnedValueAnswer(sql: Sql) {
   const rows = await sql.query<Record<string, unknown>>(
     "select id,as_of_date::text,method,result_json,source_reference,created_at " +
@@ -922,6 +974,7 @@ export async function tryGovernanceDataAnswer(sql: Sql, question: string) {
   if (isTraceabilityExceptionQuestion(question)) return traceabilityExceptionAnswer(sql);
   if (isGovernanceOperatingStatusQuestion(question)) return governanceOperatingStatusAnswer(sql);
   if (isOverallRagHealthQuestion(question)) return overallRagHealthAnswer(sql);
+  if (isAssetMaintenanceQuestion(question)) return assetMaintenanceAnswer(sql);
   if (isEarnedValueQuestion(question)) return earnedValueAnswer(sql);
   if (isDecisionIntelligenceQuestion(question)) return decisionIntelligenceAnswer(sql);
   if (isSupplierRiskIntelligenceQuestion(question)) return supplierRiskIntelligenceAnswer(sql);

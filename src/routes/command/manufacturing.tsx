@@ -1,14 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Panel } from "@/components/kpi";
+import { AssetMaintenancePanel } from "@/components/asset-maintenance-panel";
+import { getAssetMaintenanceState } from "@/lib/asset-maintenance-authority";
 import {
   MANUFACTURING_CONTROLS,
   MANUFACTURING_GATES,
   MANUFACTURING_STATUS_LABELS,
 } from "@/lib/data/manufacturing-control";
 
-export const Route = createFileRoute("/command/manufacturing")({ component: Manufacturing });
+export const Route = createFileRoute("/command/manufacturing")({
+  loader: async () => getAssetMaintenanceState(),
+  component: Manufacturing,
+});
 
 function Manufacturing() {
+  const maintenance = Route.useLoaderData();
   const pending = MANUFACTURING_CONTROLS.filter((c) => c.status === "pending").length;
   const verify = MANUFACTURING_CONTROLS.filter((c) => c.status === "verify").length;
   const planned = MANUFACTURING_CONTROLS.filter((c) => c.status === "planned").length;
@@ -35,6 +41,8 @@ function Manufacturing() {
           <p className="text-3xl tabular-nums">{planned}</p>
         </Panel>
       </div>
+
+      <AssetMaintenancePanel state={maintenance} />
 
       <Panel title="Manufacturing control register">
         <div
