@@ -73,7 +73,8 @@ test("Better Auth owns the HTTP cookie response without a duplicate TanStack han
   assert.match(authApiRoute, /GET: \(\{ request \}\) => handleAuthRequest\(request\)/);
   assert.match(authApiRoute, /POST: \(\{ request \}\) => handleProtectedAuthPost\(request\)/);
   assert.match(authApiRoute, /return handleAuthRequest\(request\)/);
-  assert.match(authServer, /const response = await auth\.handler\(request\)/);
+  assert.match(authServer, /postgresAuthDialect\.runInRequest\(\(\) => auth\.handler\(request\)\)/);
+  assert.match(authServer, /: await auth\.handler\(request\)/);
   assert.match(authServer, /return response/);
   assert.doesNotMatch(authApiRoute, /new Response\(response\.body/);
   assert.doesNotMatch(authServer, /tanstackStartCookies/);

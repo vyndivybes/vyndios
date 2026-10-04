@@ -86,11 +86,11 @@ const grokTokenUrl = `${issuerBase}/api/auth/oauth2/token`;
 const grokUserInfoUrl = `${issuerBase}/api/auth/oauth2/userinfo`;
 
 const postgresTransport = await resolvePostgresTransport();
-const database = postgresTransport
-  ? {
-      dialect: requestSafePostgresDialect(postgresTransport.connectionString),
-      type: "postgres" as const,
-    }
+const postgresAuthDialect = postgresTransport
+  ? requestSafePostgresDialect(postgresTransport.connectionString)
+  : null;
+const database = postgresAuthDialect
+  ? { dialect: postgresAuthDialect, type: "postgres" as const }
   : { dialect: pgliteDialect(() => getPglite()), type: "postgres" as const };
 
 export const SESSION_TOKEN_COOKIE = "__Host-grok-auth.session_token";
@@ -236,7 +236,9 @@ export async function handleAuthRequest(request: Request): Promise<Response> {
   const started = Date.now();
   const route = new URL(request.url).pathname;
   try {
-    const response = await auth.handler(request);
+    const response = postgresAuthDialect
+      ? await postgresAuthDialect.runInRequest(() => auth.handler(request))
+      : await auth.handler(request);
     const failure = response.status >= 500;
     if (failure) {
       console.error("[auth] Better Auth endpoint failed", {

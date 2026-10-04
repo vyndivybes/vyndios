@@ -13,9 +13,12 @@ import {
   type TransactionSettings,
 } from "kysely";
 import { Client } from "pg";
+import { AsyncLocalStorage } from "node:async_hooks";
 
 type PostgresClient = Pick<Client, "connect" | "end" | "query">;
 type PostgresClientFactory = () => PostgresClient;
+type RequestState = { client?: PostgresClient };
+const requestState = new AsyncLocalStorage<RequestState>();
 
 /**
  * Better Auth is initialized once per Worker isolate, so a normal pg.Pool can
@@ -27,13 +30,22 @@ type PostgresClientFactory = () => PostgresClient;
 export function requestSafePostgresDialect(
   connectionString: string,
   createClient: PostgresClientFactory = () => new Client({ connectionString }),
-): Dialect {
-  return {
+): Dialect & { runInRequest<T>(work: () => Promise<T>): Promise<T> } {
+  const dialect: Dialect = {
     createAdapter: () => new PostgresAdapter(),
     createDriver: () => new RequestSafePostgresDriver(createClient),
     createQueryCompiler: (): QueryCompiler => new PostgresQueryCompiler(),
     createIntrospector: (db: Kysely<unknown>): DatabaseIntrospector => new PostgresIntrospector(db),
   };
+  return Object.assign(dialect, {
+    async runInRequest<T>(work: () => Promise<T>): Promise<T> {
+      const state: RequestState = {};
+      return requestState.run(state, async () => {
+        try { return await work(); }
+        finally { if (state.client) await state.client.end().catch(() => undefined); }
+      });
+    },
+  });
 }
 
 class RequestSafePostgresDriver implements Driver {
@@ -46,10 +58,13 @@ class RequestSafePostgresDriver implements Driver {
   async init(): Promise<void> {}
 
   async acquireConnection(): Promise<DatabaseConnection> {
+    const state = requestState.getStore();
+    if (state?.client) return new RequestSafePostgresConnection(state.client, false);
     const client = this.createClient();
     try {
       await client.connect();
-      return new RequestSafePostgresConnection(client);
+      if (state) state.client = client;
+      return new RequestSafePostgresConnection(client, !state);
     } catch (error) {
       await client.end().catch(() => undefined);
       throw error;
@@ -83,9 +98,11 @@ class RequestSafePostgresDriver implements Driver {
 
 class RequestSafePostgresConnection implements DatabaseConnection {
   private readonly client: PostgresClient;
+  private readonly closeOnRelease: boolean;
 
-  constructor(client: PostgresClient) {
+  constructor(client: PostgresClient, closeOnRelease = true) {
     this.client = client;
+    this.closeOnRelease = closeOnRelease;
   }
 
   async executeQuery<O>(compiledQuery: CompiledQuery): Promise<QueryResult<O>> {
@@ -110,6 +127,6 @@ class RequestSafePostgresConnection implements DatabaseConnection {
   }
 
   async close(): Promise<void> {
-    await this.client.end();
+    if (this.closeOnRelease) await this.client.end();
   }
 }
