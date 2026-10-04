@@ -7,6 +7,7 @@ import { getProgramForecastState } from "@/lib/forecast-authority";
 import { getMonteCarloState } from "@/lib/monte-carlo-authority";
 import { getDecisionIntelligenceState } from "@/lib/decision-intelligence-authority";
 import { getEarnedValueState } from "@/lib/earned-value-authority";
+import { EnterpriseDigitalThreadPanel } from "@/components/enterprise-digital-thread-panel";
 
 export const Route = createFileRoute("/command/intelligence")({
   loader: async () => {
@@ -64,6 +65,8 @@ function Intelligence() {
         {readiness.vedmEvidence.length ? <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-xs"><thead className="border-b border-border uppercase tracking-wider text-subtle"><tr><th className="px-3 py-2">Evidence</th><th className="px-3 py-2">Domain</th><th className="px-3 py-2">State</th><th className="px-3 py-2">Confidence</th><th className="px-3 py-2">Source</th></tr></thead><tbody>{readiness.vedmEvidence.map((item) => <tr key={item.id} className="border-t border-border/70"><td className="px-3 py-3"><p className="font-semibold text-fg">{item.title}</p><p className="font-mono text-[10px] text-subtle">{item.id}</p></td><td className="px-3 py-3 text-muted">{item.domain}</td><td className={`px-3 py-3 font-semibold ${item.evidenceState === "sufficient" ? "text-green" : "text-warn"}`}>{item.evidenceState}</td><td className="px-3 py-3 text-muted">Not inferred</td><td className="max-w-sm break-words px-3 py-3 text-[10px] text-subtle">{item.sourceReference}</td></tr>)}</tbody></table></div> : <p className="text-sm text-muted">No controlled VEDM evidence nodes are currently in the required-release set.</p>}
       </Panel>
     </section>
+
+    <EnterpriseDigitalThreadPanel />
 
     <Panel title="Earned Value" kicker={earnedValue.latest ? "Captured " + earnedValue.latest.method + " · as of " + earnedValue.latest.asOfDate : "No immutable EVM snapshot captured"}>
       {earnedValue.latest ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-8">

@@ -21,7 +21,23 @@ export type DigitalThreadNodeKind =
   | "bom_revision"
   | "job_card"
   | "quality_release"
-  | "shipment";
+  | "shipment"
+  | "supplier"
+  | "purchase_order"
+  | "goods_receipt"
+  | "inventory_lot"
+  | "inventory_movement"
+  | "material_lot"
+  | "traveller"
+  | "equipment"
+  | "operator"
+  | "quality_inspection"
+  | "ncr"
+  | "capa"
+  | "sales_order"
+  | "invoice"
+  | "job_cost"
+  | "risk";
 
 export type DigitalThreadNode = {
   id: string;
@@ -47,7 +63,23 @@ export type DigitalThreadEdge = {
     | "CONFIGURED_BY"
     | "EXECUTED_BY"
     | "RELEASED_BY"
-    | "FULFILLED_BY";
+    | "FULFILLED_BY"
+    | "SUPPLIES"
+    | "RECEIVED_AS"
+    | "STOCKED_AS"
+    | "ALLOCATED_TO"
+    | "CONSUMED_BY"
+    | "BUILT_AS"
+    | "OPERATED_WITH"
+    | "PERFORMED_BY"
+    | "USED_BY"
+    | "WORKED_ON"
+    | "INSPECTED_BY"
+    | "NONCONFORMITY"
+    | "CORRECTED_BY"
+    | "BILLED_BY"
+    | "COSTED_BY"
+    | "EXPOSES_RISK";
 };
 
 export type DigitalThreadGap = {
@@ -56,7 +88,9 @@ export type DigitalThreadGap = {
     | "BOM_REVISION_MISSING"
     | "JOB_CARD_MISSING"
     | "QUALITY_RELEASE_MISSING"
-    | "SHIPMENT_MISSING";
+    | "SHIPMENT_MISSING"
+    | "ENTERPRISE_LINK_ENDPOINT_MISSING"
+    | "SERIAL_SHIPMENT_ALLOCATION_MISSING";
   message: string;
 };
 
@@ -189,6 +223,89 @@ export function compileDigitalProductThread(
   return {
     sourceRepository: graph.sourceRepository,
     sourceCommit: graph.sourceCommit,
+    nodeById,
+    edges,
+    gaps,
+  };
+}
+
+
+export type EnterpriseThreadNodeInput = {
+  id: string;
+  kind: DigitalThreadNodeKind;
+  title: string;
+  sourceRef: string;
+  current?: boolean;
+};
+
+export type EnterpriseThreadEdgeInput = {
+  from: string;
+  to: string;
+  relation: DigitalThreadEdge["relation"];
+};
+
+export type EnterpriseThreadExtensionInput = {
+  nodes: EnterpriseThreadNodeInput[];
+  edges: EnterpriseThreadEdgeInput[];
+  gaps?: DigitalThreadGap[];
+};
+
+function edgeKey(edge: DigitalThreadEdge) {
+  return edge.from + "|" + edge.relation + "|" + edge.to;
+}
+
+export function extendEnterpriseDigitalThread(
+  thread: DigitalProductThread,
+  input: EnterpriseThreadExtensionInput,
+): DigitalProductThread {
+  const nodeById = new Map(thread.nodeById);
+  const edges = [...thread.edges];
+  let gaps = [...thread.gaps];
+
+  for (const node of input.nodes) {
+    if (!node.id.trim()) continue;
+    const existing = nodeById.get(node.id);
+    if (!existing) {
+      nodeById.set(node.id, {
+        id: node.id,
+        kind: node.kind,
+        title: node.title,
+        sourceRef: node.sourceRef,
+        current: node.current ?? true,
+      });
+    }
+  }
+
+  const kinds=new Set([...nodeById.values()].map((node)=>node.kind));
+  gaps=gaps.filter((gap)=>{
+    if(gap.code==="JOB_CARD_MISSING"&&kinds.has("job_card")) return false;
+    if(gap.code==="QUALITY_RELEASE_MISSING"&&kinds.has("quality_release")) return false;
+    if(gap.code==="SHIPMENT_MISSING"&&kinds.has("shipment")) return false;
+    return true;
+  });
+
+  const seenEdges = new Set(edges.map(edgeKey));
+  for (const edge of input.edges) {
+    if (!nodeById.has(edge.from) || !nodeById.has(edge.to)) {
+      gaps.push({
+        code: "ENTERPRISE_LINK_ENDPOINT_MISSING",
+        message: "Enterprise thread link withheld because a canonical endpoint is missing: " + edge.from + " " + edge.relation + " " + edge.to + ".",
+      });
+      continue;
+    }
+    const key = edgeKey(edge);
+    if (seenEdges.has(key)) continue;
+    seenEdges.add(key);
+    edges.push({ ...edge });
+  }
+
+  for (const gap of input.gaps ?? []) {
+    if (!gaps.some((existing) => existing.code === gap.code && existing.message === gap.message)) gaps.push(gap);
+  }
+
+  return {
+    sourceRepository: thread.sourceRepository,
+    sourceCommit: thread.sourceCommit,
     nodeById,
     edges,
     gaps,

@@ -7,6 +7,7 @@ import { analyzeEngineeringImpact } from "@/lib/impact-propagation-model";
 import { buildProgramForecast, type ForecastTask } from "@/lib/forecast-model";
 import { buildDecisionIntelligenceFromSql } from "@/lib/decision-intelligence-authority";
 import { buildAssetMaintenanceIntelligence } from "@/lib/asset-maintenance-model";
+import { buildEnterpriseDigitalThreadFromSql } from "@/lib/enterprise-digital-thread-authority";
 
 type ActiveActionRow = {
   id: string;
@@ -109,6 +110,11 @@ export function isProgramForecastQuestion(question: string) {
 export function isEarnedValueQuestion(question: string) {
   const q = question.toLowerCase();
   return /earned\s+value|\bevm\b|cost\s+performance\s+index|schedule\s+performance\s+index|\bcpi\b|\bspi\b|planned\s+value|actual\s+cost|estimate\s+at\s+completion|\beac\b|\betc\b|\bvac\b|\btcpi\b/.test(q);
+}
+
+export function isEnterpriseDigitalThreadQuestion(question: string) {
+  const q = question.toLowerCase();
+  return /enterprise\s+digital\s+thread|digital\s+thread|full\s+lineage|cross[-\s]domain\s+trace|what\s+is\s+affected\s+if|which.*(?:serial|job|shipment|invoice|risk).*affected|trace.*(?:supplier|po|grn|material|serial|traveller|shipment|invoice)/.test(q);
 }
 
 export function isAssetMaintenanceQuestion(question: string) {
@@ -848,6 +854,24 @@ async function readinessIntelligenceAnswer(sql: Sql) {
   ].join("\n\n");
 }
 
+async function enterpriseDigitalThreadAnswer(sql: Sql, question: string) {
+  const result=await buildEnterpriseDigitalThreadFromSql(sql,question);
+  if(!result.matched){
+    return "No governed enterprise digital-thread lineage matched that reference. Use a Serial, Traveller, Job Card, PO, GRN, supplier, shipment, invoice, equipment or other controlled identifier.";
+  }
+  const roots=result.rootNodeIds.length?result.rootNodeIds.join(", "):"job-card lineage";
+  const affected=result.impact.affectedNodeIds.slice(0,20);
+  const gapText=result.gaps.length?result.gaps.map((gap)=>gap.message).join(" "):"No represented graph gap was detected for the matched canonical records.";
+  return [
+    "Enterprise Digital Thread matched "+roots+".",
+    "Coverage: "+result.summary.jobCards+" Job Card(s) · "+result.summary.travellers+" serial/Traveller(s) · "+result.summary.suppliers+" supplier(s) · "+result.summary.goodsReceipts+" GRN(s) · "+result.summary.qualityReleases+" Quality Release(s) · "+result.summary.shipments+" shipment(s) · "+result.summary.risks+" linked open risk(s).",
+    "Affected downstream nodes from the matched root: "+(affected.length?affected.join(", "):"none represented")+".",
+    "Governed gap: "+gapText,
+    "Serial shipment identity is not represented by current dispatch authority; VYNDI does not infer which released serial was packed into a specific shipment from quantity evidence alone.",
+    "Authority boundary: this is read-only cross-domain lineage and impact evidence. It does not mutate Procurement, Inventory, Production, Quality, Finance, Risk or Engineering authority."
+  ].join("\n\n");
+}
+
 async function assetMaintenanceAnswer(sql: Sql) {
   const [assets, workOrders, operatingRows] = await Promise.all([
     sql.query<Record<string, unknown>>(
@@ -974,6 +998,7 @@ export async function tryGovernanceDataAnswer(sql: Sql, question: string) {
   if (isTraceabilityExceptionQuestion(question)) return traceabilityExceptionAnswer(sql);
   if (isGovernanceOperatingStatusQuestion(question)) return governanceOperatingStatusAnswer(sql);
   if (isOverallRagHealthQuestion(question)) return overallRagHealthAnswer(sql);
+  if (isEnterpriseDigitalThreadQuestion(question)) return enterpriseDigitalThreadAnswer(sql, question);
   if (isAssetMaintenanceQuestion(question)) return assetMaintenanceAnswer(sql);
   if (isEarnedValueQuestion(question)) return earnedValueAnswer(sql);
   if (isDecisionIntelligenceQuestion(question)) return decisionIntelligenceAnswer(sql);
