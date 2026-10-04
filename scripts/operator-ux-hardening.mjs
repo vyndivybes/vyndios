@@ -11,6 +11,7 @@ if (!email || !password) throw new Error("VYNDI_TEST_EMAIL and VYNDI_TEST_PASSWO
 const viewports = [
   { name: "desktop-1440", width: 1440, height: 900 },
   { name: "desktop-1180", width: 1180, height: 820 },
+  { name: "tablet-768", width: 768, height: 1024 },
   { name: "mobile-390", width: 390, height: 844 },
 ];
 const routes = ["/command", "/command/intelligence", "/command/planning", "/command/engineering", "/command/scenarios", "/command/quality", "/command/procurement", "/command/risk", "/command/ibpe-operating-workspace/optimizer", "/command/ibpe-operating-workspace/release", "/command/sales", "/command/inventory", "/command/operations", "/command/financial-cockpit"];
@@ -35,9 +36,15 @@ try {
 
     for (const route of routes) {
       const page = await context.newPage();
+      const pageErrors = [];
+      page.on("pageerror", (error) => pageErrors.push(String(error?.message || error)));
       const response = await page.goto(`${baseUrl}${route}`, { waitUntil: "domcontentloaded", timeout: 90_000 });
       assert.ok(response?.ok(), `${route} returned HTTP ${response?.status() ?? "none"}`);
       await page.locator("body").waitFor({ state: "visible", timeout: 30_000 });
+      const body = (await page.locator("body").innerText()).trim();
+      assert.doesNotMatch(page.url(), /\/login(?:\?|$)|\/command-login/, `${route} lost authenticated access at ${viewport.name}`);
+      assert.doesNotMatch(body, /Something went wrong|Internal Server Error|Cannot read properties of undefined/i, `${route} rendered a fatal error at ${viewport.name}`);
+      assert.deepEqual(pageErrors, [], `${route} emitted browser errors at ${viewport.name}: ${pageErrors.join(" | ")}`);
       const overflow = await page.evaluate(() => ({
         documentWidth: document.documentElement.scrollWidth,
         viewportWidth: document.documentElement.clientWidth,
@@ -47,7 +54,7 @@ try {
         overflow.documentWidth <= overflow.viewportWidth + 2,
         `${route} overflows horizontally at ${viewport.width}px: ${JSON.stringify(overflow)}`,
       );
-      results.push({ viewport: viewport.name, route, overflow });
+      results.push({ viewport: viewport.name, route, overflow, pageErrors });
       await page.close();
     }
     await context.close();

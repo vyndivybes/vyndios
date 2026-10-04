@@ -4,8 +4,9 @@ import test from "node:test";
 
 const source = await readFile(new URL("./operator-ux-hardening.mjs", import.meta.url), "utf8");
 
-test("operator UX qualification covers desktop, compact desktop and mobile", () => {
-  for (const width of ["1440", "1180", "390"]) assert.match(source, new RegExp(width));
+test("operator UX qualification covers desktop, tablet and mobile", () => {
+  for (const width of ["1440", "1180", "768", "390"]) assert.match(source, new RegExp(width));
+  assert.match(source, /tablet-/);
   assert.match(source, /scrollWidth/);
   assert.match(source, /clientWidth/);
   assert.match(source, /financial-cockpit/);
