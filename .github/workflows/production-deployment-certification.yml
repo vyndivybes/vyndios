@@ -1,0 +1,41 @@
+name: Production Deployment Certification
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact production source SHA to certify
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      VYNDI_TEST_BASE_URL: https://vyndios.vayushastr.workers.dev
+      VYNDI_TEST_EXPECTED_SHA: ${{ inputs.expected_sha }}
+      VYNDI_TEST_EMAIL: ${{ secrets.VYNDI_TEST_EMAIL }}
+      VYNDI_TEST_PASSWORD: ${{ secrets.VYNDI_TEST_PASSWORD }}
+      VYNDI_TEST_EVIDENCE_DIR: artifacts/production-certification
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Certify exact production deployment
+        run: npm run test:browser:production
+      - name: Preserve certification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-certification-${{ inputs.expected_sha }}
+          path: artifacts/production-certification
+          if-no-files-found: warn

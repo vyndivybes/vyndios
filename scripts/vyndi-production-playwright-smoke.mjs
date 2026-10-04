@@ -67,6 +67,7 @@ const evidence = {
   expectedSha: expectedSha || null,
   startedAt: new Date().toISOString(),
   routes: [],
+  preflight: {},
   releaseMarker: null,
   result: "RUNNING",
 };
@@ -78,6 +79,42 @@ const context = await browser.newContext({
 });
 
 try {
+  for (const [name, path] of [
+    ["root", "/"],
+    ["releaseMarker", "/api/runtime/release-marker"],
+    ["health", "/api/runtime/health"],
+  ]) {
+    try {
+      const response = await context.request.get(`${baseUrl}${path}`, {
+        timeout: 30_000,
+        failOnStatusCode: false,
+      });
+      const body = await response.text().catch(() => "");
+      const headers = response.headers();
+      evidence.preflight[name] = {
+        path,
+        status: response.status(),
+        ok: response.ok(),
+        cfRay: headers["cf-ray"] || null,
+        serverTiming: headers["server-timing"] || null,
+        contentType: headers["content-type"] || null,
+        bodyPreview: body.slice(0, 1000),
+      };
+    } catch (error) {
+      evidence.preflight[name] = {
+        path,
+        status: null,
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  assert.ok(
+    evidence.preflight.root?.ok,
+    `Production preflight failed: root HTTP ${evidence.preflight.root?.status ?? "unreachable"} · cf-ray ${evidence.preflight.root?.cfRay ?? "none"} · ${evidence.preflight.root?.error ?? evidence.preflight.root?.bodyPreview ?? ""}`,
+  );
+
   if (expectedSha) {
     const markerResponse = await context.request.get(`${baseUrl}/api/runtime/release-marker`);
     const markerText = await markerResponse.text().catch(() => "");

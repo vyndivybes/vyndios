@@ -54,9 +54,6 @@ export const askVibpeGovernanceCopilot = createServerFn({ method: "POST" })
       const sql = await getSql();
       const question = normalizeQuestion(data.question);
 
-      const optimizerAnswer = await answerGovernedOptimizerExecutionRequest(sql, question);
-      if (optimizerAnswer) return { handled: true as const, answer: optimizerAnswer };
-
       const priorityAnswer = await tryVibpePriorityOperationalControl(sql, question);
       if (priorityAnswer) return { handled: true as const, answer: priorityAnswer };
 
@@ -76,6 +73,8 @@ export const askVibpeGovernanceCopilot = createServerFn({ method: "POST" })
         return { handled: true as const, answer: exactControlFallback(question) };
       }
 
+      const optimizerAnswer = await answerGovernedOptimizerExecutionRequest(sql, question);
+      if (optimizerAnswer) return { handled: true as const, answer: optimizerAnswer };
 
       return { handled: false as const };
     } catch {
