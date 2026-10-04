@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { getSql } from "@/lib/db";
+import { getSql, type SqlRow } from "@/lib/db";
 import { requireBusinessActor } from "@/lib/business-actor";
 import { getCommandRole } from "@/lib/command-access";
 import { canPerform } from "@/lib/page-access";
@@ -19,7 +19,7 @@ export const getEngineeringImpactState = createServerFn({ method:"GET" }).handle
   await requireView();
   const sql=await getSql();
   const graph=compileVedmAuthorityGraph(createVedmR3aSeed(),new Date().toISOString().slice(0,10));
-  const recent=await sql.query<Record<string,unknown>>(
+  const recent=await sql.query<SqlRow>(
     `select id,source_node_id,source_repository,source_commit,as_of_date::text,change_reference,
             result_json,actor_user_id,actor_role,created_at
        from vyndi_impact_assessments
@@ -51,13 +51,13 @@ export const assessEngineeringImpact = createServerFn({ method:"POST" })
     if (!impact.valid) throw new Error(impact.issues.join(" "));
 
     const [taskRows,riskRows]=await Promise.all([
-      sql.query<Record<string,unknown>>(
+      sql.query<SqlRow>(
         `select id,title,status,required_inputs,required_evidence,risk_ids
            from vyndi_program_tasks
           where program_id='VYNDI-MASTER-PROGRAM'
           order by id`,
       ),
-      sql.query<Record<string,unknown>>(
+      sql.query<SqlRow>(
         `select id,risk,status,affected_objects,exposure_score
            from vyndi_risk_intelligence
           where status<>'closed'

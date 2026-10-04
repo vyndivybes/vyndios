@@ -1,10 +1,11 @@
 import type { Sql } from "@/lib/db";
 import { compileVedmAuthorityGraph, createVedmR3aSeed } from "@/lib/vedm-authority-graph";
-import { deriveVedmRisk } from "@/lib/vyndi-risk-model";
+import { classifyVedmIssueDomain, deriveVedmRisk } from "@/lib/vyndi-risk-model";
 import { buildProgramNetwork, type ProgramTaskInput } from "@/lib/program-planning-model";
 import { buildReadinessAssessment } from "@/lib/readiness-model";
 import { analyzeEngineeringImpact } from "@/lib/impact-propagation-model";
 import { buildProgramForecast, type ForecastTask } from "@/lib/forecast-model";
+import { buildDecisionIntelligenceFromSql } from "@/lib/decision-intelligence-authority";
 
 type ActiveActionRow = {
   id: string;
@@ -122,6 +123,11 @@ export function isManufacturingQualityIntelligenceQuestion(question: string) {
 export function isSupplierRiskIntelligenceQuestion(question: string) {
   const q = question.toLowerCase();
   return /supplier\s+risk|single[-\s]source|supplier\s+reliability|late[-\s]delivery\s+probab|lead[-\s]time\s+drift|incoming\s+supplier\s+quality/.test(q);
+}
+
+export function isDecisionIntelligenceQuestion(question: string) {
+  const q = question.toLowerCase();
+  return /decision\s+options?|safest\s+option|recovery\s+options?|what\s+should\s+we\s+do|best\s+risk[-\s]adjusted\s+path|recommended\s+path|decision\s+intelligence/.test(q);
 }
 
 async function traceabilityExceptionAnswer(sql: Sql) {
@@ -831,6 +837,26 @@ async function readinessIntelligenceAnswer(sql: Sql) {
   ].join("\n\n");
 }
 
+async function decisionIntelligenceAnswer(sql: Sql) {
+  const {result}=await buildDecisionIntelligenceFromSql(sql);
+  const primary=result.options.find((option)=>option.id===result.primaryAdvisoryOptionId)??result.options[0];
+  const lines=result.options.slice(0,6).map((option,index)=>[
+    `Option ${index+1}: ${option.title} [${option.decisionClass}]`,
+    `Why: ${option.rationale}`,
+    `Actions: ${option.actions.join("; ")}`,
+    `Consequences / limits: ${option.consequences.join("; ")}`,
+    `Authority: ${option.authorityRequired}`,
+    option.evidenceReferences.length?`Evidence: ${option.evidenceReferences.join("; ")}`:"Evidence: no additional captured reference required for this comparison option.",
+  ].join("\n"));
+
+  return [
+    `VIBPE Decision Intelligence: ${result.options.length} advisory option(s). Primary advisory option: ${primary?.title??"none"}.`,
+    ...lines,
+    `Ranking method: ${result.rankingMethod}. This is governance-priority ordering, not an invented utility score.`,
+    "Authority boundary: VIBPE does not approve, transact, release engineering, accept risk, commit funding, issue purchase orders or modify the governed baseline. A human owning authority must decide and execute any controlled action."
+  ].join("\n\n");
+}
+
 async function riskIntelligenceAnswer(sql: Sql) {
   const risks = await sql.query<Record<string, unknown>>(`
     select id,risk,domain,likelihood,impact,status,mitigation,owner,due_on,
@@ -869,6 +895,7 @@ export async function tryGovernanceDataAnswer(sql: Sql, question: string) {
   if (isTraceabilityExceptionQuestion(question)) return traceabilityExceptionAnswer(sql);
   if (isGovernanceOperatingStatusQuestion(question)) return governanceOperatingStatusAnswer(sql);
   if (isOverallRagHealthQuestion(question)) return overallRagHealthAnswer(sql);
+  if (isDecisionIntelligenceQuestion(question)) return decisionIntelligenceAnswer(sql);
   if (isSupplierRiskIntelligenceQuestion(question)) return supplierRiskIntelligenceAnswer(sql);
   if (isRiskIntelligenceQuestion(question)) return riskIntelligenceAnswer(sql);
   if (isProgramPlanningQuestion(question)) return programPlanningAnswer(sql);

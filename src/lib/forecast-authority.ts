@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { getSql } from "@/lib/db";
+import { getSql, type SqlRow } from "@/lib/db";
 import { getCommandRole } from "@/lib/command-access";
 import { canPerform } from "@/lib/page-access";
 import { requireBusinessActor } from "@/lib/business-actor";
@@ -17,7 +17,7 @@ async function requireView(){
 async function loadForecastInputs(){
   const sql=await getSql();
   const [tasks,deps,latest]=await Promise.all([
-    sql.query<Record<string,unknown>>(
+    sql.query<SqlRow>(
       `select id,title,planned_start,planned_finish,
               optimistic_days,most_likely_days,pessimistic_days,
               cost_forecast_required,cost_optimistic_lakh,cost_most_likely_lakh,cost_pessimistic_lakh,
@@ -26,13 +26,13 @@ async function loadForecastInputs(){
         where program_id=$1 order by id`,
       [PROGRAM_ID],
     ),
-    sql.query<Record<string,unknown>>(
+    sql.query<SqlRow>(
       `select predecessor_id,successor_id,lag_days
          from vyndi_program_dependencies
         where program_id=$1 order by predecessor_id,successor_id`,
       [PROGRAM_ID],
     ),
-    sql.query<Record<string,unknown>>(
+    sql.query<SqlRow>(
       `select id,method,input_json,result_json,source_reference,actor_user_id,actor_role,created_at
          from vyndi_program_forecast_runs
         where program_id=$1 order by created_at desc,id desc limit 1`,

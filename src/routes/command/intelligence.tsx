@@ -5,16 +5,18 @@ import { getGovernedIntelligence } from "@/lib/intelligence-data";
 import { getReadinessIntelligenceState } from "@/lib/readiness-authority";
 import { getProgramForecastState } from "@/lib/forecast-authority";
 import { getMonteCarloState } from "@/lib/monte-carlo-authority";
+import { getDecisionIntelligenceState } from "@/lib/decision-intelligence-authority";
 
 export const Route = createFileRoute("/command/intelligence")({
   loader: async () => {
-    const [data, readiness, forecast, monteCarlo] = await Promise.all([
+    const [data, readiness, forecast, monteCarlo, decision] = await Promise.all([
       getGovernedIntelligence(),
       getReadinessIntelligenceState(),
       getProgramForecastState(),
       getMonteCarloState(),
+      getDecisionIntelligenceState(),
     ]);
-    return { data, readiness, forecast, monteCarlo };
+    return { data, readiness, forecast, monteCarlo, decision };
   },
   component: Intelligence,
 });
@@ -24,7 +26,7 @@ const money = (value: number) => `₹${number(value)} lakh`;
 const severityTone = (severity: string) => severity === "critical" || severity === "high" ? "text-danger" : "text-warn";
 
 function Intelligence() {
-  const { data, readiness, forecast, monteCarlo } = Route.useLoaderData();
+  const { data, readiness, forecast, monteCarlo, decision } = Route.useLoaderData();
   const readinessPct = (value: number | null) => value == null ? "Not rated" : `${number(value)}%`;
   return <div className="space-y-6">
     <header className="flex flex-col gap-4 border-b border-border pb-6 lg:flex-row lg:items-end lg:justify-between">
@@ -89,6 +91,28 @@ function Intelligence() {
         <p>Schedule O/M/P coverage {number(monteCarlo.scheduleInputCoveragePct)}%. Monte Carlo remains withheld until all governed program tasks have complete schedule distributions and a run is captured.</p>
         <Link to="/command/planning" className="mt-3 inline-block text-xs font-semibold text-accent">Open Monte Carlo Planning →</Link>
       </div>}
+    </Panel>
+
+    <Panel title="Decision Intelligence" kicker="Advisory options · governance-priority ordering · no automatic approval">
+      <div className="space-y-3">
+        {decision.live.options.map((option, index) => <article key={option.id} className="rounded-xl border border-border p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-green">Option {index + 1} · {option.decisionClass.replaceAll("_"," ")}</p>
+              <h3 className="mt-1 text-sm font-semibold text-fg">{option.title}</h3>
+            </div>
+            {decision.live.primaryAdvisoryOptionId === option.id ? <span className="rounded-full border border-accent/30 bg-accent/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-accent">Primary advisory</span> : null}
+          </div>
+          <p className="mt-2 text-xs leading-5 text-muted">{option.rationale}</p>
+          <div className="mt-3 grid gap-3 lg:grid-cols-2">
+            <div><p className="text-[10px] font-semibold uppercase tracking-wider text-subtle">Actions</p><ul className="mt-1 space-y-1">{option.actions.map((item) => <li key={item} className="text-xs leading-5 text-muted">• {item}</li>)}</ul></div>
+            <div><p className="text-[10px] font-semibold uppercase tracking-wider text-subtle">Consequences / limits</p><ul className="mt-1 space-y-1">{option.consequences.map((item) => <li key={item} className="text-xs leading-5 text-muted">• {item}</li>)}</ul></div>
+          </div>
+          <p className="mt-3 text-[10px] leading-4 text-subtle">{option.authorityRequired}</p>
+          {option.evidenceReferences.length ? <p className="mt-1 break-words text-[10px] text-subtle">Evidence: {option.evidenceReferences.join(" · ")}</p> : null}
+        </article>)}
+        <p className="text-[10px] leading-5 text-subtle">Ranking method: {decision.live.rankingMethod}. No option is an approval, commitment, engineering release, purchase order, funding decision or risk acceptance.</p>
+      </div>
     </Panel>
 
     {!data.available ? <Panel title="Governed snapshot required" kicker="No values inferred">

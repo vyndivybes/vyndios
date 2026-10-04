@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { getSql } from "@/lib/db";
+import { getSql, type SqlRow } from "@/lib/db";
 import { getCommandRole } from "@/lib/command-access";
 import { canPerform } from "@/lib/page-access";
 import { requireBusinessActor } from "@/lib/business-actor";
@@ -31,17 +31,17 @@ export const getReadinessIntelligenceState = createServerFn({ method: "GET" }).h
   const sql = await getSql();
 
   const [taskRows, evidenceRows, riskRows] = await Promise.all([
-    sql.query<Record<string, unknown>>(
+    sql.query<SqlRow>(
       `select id,domain,status from vyndi_program_tasks
         where program_id=$1 order by id`,
       [PROGRAM_ID],
     ),
-    sql.query<Record<string, unknown>>(
+    sql.query<SqlRow>(
       `select * from vyndi_readiness_evidence
         where program_id=$1 order by domain,id`,
       [PROGRAM_ID],
     ),
-    sql.query<Record<string, unknown>>(
+    sql.query<SqlRow>(
       `select id,exposure_score,status from vyndi_risk_intelligence
         where status<>'closed' order by exposure_score desc,id`,
     ),

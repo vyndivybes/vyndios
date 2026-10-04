@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { getSql } from "@/lib/db";
+import { getSql, type SqlRow } from "@/lib/db";
 import { getCommandRole } from "@/lib/command-access";
 import { canPerform } from "@/lib/page-access";
 import { requireBusinessActor } from "@/lib/business-actor";
@@ -20,7 +20,7 @@ async function requireView(){
 async function loadScenarioBasis(){
   const sql=await getSql();
   const [taskRows,dependencyRows,riskRows,recent]=await Promise.all([
-    sql.query<Record<string,unknown>>(
+    sql.query<SqlRow>(
       `select id,title,status,required_inputs,required_evidence,
               optimistic_days,most_likely_days,pessimistic_days,
               cost_forecast_required,cost_optimistic_lakh,cost_most_likely_lakh,cost_pessimistic_lakh
@@ -28,19 +28,19 @@ async function loadScenarioBasis(){
         where program_id=$1 order by id`,
       [PROGRAM_ID],
     ),
-    sql.query<Record<string,unknown>>(
+    sql.query<SqlRow>(
       `select predecessor_id,successor_id,lag_days
          from vyndi_program_dependencies
         where program_id=$1 order by predecessor_id,successor_id`,
       [PROGRAM_ID],
     ),
-    sql.query<Record<string,unknown>>(
+    sql.query<SqlRow>(
       `select id,risk,status,affected_objects,exposure_score
          from vyndi_risk_intelligence
         where status<>'closed'
         order by exposure_score desc nulls last,id`,
     ),
-    sql.query<Record<string,unknown>>(
+    sql.query<SqlRow>(
       `select id,scenario_name,source_node_id,target_task_id,source_commit,as_of_date::text,
               assumption_json,baseline_json,scenario_json,impact_json,linked_program_tasks,
               linked_risks,source_reference,actor_role,created_at
