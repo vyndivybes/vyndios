@@ -89,12 +89,12 @@ export function buildSupplierPerformanceScorecard(input:SupplierPerformanceInput
 
     const attention:string[]=[];
     const lateOrIncomplete=completedOrders.length-otifCount;
-    if(lateOrIncomplete>0) attention.push(\`\${lateOrIncomplete} completed order(s) missed OTIF\`);
-    if(rejectedQty>0) attention.push(\`\${round4(rejectedQty)} received unit(s) rejected\`);
-    if(Number(supplier.openNcrCount)>0) attention.push(\`\${Math.trunc(Number(supplier.openNcrCount))} open supplier-linked NCR(s)\`);
-    if(Number(supplier.overdueCapaCount)>0) attention.push(\`\${Math.trunc(Number(supplier.overdueCapaCount))} overdue supplier-linked CAPA(s)\`);
-    if(costVariancePct!=null&&costVariancePct>0) attention.push(\`invoice cost is \${costVariancePct}% above PO price basis\`);
-    if(traceabilityCompletenessPct!=null&&traceabilityCompletenessPct<100) attention.push(\`\${round2(100-traceabilityCompletenessPct)}% receipt traceability evidence incomplete\`);
+    if(lateOrIncomplete>0) attention.push(`${lateOrIncomplete} completed order(s) missed OTIF`);
+    if(rejectedQty>0) attention.push(`${round4(rejectedQty)} received unit(s) rejected`);
+    if(Number(supplier.openNcrCount)>0) attention.push(`${Math.trunc(Number(supplier.openNcrCount))} open supplier-linked NCR(s)`);
+    if(Number(supplier.overdueCapaCount)>0) attention.push(`${Math.trunc(Number(supplier.overdueCapaCount))} overdue supplier-linked CAPA(s)`);
+    if(costVariancePct!=null&&costVariancePct>0) attention.push(`invoice cost is ${costVariancePct}% above PO price basis`);
+    if(traceabilityCompletenessPct!=null&&traceabilityCompletenessPct<100) attention.push(`${round2(100-traceabilityCompletenessPct)}% receipt traceability evidence incomplete`);
     if(meanResponseHours==null) attention.push("responsiveness evidence not yet captured");
 
     return {

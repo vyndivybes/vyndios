@@ -62,20 +62,20 @@ async function requireView(){
 export async function buildSupplierPerformanceFromSql(sql:Sql){
   const [suppliers,deliveries,receipts,quality,costs,responses]=await Promise.all([
     sql.query<SupplierRow>(
-      \`select id,name from vyndi_suppliers where active=true order by name,id\`,
+      `select id,name from vyndi_suppliers where active=true order by name,id`,
     ),
     sql.query<DeliveryRow>(
-      \`select p.id as purchase_order_id,p.supplier_id,p.quantity,p.expected_receipt_on::text,
+      `select p.id as purchase_order_id,p.supplier_id,p.quantity,p.expected_receipt_on::text,
               max(r.received_on)::text as actual_receipt_on,
               coalesce(sum(r.quantity_received),0) as received_quantity
          from vyndi_purchase_orders p
          join vyndi_goods_receipts r on r.purchase_order_id=p.id
         where p.status='received'
         group by p.id,p.supplier_id,p.quantity,p.expected_receipt_on
-        order by p.supplier_id,p.id\`,
+        order by p.supplier_id,p.id`,
     ),
     sql.query<ReceiptRow>(
-      \`select p.supplier_id,
+      `select p.supplier_id,
               count(r.id)::int as receipt_count,
               coalesce(sum(r.quantity_received),0) as received_qty,
               coalesce(sum(r.quantity_accepted),0) as accepted_qty,
@@ -88,10 +88,10 @@ export async function buildSupplierPerformanceFromSql(sql:Sql){
          from vyndi_purchase_orders p
          join vyndi_goods_receipts r on r.purchase_order_id=p.id
         group by p.supplier_id
-        order by p.supplier_id\`,
+        order by p.supplier_id`,
     ),
     sql.query<QualityRow>(
-      \`select p.supplier_id,n.id as ncr_id,n.severity,n.status as ncr_status,
+      `select p.supplier_id,n.id as ncr_id,n.severity,n.status as ncr_status,
               c.id as capa_id,c.status as capa_status,c.due_on::text as capa_due_on,
               c.effectiveness_evidence_ref
          from vyndi_quality_inspections i
@@ -100,23 +100,23 @@ export async function buildSupplierPerformanceFromSql(sql:Sql){
          join vyndi_quality_ncrs n on n.inspection_id=i.id
          left join vyndi_quality_capas c on c.ncr_id=n.id
         where i.inspection_stage='incoming'
-        order by p.supplier_id,n.id,c.id\`,
+        order by p.supplier_id,n.id,c.id`,
     ),
     sql.query<CostRow>(
-      \`select p.supplier_id,
+      `select p.supplier_id,
               coalesce(sum(i.quantity_invoiced*p.unit_price_inr),0) as expected_invoice_cost_inr,
               coalesce(sum(i.amount_ex_gst_inr),0) as actual_invoice_cost_inr
          from vyndi_supplier_invoices i
          join vyndi_purchase_orders p on p.id=i.purchase_order_id
         where i.status<>'void'
         group by p.supplier_id
-        order by p.supplier_id\`,
+        order by p.supplier_id`,
     ),
     sql.query<ResponseRow>(
-      \`select supplier_id,
+      `select supplier_id,
               extract(epoch from (responded_at-requested_at))/3600.0 as response_hours
          from vyndi_current_supplier_response_events
-        order by supplier_id,requested_at,id\`,
+        order by supplier_id,requested_at,id`,
     ),
   ]);
 
@@ -186,11 +186,11 @@ export const getSupplierPerformanceState=createServerFn({method:"GET"}).handler(
   const sql=await getSql();
   const [live,suppliers,latestRows]=await Promise.all([
     buildSupplierPerformanceFromSql(sql),
-    sql.query<SupplierRow>(\`select id,name from vyndi_suppliers where active=true order by name,id\`),
+    sql.query<SupplierRow>(`select id,name from vyndi_suppliers where active=true order by name,id`),
     sql.query<LatestRunRow>(
-      \`select id,result_json,source_reference,actor_role,created_at::text
+      `select id,result_json,source_reference,actor_role,created_at::text
          from vyndi_supplier_performance_runs
-        order by created_at desc,id desc limit 1\`,
+        order by created_at desc,id desc limit 1`,
     ),
   ]);
   const latest=latestRows[0];
@@ -235,24 +235,24 @@ export const recordSupplierResponseEvent=createServerFn({method:"POST"})
     const actor=await requireBusinessActor("edit");
     if(Date.parse(data.respondedAt)<Date.parse(data.requestedAt)) throw new Error("Supplier response cannot precede the governed request timestamp.");
     const sql=await getSql();
-    const supplier=await sql.query<{id:string}>(\`select id from vyndi_suppliers where id=$1 and active=true\`,[data.supplierId]);
+    const supplier=await sql.query<{id:string}>(`select id from vyndi_suppliers where id=$1 and active=true`,[data.supplierId]);
     if(!supplier[0]) throw new Error("Active supplier not found.");
     if(data.supersedesEventId){
-      const prior=await sql.query<{supplier_id:string}>(\`select supplier_id from vyndi_supplier_response_events where id=$1\`,[data.supersedesEventId]);
+      const prior=await sql.query<{supplier_id:string}>(`select supplier_id from vyndi_supplier_response_events where id=$1`,[data.supersedesEventId]);
       if(!prior[0]||prior[0].supplier_id!==data.supplierId) throw new Error("Superseded response event must belong to the same supplier.");
     }
     const id="SUP-RESP-"+crypto.randomUUID();
     await sql.query(
-      \`insert into vyndi_supplier_response_events(
+      `insert into vyndi_supplier_response_events(
         id,supplier_id,request_reference,request_type,requested_at,responded_at,supersedes_event_id,
         source_reference,recorded_by,recorded_role
-      ) values($1,$2,$3,$4,$5::timestamptz,$6::timestamptz,$7,$8,$9,$10)\`,
+      ) values($1,$2,$3,$4,$5::timestamptz,$6::timestamptz,$7,$8,$9,$10)`,
       [id,data.supplierId,data.requestReference,data.requestType,data.requestedAt,data.respondedAt,data.supersedesEventId??null,data.sourceReference,actor.userId,actor.role],
     );
     await sql.query(
-      \`insert into vyndi_audit_events(
+      `insert into vyndi_audit_events(
         id,entity_type,entity_id,action,actor_user_id,actor_role,source_reference,payload_json,correlation_id
-      ) values($1,'supplier_response_event',$2,'SUPPLIER_RESPONSE_RECORDED',$3,$4,$5,$6::jsonb,$7)\`,
+      ) values($1,'supplier_response_event',$2,'SUPPLIER_RESPONSE_RECORDED',$3,$4,$5,$6::jsonb,$7)`,
       [crypto.randomUUID(),id,actor.userId,actor.role,data.sourceReference,JSON.stringify({
         supplierId:data.supplierId,requestReference:data.requestReference,requestType:data.requestType,
         requestedAt:data.requestedAt,respondedAt:data.respondedAt,supersedesEventId:data.supersedesEventId??null,
@@ -269,14 +269,14 @@ export const captureSupplierPerformanceSnapshot=createServerFn({method:"POST"})
     const result=await buildSupplierPerformanceFromSql(sql);
     const id="SUP-PERF-"+crypto.randomUUID();
     await sql.query(
-      \`insert into vyndi_supplier_performance_runs(id,result_json,source_reference,actor_user_id,actor_role)
-       values($1,$2::jsonb,$3,$4,$5)\`,
+      `insert into vyndi_supplier_performance_runs(id,result_json,source_reference,actor_user_id,actor_role)
+       values($1,$2::jsonb,$3,$4,$5)`,
       [id,JSON.stringify(result),data.sourceReference,actor.userId,actor.role],
     );
     await sql.query(
-      \`insert into vyndi_audit_events(
+      `insert into vyndi_audit_events(
         id,entity_type,entity_id,action,actor_user_id,actor_role,source_reference,payload_json,correlation_id
-      ) values($1,'supplier_performance_run',$2,'SUPPLIER_PERFORMANCE_CAPTURED',$3,$4,$5,$6::jsonb,'SUPPLIER_PERFORMANCE')\`,
+      ) values($1,'supplier_performance_run',$2,'SUPPLIER_PERFORMANCE_CAPTURED',$3,$4,$5,$6::jsonb,'SUPPLIER_PERFORMANCE')`,
       [crypto.randomUUID(),id,actor.userId,actor.role,data.sourceReference,JSON.stringify(result.summary)],
     );
     return {ok:true,id,result};

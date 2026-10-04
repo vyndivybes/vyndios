@@ -541,9 +541,9 @@ async function programPlanningAnswer(sql: Sql) {
 
 async function supplierPerformanceAnswer(sql: Sql) {
   const rows=await sql.query<Record<string,unknown>>(
-    \`select id,result_json,source_reference,created_at
+    `select id,result_json,source_reference,created_at
        from vyndi_supplier_performance_runs
-      order by created_at desc,id desc limit 1\`,
+      order by created_at desc,id desc limit 1`,
   );
   const row=rows[0];
   if(!row){
@@ -563,16 +563,16 @@ async function supplierPerformanceAnswer(sql: Sql) {
     }>;
   };
   const top=result.suppliers.slice(0,8).map((item)=>
-    \`\${item.supplierName} (\${item.supplierId}) — OTIF \${item.otifPct==null?"WITHHELD":item.otifPct+"%"}; PPM \${item.rejectPpm==null?"WITHHELD":Math.round(item.rejectPpm)}; yield \${item.acceptanceYieldPct==null?"WITHHELD":item.acceptanceYieldPct+"%"}; open NCR/CAPA \${item.openNcrCount}/\${item.openCapaCount}; cost variance \${item.costVariancePct==null?"WITHHELD":item.costVariancePct+"%"}; traceability \${item.traceabilityCompletenessPct==null?"WITHHELD":item.traceabilityCompletenessPct+"%"}; mean response \${item.meanResponseHours==null?"WITHHELD":item.meanResponseHours+"h"}; evidence \${item.evidenceCoveragePct}%.\`
+    `${item.supplierName} (${item.supplierId}) — OTIF ${item.otifPct==null?"WITHHELD":item.otifPct+"%"}; PPM ${item.rejectPpm==null?"WITHHELD":Math.round(item.rejectPpm)}; yield ${item.acceptanceYieldPct==null?"WITHHELD":item.acceptanceYieldPct+"%"}; open NCR/CAPA ${item.openNcrCount}/${item.openCapaCount}; cost variance ${item.costVariancePct==null?"WITHHELD":item.costVariancePct+"%"}; traceability ${item.traceabilityCompletenessPct==null?"WITHHELD":item.traceabilityCompletenessPct+"%"}; mean response ${item.meanResponseHours==null?"WITHHELD":item.meanResponseHours+"h"}; evidence ${item.evidenceCoveragePct}%.`
   );
   return [
-    \`Latest governed Supplier Performance scorecard: \${clean(row.id)} · \${result.summary.supplierCount} active supplier(s).\`,
-    \`Evidence coverage by dimension: OTIF \${result.summary.suppliersWithOtifEvidence}; incoming quality \${result.summary.suppliersWithQualityEvidence}; invoice cost \${result.summary.suppliersWithCostEvidence}; traceability \${result.summary.suppliersWithTraceabilityEvidence}; responsiveness \${result.summary.suppliersWithResponseEvidence}.\`,
-    \`Corrective-action burden: \${result.summary.openNcrCount} open supplier-linked NCR; \${result.summary.openCapaCount} open CAPA; \${result.summary.overdueCapaCount} overdue CAPA.\`,
-    top.length?\`Supplier detail: \${top.join(" | ")}\`:"No active supplier performance rows are represented.",
-    \`Evidence: \${clean(row.source_reference)} · captured \${clean(row.created_at)}.\`,
+    `Latest governed Supplier Performance scorecard: ${clean(row.id)} · ${result.summary.supplierCount} active supplier(s).`,
+    `Evidence coverage by dimension: OTIF ${result.summary.suppliersWithOtifEvidence}; incoming quality ${result.summary.suppliersWithQualityEvidence}; invoice cost ${result.summary.suppliersWithCostEvidence}; traceability ${result.summary.suppliersWithTraceabilityEvidence}; responsiveness ${result.summary.suppliersWithResponseEvidence}.`,
+    `Corrective-action burden: ${result.summary.openNcrCount} open supplier-linked NCR; ${result.summary.openCapaCount} open CAPA; ${result.summary.overdueCapaCount} overdue CAPA.`,
+    top.length?`Supplier detail: ${top.join(" | ")}`:"No active supplier performance rows are represented.",
+    `Evidence: ${clean(row.source_reference)} · captured ${clean(row.created_at)}.`,
     "Boundary: VYNDI does not collapse these dimensions into an invented weighted supplier score. Supplier Risk remains a separate probabilistic/lane-risk authority; this scorecard reports observed supplier-level operating performance."
-  ].join("\\n\\n");
+  ].join("\n\n");
 }
 
 async function supplierRiskIntelligenceAnswer(sql: Sql) {

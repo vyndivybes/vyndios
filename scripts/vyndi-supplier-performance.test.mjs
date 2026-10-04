@@ -60,3 +60,16 @@ test("aggregate test gate includes Package O",()=>{
   assert.match(pkg,/vyndi-supplier-performance\.test\.mjs/);
   assert.match(pkg,/supplier-performance-model\.test\.ts/);
 });
+
+
+test("Package O TypeScript source contains no connector escape artifacts",()=>{
+  for(const [name,source] of [
+    ["model",model],
+    ["authority",authority],
+    ["panel",panel],
+    ["vibpe",vibpe],
+  ]){
+    assert.equal(source.includes("\\`"),false,`${name} contains an escaped backtick artifact`);
+    assert.equal(source.includes("\\\${"),false,`${name} contains an escaped template placeholder artifact`);
+  }
+});

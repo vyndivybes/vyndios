@@ -7,8 +7,8 @@ import {
   type SupplierPerformanceState,
 } from "@/lib/supplier-performance-authority";
 
-const pct=(value:number|null)=>value==null?"WITHHELD":\`\${value.toFixed(1)}%\`;
-const hours=(value:number|null)=>value==null?"WITHHELD":\`\${value.toFixed(1)} h\`;
+const pct=(value:number|null)=>value==null?"WITHHELD":`${value.toFixed(1)}%`;
+const hours=(value:number|null)=>value==null?"WITHHELD":`${value.toFixed(1)} h`;
 const ppm=(value:number|null)=>value==null?"WITHHELD":Math.round(value).toLocaleString("en-IN");
 const iso=(value:string)=>value?new Date(value).toISOString():"";
 
@@ -47,7 +47,7 @@ export function SupplierPerformancePanel({state}:{state:SupplierPerformanceState
         <Kpi label="Quality evidenced" value={String(summary.suppliersWithQualityEvidence)} hint="Received / accepted / rejected"/>
         <Kpi label="Traceability evidenced" value={String(summary.suppliersWithTraceabilityEvidence)} hint="GRN identity coverage"/>
         <Kpi label="Response evidenced" value={String(summary.suppliersWithResponseEvidence)} hint="Governed request/response events"/>
-        <Kpi label="Open NCR/CAPA" value={\`\${summary.openNcrCount}/\${summary.openCapaCount}\`} hint="Supplier-linked incoming quality" tone={summary.openNcrCount||summary.openCapaCount?"warn":"ok"}/>
+        <Kpi label="Open NCR/CAPA" value={`${summary.openNcrCount}/${summary.openCapaCount}`} hint="Supplier-linked incoming quality" tone={summary.openNcrCount||summary.openCapaCount?"warn":"ok"}/>
         <Kpi label="Overdue CAPA" value={String(summary.overdueCapaCount)} hint="Supplier-linked corrective action" tone={summary.overdueCapaCount?"warn":"ok"}/>
       </div>
 
