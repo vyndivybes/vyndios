@@ -15,7 +15,7 @@ const [migration,model,authority,panel,route,vibpe,pkg]=await Promise.all([
 test("Package Q adds controlled document master immutable revisions links and released manifests",()=>{
   for(const token of ["vyndi_engineering_documents","vyndi_engineering_document_revisions","vyndi_engineering_document_links","vyndi_engineering_configuration_manifests"]) assert.match(migration,new RegExp(token));
   assert.match(migration,/content_sha256/);
-  assert.match(migration,/check \(content_sha256 ~ '^\[0-9a-f\]\{64\}\$'\)/i);
+  assert.match(migration,/content_sha256 text not null check \(content_sha256 ~ '\^\[0-9a-f\]\{64\}\$'\)/i);
   assert.match(migration,/release_vyndi_engineering_document_revision/);
   assert.match(migration,/vyndi_reject_released_document_mutation/);
   assert.match(migration,/before update or delete on vyndi_engineering_configuration_manifests/i);
