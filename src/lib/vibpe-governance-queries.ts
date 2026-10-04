@@ -105,6 +105,11 @@ export function isProgramForecastQuestion(question: string) {
   return /schedule\s+forecast|program\s+forecast|programme\s+forecast|cost\s+forecast|\bp50\b|\bp80\b|\bp95\b/.test(q);
 }
 
+export function isEarnedValueQuestion(question: string) {
+  const q = question.toLowerCase();
+  return /earned\s+value|\bevm\b|cost\s+performance\s+index|schedule\s+performance\s+index|\bcpi\b|\bspi\b|planned\s+value|actual\s+cost|estimate\s+at\s+completion|\beac\b|\betc\b|\bvac\b|\btcpi\b/.test(q);
+}
+
 export function isEngineeringScenarioQuestion(question: string) {
   const q = question.toLowerCase();
   return /engineering\s+scenario|latest\s+engineering\s+scenario|scenario\s+(?:impact|delta).*engineering|engineering.*scenario\s+(?:impact|delta)/.test(q);
@@ -837,6 +842,28 @@ async function readinessIntelligenceAnswer(sql: Sql) {
   ].join("\n\n");
 }
 
+async function earnedValueAnswer(sql: Sql) {
+  const rows = await sql.query<Record<string, unknown>>(
+    "select id,as_of_date::text,method,result_json,source_reference,created_at " +
+    "from vyndi_earned_value_runs where program_id='VYNDI-MASTER-PROGRAM' " +
+    "order by as_of_date desc,created_at desc,id desc limit 1"
+  );
+  const row = rows[0];
+  if (!row) {
+    return "No governed Earned Value snapshot has been captured. Open Integrated Operating Plan → Earned Value Intelligence, complete progress and actual-cost evidence, and capture an immutable EVM snapshot before VIBPE reports CPI/SPI or completion-cost forecasts.";
+  }
+  const result = (row.result_json ?? {}) as Record<string, unknown>;
+  const show = (value: unknown, digits = 3) => value == null ? "WITHHELD" : n(value).toFixed(digits);
+  const moneyValue = (value: unknown) => value == null ? "WITHHELD" : "₹" + n(value).toFixed(2) + "L";
+  return [
+    "Earned Value as of " + clean(row.as_of_date) + ": BAC " + moneyValue(result.bacLakh) + " · PV " + moneyValue(result.pvLakh) + " · EV " + moneyValue(result.evLakh) + " · AC " + moneyValue(result.acLakh) + ".",
+    "Performance: SPI " + show(result.spi) + " · CPI " + show(result.cpi) + " · schedule variance " + moneyValue(result.svLakh) + " · cost variance " + moneyValue(result.cvLakh) + ".",
+    "Completion outlook: EAC " + moneyValue(result.eacLakh) + " · ETC " + moneyValue(result.etcLakh) + " · VAC " + moneyValue(result.vacLakh) + " · TCPI(BAC) " + show(result.tcpiBac) + ".",
+    "Evidence coverage: physical progress " + show(result.progressCoveragePct, 1) + "% · actual cost " + show(result.actualCostCoveragePct, 1) + "%. Source " + clean(row.source_reference) + " · run " + clean(row.id) + ".",
+    "Authority boundary: Earned Value is advisory program-control evidence. EV is derived from governed task completion/progress; VIBPE does not approve budgets, payments, schedule changes, engineering release or transactions."
+  ].join("\n\n");
+}
+
 async function decisionIntelligenceAnswer(sql: Sql) {
   const {result}=await buildDecisionIntelligenceFromSql(sql);
   const primary=result.options.find((option)=>option.id===result.primaryAdvisoryOptionId)??result.options[0];
@@ -895,6 +922,7 @@ export async function tryGovernanceDataAnswer(sql: Sql, question: string) {
   if (isTraceabilityExceptionQuestion(question)) return traceabilityExceptionAnswer(sql);
   if (isGovernanceOperatingStatusQuestion(question)) return governanceOperatingStatusAnswer(sql);
   if (isOverallRagHealthQuestion(question)) return overallRagHealthAnswer(sql);
+  if (isEarnedValueQuestion(question)) return earnedValueAnswer(sql);
   if (isDecisionIntelligenceQuestion(question)) return decisionIntelligenceAnswer(sql);
   if (isSupplierRiskIntelligenceQuestion(question)) return supplierRiskIntelligenceAnswer(sql);
   if (isRiskIntelligenceQuestion(question)) return riskIntelligenceAnswer(sql);

@@ -6,6 +6,7 @@ import { PlanningStudio } from "@/components/planning-studio";
 import { ProgramGatePlan } from "@/components/program-gate-plan";
 import { ProgramForecastPanel } from "@/components/program-forecast-panel";
 import { MonteCarloPanel } from "@/components/monte-carlo-panel";
+import { EarnedValuePanel } from "@/components/earned-value-panel";
 import { COMPANY, TRANCHES } from "@/lib/data/company";
 import { getCommandRole } from "@/lib/command-access";
 import { listEngineeringAuthority } from "@/lib/engineering-authority";
@@ -15,6 +16,7 @@ import { canPerform } from "@/lib/page-access";
 import { getProgramPlanningState } from "@/lib/program-planning-authority";
 import { getProgramForecastState } from "@/lib/forecast-authority";
 import { getMonteCarloState } from "@/lib/monte-carlo-authority";
+import { getEarnedValueState } from "@/lib/earned-value-authority";
 import {
   DEFAULT_APPROVED_OPERATING_PLAN,
   calendarMonthForPlanMonth,
@@ -24,7 +26,7 @@ import {
 
 export const Route = createFileRoute("/command/planning")({
   loader: async () => {
-    const [role, plan, engineering, procurement, program, forecast, monteCarlo] = await Promise.all([
+    const [role, plan, engineering, procurement, program, forecast, monteCarlo, earnedValue] = await Promise.all([
       getCommandRole(),
       getOperatingPlanState(),
       listEngineeringAuthority(),
@@ -32,8 +34,9 @@ export const Route = createFileRoute("/command/planning")({
       getProgramPlanningState(),
       getProgramForecastState(),
       getMonteCarloState(),
+      getEarnedValueState(),
     ]);
-    return { role, plan, engineering, procurement, program, forecast, monteCarlo };
+    return { role, plan, engineering, procurement, program, forecast, monteCarlo, earnedValue };
   },
   component: MasterPlan,
 });
@@ -59,7 +62,7 @@ const ROADMAP_META = [
 const capitalLadder = TRANCHES.filter((t) => t.id !== "STBY").reduce((s, t) => s + t.amount, 0);
 
 function MasterPlan() {
-  const { role, plan, engineering, procurement, program, forecast, monteCarlo } = Route.useLoaderData();
+  const { role, plan, engineering, procurement, program, forecast, monteCarlo, earnedValue } = Route.useLoaderData();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -212,6 +215,8 @@ function MasterPlan() {
     <PlanningStudio role={role} approvedFinance={plan.approved?.finance ?? null} draftFinance={plan.draft?.finance ?? null} draftId={plan.draft?.id ?? null} engineeringCoverage={engineeringCoverage} realityBlockers={realityBlockers} />
 
     <ProgramGatePlan role={role} state={program} />
+
+    <EarnedValuePanel state={earnedValue} />
 
     <ProgramForecastPanel state={forecast} />
 
