@@ -16,6 +16,9 @@ test("H3 qualifies bounded DB, route and optimizer load without weakening govern
   ]);
 
   assert.match(db,/for \(const concurrency of \[5,10,20\]\)/);
+  assert.match(db,/async function warmPool/);
+  assert.match(db,/startupWarmup/);
+  assert.match(db,/clients\.map\(\(client\)=>client\.release\(\)\)/);
   assert.match(db,/H3-HOTSPOT/);
   assert.match(db,/hotspotCurrentRevision,13/);
   assert.match(db,/unattributedAuditEvents,0/);

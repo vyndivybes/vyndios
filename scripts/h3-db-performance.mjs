@@ -66,6 +66,14 @@ async function runConcurrent({ concurrency, count, operation }) {
   return phaseStats(samples,Date.now()-started);
 }
 
+async function warmPool(size) {
+  const started=Date.now();
+  const clients=await Promise.all(Array.from({length:size},()=>pool.connect()));
+  const wallMs=Date.now()-started;
+  clients.map((client)=>client.release());
+  return {connections:size,wallMs};
+}
+
 async function saveOrder(id, units, actor="h3-load") {
   return pool.query(
     `select * from save_vyndi_sales_order(
@@ -84,6 +92,7 @@ const evidence={
   environment:"isolated-postgresql",
   poolMax:20,
   startedAt:new Date().toISOString(),
+  startupWarmup:null,
   readTiers:[],
   writeTiers:[],
   hotspot:null,
@@ -95,7 +104,7 @@ const evidence={
 };
 
 try {
-  await pool.query("select 1");
+  evidence.startupWarmup=await warmPool(evidence.poolMax);
   await pool.query("delete from vyndi_sales_order_revisions where sales_order_id like 'H3-%'");
   await pool.query("delete from vyndi_audit_events where entity_type='sales_order' and entity_id like 'H3-%'");
   await pool.query("delete from vyndi_sales_orders where id like 'H3-%'");
