@@ -699,7 +699,9 @@ async function monteCarloAnswer(sql: Sql) {
     `Schedule: P50 ${result.schedule.p50Days??"WITHHELD"}d · P80 ${result.schedule.p80Days??"WITHHELD"}d · P95 ${result.schedule.p95Days??"WITHHELD"}d.`,
     `Dominant sampled critical path: ${path?`${path.path.join(" → ")} (${path.frequencyPct}%)`:"unavailable"}.`,
     `Cost: ${result.cost.available?`P50 ₹${result.cost.p50Lakh}L · P80 ₹${result.cost.p80Lakh}L · P95 ₹${result.cost.p95Lakh}L`:"WITHHELD"}.`,
-    `Evidence: ${clean(row.source_reference)} · captured ${clean(row.created_at)}.`,
+    `Evidence: ${clean(row.source_reference)} · captured ${clean(row.created_at)}. This is a saved simulation, not a new run performed by chat.`,
+    `Model assumptions and limitations: ${(result.limitations ?? []).join(" ") || "Not retained; review the captured simulation inputs before interpreting percentiles."}`,
+    "Controlled next action: review optimistic/most-likely/pessimistic task inputs and dependencies in /command/planning; capture a new seeded run if the schedule has changed. Simulated percentiles are not observed delivery performance.",
     "Boundary: this Monte Carlo uses governed program task uncertainty and resamples the critical path. It is not a physical material/FEA/fatigue response model; those probabilities remain withheld until explicit governed response functions exist."
   ].join("\n\n");
 }
@@ -1185,3 +1187,4 @@ export async function tryGovernanceDataAnswer(sql: Sql, question: string) {
   if (isProgramForecastQuestion(question)) return programForecastAnswer(sql);
   return undefined;
 }
+

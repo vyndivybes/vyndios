@@ -9,6 +9,9 @@ import { tryVibpeOperationalControlCompletion } from "@/lib/vibpe-operational-co
 import { tryVibpePriorityOperationalControl } from "@/lib/vibpe-operational-control-priority";
 import { answerGovernedOptimizerExecutionRequest } from "@/lib/vibpe-optimizer-copilot";
 
+import { isVibpeContextualRequest } from "@/lib/vibpe-intent";
+import { vibpeSourceFailureMessage } from "@/lib/vibpe-answer-quality";
+
 function normalizeQuestion(question: string) {
   return question
     .replaceAll("\u2019", "'")
@@ -45,30 +48,38 @@ export const askVibpeGovernanceCopilot = createServerFn({ method: "POST" })
       context.userId ? { userId: context.userId, email: context.userEmail } : undefined,
     );
 
-    const sql = await getSql();
-    const question = normalizeQuestion(data.question);
+    if (isVibpeContextualRequest(data.question)) return { handled: false as const };
 
-    const priorityAnswer = await tryVibpePriorityOperationalControl(sql, question);
-    if (priorityAnswer) return { handled: true as const, answer: priorityAnswer };
+    try {
+      const sql = await getSql();
+      const question = normalizeQuestion(data.question);
 
-    const completionAnswer = await tryVibpeOperationalControlCompletion(sql, question);
-    if (completionAnswer) return { handled: true as const, answer: completionAnswer };
+      const optimizerAnswer = await answerGovernedOptimizerExecutionRequest(sql, question);
+      if (optimizerAnswer) return { handled: true as const, answer: optimizerAnswer };
 
-    const operationalAuditAnswer = await tryVibpeOperationalControlAudit(sql, question);
-    if (operationalAuditAnswer) return { handled: true as const, answer: operationalAuditAnswer };
+      const priorityAnswer = await tryVibpePriorityOperationalControl(sql, question);
+      if (priorityAnswer) return { handled: true as const, answer: priorityAnswer };
 
-    const specialistAnswer = await tryVibpeLiveSpecialistAnswer(sql, question);
-    if (specialistAnswer) return { handled: true as const, answer: specialistAnswer };
+      const completionAnswer = await tryVibpeOperationalControlCompletion(sql, question);
+      if (completionAnswer) return { handled: true as const, answer: completionAnswer };
 
-    const governanceAnswer = await tryGovernanceDataAnswer(sql, data.question);
-    if (governanceAnswer) return { handled: true as const, answer: governanceAnswer };
+      const operationalAuditAnswer = await tryVibpeOperationalControlAudit(sql, question);
+      if (operationalAuditAnswer) return { handled: true as const, answer: operationalAuditAnswer };
 
-    if (isExactOperationalControlQuestion(question)) {
-      return { handled: true as const, answer: exactControlFallback(question) };
+      const specialistAnswer = await tryVibpeLiveSpecialistAnswer(sql, question);
+      if (specialistAnswer) return { handled: true as const, answer: specialistAnswer };
+
+      const governanceAnswer = await tryGovernanceDataAnswer(sql, data.question);
+      if (governanceAnswer) return { handled: true as const, answer: governanceAnswer };
+
+      if (isExactOperationalControlQuestion(question)) {
+        return { handled: true as const, answer: exactControlFallback(question) };
+      }
+
+
+      return { handled: false as const };
+    } catch {
+      return { handled: true as const, answer: vibpeSourceFailureMessage("The governed record source"), dataMode: "degraded" as const };
     }
-
-    const optimizerAnswer = await answerGovernedOptimizerExecutionRequest(sql, question);
-    if (optimizerAnswer) return { handled: true as const, answer: optimizerAnswer };
-
-    return { handled: false as const };
   });
+

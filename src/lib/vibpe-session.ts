@@ -3,6 +3,8 @@ import type { IbpeScenarioRequest } from "@/lib/ibpe-scenario-lab";
 import { loadPersistedVibpeSession, persistVibpeSession } from "@/lib/vibpe-persistence";
 
 export type VibpeSessionState = {
+  governedRunId?: string;
+  selectedUiScenarioKey?: string;
   activeScenario?: IbpeScenarioRequest;
   previousScenario?: IbpeScenarioRequest;
   planningHorizonMonths?: number;
@@ -38,10 +40,11 @@ export async function hydrateVibpeSession(
       ...persisted,
       referencedProducts: persisted.referencedProducts ?? [],
     };
-    sessions.set(sessionKey, normalized);
+    sessions.set(JSON.stringify([ownerKey, sessionKey]), normalized);
     return normalized;
   }
-  return getVibpeSession(sessionKey);
+  sessions.delete(JSON.stringify([ownerKey, sessionKey]));
+  return { referencedProducts: [] };
 }
 
 export async function updatePersistedVibpeSession(
@@ -50,8 +53,10 @@ export async function updatePersistedVibpeSession(
   sessionKey: string,
   patch: Partial<VibpeSessionState>,
 ): Promise<VibpeSessionState> {
-  const next = updateVibpeSession(sessionKey, patch);
+  const key = JSON.stringify([ownerKey, sessionKey]);
+  const next = { ...getVibpeSession(key), ...patch };
   await persistVibpeSession(sql, ownerKey, sessionKey, next);
+  sessions.set(key, next);
   return next;
 }
 
@@ -59,6 +64,7 @@ export function clearVibpeSession(sessionKey: string) {
   sessions.delete(sessionKey);
 }
 
-// The in-memory map is only a request-local cache. Durable advisory decision
+// The owner-scoped in-memory map is a warm-process cache; hydration always reads durable state. Durable advisory decision
 // context is persisted separately and remains non-transactional. Approved plans,
 // releases, finance postings and procurement commitments stay in owning services.
+

@@ -16,6 +16,7 @@ import { retrieveVibpeKnowledgeEvidence, type VibpeKnowledgeEvidence } from "@/l
 import { refreshVibpeWeeklyReviewsIfStale } from "@/lib/vibpe-weekly-review-knowledge";
 import { refreshVayuShastrDriveIfStale } from "@/lib/vibpe-vayu-shastr-drive";
 import { buildVibpeAnswerReceipt, deriveVibpeDegradationState, type VibpeSourceState } from "@/lib/vibpe-reasoning-core";
+import { assessVibpeEvidenceQuality, requiredVibpeMethod, describeVibpeMethod, vibpeSourceFailureMessage, type VibpeEvidenceQuality } from "@/lib/vibpe-answer-quality";
 import { persistVibpeAnswerReceipt } from "@/lib/vibpe-persistence";
 
 export type IbpeCopilotRequest = {
@@ -37,6 +38,7 @@ export type IbpeCopilotResponse = {
   scenarioId?: string;
   knowledgeEvidence?: VibpeKnowledgeEvidence[];
   reasoningReceiptId?: string;
+  evidenceQuality?: VibpeEvidenceQuality;
   dataMode?: "live" | "partial" | "degraded" | "fixture" | "assumption-dependent";
   advisoryOnly: true;
 };
@@ -48,6 +50,7 @@ type LatestRunRow = {
   approved_plan_revision: number | string;
   input_hash: string;
   source_sha: string;
+  captured_at: string;
   result_json: IntegratedPlanningResult;
   validation_json: IbpeValidationContext;
 };
@@ -488,7 +491,7 @@ function systemPrompt() {
 async function latestRun() {
   const sql = await getSql();
   const rows = await sql.query<LatestRunRow>(
-    `select id,engine_version,approved_plan_revision,input_hash,source_sha,result_json,validation_json
+    `select id,engine_version,approved_plan_revision,input_hash,source_sha,result_json,validation_json,created_at::text as captured_at
        from vyndi_ibpe_runs where status='complete' order by created_at desc limit 1`,
   );
   const row = rows[0];
@@ -508,7 +511,13 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
     const actor = await requireBusinessActor("view");
     if (!data.question) return { ok: false, error: "Ask a question first.", advisoryOnly: true };
 
-    const { sql, row } = await latestRun();
+    let loaded: Awaited<ReturnType<typeof latestRun>>;
+    try {
+      loaded = await latestRun();
+    } catch {
+      return { ok: false, error: vibpeSourceFailureMessage("The governed IBPE baseline") + " Run or refresh governed IBPE before retrying.", dataMode: "degraded", advisoryOnly: true };
+    }
+    const { sql, row } = loaded;
     let knowledgeRefreshWarning: string | undefined;
     try {
       await Promise.all([
@@ -531,7 +540,8 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
       sourceSha: row.source_sha,
     };
     const questions = splitQuestions(data.question);
-    const runtimeSourceStates: VibpeSourceState[] = [];
+    const runtimeSourceStates: VibpeSourceState[] = [{ source: "governed-IBPE-snapshot", status: "cached", detail: `Captured ${row.captured_at || "at an unknown time"}; snapshot interpretation is not a fresh engine run.` }];
+    if (knowledgeRefreshWarning) runtimeSourceStates.push({ source: "knowledge-refresh", status: "unavailable", detail: "Refresh failed; retained knowledge is historical." });
     let knowledgeEvidence: VibpeKnowledgeEvidence[] = [];
     try {
       knowledgeEvidence = await retrieveVibpeKnowledgeEvidence(sql, data.question, 10);
@@ -586,6 +596,8 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
       try {
         vibpe2 = await runVibpeCopilot2(sql, data.question, row.result_json, {
           sessionKey: actor.userId,
+          ownerKey: actor.userId,
+          governedRunId: row.id,
           uiScenario: data.scenario,
         });
       } catch (error) {
@@ -595,6 +607,8 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
           detail: error instanceof Error ? error.message : "VIBPE reasoning runtime failed",
         });
         vibpe2FallbackReason = "runtime-error";
+        // A failed scenario/record request must never be replaced by an unrelated baseline answer.
+        return { ok: false, error: vibpeSourceFailureMessage("The requested Co-Pilot analysis"), dataMode: "degraded", advisoryOnly: true };
       }
     }
     const handledByVibpe2 = Boolean(vibpe2?.answer);
@@ -711,6 +725,21 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
       answer = `${answer}\n\n${dataState.disclosure}`;
     }
 
+    const requestedMethod = requiredVibpeMethod(data.question);
+    const methodVerified = requestedMethod === "scenario" ? Boolean(vibpe2?.scenarioResult || scenarioIds.size)
+      : requestedMethod === "highs-optimisation" || requestedMethod === "monte-carlo" ? false
+      : mode === "deterministic" && !vibpe2FallbackReason;
+    const evidenceQuality = assessVibpeEvidenceQuality({
+      sourceCount: 1 + surfacedKnowledgeEvidence.length,
+      unavailableCount: combinedSourceStates.filter((source) => source.status === "unavailable").length,
+      unresolvedCount: surfacedKnowledgeEvidence.filter((item) => item.authority === "unresolved").length,
+      lineageComplete: Boolean(row.id && row.input_hash && row.source_sha && Number(row.approved_plan_revision) > 0),
+      capturedAt: row.captured_at,
+      methodVerified,
+    });
+    answer += `\n\n${describeVibpeMethod(requestedMethod, Boolean(vibpe2?.scenarioResult || scenarioIds.size))}`;
+    answer += `\nEvidence assessment: ${evidenceQuality.status.toUpperCase()}. ${evidenceQuality.reasons.join(" ")} This assesses evidence coverage, not a calibrated probability of correctness.`;
+
     const reasoningReceiptId = `VIBPE-ANS-${crypto.randomUUID()}`;
     const receipt = buildVibpeAnswerReceipt({
       answerId: reasoningReceiptId,
@@ -724,7 +753,7 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
           claimClass: "governed-lineage",
           source: `IBPE:${row.input_hash.slice(0, 12)}`,
           revision: String(row.approved_plan_revision),
-          effectiveDate: new Date().toISOString().slice(0, 10),
+          effectiveDate: row.captured_at,
           authority: "governed-internal",
           supersessionState: "current",
           support: "direct",
@@ -744,19 +773,19 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
           reviewerStatus: "unreviewed" as const,
         })),
       ],
-      assumptions: vibpe2?.scenario ? [`Scenario: ${vibpe2.scenario.label}`] : [],
+      assumptions: vibpe2?.scenario ? [`Scenario: ${vibpe2.scenario.label}`, JSON.stringify(vibpe2.scenario)] : [],
       contradictions: [],
       calculations: [],
       reasoningTrace: [
         { stage: "classify-intent", status: "completed", detail: vibpe2?.intent ?? (executiveAssessment ? "assessment" : "legacy-fallback") },
         { stage: "decompose-question", status: "completed", detail: `${questions.length} question component(s)` },
         { stage: "retrieve-evidence", status: dataState.mode === "degraded" ? "blocked" : "completed", detail: dataState.disclosure },
-        { stage: "identify-conflicts", status: "completed", detail: "Authority and supersession guards applied; unresolved evidence remains explicitly unresolved." },
+        { stage: "identify-conflicts", status: "skipped", detail: "Authority labels are retained. Comprehensive cross-source contradiction detection was not performed." },
         { stage: "declare-assumptions", status: "completed", detail: vibpe2?.scenario ? `Scenario assumption: ${vibpe2.scenario.label}` : "No additional scenario assumption declared." },
-        { stage: "calculate-or-simulate", status: mode === "deterministic" ? "completed" : "skipped", detail: mode === "deterministic" ? "Governed deterministic planning path used." : "AI narrative did not replace governed numerical outputs." },
-        { stage: "test-constraints", status: "completed", detail: "Governed IBPE/advanced-planning constraints remain authoritative when available." },
-        { stage: "score-correctness", status: "completed", detail: "Five-dimension verification contract emitted." },
-        { stage: "state-uncertainty", status: "completed", detail: `Data mode ${dataState.mode}; confidence is calibrated conservatively.` },
+        { stage: "calculate-or-simulate", status: methodVerified ? "completed" : "blocked", detail: describeVibpeMethod(requestedMethod, Boolean(vibpe2?.scenarioResult || scenarioIds.size)) },
+        { stage: "test-constraints", status: "skipped", detail: "This answer does not independently rerun solver constraints; inspect persisted planning/solver evidence." },
+        { stage: "score-correctness", status: "completed", detail: "Evidence coverage checklist emitted; empirical answer correctness is unmeasured." },
+        { stage: "state-uncertainty", status: "completed", detail: `Data mode ${dataState.mode}; evidence coverage is not a calibrated probability.` },
         { stage: "recommend-controlled-action", status: "completed", detail: "Owning human authority remains required for controlled actions." },
       ],
       fiveDimensions: {
@@ -785,12 +814,15 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
           basis: "Evidence lineage and assumptions are explicit; unresolved empirical validation remains open where applicable.",
         },
       },
-      confidence: dataState.mode === "live" ? (mode === "deterministic" ? 0.82 : 0.72) : 0.58,
+      confidence: evidenceQuality.coverageScore,
+      evidenceQuality,
       nextAction: "Resolve any degraded source or unresolved constraint before relying on this advisory answer for a controlled action.",
     });
 
+    let receiptPersisted = false;
     try {
       await persistVibpeAnswerReceipt(sql, actor.userId, actor.userId, receipt);
+      receiptPersisted = true;
     } catch (error) {
       runtimeSourceStates.push({
         source: "answer-receipt",
@@ -801,39 +833,46 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
         ...(vibpe2?.dataState?.sources ?? []),
         ...runtimeSourceStates,
       ]);
+      evidenceQuality.status = "withheld";
+      evidenceQuality.reasons.push("The immutable answer receipt could not be saved.");
       if (!answer.includes("answer-receipt unavailable")) {
-        answer = `${answer}\n\nDegraded-state disclosure: answer-receipt unavailable; the advisory answer was returned but its immutable receipt was not persisted.`;
+        answer = `${answer}\n\nDegraded-state disclosure: answer-receipt unavailable; the advisory answer was returned but its immutable receipt was not persisted. Final evidence assessment: WITHHELD for controlled reliance.`;
       }
     }
 
     const questionHash = createHash("sha256").update(data.question).digest("hex");
-    await sql.query(
-      `insert into vyndi_audit_events
-        (id,entity_type,entity_id,entity_revision,action,actor_user_id,actor_role,source_reference,payload_json)
-       values ($1,'ibpe_copilot',$2,$3,'explored',$4,$5,$6,$7::jsonb)`,
-      [
-        `AUD-IBPE-AI-${crypto.randomUUID()}`,
-        row.id,
-        Number(row.approved_plan_revision),
-        actor.userId,
-        actor.role,
-        `IBPE:${row.input_hash.slice(0,12)}`,
-        JSON.stringify({
-          questionHash,
-          questionCount: questions.length,
-          scenarioId: scenarioId ?? null,
-          scenarioIds: [...scenarioIds],
-          mode,
-          executiveAssessment,
-          answerChars: answer.length,
-          knowledgeEvidenceCount: knowledgeEvidence.length,
-          knowledgeRefreshWarning: knowledgeRefreshWarning ?? null,
-          knowledgeEvidenceDocumentIds: [...new Set(knowledgeEvidence.map((item) => item.documentId))],
-          copilotVersion: handledByVibpe2 ? "2.0" : "legacy-fallback",
-          vibpe2FallbackReason: vibpe2FallbackReason ?? null,
-        }),
-      ],
-    );
+    try {
+      await sql.query(
+        `insert into vyndi_audit_events
+          (id,entity_type,entity_id,entity_revision,action,actor_user_id,actor_role,source_reference,payload_json)
+         values ($1,'ibpe_copilot',$2,$3,'explored',$4,$5,$6,$7::jsonb)`,
+        [
+          `AUD-IBPE-AI-${crypto.randomUUID()}`,
+          row.id,
+          Number(row.approved_plan_revision),
+          actor.userId,
+          actor.role,
+          `IBPE:${row.input_hash.slice(0,12)}`,
+          JSON.stringify({
+            questionHash,
+            questionCount: questions.length,
+            scenarioId: scenarioId ?? null,
+            scenarioIds: [...scenarioIds],
+            mode,
+            executiveAssessment,
+            answerChars: answer.length,
+            knowledgeEvidenceCount: knowledgeEvidence.length,
+            knowledgeRefreshWarning: knowledgeRefreshWarning ?? null,
+            knowledgeEvidenceDocumentIds: [...new Set(knowledgeEvidence.map((item) => item.documentId))],
+            copilotVersion: handledByVibpe2 ? "2.0" : "legacy-fallback",
+            vibpe2FallbackReason: vibpe2FallbackReason ?? null,
+          }),
+        ],
+      );
+
+    } catch {
+      return { ok: false, error: "The answer audit could not be recorded. Restore audit persistence and retry; this response is not qualified for a controlled decision.", dataMode: "degraded", advisoryOnly: true };
+    }
 
     return {
       ok: true,
@@ -842,8 +881,10 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
       lineage,
       scenarioId,
       knowledgeEvidence: surfacedKnowledgeEvidence,
-      reasoningReceiptId,
+      reasoningReceiptId: receiptPersisted ? reasoningReceiptId : undefined,
+      evidenceQuality,
       dataMode: dataState.mode,
       advisoryOnly: true,
     };
   }));
+

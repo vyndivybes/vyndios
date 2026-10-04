@@ -1,3 +1,4 @@
+import { isVibpeContextualRequest } from "@/lib/vibpe-intent";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "@tanstack/react-router";
 import { Bot, BrainCircuit, ChevronRight, ExternalLink, FileSearch, Printer, Send, ShieldCheck, Sparkles, X } from "lucide-react";
@@ -183,29 +184,32 @@ export function IbpeCopilot() {
   }, [messages, busy]);
 
   async function resolveOne(clean: string): Promise<RoutedAnswer> {
-    const governance = await askVibpeGovernanceCopilot({ data: { question: clean } });
-    if (governance.handled) {
-      return {
-        text: governance.answer,
-        meta: "Governed VIBPE control state · live read-only sources",
-      };
-    }
+    if (!isVibpeContextualRequest(clean)) {
+      const governance = await askVibpeGovernanceCopilot({ data: { question: clean } });
+      if (governance.handled) {
+        return {
+          text: governance.answer,
+          meta: "dataMode" in governance && governance.dataMode === "degraded" ? "Governed source unavailable · conclusion withheld" : "Governed VIBPE control state · live read-only sources",
+        };
+      }
 
-    const operational = await askVibpeOperationalStatus({ data: { question: clean } });
-    if (operational.handled) {
-      return {
-        text: operational.answer,
-        meta: "Governed operational status · live read-only sources",
-      };
-    }
+      const operational = await askVibpeOperationalStatus({ data: { question: clean } });
+      if (operational.handled) {
+        return {
+          text: operational.answer,
+          meta: "Governed operational status · live read-only sources",
+        };
+      }
 
-    const traceability = await askTraceabilityCopilot({ data: { question: clean } });
-    if (traceability.handled) {
-      return {
-        text: traceability.answer,
-        meta: "Governed traceability search · read-only · RBAC filtered",
-        traceabilityQuery: traceability.query,
-      };
+      const traceability = await askTraceabilityCopilot({ data: { question: clean } });
+      if (traceability.handled) {
+        return {
+          text: traceability.answer,
+          meta: "Governed traceability search · read-only · RBAC filtered",
+          traceabilityQuery: traceability.query,
+        };
+      }
+
     }
 
     const response = await askIbpeCopilot({ data: { question: clean, scenario: scenario ?? undefined } });
@@ -443,3 +447,4 @@ export function IbpeCopilot() {
     </>
   );
 }
+

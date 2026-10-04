@@ -21,6 +21,9 @@ export type VibpeScenarioParse = {
   intent: VibpeIntent;
   horizonMonths?: number;
   scenario?: IbpeScenarioRequest;
+  scenarioPatch?: Partial<IbpeScenarioRequest>;
+  fundingDelayMonths?: number;
+  resetScenario?: boolean;
   referencedProducts: string[];
   preservePriorScenario: boolean;
   conversationalReply?: string;
@@ -74,10 +77,14 @@ function cashInjectionFromQuestion(question: string) {
 }
 
 function percentFrom(question: string, terms: RegExp) {
-  const q = normalise(question.toLowerCase());
-  const before = q.match(new RegExp(`(\\d+(?:\\.\\d+)?)\\s*%[^.;]{0,30}${terms.source}`, "i"));
-  const after = q.match(new RegExp(`${terms.source}[^.;]{0,30}(\\d+(?:\\.\\d+)?)\\s*%`, "i"));
-  return numberFrom(before) ?? numberFrom(after);
+  // Split independent changes so a cost percentage cannot become a demand change.
+  const clauses = normalise(question.toLowerCase()).split(/;|\band\b|\bthen\b|\balso\b/);
+  for (const clause of clauses) {
+    if (!terms.test(clause)) continue;
+    const matches = [...clause.matchAll(/(\d+(?:\.\d+)?)\s*%/g)];
+    if (matches.length === 1) return Number(matches[0][1]);
+  }
+  return undefined;
 }
 
 function delayFromQuestion(question: string) {
@@ -107,19 +114,25 @@ export function parseVibpeIntent(question: string): VibpeScenarioParse {
   const referencedProducts = referenced.map(([, productId]) => productId);
   const horizonMonths = horizonFromQuestion(question);
   const cashInjectionLakh = cashInjectionFromQuestion(question);
-  const demandPct = percentFrom(question, /(?:demand|sales|volume|units|growth|increase|decrease|reduce|cut)/);
+  const demandPct = percentFrom(question, /(?:demand|sales|volume|units|growth)/);
   const costPct = percentFrom(question, /(?:procurement|purchase|supplier|material|component|cost|price)/);
   const capacityPct = percentFrom(question, /(?:capacity|production|manufacturing|output)/);
   const leadTimePct = percentFrom(question, /(?:lead\s*time|supplier\s*time)/);
   const delayMonths = delayFromQuestion(question);
+  const fundingDelayMonths = /fund|capital|cash injection/i.test(q)
+    ? delayMonths ?? numberFrom(normalise(q).match(/(?:funding|capital|cash injection)[^.;]{0,30}(\d{1,2})\s*months?\s+(?:late|later)/i))
+    : undefined;
+  const resetScenario = /\b(?:reset|clear) (?:the )?scenario\b|\b(?:new scenario|from baseline|back to (?:the )?baseline)\b|^(?:show (?:the )?)?(?:governed |approved )?baseline[?.!\s]*$/i.test(question);
 
-  const asksDecreaseDemand = /(?:reduce|decrease|cut|lower|slow)[^.;]{0,30}(?:demand|sales|volume|units)|(?:demand|sales|volume|units)[^.;]{0,30}(?:reduce|decrease|cut|lower|slow)/i.test(q);
-  const asksDecreaseCost = /(?:reduce|decrease|cut|lower)[^.;]{0,30}(?:cost|price|procurement)|(?:cost|price|procurement)[^.;]{0,30}(?:reduce|decrease|cut|lower)/i.test(q);
+  const decreases = (terms: RegExp) => normalise(q).split(/;|\band\b|\bthen\b|\balso\b/)
+    .some((clause) => terms.test(clause) && /\b(reduce|decrease|cut|lower|slow)\b/.test(clause));
+  const asksDecreaseDemand = decreases(/demand|sales|volume|units/);
+  const asksDecreaseCost = decreases(/cost|price|procurement|purchase|supplier|material|component/);
 
   const patch: Partial<IbpeScenarioRequest> = {};
   if (cashInjectionLakh != null) {
     patch.cashInjectionLakh = cashInjectionLakh;
-    patch.cashInjectionPeriod = 1;
+    patch.cashInjectionPeriod = numberFrom(normalise(q).match(/(?:in|at|by)\s+(?:month\s*|m)(\d{1,2})\b/i)) ?? 1;
   }
   if (demandPct != null && /demand|sales|volume|units|growth/i.test(q)) {
     const multiplier = 1 + (asksDecreaseDemand ? -demandPct : demandPct) / 100;
@@ -130,11 +143,11 @@ export function parseVibpeIntent(question: string): VibpeScenarioParse {
     patch.procurementCostMultiplier = 1 + (asksDecreaseCost ? -costPct : costPct) / 100;
   }
   if (capacityPct != null && /capacity|production|manufacturing|output/i.test(q)) {
-    const decrease = /reduce|decrease|cut|lower/i.test(q);
+    const decrease = decreases(/capacity|production|manufacturing|output/);
     patch.capacityMultiplier = 1 + (decrease ? -capacityPct : capacityPct) / 100;
   }
   if (leadTimePct != null && /lead\s*time|supplier\s*time/i.test(q)) {
-    const decrease = /reduce|decrease|cut|lower/i.test(q);
+    const decrease = decreases(/lead\s*time|supplier\s*time/);
     patch.leadTimeMultiplier = 1 + (decrease ? -leadTimePct : leadTimePct) / 100;
   }
   if (delayMonths != null && /receipt|supply|supplier|delivery/i.test(q)) patch.receiptDelayMonths = delayMonths;
@@ -147,11 +160,11 @@ export function parseVibpeIntent(question: string): VibpeScenarioParse {
   const asksNavigation = /take me to|open (?:the )?(?:page|workspace)|navigate to|go to (?:the )?/i.test(q);
 
   let intent: VibpeIntent = "assessment";
-  if (isFollowUp) intent = "follow-up";
+  if (isFollowUp) intent = asksCompare ? "comparison" : "follow-up";
   else if (asksNavigation) intent = "navigation";
   else if (asksCompare) intent = "comparison";
   else if (asksOptimise) intent = "optimisation";
-  else if (scenarioRequested) intent = "scenario";
+  else if (scenarioRequested || fundingDelayMonths != null) intent = "scenario";
   else if (horizonMonths != null || /how to plan|plan for the next|forecast the next/i.test(q)) intent = "planning-horizon";
   else if (asksRootCause) intent = "root-cause";
   else if (/fund|cash|liquid|runway|budget|money/i.test(q)) intent = "funding";
@@ -174,6 +187,9 @@ export function parseVibpeIntent(question: string): VibpeScenarioParse {
     intent,
     horizonMonths,
     scenario,
+    scenarioPatch: scenarioRequested ? patch : undefined,
+    fundingDelayMonths,
+    resetScenario,
     referencedProducts,
     preservePriorScenario: intent === "follow-up" || intent === "comparison",
   };
@@ -196,4 +212,10 @@ function buildScenarioLabel(input: {
   if (input.leadTimePct != null) parts.push(`lead time ${input.leadTimePct}%`);
   if (input.delayMonths != null) parts.push(`delay ${input.delayMonths}m`);
   return parts.join(" · ") || "Advisory scenario";
+}
+
+/** Keep hypothetical and conversational requests out of exact-ledger fallback handlers. */
+export function isVibpeContextualRequest(question: string): boolean {
+  const parsed = parseVibpeIntent(question);
+  return Boolean(parsed.scenario || parsed.fundingDelayMonths != null || parsed.resetScenario || ["follow-up", "planning-horizon", "conversation", "comparison"].includes(parsed.intent));
 }

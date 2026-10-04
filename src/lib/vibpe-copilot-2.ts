@@ -3,6 +3,8 @@ import type { IntegratedPlanningResult } from "@/lib/integrated-business-plannin
 import type { IbpeScenarioComparison, IbpeScenarioRequest } from "@/lib/ibpe-scenario-lab";
 import { evaluateScenario } from "@/lib/ibpe-scenario-lab";
 import { parseVibpeIntent, type VibpeScenarioParse } from "@/lib/vibpe-intent";
+import { resolveVibpeScenarioContext } from "@/lib/vibpe-scenario-context";
+import { vibpeSourceFailureMessage } from "@/lib/vibpe-answer-quality";
 import { retrieveVibpeKnowledgeEvidence, type VibpeKnowledgeEvidence } from "@/lib/vibpe-knowledge-retrieval";
 import { tryGovernanceDataAnswer } from "@/lib/vibpe-governance-queries";
 import { tryOperationalDataAnswer } from "@/lib/vibpe-operational-queries";
@@ -332,33 +334,55 @@ async function resolvePriorScenario(
   sql: Sql,
   governedBaseline: IntegratedPlanningResult,
   priorScenario?: IbpeScenarioRequest,
+  governedRunId?: string,
 ) {
   if (!priorScenario) return governedBaseline;
-  return (await evaluateScenario(sql, priorScenario)).result;
+  const packet = await evaluateScenario(sql, priorScenario);
+  if (governedRunId && packet.lineage.governedRunId !== governedRunId) throw new Error("Baseline changed during follow-up; retry.");
+  return packet.result;
 }
 
 export async function runVibpeCopilot2(
   sql: Sql,
   question: string,
   governedBaseline: IntegratedPlanningResult,
-  options: { sessionKey?: string; ownerKey?: string; uiScenario?: IbpeScenarioRequest } = {},
+  options: { sessionKey?: string; ownerKey?: string; uiScenario?: IbpeScenarioRequest; governedRunId?: string } = {},
 ): Promise<VibpeCopilot2Result> {
   const parsed = parseVibpeIntent(question);
   const sessionKey = options.sessionKey ?? "default";
   const ownerKey = options.ownerKey ?? sessionKey;
   const sourceStates: VibpeSourceState[] = [];
-  let session = getVibpeSession(sessionKey);
+  let session = { referencedProducts: [] } as ReturnType<typeof getVibpeSession>;
   try {
     session = await hydrateVibpeSession(sql, ownerKey, sessionKey);
     sourceStates.push({ source: "decision-context", status: "live" });
-  } catch (error) {
+  } catch {
     sourceStates.push({
       source: "decision-context",
       status: "unavailable",
-      detail: error instanceof Error ? error.message : "persistence read failed",
+      detail: "Saved conversation context could not be loaded.",
     });
   }
-  const priorScenario = session.activeScenario ?? options.uiScenario;
+  const contextNotLoaded = sourceStates.some((source) => source.status === "unavailable");
+  const baselineChanged = Boolean(options.governedRunId && session.governedRunId !== options.governedRunId && session.activeScenario);
+  const selectedUiScenarioKey = options.uiScenario ? JSON.stringify(options.uiScenario) : session.selectedUiScenarioKey;
+  const uiSelectionChanged = Boolean(options.uiScenario && selectedUiScenarioKey !== session.selectedUiScenarioKey);
+  const priorScenario = parsed.resetScenario ? undefined : uiSelectionChanged ? options.uiScenario : baselineChanged ? undefined : session.activeScenario;
+  const resolvedContext = resolveVibpeScenarioContext(parsed, priorScenario);
+  if (parsed.scenario || parsed.fundingDelayMonths != null) parsed.scenario = resolvedContext.scenario;
+  const contextRequired = parsed.intent === "follow-up" || parsed.fundingDelayMonths != null || (parsed.intent === "comparison" && !parsed.scenario);
+  const saveSession = async (patch: Parameters<typeof updatePersistedVibpeSession>[3]) => {
+    try {
+      await updatePersistedVibpeSession(sql, ownerKey, sessionKey, {
+        ...((baselineChanged || parsed.resetScenario) ? { activeScenario: undefined, previousScenario: undefined, referencedProducts: [], planningHorizonMonths: undefined } : {}),
+        ...patch,
+        governedRunId: options.governedRunId,
+        selectedUiScenarioKey,
+      });
+    } catch {
+      sourceStates.push({ source: "decision-context-save", status: "unavailable", detail: "This conversation change was not saved. Restate the scenario on your next request." });
+    }
+  };
   const currentDataState = () => deriveVibpeDegradationState(sourceStates);
   const withDisclosure = (answer?: string) => {
     if (!answer) return answer;
@@ -366,105 +390,117 @@ export async function runVibpeCopilot2(
     return state.mode === "live" ? answer : `${answer}\n\n${state.disclosure}`;
   };
 
-  try {
-    const governanceAnswer = await tryGovernanceDataAnswer(sql, question);
-    if (governanceAnswer) {
-      await updatePersistedVibpeSession(sql, ownerKey, sessionKey, { lastIntent: parsed.intent, lastQuestion: question });
-      return {
-        intent: parsed.intent,
-        answer: withDisclosure(governanceAnswer),
-        doctrine: vibpeBusinessOperatorContext(),
-      dataState: currentDataState(),
-      advisoryOnly: true,
-      };
-    }
-  } catch (error) {
-    sourceStates.push({
-      source: "governance",
-      status: "unavailable",
-      detail: error instanceof Error ? error.message : "governance query failed",
-    });
+  if (resolvedContext.clarification || (contextRequired && !priorScenario && (baselineChanged || contextNotLoaded))) {
+    return { intent: parsed.intent, answer: resolvedContext.clarification ?? "The previous scenario cannot be safely restored for this baseline. Restate its assumptions before continuing; no follow-up calculation was performed.", doctrine: vibpeBusinessOperatorContext(), dataState: currentDataState(), advisoryOnly: true };
   }
+  if (baselineChanged || parsed.resetScenario) await saveSession({});
 
-  try {
-    const operationalAnswer = await tryOperationalDataAnswer(sql, question);
-    if (operationalAnswer) {
-      await updatePersistedVibpeSession(sql, ownerKey, sessionKey, { lastIntent: parsed.intent, lastQuestion: question });
-      return {
-        intent: parsed.intent,
-        answer: withDisclosure(operationalAnswer),
-        doctrine: vibpeBusinessOperatorContext(),
-      dataState: currentDataState(),
-      advisoryOnly: true,
-      };
-    }
-  } catch (error) {
-    sourceStates.push({
-      source: "operational",
-      status: "unavailable",
-      detail: error instanceof Error ? error.message : "operational query failed",
-    });
-  }
-
-  try {
-    const truthContractAnswer = await tryVibpeTruthContractAnswer(sql, question, governedBaseline);
-    if (truthContractAnswer) {
-      await updatePersistedVibpeSession(sql, ownerKey, sessionKey, { lastIntent: parsed.intent, lastQuestion: question });
-      return {
-        intent: parsed.intent,
-        answer: withDisclosure(truthContractAnswer),
-        doctrine: vibpeBusinessOperatorContext(),
-      dataState: currentDataState(),
-      advisoryOnly: true,
-      };
-    }
-  } catch (error) {
-    sourceStates.push({
-      source: "truth-contract",
-      status: "unavailable",
-      detail: error instanceof Error ? error.message : "truth-contract query failed",
-    });
-  }
-
-  const engineeringAnalysis = await resolveVibpeEngineeringAnalysis(sql, question);
-  if (engineeringAnalysis.handled && engineeringAnalysis.answer) {
-    await updatePersistedVibpeSession(sql, ownerKey, sessionKey, { lastIntent: parsed.intent, lastQuestion: question });
-    return {
-      intent: parsed.intent,
-      answer: withDisclosure(engineeringAnalysis.answer),
-      doctrine: vibpeBusinessOperatorContext(),
-      evidenceMode: "engineering-analysis",
-      dataState: currentDataState(),
-      advisoryOnly: true,
-    };
-  }
-
-  if (isKnowledgeQuestion(question)) {
+  // Explicit scenario and conversational requests must not be swallowed by generic ledger handlers.
+  if (!parsed.scenario && parsed.fundingDelayMonths == null && !["follow-up", "planning-horizon", "conversation", "baseline", "comparison"].includes(parsed.intent)) {
     try {
-      const evidence = await retrieveVibpeKnowledgeEvidence(sql, question, 8);
-      const answer = knowledgeAnswer(question, evidence);
-      if (answer) {
-        await updatePersistedVibpeSession(sql, ownerKey, sessionKey, { lastIntent: parsed.intent, lastQuestion: question });
+      const governanceAnswer = await tryGovernanceDataAnswer(sql, question);
+      if (governanceAnswer) {
+        await saveSession({ lastIntent: parsed.intent, lastQuestion: question });
         return {
           intent: parsed.intent,
-          answer: withDisclosure(answer),
+          answer: withDisclosure(governanceAnswer),
           doctrine: vibpeBusinessOperatorContext(),
-          evidenceMode: "repository-knowledge",
-      dataState: currentDataState(),
-      advisoryOnly: true,
+        dataState: currentDataState(),
+        advisoryOnly: true,
         };
       }
-    } catch (error) {
+    } catch {
       sourceStates.push({
-        source: "knowledge",
+        source: "governance",
         status: "unavailable",
-        detail: error instanceof Error ? error.message : "knowledge retrieval failed",
+        detail: "governance query failed",
       });
     }
+
+    try {
+      const operationalAnswer = await tryOperationalDataAnswer(sql, question);
+      if (operationalAnswer) {
+        await saveSession({ lastIntent: parsed.intent, lastQuestion: question });
+        return {
+          intent: parsed.intent,
+          answer: withDisclosure(operationalAnswer),
+          doctrine: vibpeBusinessOperatorContext(),
+        dataState: currentDataState(),
+        advisoryOnly: true,
+        };
+      }
+    } catch {
+      sourceStates.push({
+        source: "operational",
+        status: "unavailable",
+        detail: "operational query failed",
+      });
+    }
+
+    try {
+      const truthContractAnswer = await tryVibpeTruthContractAnswer(sql, question, governedBaseline);
+      if (truthContractAnswer) {
+        await saveSession({ lastIntent: parsed.intent, lastQuestion: question });
+        return {
+          intent: parsed.intent,
+          answer: withDisclosure(truthContractAnswer),
+          doctrine: vibpeBusinessOperatorContext(),
+        dataState: currentDataState(),
+        advisoryOnly: true,
+        };
+      }
+    } catch {
+      sourceStates.push({
+        source: "truth-contract",
+        status: "unavailable",
+        detail: "truth-contract query failed",
+      });
+    }
+
+    if (sourceStates.some((source) => ["governance", "operational", "truth-contract"].includes(source.source) && source.status === "unavailable")) {
+      return { intent: parsed.intent, answer: vibpeSourceFailureMessage("The requested governed record source"), doctrine: vibpeBusinessOperatorContext(), dataState: currentDataState(), advisoryOnly: true };
+    }
+    const engineeringAnalysis = await resolveVibpeEngineeringAnalysis(sql, question);
+    if (engineeringAnalysis.handled && engineeringAnalysis.answer) {
+      await saveSession({ lastIntent: parsed.intent, lastQuestion: question });
+      return {
+        intent: parsed.intent,
+        answer: withDisclosure(engineeringAnalysis.answer),
+        doctrine: vibpeBusinessOperatorContext(),
+        evidenceMode: "engineering-analysis",
+        dataState: currentDataState(),
+        advisoryOnly: true,
+      };
+    }
+
+    if (isKnowledgeQuestion(question)) {
+      try {
+        const evidence = await retrieveVibpeKnowledgeEvidence(sql, question, 8);
+        const answer = knowledgeAnswer(question, evidence);
+        if (answer) {
+          await saveSession({ lastIntent: parsed.intent, lastQuestion: question });
+          return {
+            intent: parsed.intent,
+            answer: withDisclosure(answer),
+            doctrine: vibpeBusinessOperatorContext(),
+            evidenceMode: "repository-knowledge",
+        dataState: currentDataState(),
+        advisoryOnly: true,
+          };
+        }
+      } catch {
+        sourceStates.push({
+          source: "knowledge",
+          status: "unavailable",
+          detail: "knowledge retrieval failed",
+        });
+      }
+    }
+
   }
 
   if (parsed.intent === "conversation") {
-    await updatePersistedVibpeSession(sql, ownerKey, sessionKey, { lastIntent: parsed.intent, lastQuestion: question });
+    await saveSession({ lastIntent: parsed.intent, lastQuestion: question });
     return {
       intent: parsed.intent,
       answer: withDisclosure(parsed.conversationalReply),
@@ -475,8 +511,8 @@ export async function runVibpeCopilot2(
   }
 
   if (parsed.intent === "follow-up") {
-    const target = await resolvePriorScenario(sql, governedBaseline, priorScenario);
-    await updatePersistedVibpeSession(sql, ownerKey, sessionKey, { lastIntent: parsed.intent, lastQuestion: question });
+    const target = await resolvePriorScenario(sql, governedBaseline, priorScenario, options.governedRunId);
+    await saveSession({ lastIntent: parsed.intent, lastQuestion: question });
     return {
       intent: parsed.intent,
       answer: withDisclosure(followUpAnswer(target)),
@@ -488,10 +524,17 @@ export async function runVibpeCopilot2(
     };
   }
 
+  if (parsed.intent === "comparison" && priorScenario && !parsed.scenario) {
+    const packet = await evaluateScenario(sql, priorScenario);
+    if (options.governedRunId && packet.lineage.governedRunId !== options.governedRunId) throw new Error("Baseline changed during comparison; retry.");
+    await saveSession({ lastIntent: parsed.intent, lastQuestion: question });
+    return { intent: parsed.intent, answer: withDisclosure(scenarioAnswer(packet.scenario, packet.result, packet.comparison)), scenario: packet.scenario, scenarioResult: packet.result, comparison: packet.comparison, doctrine: vibpeBusinessOperatorContext(), dataState: currentDataState(), advisoryOnly: true };
+  }
+
   if (parsed.intent === "planning-horizon") {
     const horizonMonths = parsed.horizonMonths ?? session.planningHorizonMonths ?? 6;
-    const target = await resolvePriorScenario(sql, governedBaseline, priorScenario);
-    await updatePersistedVibpeSession(sql, ownerKey, sessionKey, {
+    const target = await resolvePriorScenario(sql, governedBaseline, priorScenario, options.governedRunId);
+    await saveSession({
       planningHorizonMonths: horizonMonths,
       lastIntent: parsed.intent,
       lastQuestion: question,
@@ -510,7 +553,10 @@ export async function runVibpeCopilot2(
 
   if (parsed.scenario) {
     const packet = await evaluateScenario(sql, parsed.scenario);
-    await updatePersistedVibpeSession(sql, ownerKey, sessionKey, {
+    if (options.governedRunId && packet.lineage.governedRunId !== options.governedRunId) {
+      throw new Error("The governed baseline changed during scenario evaluation. Refresh and retry.");
+    }
+    await saveSession({
       previousScenario: priorScenario,
       activeScenario: packet.scenario,
       planningHorizonMonths: parsed.horizonMonths ?? session.planningHorizonMonths,
@@ -524,7 +570,7 @@ export async function runVibpeCopilot2(
       scenario: packet.scenario,
       scenarioResult: packet.result,
       comparison: packet.comparison,
-      horizonMonths: parsed.horizonMonths,
+      horizonMonths: parsed.horizonMonths ?? session.planningHorizonMonths,
       doctrine: vibpeBusinessOperatorContext(),
       dataState: currentDataState(),
       advisoryOnly: true,
@@ -532,7 +578,7 @@ export async function runVibpeCopilot2(
   }
 
   const answer = intentAnswer(parsed.intent, question, governedBaseline);
-  await updatePersistedVibpeSession(sql, ownerKey, sessionKey, {
+  await saveSession({
     referencedProducts: parsed.referencedProducts,
     lastIntent: parsed.intent,
     lastQuestion: question,
@@ -545,3 +591,4 @@ export async function runVibpeCopilot2(
     advisoryOnly: true,
   };
 }
+

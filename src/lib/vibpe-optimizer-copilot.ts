@@ -1,3 +1,5 @@
+import { requiredVibpeMethod } from "./vibpe-answer-quality.ts";
+import { readAdvancedOptimizationVibpeEvidence, formatAdvancedOptimizationVibpeEvidence } from "./advanced-optimization-vibpe-evidence.ts";
 import type { Sql } from "./db.ts";
 import { loadPreparedAdvancedOptimizerEnvelope } from "./advanced-optimizer-authority.ts";
 import {
@@ -14,12 +16,13 @@ type LatestPacketRow = {
 };
 
 export async function answerGovernedOptimizerExecutionRequest(sql: Sql, question: string) {
-  if (!isGovernedOptimizerExecutionRequest(question)) return null;
+  if (!isGovernedOptimizerExecutionRequest(question) && requiredVibpeMethod(question) !== "highs-optimisation") return null;
 
   const packets = await sql.query<LatestPacketRow>(
     `select id,parent_ibpe_run_id,created_at::text
        from vyndi_advanced_planning_packets
       where status='complete'
+        and parent_ibpe_run_id=(select id from vyndi_ibpe_runs where status='complete' order by created_at desc limit 1)
       order by created_at desc
       limit 1`,
   );
@@ -33,6 +36,10 @@ export async function answerGovernedOptimizerExecutionRequest(sql: Sql, question
   }
 
   try {
+    const saved = await readAdvancedOptimizationVibpeEvidence(sql, packet.id);
+    if (saved) {
+      return [formatAdvancedOptimizationVibpeEvidence(saved), `Captured ${saved.createdAt}; packet ${packet.id}; parent IBPE ${packet.parent_ibpe_run_id}. This is a persisted result, not a solver run performed by this conversation.`, `Controlled next action: inspect ${GOVERNED_OPTIMIZER_ROUTE}. Resolve infeasible constraints or missing authority before requesting a new governed run.`].join("\n\n");
+    }
     const prepared = await loadPreparedAdvancedOptimizerEnvelope(packet.id);
     const errors = prepared.issues.filter((issue) => issue.severity === "error");
     if (!prepared.readyForGovernedOptimization) {
@@ -58,3 +65,4 @@ export async function answerGovernedOptimizerExecutionRequest(sql: Sql, question
     ].join("\n\n");
   }
 }
+

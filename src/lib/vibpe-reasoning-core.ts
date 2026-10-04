@@ -1,3 +1,5 @@
+import type { VibpeEvidenceQuality } from "./vibpe-answer-quality.ts";
+
 export type VibpeVerificationStatus =
   | "verified"
   | "supported"
@@ -118,7 +120,9 @@ export type VibpeAnswerReceipt = {
   calculations: VibpeCalculationReceipt[];
   reasoningTrace: VibpeReasoningTraceEntry[];
   fiveDimensions: VibpeFiveDimensionAssessment;
+  /** Legacy numeric field: evidence coverage when evidenceQuality is present, not probability. */
   confidence: number;
+  evidenceQuality?: VibpeEvidenceQuality;
   nextAction?: string;
   reviewerStatus: "unreviewed" | "accepted" | "corrected" | "rejected";
 };
@@ -127,7 +131,7 @@ export function buildVibpeAnswerReceipt(input: Omit<VibpeAnswerReceipt, "schema"
   reviewerStatus?: VibpeAnswerReceipt["reviewerStatus"];
 }): VibpeAnswerReceipt {
   if (!Number.isFinite(input.confidence) || input.confidence < 0 || input.confidence > 1) {
-    throw new Error("VIBPE confidence must be calibrated to the closed interval [0,1].");
+    throw new Error("VIBPE confidence/coverage must be finite in the closed interval [0,1].");
   }
   return {
     schema: "vibpe-answer-receipt/v1",
@@ -196,3 +200,4 @@ export function explainBindingConstraints(constraints: VibpeFinitePlanningConstr
     }))
     .sort((a, b) => Math.abs(Number(b.gap ?? 0)) - Math.abs(Number(a.gap ?? 0)));
 }
+
