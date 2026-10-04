@@ -100,7 +100,7 @@ export const getReadinessIntelligenceState = createServerFn({ method: "GET" }).h
       activeRisks: risks,
       configurationBlockers,
     }),
-    persistedEvidence: [...evidenceRows],
+    persistedEvidence,
     vedmEvidence: vedmNodes.map((node) => ({
       id: node.id,
       domain: node.domain,
