@@ -15,13 +15,8 @@ const text = (row: Row, ...keys: string[]) => {
 
 export const Route = createFileRoute("/command/operations")({
   loader: async () => {
-    const [warnings, dispatch, quality, dispatchSerialCandidates] = await Promise.all([
-      getInventoryMslWarnings(),
-      listDispatchRegister(),
-      listQualityAuthority(),
-      listDispatchSerialCandidates(),
-    ]);
-    return { warnings, dispatch, quality, dispatchSerialCandidates };
+    const warnings = await getInventoryMslWarnings();
+    return { warnings };
   },
   component: Operations,
 });
@@ -202,11 +197,38 @@ function LineageRecord({ row }: { row: Awaited<ReturnType<typeof getOperatingLin
 }
 
 function Operations() {
-  const { warnings, dispatch, quality, dispatchSerialCandidates } = Route.useLoaderData();
+  const { warnings } = Route.useLoaderData();
+  const [dispatch, setDispatch] = useState<Awaited<ReturnType<typeof listDispatchRegister>>>([]);
+  const [dispatchSerialCandidates, setDispatchSerialCandidates] = useState<DispatchSerialCandidate[]>([]);
+  const [dispatchLoaded, setDispatchLoaded] = useState(false);
+  const [dispatchBusy, setDispatchBusy] = useState(false);
+  const [dispatchError, setDispatchError] = useState("");
+  const [quality, setQuality] = useState<Awaited<ReturnType<typeof listQualityAuthority>> | null>(null);
+  const [qualityLoaded, setQualityLoaded] = useState(false);
+  const [qualityBusy, setQualityBusy] = useState(false);
+  const [qualityError, setQualityError] = useState("");
   const [lineage, setLineage] = useState<Awaited<ReturnType<typeof getOperatingLineage>>>([]);
   const [lineageLoaded, setLineageLoaded] = useState(false);
   const [lineageBusy, setLineageBusy] = useState(false);
   const [lineageError, setLineageError] = useState("");
+
+  async function loadDispatchRegister() {
+    if (dispatchLoaded || dispatchBusy) return;
+    setDispatchBusy(true); setDispatchError("");
+    try {
+      const [register, candidates] = await Promise.all([listDispatchRegister(), listDispatchSerialCandidates()]);
+      setDispatch(register); setDispatchSerialCandidates(candidates); setDispatchLoaded(true);
+    } catch (error) { setDispatchError(error instanceof Error ? error.message : "Dispatch register could not be loaded."); }
+    finally { setDispatchBusy(false); }
+  }
+
+  async function loadQualityAuthority() {
+    if (qualityLoaded || qualityBusy) return;
+    setQualityBusy(true); setQualityError("");
+    try { setQuality(await listQualityAuthority()); setQualityLoaded(true); }
+    catch (error) { setQualityError(error instanceof Error ? error.message : "Quality authority could not be loaded."); }
+    finally { setQualityBusy(false); }
+  }
 
   async function loadOperatingLineage() {
     if (lineageLoaded || lineageBusy) return;
@@ -222,10 +244,10 @@ function Operations() {
     }
   }
   const currentDispatch = dispatch.filter((row) => row.status === "posted");
-  const openNcr = (quality.ncrs as Row[]).filter(
+  const openNcr = ((quality?.ncrs ?? []) as Row[]).filter(
     (row) => !["closed", "rejected"].includes(text(row, "status")),
   ).length;
-  const releases = (quality.releases as Row[]).filter(
+  const releases = ((quality?.releases ?? []) as Row[]).filter(
     (row) => text(row, "status") === "released",
   ).length;
   const shortages = lineage.reduce((sum, row) => sum + row.shortageLines, 0);
@@ -252,19 +274,19 @@ function Operations() {
         <Kpi label="Committed lineage" value={lineageLoaded ? String(lineage.length) : "On demand"} hint="Open lineage register to load" />
         <Kpi label="Live shortages" value={lineageLoaded ? String(shortages) : "On demand"} hint="Loaded with governed lineage" tone={lineageLoaded && shortages ? "warn" : undefined} />
         <Kpi label="Inventory alerts" value={String(warnings.length)} hint="MSL / stockout" tone={warnings.length ? "warn" : "ok"} />
-        <Kpi label="Quality releases" value={String(releases)} hint={`${openNcr} open NCR`} tone={openNcr ? "warn" : "ok"} />
-        <Kpi label="Posted dispatch" value={String(currentDispatch.length)} hint="Operations-owned register" tone={currentDispatch.length ? "ok" : undefined} />
+        <Kpi label="Quality releases" value={qualityLoaded ? String(releases) : "On demand"} hint={qualityLoaded ? `${openNcr} open NCR` : "Load quality authority"} tone={qualityLoaded && openNcr ? "warn" : undefined} />
+        <Kpi label="Posted dispatch" value={dispatchLoaded ? String(currentDispatch.length) : "On demand"} hint="Load canonical dispatch register" tone={dispatchLoaded && currentDispatch.length ? "ok" : undefined} />
       </div>
 
       <Panel title="Today's operating exceptions" kicker="Material · quality · dispatch">
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="rounded-lg border border-border p-3">
             <p className="text-xs uppercase tracking-wider text-muted">Material</p>
-            <p className={shortages ? "mt-1 font-semibold text-warn" : "mt-1 font-semibold text-ok"}>{shortages ? `${shortages} shortage line(s)` : "No live shortage"}</p>
+            <p className={lineageLoaded && shortages ? "mt-1 font-semibold text-warn" : lineageLoaded ? "mt-1 font-semibold text-ok" : "mt-1 font-semibold text-muted"}>{lineageLoaded ? (shortages ? `${shortages} shortage line(s)` : "No live shortage") : "Open lineage to assess"}</p>
           </div>
           <div className="rounded-lg border border-border p-3">
             <p className="text-xs uppercase tracking-wider text-muted">Quality</p>
-            <p className={openNcr ? "mt-1 font-semibold text-warn" : "mt-1 font-semibold text-ok"}>{openNcr ? `${openNcr} open NCR(s)` : "No open NCR"}</p>
+            <p className={qualityLoaded && openNcr ? "mt-1 font-semibold text-warn" : qualityLoaded ? "mt-1 font-semibold text-ok" : "mt-1 font-semibold text-muted"}>{qualityLoaded ? (openNcr ? `${openNcr} open NCR(s)` : "No open NCR") : "Open quality authority to assess"}</p>
           </div>
           <div className="rounded-lg border border-border p-3">
             <p className="text-xs uppercase tracking-wider text-muted">Inventory</p>
@@ -273,12 +295,19 @@ function Operations() {
         </div>
       </Panel>
 
+      <Panel title="Quality authority" kicker="load only when evidence is required">
+        <details className="rounded-xl border border-border p-3" onToggle={(event) => { if (event.currentTarget.open) void loadQualityAuthority(); }}>
+          <summary className="cursor-pointer font-semibold text-accent">Quality evidence ({qualityLoaded ? `${releases} release(s) · ${openNcr} open NCR` : "load on demand"})</summary>
+          {qualityBusy ? <p className="mt-3 text-sm text-muted">Loading Quality authority…</p> : qualityError ? <p role="alert" className="mt-3 text-sm text-warn">{qualityError}</p> : qualityLoaded ? <p className="mt-3 text-sm text-muted">{releases} current release(s) · {openNcr} open NCR(s). Full Quality controls remain in the Quality workspace.</p> : <p className="mt-3 text-sm text-muted">Open to load current governed Quality evidence.</p>}
+        </details>
+      </Panel>
+
       <Panel title="Operating controls" kicker="compact register · expand only the evidence you need">
         <div className="space-y-3">
-          <details className="rounded-xl border border-border p-3">
-            <summary className="cursor-pointer font-semibold text-accent">Canonical Dispatch Register ({dispatch.length})</summary>
+          <details className="rounded-xl border border-border p-3" onToggle={(event) => { if (event.currentTarget.open) void loadDispatchRegister(); }}>
+            <summary className="cursor-pointer font-semibold text-accent">Canonical Dispatch Register ({dispatchLoaded ? dispatch.length : "load on demand"})</summary>
             <p className="mt-2 text-xs text-muted">Operations/Fulfilment owns shipment truth; Finance is downstream.</p>
-            {dispatch.length ? (
+            {dispatchBusy ? <p className="mt-3 text-sm text-muted">Loading canonical dispatch…</p> : dispatchError ? <p role="alert" className="mt-3 text-sm text-warn">{dispatchError}</p> : dispatch.length ? (
               <div className="mt-3 space-y-2" data-full-view-table="operations-dispatch-register">
                 <div className="hidden grid-cols-[minmax(0,.95fr)_minmax(0,1.35fr)_minmax(0,.55fr)_minmax(0,.8fr)_minmax(0,.7fr)_minmax(0,1.45fr)] gap-3 rounded-lg border border-border bg-surface/55 px-3 py-2 text-[9px] font-bold uppercase tracking-[0.12em] text-subtle lg:grid">
                   <span>Shipment</span><span>Order / job</span><span className="text-right">Units</span><span>Quality</span><span>Status</span><span>Finance downstream</span>

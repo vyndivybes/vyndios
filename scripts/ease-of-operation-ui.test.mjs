@@ -168,3 +168,16 @@ test("Operations initial GET defers heavyweight order-to-cash lineage reconstruc
   assert.doesNotMatch(loader, /getOperatingLineage\(\)/, "initial Operations navigation must stay within the Worker CPU budget");
   assert.match(operationsSource, /loadOperatingLineage/);
 });
+
+
+test("Operations initial GET defers heavyweight dispatch and quality registers", () => {
+  const loaderStart = operationsSource.indexOf("loader: async () =>");
+  const loaderEnd = operationsSource.indexOf("component: Operations", loaderStart);
+  assert.ok(loaderStart >= 0 && loaderEnd > loaderStart);
+  const loader = operationsSource.slice(loaderStart, loaderEnd);
+  assert.doesNotMatch(loader, /listDispatchRegister\(\)/);
+  assert.doesNotMatch(loader, /listQualityAuthority\(\)/);
+  assert.doesNotMatch(loader, /listDispatchSerialCandidates\(\)/);
+  assert.match(operationsSource, /loadDispatchRegister/);
+  assert.match(operationsSource, /loadQualityAuthority/);
+});
