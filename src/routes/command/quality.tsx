@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Kpi, Panel } from "@/components/kpi";
+import { ManufacturingQualityIntelligencePanel } from "@/components/manufacturing-quality-intelligence-panel";
 import { listQualityAuthority } from "@/lib/quality-authority";
 import { listIsoQualityCompliance } from "@/lib/iso-quality-compliance";
+import { getManufacturingQualityIntelligence } from "@/lib/manufacturing-quality-authority";
 
 type Row = Record<string, unknown>;
 const text = (row: Row, ...keys: string[]) => {
@@ -15,8 +17,12 @@ const num = (row: Row, ...keys: string[]) => {
 
 export const Route = createFileRoute("/command/quality")({
   loader: async () => {
-    const [quality, iso] = await Promise.all([listQualityAuthority(), listIsoQualityCompliance()]);
-    return { quality, iso };
+    const [quality, iso, intelligence] = await Promise.all([
+      listQualityAuthority(),
+      listIsoQualityCompliance(),
+      getManufacturingQualityIntelligence(),
+    ]);
+    return { quality, iso, intelligence };
   },
   component: Quality,
 });
@@ -32,7 +38,7 @@ function StatusPill({ value }: { value: string }) {
 }
 
 function Quality() {
-  const { quality, iso } = Route.useLoaderData();
+  const { quality, iso, intelligence } = Route.useLoaderData();
   const inspections = quality.inspections as Row[];
   const ncrs = quality.ncrs as Row[];
   const capas = quality.capas as Row[];
@@ -75,6 +81,8 @@ function Quality() {
         <Kpi label="Open CAPA" value={String(openCapa)} hint="Effectiveness pending" tone={openCapa ? "warn" : "ok"} />
         <Kpi label="ISO release ready" value={String(readyProducts)} hint={`${released} serialized Quality releases`} tone={readyProducts ? "ok" : "warn"} />
       </div>
+
+      <ManufacturingQualityIntelligencePanel state={intelligence} />
 
       <Panel title="ISO Standards Register" kicker="Controlled edition · lifecycle · source">
         <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">

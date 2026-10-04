@@ -114,6 +114,11 @@ export function isMonteCarloQuestion(question: string) {
   return /monte\s+carlo|critical\s+path\s+frequency|probabilistic\s+schedule|schedule\s+uncertainty\s+simulation/.test(q);
 }
 
+export function isManufacturingQualityIntelligenceQuestion(question: string) {
+  const q = question.toLowerCase();
+  return /quality\s+forecast|defect\s+probab|yield\s+(?:forecast|estimate)|process\s+capability|\bcpk\b|\bcp\b|manufacturing\s+quality\s+intelligence/.test(q);
+}
+
 async function traceabilityExceptionAnswer(sql: Sql) {
   const rows = await sql.query<Record<string, unknown>>(`
     select c.id as job_card_id,
@@ -495,6 +500,45 @@ async function programPlanningAnswer(sql: Sql) {
   ].join("\n\n");
 }
 
+async function manufacturingQualityIntelligenceAnswer(sql: Sql) {
+  const rows=await sql.query<Record<string,unknown>>(
+    `select id,result_json,source_reference,created_at
+       from vyndi_quality_intelligence_runs
+      order by created_at desc,id desc limit 1`,
+  );
+  const row=rows[0];
+  if(!row){
+    return "No governed Quality Intelligence snapshot has been captured. Use Quality → Manufacturing & Quality Intelligence to review canonical inspection evidence and capture a snapshot before VIBPE reports defect/yield or Cp/Cpk intelligence.";
+  }
+  const result=row.result_json as {
+    stageForecasts:Array<{
+      stage:string;sampleSize:number;defectQuantity:number;
+      forecast:{available:boolean;expectedDefectPct:number|null;lower90Pct:number|null;upper90Pct:number|null;expectedYieldPct:number|null;reason:string};
+    }>;
+    capabilities:Array<{
+      characteristicCode:string;characteristicName:string;
+      capability:{available:boolean;sampleSize:number;cp:number|null;cpk:number|null;reason:string};
+    }>;
+    qualityControl:{ncrOpen:number;ncrOpenCritical:number;ncrOpenMajor:number;capaOpen:number;releasedSerials:number;blockedSerials:number};
+    manufacturingActuals:{completedJobs:number;completedQuantity:number;scrapInr:number;reworkInr:number;scrapReworkCostPct:number|null};
+  };
+  const final=result.stageForecasts.find((item)=>item.stage==="final");
+  const capability=result.capabilities.filter((item)=>item.capability.available);
+  const weakest=[...capability].sort((a,b)=>(a.capability.cpk??Infinity)-(b.capability.cpk??Infinity))[0];
+  return [
+    `Latest governed Quality Intelligence: ${clean(row.id)} · source ${clean(row.source_reference)}.`,
+    final?.forecast.available
+      ? `Final inspection predictive defect probability ${final.forecast.expectedDefectPct}% (90% interval ${final.forecast.lower90Pct}%–${final.forecast.upper90Pct}%); yield estimate ${final.forecast.expectedYieldPct}% from ${final.sampleSize} inspected unit(s).`
+      : `Final inspection defect/yield forecast: WITHHELD — ${final?.forecast.reason??"no final inspection sample"}.`,
+    weakest
+      ? `Lowest rated capability: ${weakest.characteristicCode} · Cpk ${weakest.capability.cpk} · Cp ${weakest.capability.cp} · n=${weakest.capability.sampleSize}.`
+      : "Process capability: WITHHELD — no characteristic currently has sufficient consistent measurement/specification evidence.",
+    `Quality control: ${result.qualityControl.ncrOpen} open NCR (${result.qualityControl.ncrOpenCritical} critical, ${result.qualityControl.ncrOpenMajor} major); ${result.qualityControl.capaOpen} open CAPA; released/blocked serials ${result.qualityControl.releasedSerials}/${result.qualityControl.blockedSerials}.`,
+    `Manufacturing actuals: ${result.manufacturingActuals.completedJobs} completed job(s), ${result.manufacturingActuals.completedQuantity} unit(s), observed scrap+rework cost ₹${(result.manufacturingActuals.scrapInr+result.manufacturingActuals.reworkInr).toFixed(0)}${result.manufacturingActuals.scrapReworkCostPct==null?"":` (${result.manufacturingActuals.scrapReworkCostPct}% of captured actual cost)`}.`,
+    "Boundary: observed scrap/rework cost is not a future scrap-rate prediction. Defect/yield and Cp/Cpk are reported only from captured canonical evidence meeting their minimum evidence gates."
+  ].join("\n\n");
+}
+
 async function monteCarloAnswer(sql: Sql) {
   const rows=await sql.query<Record<string,unknown>>(
     `select id,method,iterations,seed,result_json,source_reference,created_at
@@ -776,6 +820,7 @@ export async function tryGovernanceDataAnswer(sql: Sql, question: string) {
   if (isProgramPlanningQuestion(question)) return programPlanningAnswer(sql);
   if (isReadinessIntelligenceQuestion(question)) return readinessIntelligenceAnswer(sql);
   if (isEngineeringScenarioQuestion(question)) return engineeringScenarioAnswer(sql);
+  if (isManufacturingQualityIntelligenceQuestion(question)) return manufacturingQualityIntelligenceAnswer(sql);
   if (isMonteCarloQuestion(question)) return monteCarloAnswer(sql);
   if (isEngineeringImpactQuestion(question)) return engineeringImpactAnswer(sql, question);
   if (isProgramForecastQuestion(question)) return programForecastAnswer(sql);
