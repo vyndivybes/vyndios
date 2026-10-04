@@ -32,6 +32,9 @@ test("Monte Carlo emits schedule and cost quantiles from complete governed distr
     seed:7,
   });
   assert.equal(result.available,true);
+  assert.ok(result.schedule.p50Days != null);
+  assert.ok(result.schedule.p80Days != null);
+  assert.ok(result.schedule.p95Days != null);
   assert.ok(result.schedule.p50Days>0);
   assert.ok(result.schedule.p80Days>result.schedule.p50Days);
   assert.ok(result.schedule.p95Days>result.schedule.p80Days);

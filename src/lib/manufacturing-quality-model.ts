@@ -28,7 +28,7 @@ export function forecastDefectProbability(input:DefectForecastInput){
     return unavailable("Inspection sample and defect quantities are invalid.");
   }
   if(n<minSampleSize){
-    return unavailable(`At least ${minSampleSize} inspected units are required before VYNDI publishes a defect/yield probability estimate.`);
+    return unavailable(`At least ${minSampleSize} inspected units are required in the sample before VYNDI publishes a defect/yield probability estimate.`);
   }
 
   const alpha=defects+1;

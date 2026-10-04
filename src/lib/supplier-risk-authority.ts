@@ -1,12 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { getSql } from "@/lib/db";
+import { getSql, type SqlRow } from "@/lib/db";
 import { getCommandRole } from "@/lib/command-access";
 import { canPerform } from "@/lib/page-access";
 import { requireBusinessActor } from "@/lib/business-actor";
 import { analyzeSupplierRiskEvidence } from "@/lib/supplier-risk-model";
 
-type Row=Record<string,unknown>;
+type Row=SqlRow;
 type Sql=Awaited<ReturnType<typeof getSql>>;
 const clean=(value:unknown)=>String(value??"").trim();
 const n=(value:unknown)=>Number(value??0);
