@@ -20,7 +20,7 @@ test("Hyperdrive database requests reconcile the migration ledger before returni
 });
 
 test("runtime migration policy blocks destructive SQL and only permits Hyperdrive",()=>{
-  assert.match(helper,/transportSource!==\"hyperdrive\"/);
+  assert.match(helper,/transportSource!=="hyperdrive"/);
   assert.match(helper,/DROP TABLE/);
   assert.match(helper,/DROP COLUMN/);
   assert.match(helper,/TRUNCATE/);

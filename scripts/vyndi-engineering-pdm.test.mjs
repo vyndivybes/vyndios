@@ -75,7 +75,7 @@ test("Package Q migration has balanced PLpgSQL delimiters and safe release order
 test("Package Q TypeScript contains no connector escape artifacts",()=>{
   for(const [name,source] of [["model",model],["authority",authority],["panel",panel],["route",route],["vibpe",vibpe]]){
     assert.equal(source.includes("\\`"),false,`${name} contains an escaped backtick artifact`);
-    assert.equal(source.includes("\\\${"),false,`${name} contains an escaped template placeholder artifact`);
+    assert.equal(source.includes("\\${"),false,`${name} contains an escaped template placeholder artifact`);
   }
 });
 

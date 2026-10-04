@@ -145,7 +145,7 @@ async function ensureHyperdriveSchemaReady(transport: PostgresTransport):Promise
           console.log("[db] runtime Hyperdrive reconciliation applied "+migration.name);
         }catch(error){
           if(inTransaction){
-            try{await client.query("ROLLBACK");}catch{}
+            try{await client.query("ROLLBACK");}catch{/* best-effort rollback */}
           }
           if(error instanceof RuntimeSchemaMigrationError) throw error;
           throw new RuntimeSchemaMigrationError({
@@ -157,7 +157,7 @@ async function ensureHyperdriveSchemaReady(transport: PostgresTransport):Promise
         }
       }
     }finally{
-      try{await client.end();}catch{}
+      try{await client.end();}catch{/* best-effort connection cleanup */}
     }
   })().catch((error)=>{
     globalRef.__hyperdriveMigrationReady__=undefined;

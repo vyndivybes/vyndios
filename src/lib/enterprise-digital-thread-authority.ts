@@ -14,7 +14,7 @@ const makeNode=(id:string,kind:DigitalThreadNode["kind"],title:string,sourceRef:
 const makeEdge=(from:string,to:string,relation:DigitalThreadEdge["relation"])=>({from,to,relation});
 
 function referenceCandidate(query:string){
-  const tokens=query.trim().split(/\s+/).map((token)=>token.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9._\/-]+$/g,"")).filter(Boolean);
+  const tokens=query.trim().split(/\s+/).map((token)=>token.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9._/-]+$/g,"")).filter(Boolean);
   return tokens.filter((token)=>/\d/.test(token)&&token.length>=4).sort((a,b)=>b.length-a.length)[0] ?? query.trim();
 }
 
@@ -22,14 +22,14 @@ async function resolveJobCards(sql:Sql, query:string) {
   const pattern="%"+referenceCandidate(query)+"%";
   const statement =
     "select distinct job_card_id from (" +
-    " select c.id as job_card_id from epr_production_job_cards c where c.id ilike $1 or c.sales_order_id ilike $1 or coalesce(c.batch_code,\'\') ilike $1" +
-    " union all select t.job_card_id from epr_travellers t where t.job_card_id is not null and (t.id ilike $1 or t.serial_number ilike $1 or coalesce(t.engineering_revision,\'\') ilike $1)" +
-    " union all select p.job_card_id from vyndi_purchase_orders p left join vyndi_suppliers s on s.id=p.supplier_id where p.job_card_id is not null and (p.id ilike $1 or p.sku ilike $1 or coalesce(p.supplier_id,\'\') ilike $1 or coalesce(s.name,\'\') ilike $1)" +
+    " select c.id as job_card_id from epr_production_job_cards c where c.id ilike $1 or c.sales_order_id ilike $1 or coalesce(c.batch_code,'') ilike $1" +
+    " union all select t.job_card_id from epr_travellers t where t.job_card_id is not null and (t.id ilike $1 or t.serial_number ilike $1 or coalesce(t.engineering_revision,'') ilike $1)" +
+    " union all select p.job_card_id from vyndi_purchase_orders p left join vyndi_suppliers s on s.id=p.supplier_id where p.job_card_id is not null and (p.id ilike $1 or p.sku ilike $1 or coalesce(p.supplier_id,'') ilike $1 or coalesce(s.name,'') ilike $1)" +
     " union all select p.job_card_id from vyndi_goods_receipts g join vyndi_purchase_orders p on p.id=g.purchase_order_id where p.job_card_id is not null and g.id ilike $1" +
     " union all select q.job_card_id from vyndi_quality_releases q where q.job_card_id is not null and (q.id ilike $1 or q.serial_number ilike $1)" +
     " union all select s.job_card_id from vyndi_shipments s where s.job_card_id is not null and s.id ilike $1" +
     " union all select s.job_card_id from vyndi_invoices i join vyndi_shipments s on s.id=i.shipment_id where s.job_card_id is not null and i.id ilike $1" +
-    " union all select t.job_card_id from epr_operation_controls oc join epr_travellers t on t.id=oc.traveller_id left join epr_equipment e on e.id=oc.equipment_id left join epr_operators o on o.id=oc.operator_id where t.job_card_id is not null and (coalesce(oc.equipment_id,\'\') ilike $1 or coalesce(e.asset_tag,\'\') ilike $1 or coalesce(oc.operator_id,\'\') ilike $1 or coalesce(o.display_name,\'\') ilike $1)" +
+    " union all select t.job_card_id from epr_operation_controls oc join epr_travellers t on t.id=oc.traveller_id left join epr_equipment e on e.id=oc.equipment_id left join epr_operators o on o.id=oc.operator_id where t.job_card_id is not null and (coalesce(oc.equipment_id,'') ilike $1 or coalesce(e.asset_tag,'') ilike $1 or coalesce(oc.operator_id,'') ilike $1 or coalesce(o.display_name,'') ilike $1)" +
     ") x where job_card_id is not null order by job_card_id limit 12";
   const rows=await sql.query<{job_card_id:string}>(statement,[pattern]);
   return unique(rows.map((row)=>clean(row.job_card_id)));
@@ -44,14 +44,14 @@ export async function buildEnterpriseDigitalThreadFromSql(sql:Sql,query:string){
   const [jobCards,travellers,purchaseOrders,materialLots,operations,qualityInspections,qualityNcrs,qualityCapas,qualityReleases,shipments,jobCosts]=await Promise.all([
     sql.query<Row>("select c.*,o.variant_name,o.variant_id,o.status as sales_order_status from epr_production_job_cards c left join vyndi_sales_orders o on o.id=c.sales_order_id where c.id=any($1::text[]) order by c.id",[jobCardIds]),
     sql.query<Row>("select * from epr_travellers where job_card_id=any($1::text[]) order by job_card_id,id",[jobCardIds]),
-    sql.query<Row>("select p.*,s.name as supplier_name from vyndi_purchase_orders p left join vyndi_suppliers s on s.id=p.supplier_id where p.job_card_id=any($1::text[]) and p.status<>\'cancelled\' order by p.id",[jobCardIds]),
+    sql.query<Row>("select p.*,s.name as supplier_name from vyndi_purchase_orders p left join vyndi_suppliers s on s.id=p.supplier_id where p.job_card_id=any($1::text[]) and p.status<>'cancelled' order by p.id",[jobCardIds]),
     sql.query<Row>("select l.* from epr_material_lots l join epr_travellers t on t.id=l.traveller_id where t.job_card_id=any($1::text[]) order by l.id",[jobCardIds]),
     sql.query<Row>("select oc.*,e.asset_tag,e.equipment_type,o.display_name as operator_name from epr_operation_controls oc join epr_travellers t on t.id=oc.traveller_id left join epr_equipment e on e.id=oc.equipment_id left join epr_operators o on o.id=oc.operator_id where t.job_card_id=any($1::text[]) order by oc.traveller_id,oc.started_at,oc.id",[jobCardIds]),
     sql.query<Row>("select q.* from vyndi_quality_inspections q where q.job_card_id=any($1::text[]) order by q.recorded_at,q.id",[jobCardIds]),
     sql.query<Row>("select n.* from vyndi_quality_ncrs n where n.job_card_id=any($1::text[]) order by n.created_at,n.id",[jobCardIds]),
     sql.query<Row>("select c.* from vyndi_quality_capas c join vyndi_quality_ncrs n on n.id=c.ncr_id where n.job_card_id=any($1::text[]) order by c.created_at,c.id",[jobCardIds]),
     sql.query<Row>("select * from vyndi_quality_releases where job_card_id=any($1::text[]) and superseded_at is null order by decided_at,id",[jobCardIds]),
-    sql.query<Row>("select * from vyndi_shipments where job_card_id=any($1::text[]) and status=\'posted\' order by posted_at,id",[jobCardIds]),
+    sql.query<Row>("select * from vyndi_shipments where job_card_id=any($1::text[]) and status='posted' order by posted_at,id",[jobCardIds]),
     sql.query<Row>("select * from epr_job_cost_snapshots where job_card_id=any($1::text[]) order by captured_at,id",[jobCardIds]),
   ]);
 
@@ -71,7 +71,7 @@ export async function buildEnterpriseDigitalThreadFromSql(sql:Sql,query:string){
       "join epr_inventory_ledger issue_ledger on issue_ledger.id=a.issue_ledger_id where g.purchase_order_id=any($1::text[]) and issue_ledger.traveller_id=any($2::text[]) " +
       "order by g.id,fl.id,issue_ledger.movement_id,issue_ledger.traveller_id",[poIds,travellerIds]):Promise.resolve([] as Row[]),
     salesOrderIds.length?sql.query<Row>("select i.* from vyndi_invoices i where i.sales_order_id=any($1::text[]) order by i.plan_month,i.id",[salesOrderIds]):Promise.resolve([] as Row[]),
-    sql.query<Row>("select * from vyndi_risk_intelligence where status<>\'closed\' order by exposure_score desc nulls last,id"),
+    sql.query<Row>("select * from vyndi_risk_intelligence where status<>'closed' order by exposure_score desc nulls last,id"),
     shipmentIds.length?sql.query<Row>("select a.* from vyndi_shipment_serial_allocations a where a.shipment_id=any($1::text[]) and a.status='active' order by a.shipment_id,a.serial_number",[shipmentIds]):Promise.resolve([] as Row[]),
   ]);
 

@@ -70,6 +70,6 @@ test("Package O TypeScript source contains no connector escape artifacts",()=>{
     ["vibpe",vibpe],
   ]){
     assert.equal(source.includes("\\`"),false,`${name} contains an escaped backtick artifact`);
-    assert.equal(source.includes("\\\${"),false,`${name} contains an escaped template placeholder artifact`);
+    assert.equal(source.includes("\\${"),false,`${name} contains an escaped template placeholder artifact`);
   }
 });

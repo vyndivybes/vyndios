@@ -73,6 +73,6 @@ test("ECN release revalidates approved ECR revision and BOM scope at the databas
 test("Package P TypeScript contains no connector escape artifacts",()=>{
   for(const [name,source] of [["model",model],["authority",authority],["panel",panel],["route",route],["vibpe",vibpe]]){
     assert.equal(source.includes("\\`"),false,`${name} contains an escaped backtick artifact`);
-    assert.equal(source.includes("\\\${"),false,`${name} contains an escaped template placeholder artifact`);
+    assert.equal(source.includes("\\${"),false,`${name} contains an escaped template placeholder artifact`);
   }
 });
