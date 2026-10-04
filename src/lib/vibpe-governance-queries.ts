@@ -109,6 +109,11 @@ export function isEngineeringScenarioQuestion(question: string) {
   return /engineering\s+scenario|latest\s+engineering\s+scenario|scenario\s+(?:impact|delta).*engineering|engineering.*scenario\s+(?:impact|delta)/.test(q);
 }
 
+export function isMonteCarloQuestion(question: string) {
+  const q = question.toLowerCase();
+  return /monte\s+carlo|critical\s+path\s+frequency|probabilistic\s+schedule|schedule\s+uncertainty\s+simulation/.test(q);
+}
+
 async function traceabilityExceptionAnswer(sql: Sql) {
   const rows = await sql.query<Record<string, unknown>>(`
     select c.id as job_card_id,
@@ -490,6 +495,36 @@ async function programPlanningAnswer(sql: Sql) {
   ].join("\n\n");
 }
 
+async function monteCarloAnswer(sql: Sql) {
+  const rows=await sql.query<Record<string,unknown>>(
+    `select id,method,iterations,seed,result_json,source_reference,created_at
+       from vyndi_monte_carlo_runs
+      where program_id='VYNDI-MASTER-PROGRAM'
+      order by created_at desc,id desc limit 1`,
+  );
+  const row=rows[0];
+  if(!row){
+    return "No governed Monte Carlo run has been captured yet. Complete schedule O/M/P inputs in Planning and capture a seeded Monte Carlo run before VIBPE reports probabilistic schedule evidence.";
+  }
+  const result=row.result_json as {
+    schedule:{
+      p50Days:number|null;p80Days:number|null;p95Days:number|null;
+      criticalPathFrequency:Array<{path:string[];frequencyPct:number;count:number}>;
+    };
+    cost:{available:boolean;p50Lakh:number|null;p80Lakh:number|null;p95Lakh:number|null};
+    limitations:string[];
+  };
+  const path=result.schedule.criticalPathFrequency[0];
+  return [
+    `Latest governed Monte Carlo: ${clean(row.id)} · ${n(row.iterations)} iterations · seed ${n(row.seed)} · ${clean(row.method)}.`,
+    `Schedule: P50 ${result.schedule.p50Days??"WITHHELD"}d · P80 ${result.schedule.p80Days??"WITHHELD"}d · P95 ${result.schedule.p95Days??"WITHHELD"}d.`,
+    `Dominant sampled critical path: ${path?`${path.path.join(" → ")} (${path.frequencyPct}%)`:"unavailable"}.`,
+    `Cost: ${result.cost.available?`P50 ₹${result.cost.p50Lakh}L · P80 ₹${result.cost.p80Lakh}L · P95 ₹${result.cost.p95Lakh}L`:"WITHHELD"}.`,
+    `Evidence: ${clean(row.source_reference)} · captured ${clean(row.created_at)}.`,
+    "Boundary: this Monte Carlo uses governed program task uncertainty and resamples the critical path. It is not a physical material/FEA/fatigue response model; those probabilities remain withheld until explicit governed response functions exist."
+  ].join("\n\n");
+}
+
 async function engineeringScenarioAnswer(sql: Sql) {
   const rows=await sql.query<Record<string,unknown>>(
     `select id,scenario_name,source_node_id,target_task_id,source_commit,
@@ -741,6 +776,7 @@ export async function tryGovernanceDataAnswer(sql: Sql, question: string) {
   if (isProgramPlanningQuestion(question)) return programPlanningAnswer(sql);
   if (isReadinessIntelligenceQuestion(question)) return readinessIntelligenceAnswer(sql);
   if (isEngineeringScenarioQuestion(question)) return engineeringScenarioAnswer(sql);
+  if (isMonteCarloQuestion(question)) return monteCarloAnswer(sql);
   if (isEngineeringImpactQuestion(question)) return engineeringImpactAnswer(sql, question);
   if (isProgramForecastQuestion(question)) return programForecastAnswer(sql);
   return undefined;
