@@ -18,7 +18,7 @@ test("Cloudflare remains the VYNDI production deployment authority while legacy 
   assert.doesNotMatch(authRuntime, /tiger-field-flora-finch/);
   assert.match(productionSmoke, /vyndios\.vayushastr\.workers\.dev/);
   assert.match(releaseScript, /vyndios\.vayushastr\.workers\.dev/);
-  assert.equal(pkg.devDependencies["@cloudflare/vite-plugin"], "1.54.7");
+  assert.equal(pkg.devDependencies["@cloudflare/vite-plugin"], "1.62.5");
   assert.equal(pkg.devDependencies?.nitro, undefined);
 
   assert.match(vite, /import \{ cloudflare \} from "@cloudflare\/vite-plugin"/);
@@ -42,4 +42,13 @@ test("release acceptance policy names Cloudflare Workers as the production path"
   assert.match(audit, /Declared production deployer:\*\* Cloudflare Workers/);
   assert.match(audit, /Cloudflare Workers is the \*\*declared production deployer\*\*/);
   assert.match(audit, /Cloudflare Workers is the \*\*declared production deployer\*\*/);
+});
+
+
+test("production smoke waits for hydrated login readiness before credential interaction", () => {
+  const readiness = productionSmoke.indexOf('locator(".vy-login.is-cinematic").waitFor');
+  const emailFill = productionSmoke.indexOf("getByLabel(/Authorised Email/i).fill(email)");
+  assert.ok(readiness >= 0, "production smoke must wait for the mounted login readiness marker");
+  assert.ok(emailFill >= 0, "production smoke must fill the authorised email field");
+  assert.ok(readiness < emailFill, "login readiness must be established before credentials are entered");
 });

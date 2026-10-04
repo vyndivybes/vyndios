@@ -112,6 +112,8 @@ try {
     timeout: 60_000,
   });
   assert.ok(loginResponse?.ok(), `Login page returned HTTP ${loginResponse?.status() ?? "none"}`);
+  // The SSR form is visible before React installs onSubmit; wait for mounted readiness.
+  await login.locator(".vy-login.is-cinematic").waitFor({ state: "visible", timeout: 30_000 });
   await login.getByLabel(/Authorised Email/i).fill(email);
   await login.getByLabel(/^Password$/i).fill(password);
   await login.getByRole("button", { name: /Authorize · Enter Command/i }).click();
