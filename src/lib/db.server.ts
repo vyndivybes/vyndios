@@ -98,10 +98,10 @@ async function ensureHyperdriveSchemaReady(transport: PostgresTransport):Promise
           await client.query("BEGIN");
           inTransaction=true;
           await client.query("select pg_advisory_xact_lock($1,$2)",[1982,1505]);
-          await client.query(
-            "create table if not exists _migrations (name text primary key, applied_at timestamptz not null default now())",
-          );
-
+          // Production migrations own schema DDL. Hyperdrive intentionally uses a
+          // restricted runtime role, so readiness must only read the ledger here.
+          // A missing ledger still fails closed via SELECT (42P01) instead of
+          // requiring CREATE privilege on every application request.
           const appliedRows=await client.query<{name:string}>("select name from _migrations");
           const plan=planRuntimeSchemaMigrations({
             transportSource:"hyperdrive",

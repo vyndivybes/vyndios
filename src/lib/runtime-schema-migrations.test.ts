@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   planRuntimeSchemaMigrations,
   destructiveRuntimeMigrationStatements,
@@ -53,4 +54,12 @@ test("current Hyperdrive schema is a no-op",()=>{
   assert.equal(plan.allowed,true);
   assert.deepEqual(plan.pending,[]);
   assert.deepEqual(plan.blocked,[]);
+});
+
+
+test("Hyperdrive runtime ledger access never requires schema CREATE privilege",()=>{
+  const source=readFileSync(new URL("./db.server.ts",import.meta.url),"utf8");
+  const runtimeBlock=source.slice(source.indexOf("async function ensureHyperdriveSchemaReady"),source.indexOf("export async function readRuntimeSchemaMigrationStatus"));
+  assert.doesNotMatch(runtimeBlock,/create\s+table\s+if\s+not\s+exists\s+_migrations/i);
+  assert.match(runtimeBlock,/select name from _migrations/i);
 });
