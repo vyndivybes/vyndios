@@ -58,3 +58,10 @@ export const ensureDbReady = createServerOnlyFn(async (): Promise<void> => {
   const { ensureDbReadyServer } = await import("./db.server.ts");
   return ensureDbReadyServer();
 });
+
+export const getSchemaMigrationStatus = createServerOnlyFn(async () => {
+  await syncCloudflareRuntimeEnv();
+  const { getSqlServer, readRuntimeSchemaMigrationStatus } = await import("./db.server.ts");
+  const sql=await getSqlServer();
+  return readRuntimeSchemaMigrationStatus(sql);
+});

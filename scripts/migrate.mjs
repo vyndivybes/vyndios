@@ -11,12 +11,15 @@ import { migrationEnvironmentDecision } from "./migration-environment.mjs";
 import { requireDestructiveMigrationEvidence } from "./migration-risk.mjs";
 
 const databaseUrl = process.env.DATABASE_URL;
+const migrationEnvironment = migrationEnvironmentDecision(process.env);
 if (!databaseUrl) {
-  console.log("[migrate] DATABASE_URL not set — skipping (the PGLite fallback migrates itself).");
+  if (migrationEnvironment.allowed && (process.env.WORKERS_CI === "1" || process.env.WORKERS_CI_BRANCH === "main")) {
+    console.log("[migrate] DATABASE_URL not set — runtime Hyperdrive reconciliation will enforce schema before queries.");
+  } else {
+    console.log("[migrate] DATABASE_URL not set — skipping (PGLite migrates itself; deployed Hyperdrive reconciles at runtime).");
+  }
   process.exit(0);
 }
-
-const migrationEnvironment = migrationEnvironmentDecision(process.env);
 if (!migrationEnvironment.allowed) {
   console.log(`[migrate] database migration blocked — ${migrationEnvironment.reason}.`);
   process.exit(0);
