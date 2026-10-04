@@ -48,3 +48,13 @@ test("VIBPE explains readiness while preserving the composite-index boundary", (
   assert.match(vibpe, /Evidence confidence:/);
   assert.match(vibpe, /Composite VPRI: WITHHELD/);
 });
+
+
+test("readiness server state returns normalized serializable evidence rather than raw unknown DB rows", () => {
+  assert.doesNotMatch(authority, /persistedEvidence:\s*\[\.\.\.evidenceRows\]/);
+  assert.match(authority, /persistedEvidence,\s*\n\s*vedmEvidence:/);
+});
+
+test("VIBPE readiness query imports the VEDM domain classifier it executes", () => {
+  assert.match(vibpe, /classifyVedmIssueDomain[\s\S]*from "@\/lib\/vyndi-risk-model"/);
+});
