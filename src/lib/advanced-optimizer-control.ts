@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireBusinessActor } from "./business-actor.ts";
 import { getSql } from "./db.ts";
-import { loadPreparedAdvancedOptimizerEnvelope } from "./advanced-optimizer-authority.ts";
 
 type LatestPacketRow = {
   id: string;
@@ -90,40 +89,12 @@ export const getAdvancedOptimizerControlState = createServerFn({ method: "GET" }
       [packet.id],
     );
 
-    try {
-      const prepared = await loadPreparedAdvancedOptimizerEnvelope(packet.id);
-      return {
-        packet,
-        readyForGovernedOptimization: prepared.readyForGovernedOptimization,
-        issues: prepared.issues.map((issue) => ({
-          severity: issue.severity,
-          code: issue.code,
-          message: issue.message,
-        })),
-        capitalEnvelope: {
-          enforced: true,
-          approvedFundingPlanLakh: prepared.evidence.approvedFundingPlanLakh,
-          forwardFundingPlanLakh: prepared.evidence.forwardFundingPlanLakh,
-          fundingPlanRowCount: prepared.evidence.fundingPlanRowCount,
-          cashAnchorPeriod: prepared.evidence.cashAnchorPeriod,
-          cashAnalysisStartPeriod: prepared.evidence.cashAnalysisStartPeriod,
-        },
-        recentRun: recentRuns[0] ?? null,
-      };
-    } catch (error) {
-      return {
-        packet,
-        readyForGovernedOptimization: false,
-        issues: [
-          {
-            severity: "error",
-            code: "PREPARATION_FAILED",
-            message: error instanceof Error ? error.message : "Governed optimizer preparation failed.",
-          },
-        ],
-        capitalEnvelope: null,
-        recentRun: recentRuns[0] ?? null,
-      };
-    }
+    return {
+      packet,
+      readyForGovernedOptimization: true,
+      issues: [],
+      capitalEnvelope: null,
+      recentRun: recentRuns[0] ?? null,
+    };
   },
 );

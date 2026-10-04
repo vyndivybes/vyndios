@@ -94,3 +94,15 @@ test("optimizer execution cannot crash on transient undefined loader data", asyn
   );
   assert.match(refreshHelper, /window\.location\.reload\(\)/);
 });
+
+
+test("ordinary optimizer GET state does not reconstruct the frozen optimization envelope", async () => {
+  const control = await source("src/lib/advanced-optimizer-control.ts");
+  assert.doesNotMatch(
+    control,
+    /loadPreparedAdvancedOptimizerEnvelope/,
+    "read-only optimizer navigation must not reconstruct the full governed optimization envelope",
+  );
+  assert.match(control, /vyndi_advanced_planning_packets/);
+  assert.match(control, /vyndi_advanced_optimization_runs/);
+});
