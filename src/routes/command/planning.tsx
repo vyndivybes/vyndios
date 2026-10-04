@@ -5,6 +5,7 @@ import { Kpi, Panel } from "@/components/kpi";
 import { PlanningStudio } from "@/components/planning-studio";
 import { ProgramGatePlan } from "@/components/program-gate-plan";
 import { ProgramForecastPanel } from "@/components/program-forecast-panel";
+import { MonteCarloPanel } from "@/components/monte-carlo-panel";
 import { COMPANY, TRANCHES } from "@/lib/data/company";
 import { getCommandRole } from "@/lib/command-access";
 import { listEngineeringAuthority } from "@/lib/engineering-authority";
@@ -13,6 +14,7 @@ import { approveOperatingPlan, getOperatingPlanState, submitOperatingPlan } from
 import { canPerform } from "@/lib/page-access";
 import { getProgramPlanningState } from "@/lib/program-planning-authority";
 import { getProgramForecastState } from "@/lib/forecast-authority";
+import { getMonteCarloState } from "@/lib/monte-carlo-authority";
 import {
   DEFAULT_APPROVED_OPERATING_PLAN,
   calendarMonthForPlanMonth,
@@ -22,15 +24,16 @@ import {
 
 export const Route = createFileRoute("/command/planning")({
   loader: async () => {
-    const [role, plan, engineering, procurement, program, forecast] = await Promise.all([
+    const [role, plan, engineering, procurement, program, forecast, monteCarlo] = await Promise.all([
       getCommandRole(),
       getOperatingPlanState(),
       listEngineeringAuthority(),
       getProcurementPlanningReport(),
       getProgramPlanningState(),
       getProgramForecastState(),
+      getMonteCarloState(),
     ]);
-    return { role, plan, engineering, procurement, program, forecast };
+    return { role, plan, engineering, procurement, program, forecast, monteCarlo };
   },
   component: MasterPlan,
 });
@@ -56,7 +59,7 @@ const ROADMAP_META = [
 const capitalLadder = TRANCHES.filter((t) => t.id !== "STBY").reduce((s, t) => s + t.amount, 0);
 
 function MasterPlan() {
-  const { role, plan, engineering, procurement, program, forecast } = Route.useLoaderData();
+  const { role, plan, engineering, procurement, program, forecast, monteCarlo } = Route.useLoaderData();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -211,6 +214,8 @@ function MasterPlan() {
     <ProgramGatePlan role={role} state={program} />
 
     <ProgramForecastPanel state={forecast} />
+
+    <MonteCarloPanel state={monteCarlo} />
 
     <nav className="overflow-x-auto rounded-xl border border-border bg-surface/40 p-1"><div className="flex min-w-max gap-1">{PLAN_TABS.map((tab) => <Link key={tab.label} to={tab.to as never} className={`rounded-lg px-4 py-2 text-xs font-semibold ${tab.to === "/command/planning" ? "bg-accent text-accent-fg" : "text-muted hover:bg-bg/60 hover:text-fg"}`}>{tab.label}</Link>)}</div></nav>
 

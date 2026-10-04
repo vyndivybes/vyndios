@@ -4,15 +4,17 @@ import { Kpi, Panel } from "@/components/kpi";
 import { getGovernedIntelligence } from "@/lib/intelligence-data";
 import { getReadinessIntelligenceState } from "@/lib/readiness-authority";
 import { getProgramForecastState } from "@/lib/forecast-authority";
+import { getMonteCarloState } from "@/lib/monte-carlo-authority";
 
 export const Route = createFileRoute("/command/intelligence")({
   loader: async () => {
-    const [data, readiness, forecast] = await Promise.all([
+    const [data, readiness, forecast, monteCarlo] = await Promise.all([
       getGovernedIntelligence(),
       getReadinessIntelligenceState(),
       getProgramForecastState(),
+      getMonteCarloState(),
     ]);
-    return { data, readiness, forecast };
+    return { data, readiness, forecast, monteCarlo };
   },
   component: Intelligence,
 });
@@ -22,7 +24,7 @@ const money = (value: number) => `₹${number(value)} lakh`;
 const severityTone = (severity: string) => severity === "critical" || severity === "high" ? "text-danger" : "text-warn";
 
 function Intelligence() {
-  const { data, readiness, forecast } = Route.useLoaderData();
+  const { data, readiness, forecast, monteCarlo } = Route.useLoaderData();
   const readinessPct = (value: number | null) => value == null ? "Not rated" : `${number(value)}%`;
   return <div className="space-y-6">
     <header className="flex flex-col gap-4 border-b border-border pb-6 lg:flex-row lg:items-end lg:justify-between">
@@ -67,10 +69,25 @@ function Intelligence() {
         <Kpi label="Cost P50" value={forecast.latest.result.cost.p50Lakh == null ? "WITHHELD" : money(forecast.latest.result.cost.p50Lakh)} hint="Governed cost inputs"/>
         <Kpi label="Cost P80" value={forecast.latest.result.cost.p80Lakh == null ? "WITHHELD" : money(forecast.latest.result.cost.p80Lakh)} hint="Planning quantile"/>
         <Kpi label="Cost P95" value={forecast.latest.result.cost.p95Lakh == null ? "WITHHELD" : money(forecast.latest.result.cost.p95Lakh)} hint="Planning quantile"/>
-        <p className="sm:col-span-2 xl:col-span-6 text-xs text-muted">Source {forecast.latest.sourceReference} · captured {forecast.latest.createdAt}. PERT-normal approximation only; critical-path switching and correlation are not modeled. Monte Carlo remains a later governed engine.</p>
+        <p className="sm:col-span-2 xl:col-span-6 text-xs text-muted">Source {forecast.latest.sourceReference} · captured {forecast.latest.createdAt}. PERT-normal approximation only; critical-path switching and correlation are not modeled. Compare against the governed Monte Carlo run below when available.</p>
       </div> : <div className="text-sm text-muted">
         <p>Schedule coverage {number(forecast.live.schedule.coveragePct)}% · cost coverage {number(forecast.live.cost.coveragePct)}%. Quantiles remain withheld until a governed forecast run is captured from complete three-point inputs.</p>
         <Link to="/command/planning" className="mt-3 inline-block text-xs font-semibold text-accent">Open Program Forecast →</Link>
+      </div>}
+    </Panel>
+
+    <Panel title="Monte Carlo program uncertainty" kicker={monteCarlo.latest ? `${monteCarlo.latest.iterations.toLocaleString("en-IN")} iterations · seed ${monteCarlo.latest.seed}` : "No captured governed Monte Carlo run"}>
+      {monteCarlo.latest ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+        <Kpi label="MC Schedule P50" value={monteCarlo.latest.result.schedule.p50Days == null ? "WITHHELD" : `${monteCarlo.latest.result.schedule.p50Days} d`} hint="Critical path resampled"/>
+        <Kpi label="MC Schedule P80" value={monteCarlo.latest.result.schedule.p80Days == null ? "WITHHELD" : `${monteCarlo.latest.result.schedule.p80Days} d`} hint="Planning quantile"/>
+        <Kpi label="MC Schedule P95" value={monteCarlo.latest.result.schedule.p95Days == null ? "WITHHELD" : `${monteCarlo.latest.result.schedule.p95Days} d`} hint="Planning quantile"/>
+        <Kpi label="MC Cost P50" value={monteCarlo.latest.result.cost.p50Lakh == null ? "WITHHELD" : money(monteCarlo.latest.result.cost.p50Lakh)} hint="Cost-required tasks"/>
+        <Kpi label="Dominant path" value={monteCarlo.latest.result.schedule.criticalPathFrequency[0] ? `${number(monteCarlo.latest.result.schedule.criticalPathFrequency[0].frequencyPct)}%` : "—"} hint={monteCarlo.latest.result.schedule.criticalPathFrequency[0]?.path.join(" → ") || "No path evidence"}/>
+        <Kpi label="Run evidence" value={monteCarlo.latest.id.slice(0,12)} hint={monteCarlo.latest.sourceReference}/>
+        <p className="sm:col-span-2 xl:col-span-6 text-xs text-muted">Triangular task distributions with critical-path recalculation each iteration. Cross-task correlation is not yet modeled. This is program uncertainty, not a physical material/FEA/fatigue response model.</p>
+      </div> : <div className="text-sm text-muted">
+        <p>Schedule O/M/P coverage {number(monteCarlo.scheduleInputCoveragePct)}%. Monte Carlo remains withheld until all governed program tasks have complete schedule distributions and a run is captured.</p>
+        <Link to="/command/planning" className="mt-3 inline-block text-xs font-semibold text-accent">Open Monte Carlo Planning →</Link>
       </div>}
     </Panel>
 
