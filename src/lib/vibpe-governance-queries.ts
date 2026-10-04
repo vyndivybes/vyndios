@@ -1,6 +1,6 @@
 import type { Sql } from "@/lib/db";
 import { compileVedmAuthorityGraph, createVedmR3aSeed } from "@/lib/vedm-authority-graph";
-import { deriveVedmRisk } from "@/lib/vyndi-risk-model";
+import { classifyVedmIssueDomain, deriveVedmRisk } from "@/lib/vyndi-risk-model";
 import { buildProgramNetwork, type ProgramTaskInput } from "@/lib/program-planning-model";
 import { buildReadinessAssessment } from "@/lib/readiness-model";
 
