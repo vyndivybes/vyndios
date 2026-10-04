@@ -33,6 +33,10 @@ jobs:
         run: >-
           node --experimental-strip-types --test
           scripts/migration-execution.test.mjs
+          scripts/migration-risk.test.mjs
+          scripts/hyperdrive-schema-parity.test.mjs
+          scripts/h2-recovery-foundation.test.mjs
+          scripts/h5-governed-integrations.test.mjs
           scripts/controlled-identity-authority.test.mjs
           scripts/canonical-business-truth.test.mjs
           scripts/issued-material-fulfillment.test.mjs
@@ -48,6 +52,7 @@ jobs:
           scripts/session-reliability.test.mjs
           scripts/stage-d-load-resilience.test.mjs
           src/lib/auth/postgres-dialect.test.ts
+          src/lib/runtime-schema-migrations.test.ts
 
   responsive-browser-acceptance:
     runs-on: ubuntu-latest
