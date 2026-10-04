@@ -29,9 +29,11 @@ const protectedRoutes = [
   "/command/ibpe-operating-workspace/assurance",
   "/command/ibpe-operating-workspace/release",
   "/command/intelligence",
+  "/command/planning",
   "/command/scenarios",
   "/command/cash",
   "/command/engineering",
+  "/command/risk",
   "/command/sales",
   "/command/inventory",
   "/command/operations",
@@ -49,9 +51,11 @@ const routeEvidence = new Map([
   ["/command/ibpe-operating-workspace/assurance", /Assurance|evidence/i],
   ["/command/ibpe-operating-workspace/release", /Release Readiness|release/i],
   ["/command/intelligence", /Product Intelligence/i],
+  ["/command/planning", /Integrated Operating Plan|Program & Gate Planning/i],
   ["/command/scenarios", /Scenario/i],
   ["/command/cash", /Cash|Working Capital/i],
   ["/command/engineering", /Engineering/i],
+  ["/command/risk", /Risk Register|VYNDI Risk Engine/i],
 ]);
 
 await mkdir(evidenceRoot, { recursive: true });
@@ -144,7 +148,7 @@ try {
     }
 
     if (route === "/command") {
-      const productIntelligenceLink = page.getByRole("link", { name: /Product Intelligence/i });
+      const productIntelligenceLink = page.getByRole("link", { name: /^Product Intelligence →$/i });
       await productIntelligenceLink.waitFor({ state: "visible", timeout: 10_000 });
       const href = await productIntelligenceLink.getAttribute("href");
       assert.equal(href, "/command/intelligence", "Command Centre Product Intelligence link targets the wrong route");
