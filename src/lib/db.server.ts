@@ -244,10 +244,14 @@ async function createPostgresSql(transport: PostgresTransport): Promise<Sql> {
     });
   }
 
-  const pool = new Pool(requestSafePostgresPoolConfig(transport.connectionString));
   return toSql(async <T>(text: string, params: unknown[]) => {
-    const res = await pool.query(text, params);
-    return res.rows as T[];
+    const pool = new Pool(requestSafePostgresPoolConfig(transport.connectionString));
+    try {
+      const res = await pool.query(text, params);
+      return res.rows as T[];
+    } finally {
+      await pool.end();
+    }
   });
 }
 
