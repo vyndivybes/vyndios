@@ -15,14 +15,13 @@ const text = (row: Row, ...keys: string[]) => {
 
 export const Route = createFileRoute("/command/operations")({
   loader: async () => {
-    const [warnings, lineage, dispatch, quality, dispatchSerialCandidates] = await Promise.all([
+    const [warnings, dispatch, quality, dispatchSerialCandidates] = await Promise.all([
       getInventoryMslWarnings(),
-      getOperatingLineage(),
       listDispatchRegister(),
       listQualityAuthority(),
       listDispatchSerialCandidates(),
     ]);
-    return { warnings, lineage, dispatch, quality, dispatchSerialCandidates };
+    return { warnings, dispatch, quality, dispatchSerialCandidates };
   },
   component: Operations,
 });
@@ -203,7 +202,25 @@ function LineageRecord({ row }: { row: Awaited<ReturnType<typeof getOperatingLin
 }
 
 function Operations() {
-  const { warnings, lineage, dispatch, quality, dispatchSerialCandidates } = Route.useLoaderData();
+  const { warnings, dispatch, quality, dispatchSerialCandidates } = Route.useLoaderData();
+  const [lineage, setLineage] = useState<Awaited<ReturnType<typeof getOperatingLineage>>>([]);
+  const [lineageLoaded, setLineageLoaded] = useState(false);
+  const [lineageBusy, setLineageBusy] = useState(false);
+  const [lineageError, setLineageError] = useState("");
+
+  async function loadOperatingLineage() {
+    if (lineageLoaded || lineageBusy) return;
+    setLineageBusy(true);
+    setLineageError("");
+    try {
+      setLineage(await getOperatingLineage());
+      setLineageLoaded(true);
+    } catch (error) {
+      setLineageError(error instanceof Error ? error.message : "Lineage could not be loaded.");
+    } finally {
+      setLineageBusy(false);
+    }
+  }
   const currentDispatch = dispatch.filter((row) => row.status === "posted");
   const openNcr = (quality.ncrs as Row[]).filter(
     (row) => !["closed", "rejected"].includes(text(row, "status")),
@@ -232,8 +249,8 @@ function Operations() {
       </header>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <Kpi label="Committed lineage" value={String(lineage.length)} hint="Current order revisions" />
-        <Kpi label="Live shortages" value={String(shortages)} hint="Controlled requirement lines" tone={shortages ? "warn" : "ok"} />
+        <Kpi label="Committed lineage" value={lineageLoaded ? String(lineage.length) : "On demand"} hint="Open lineage register to load" />
+        <Kpi label="Live shortages" value={lineageLoaded ? String(shortages) : "On demand"} hint="Loaded with governed lineage" tone={lineageLoaded && shortages ? "warn" : undefined} />
         <Kpi label="Inventory alerts" value={String(warnings.length)} hint="MSL / stockout" tone={warnings.length ? "warn" : "ok"} />
         <Kpi label="Quality releases" value={String(releases)} hint={`${openNcr} open NCR`} tone={openNcr ? "warn" : "ok"} />
         <Kpi label="Posted dispatch" value={String(currentDispatch.length)} hint="Operations-owned register" tone={currentDispatch.length ? "ok" : undefined} />
@@ -271,10 +288,10 @@ function Operations() {
             ) : <p className="mt-3 text-sm text-muted">No dispatch has been posted. This is a valid empty canonical register, not an unknown route binding.</p>}
           </details>
 
-          <details className="rounded-xl border border-border p-3">
-            <summary className="cursor-pointer font-semibold text-accent">Order-to-cash lineage ({lineage.length})</summary>
+          <details className="rounded-xl border border-border p-3" onToggle={(event) => { if (event.currentTarget.open) void loadOperatingLineage(); }}>
+            <summary className="cursor-pointer font-semibold text-accent">Order-to-cash lineage ({lineageLoaded ? lineage.length : "load on demand"})</summary>
             <p className="mt-2 text-xs text-muted">Persisted evidence from order through production, procurement, receiving, genealogy, Quality, dispatch and Finance.</p>
-            {lineage.length ? (
+            {lineageBusy ? <p className="mt-3 text-sm text-muted">Loading governed lineage…</p> : lineageError ? <p role="alert" className="mt-3 text-sm text-warn">{lineageError}</p> : lineage.length ? (
               <div className="mt-3 space-y-2" data-full-view-table="operations-order-to-cash-lineage">
                 <div className="hidden grid-cols-[minmax(0,1fr)_minmax(0,.95fr)_minmax(0,.85fr)_minmax(0,1fr)_minmax(0,.65fr)_minmax(0,1.55fr)] gap-3 rounded-lg border border-border bg-surface/55 px-3 py-2 text-[9px] font-bold uppercase tracking-[0.12em] text-subtle lg:grid">
                   <span>Order</span><span>Job Card</span><span>Material</span><span>Procurement</span><span>Traveller</span><span>Dispatch / invoice / collection</span>
