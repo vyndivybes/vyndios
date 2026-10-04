@@ -59,8 +59,9 @@ export async function buildEnterpriseDigitalThreadFromSql(sql:Sql,query:string){
   const poIds=unique(purchaseOrders.map((row)=>clean(row.id)));
   const supplierIds=unique(purchaseOrders.map((row)=>clean(row.supplier_id)));
   const salesOrderIds=unique(jobCards.map((row)=>clean(row.sales_order_id)));
+  const shipmentIds=unique(shipments.map((row)=>clean(row.id)));
 
-  const [suppliers,goodsReceipts,fifoLinks,invoices,risks]=await Promise.all([
+  const [suppliers,goodsReceipts,fifoLinks,invoices,risks,shipmentSerialAllocations]=await Promise.all([
     supplierIds.length?sql.query<Row>("select * from vyndi_suppliers where id=any($1::text[]) order by id",[supplierIds]):Promise.resolve([] as Row[]),
     poIds.length?sql.query<Row>("select * from vyndi_goods_receipts where purchase_order_id=any($1::text[]) order by created_at,id",[poIds]):Promise.resolve([] as Row[]),
     travellerIds.length&&poIds.length?sql.query<Row>(
@@ -71,6 +72,7 @@ export async function buildEnterpriseDigitalThreadFromSql(sql:Sql,query:string){
       "order by g.id,fl.id,issue_ledger.movement_id,issue_ledger.traveller_id",[poIds,travellerIds]):Promise.resolve([] as Row[]),
     salesOrderIds.length?sql.query<Row>("select i.* from vyndi_invoices i where i.sales_order_id=any($1::text[]) order by i.plan_month,i.id",[salesOrderIds]):Promise.resolve([] as Row[]),
     sql.query<Row>("select * from vyndi_risk_intelligence where status<>\'closed\' order by exposure_score desc nulls last,id"),
+    shipmentIds.length?sql.query<Row>("select a.* from vyndi_shipment_serial_allocations a where a.shipment_id=any($1::text[]) and a.status='active' order by a.shipment_id,a.serial_number",[shipmentIds]):Promise.resolve([] as Row[]),
   ]);
 
   const vedm=compileVedmAuthorityGraph(createVedmR3aSeed(),new Date().toISOString().slice(0,10));
@@ -97,7 +99,25 @@ export async function buildEnterpriseDigitalThreadFromSql(sql:Sql,query:string){
   for(const row of qualityCapas){ const id=clean(row.id),ncr=clean(row.ncr_id); addNode(makeNode(id,"capa","CAPA "+id,"VYNDI:capa:"+id)); addEdge(ncr,id,"CORRECTED_BY"); }
   for(const row of qualityReleases){ const id=clean(row.id),traveller=clean(row.traveller_id); addNode(makeNode(id,"quality_release","Quality Release "+id,"VYNDI:quality_release:"+id)); addEdge(traveller,id,"RELEASED_BY"); }
   for(const row of shipments){ const id=clean(row.id),jc=clean(row.job_card_id); addNode(makeNode(id,"shipment","Shipment "+id,"VYNDI:shipment:"+id)); addEdge(jc,id,"FULFILLED_BY"); }
-  if(shipments.length&&qualityReleases.length){ gaps.push({ code:"SERIAL_SHIPMENT_ALLOCATION_MISSING", message:"Serial → shipment identity is not represented by canonical dispatch authority. Shipment posting proves released quantity at Job Card level, not which released serial was packed into a specific shipment." }); }
+
+  const allocatedSerialByShipment=new Map<string,number>();
+  for(const row of shipmentSerialAllocations){
+    const shipment=clean(row.shipment_id),traveller=clean(row.traveller_id),release=clean(row.quality_release_id);
+    allocatedSerialByShipment.set(shipment,(allocatedSerialByShipment.get(shipment)??0)+1);
+    addEdge(traveller,shipment,"FULFILLED_BY");
+    addEdge(release,shipment,"FULFILLED_BY");
+  }
+  for(const row of shipments){
+    const shipment=clean(row.id);
+    const expected=Number(row.units??0);
+    const allocated=allocatedSerialByShipment.get(shipment)??0;
+    if(expected>0&&allocated!==expected){
+      gaps.push({
+        code:"SERIAL_SHIPMENT_ALLOCATION_MISSING",
+        message:"Shipment "+shipment+" has exact serialized allocation "+allocated+"/"+expected+". VYNDI does not infer missing serial identity from released quantity."
+      });
+    }
+  }
   for(const row of invoices){ const id=clean(row.id),shipment=clean(row.shipment_id); addNode(makeNode(id,"invoice","Invoice "+id,"VYNDI:invoice:"+id)); addEdge(shipment,id,"BILLED_BY"); }
   for(const row of jobCosts){ const id=clean(row.id),jc=clean(row.job_card_id); addNode(makeNode(id,"job_cost","Actual Job Cost "+id,"VYNDI:job_cost:"+id)); addEdge(jc,id,"COSTED_BY"); }
 
@@ -110,7 +130,7 @@ export async function buildEnterpriseDigitalThreadFromSql(sql:Sql,query:string){
   const rootNodeIds=matchedNodes.length?matchedNodes.map((item)=>item.id):jobCardIds;
   const root=rootNodeIds[0]??jobCardIds[0]??"";
   const impact=root?assessDigitalThreadImpact(thread,root):{changedNodeId:"",affectedNodeIds:[] as string[]};
-  return { query, matched:true, rootNodeIds, nodes:[...thread.nodeById.values()].sort((a,b)=>a.kind.localeCompare(b.kind)||a.id.localeCompare(b.id)), edges:[...thread.edges].sort((a,b)=>a.from.localeCompare(b.from)||a.to.localeCompare(b.to)||a.relation.localeCompare(b.relation)), gaps:thread.gaps, impact, summary:{ jobCards:jobCardIds.length, travellers:travellerIds.length, suppliers:supplierIds.length, goodsReceipts:goodsReceipts.length, qualityReleases:qualityReleases.length, shipments:shipments.length, risks:nodes.filter((item)=>item.kind==="risk").length, serialShipmentExact:false } };
+  return { query, matched:true, rootNodeIds, nodes:[...thread.nodeById.values()].sort((a,b)=>a.kind.localeCompare(b.kind)||a.id.localeCompare(b.id)), edges:[...thread.edges].sort((a,b)=>a.from.localeCompare(b.from)||a.to.localeCompare(b.to)||a.relation.localeCompare(b.relation)), gaps:thread.gaps, impact, summary:{ jobCards:jobCardIds.length, travellers:travellerIds.length, suppliers:supplierIds.length, goodsReceipts:goodsReceipts.length, qualityReleases:qualityReleases.length, shipments:shipments.length, risks:nodes.filter((item)=>item.kind==="risk").length, serialShipmentExact:shipments.length>0&&shipments.every((row)=>(allocatedSerialByShipment.get(clean(row.id))??0)===Number(row.units??0)) } };
 }
 
 export const traceEnterpriseDigitalThread=createServerFn({method:"POST"})

@@ -185,10 +185,46 @@ test("Stage 2 order → production → quality → dispatch → invoice → rece
   assert.equal(shipmentAgain.rows[0].id,"SHIP-STAGE2","same shipment command must be idempotent");
   await assert.rejects(()=>db.query(`select post_vyndi_shipment($1,$2,$3,$4,$5,$6,$7)`,["SHIP-OVER","SO-STAGE2",6,1,"DISPATCH-OVER","test-user","operations"]),/exceeds remaining confirmed order quantity/);
 
-  const dispatch=await db.query(`select owner_workspace,job_card_id,current_quality_release_count from vyndi_dispatch_register where shipment_id='SHIP-STAGE2'`);
+  const dispatch=await db.query(`select owner_workspace,job_card_id,current_quality_release_count,allocated_serial_count,current_released_serial_count,serialization_complete,release_coverage_complete from vyndi_dispatch_register where shipment_id='SHIP-STAGE2'`);
   assert.equal(dispatch.rows[0].owner_workspace,"operations");
   assert.equal(dispatch.rows[0].job_card_id,"CARD-STAGE2");
   assert.equal(Number(dispatch.rows[0].current_quality_release_count),2);
+  assert.equal(Number(dispatch.rows[0].allocated_serial_count),0);
+  assert.equal(dispatch.rows[0].serialization_complete,false);
+
+  await assert.rejects(
+    ()=>db.query(`select * from issue_vyndi_invoice($1,$2,$3,$4,$5)`,["INV-STAGE2","SHIP-STAGE2","INVREF-001","test-user","finance"]),
+    /Serialized dispatch allocation is incomplete/,
+  );
+
+  await db.query(
+    `select allocate_vyndi_shipment_serial($1,$2,$3,$4,$5)`,
+    ["SHIP-STAGE2","QR-STAGE2-1","SERIAL-PACK-1","test-user","operations"],
+  );
+  await db.query(
+    `select allocate_vyndi_shipment_serial($1,$2,$3,$4,$5)`,
+    ["SHIP-STAGE2","QR-STAGE2-2","SERIAL-PACK-2","test-user","operations"],
+  );
+  await db.query(
+    `select deallocate_vyndi_shipment_serial($1,$2,$3,$4,$5)`,
+    ["SHIP-STAGE2","QR-STAGE2-2","packing correction","test-user","operations"],
+  );
+  await assert.rejects(
+    ()=>db.query(`select * from issue_vyndi_invoice($1,$2,$3,$4,$5)`,["INV-STAGE2","SHIP-STAGE2","INVREF-001","test-user","finance"]),
+    /Serialized dispatch allocation is incomplete/,
+  );
+  await db.query(
+    `select allocate_vyndi_shipment_serial($1,$2,$3,$4,$5)`,
+    ["SHIP-STAGE2","QR-STAGE2-2","SERIAL-PACK-2-REASSIGNED","test-user","operations"],
+  );
+
+  const serializedDispatch=await db.query(`select allocated_serial_count,current_released_serial_count,serialization_complete,release_coverage_complete,serial_numbers from vyndi_dispatch_register where shipment_id='SHIP-STAGE2'`);
+  assert.equal(Number(serializedDispatch.rows[0].allocated_serial_count),2);
+  assert.equal(Number(serializedDispatch.rows[0].current_released_serial_count),2);
+  assert.equal(serializedDispatch.rows[0].serialization_complete,true);
+  assert.equal(serializedDispatch.rows[0].release_coverage_complete,true);
+  assert.match(String(serializedDispatch.rows[0].serial_numbers),/SERIAL-STAGE2-1/);
+  assert.match(String(serializedDispatch.rows[0].serial_numbers),/SERIAL-STAGE2-2/);
 
   const invoice=await db.query(`select * from issue_vyndi_invoice($1,$2,$3,$4,$5)`,["INV-STAGE2","SHIP-STAGE2","INVREF-001","test-user","finance"]);
   assert.equal(Number(invoice.rows[0].amount_lakh),2.5,"invoice amount must derive from shipped units × controlled order ASP");
@@ -227,9 +263,13 @@ test("Stage 2 order → production → quality → dispatch → invoice → rece
   const afterVoid=await db.query(`select revenue,units,receivables from vyndi_monthly_transaction_actuals where plan_month=6`);
   assert.equal(Number(afterVoid.rows[0].revenue),0); assert.equal(Number(afterVoid.rows[0].units),0); assert.equal(Number(afterVoid.rows[0].receivables),0);
   await db.query(`select reverse_vyndi_shipment($1,$2,$3,$4)`,["SHIP-STAGE2","dispatch cancelled","test-user","operations"]);
+  const serialAfterReversal=await db.query(`select status,count(*)::int as count from vyndi_shipment_serial_allocations where shipment_id='SHIP-STAGE2' group by status`);
+  assert.equal(serialAfterReversal.rows.length,1);
+  assert.equal(serialAfterReversal.rows[0].status,"reversed");
+  assert.equal(Number(serialAfterReversal.rows[0].count),3,"reversed/reallocated history must be preserved without an active serial allocation");
 
   const audit=await db.query(`select action from vyndi_audit_events where entity_id in ('SHIP-STAGE2','INV-STAGE2','COL-STAGE2') order by created_at`);
-  assert.deepEqual(audit.rows.map((row)=>row.action).sort(),["issued","posted","posted","reversed","reversed","voided"].sort());
+  assert.deepEqual(audit.rows.map((row)=>row.action).sort(),["issued","posted","posted","reversed","reversed","voided","SHIPMENT_SERIAL_ALLOCATION_REVERSED"].sort());
 });
 
 test("recommendation → PO approval → GRN/FIFO → three-way match → payment is controlled", async (t) => {

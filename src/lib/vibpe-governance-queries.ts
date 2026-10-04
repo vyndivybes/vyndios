@@ -867,7 +867,9 @@ async function enterpriseDigitalThreadAnswer(sql: Sql, question: string) {
     "Coverage: "+result.summary.jobCards+" Job Card(s) · "+result.summary.travellers+" serial/Traveller(s) · "+result.summary.suppliers+" supplier(s) · "+result.summary.goodsReceipts+" GRN(s) · "+result.summary.qualityReleases+" Quality Release(s) · "+result.summary.shipments+" shipment(s) · "+result.summary.risks+" linked open risk(s).",
     "Affected downstream nodes from the matched root: "+(affected.length?affected.join(", "):"none represented")+".",
     "Governed gap: "+gapText,
-    "Serial shipment identity is not represented by current dispatch authority; VYNDI does not infer which released serial was packed into a specific shipment from quantity evidence alone.",
+    result.summary.serialShipmentExact
+      ? "Serial → shipment identity: EXACT — every posted shipment in this matched lineage is backed by active serialized dispatch allocation evidence."
+      : "Serial → shipment identity: INCOMPLETE/LEGACY — VYNDI does not infer missing serial identity from released quantity evidence.",
     "Authority boundary: this is read-only cross-domain lineage and impact evidence. It does not mutate Procurement, Inventory, Production, Quality, Finance, Risk or Engineering authority."
   ].join("\n\n");
 }

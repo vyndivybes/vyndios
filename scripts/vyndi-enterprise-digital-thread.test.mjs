@@ -25,19 +25,22 @@ test("enterprise thread authority reads canonical procurement FIFO production qu
   assert.match(authority,/\/command\/intelligence/);
 });
 
-test("Product Intelligence exposes cross-domain trace and impact without asserting unsupported serial dispatch identity",()=>{
+test("Product Intelligence exposes cross-domain trace and exactness without inferring missing serial dispatch identity",()=>{
   assert.match(intelligence,/EnterpriseDigitalThreadPanel/);
   assert.match(panel,/Enterprise Digital Thread/);
   assert.match(panel,/Impact/);
   assert.match(panel,/Serial → shipment/);
-  assert.match(panel,/not inferred|not represented/i);
+  assert.match(panel,/not inferred/i);
+  assert.match(panel,/serialShipmentExact/);
 });
 
 test("VIBPE can answer enterprise digital-thread and affected-by questions from canonical evidence",()=>{
   assert.match(vibpe,/isEnterpriseDigitalThreadQuestion/);
   assert.match(vibpe,/enterpriseDigitalThreadAnswer/);
   assert.match(vibpe,/affected/i);
-  assert.match(vibpe,/serial.*shipment.*not represented/i);
+  assert.match(vibpe,/Serial → shipment identity/);
+  assert.match(vibpe,/EXACT/);
+  assert.match(vibpe,/INCOMPLETE\/LEGACY/);
 });
 
 test("aggregate test gate includes Package M unit and integration coverage",()=>{

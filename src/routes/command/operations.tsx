@@ -1,8 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { useState } from "react";
 import { Kpi, Panel } from "@/components/kpi";
 import { getInventoryMslWarnings } from "@/lib/inventory-authority";
 import { getOperatingLineage } from "@/lib/operating-lineage";
-import { listDispatchRegister } from "@/lib/dispatch-authority";
+import { allocateDispatchSerial, deallocateDispatchSerial, listDispatchRegister, listDispatchSerialCandidates, type DispatchSerialCandidate } from "@/lib/dispatch-authority";
 import { listQualityAuthority } from "@/lib/quality-authority";
 
 type Row = Record<string, unknown>;
@@ -14,21 +15,71 @@ const text = (row: Row, ...keys: string[]) => {
 
 export const Route = createFileRoute("/command/operations")({
   loader: async () => {
-    const [warnings, lineage, dispatch, quality] = await Promise.all([
+    const [warnings, lineage, dispatch, quality, dispatchSerialCandidates] = await Promise.all([
       getInventoryMslWarnings(),
       getOperatingLineage(),
       listDispatchRegister(),
       listQualityAuthority(),
+      listDispatchSerialCandidates(),
     ]);
-    return { warnings, lineage, dispatch, quality };
+    return { warnings, lineage, dispatch, quality, dispatchSerialCandidates };
   },
   component: Operations,
 });
 
-function DispatchRecord({ row }: { row: Awaited<ReturnType<typeof listDispatchRegister>>[number] }) {
+function DispatchRecord({
+  row,
+  candidates,
+}: {
+  row: Awaited<ReturnType<typeof listDispatchRegister>>[number];
+  candidates: DispatchSerialCandidate[];
+}) {
+  const router = useRouter();
+  const [qualityReleaseId,setQualityReleaseId]=useState("");
+  const [message,setMessage]=useState("");
+  const [busy,setBusy]=useState(false);
   const downstream = row.invoiceId
     ? `${row.invoiceId} · ${row.invoiceStatus}`
     : "Invoice not yet posted";
+  const serializationLabel = row.serialAllocationRequired
+    ? `Serialized ${row.allocatedSerialCount}/${row.units}`
+    : "Legacy shipment · serial identity not asserted";
+  const releaseCoverageLabel = row.serialAllocationRequired
+    ? `Current released ${row.currentReleasedSerialCount}/${row.units}`
+    : "Current release coverage not required for legacy dispatch";
+  const serialSummary = row.serialNumbers.length ? row.serialNumbers.join(", ") : "No exact serial allocation yet";
+
+  async function allocateSerial() {
+    if (!qualityReleaseId) return;
+    setBusy(true); setMessage("");
+    try {
+      await allocateDispatchSerial({ data: {
+        shipmentId: row.shipmentId,
+        qualityReleaseId,
+        sourceReference: "UI:OPERATIONS:SERIAL-DISPATCH",
+      }});
+      setQualityReleaseId("");
+      setMessage("Released serial allocated.");
+      await router.invalidate();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Serial allocation failed.");
+    } finally { setBusy(false); }
+  }
+
+  async function removeSerial(releaseId:string) {
+    setBusy(true); setMessage("");
+    try {
+      await deallocateDispatchSerial({ data: {
+        shipmentId: row.shipmentId,
+        qualityReleaseId: releaseId,
+        reason: "Operations correction before financial finalization",
+      }});
+      setMessage("Serial allocation reversed.");
+      await router.invalidate();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Serial deallocation failed.");
+    } finally { setBusy(false); }
+  }
 
   return (
     <article className="rounded-lg border border-border/80 bg-bg/45 p-3 transition-colors hover:bg-surface/45">
@@ -39,7 +90,7 @@ function DispatchRecord({ row }: { row: Awaited<ReturnType<typeof listDispatchRe
           <p className="mt-1 break-all text-[10px] text-muted">{row.jobCardId || "No job card"}</p>
         </div>
         <p className="text-right text-xs tabular-nums">{row.units}</p>
-        <p className="min-w-0 break-words text-[11px] text-fg">{row.qualityReleaseCount} release(s)</p>
+        <div className="min-w-0 text-[11px] text-fg"><p>{row.qualityReleaseCount} release(s)</p><p className={row.serializationComplete ? "mt-1 text-ok" : row.serialAllocationRequired ? "mt-1 text-warn" : "mt-1 text-muted"}>{serializationLabel}</p><p className={row.releaseCoverageComplete ? "mt-1 text-ok" : row.serialAllocationRequired ? "mt-1 text-warn" : "mt-1 text-muted"}>{releaseCoverageLabel}</p><p className="mt-1 break-words text-[10px] text-muted">{serialSummary}</p></div>
         <p className="min-w-0 break-words text-[10px] font-semibold uppercase text-fg">{row.status}</p>
         <p className="min-w-0 break-all text-[11px] leading-4 text-muted">{downstream}</p>
       </div>
@@ -63,7 +114,7 @@ function DispatchRecord({ row }: { row: Awaited<ReturnType<typeof listDispatchRe
           </div>
           <div>
             <p className="text-[9px] font-semibold uppercase tracking-wider text-subtle">Quality</p>
-            <p className="mt-1">{row.qualityReleaseCount} release(s)</p>
+            <p className="mt-1">{row.qualityReleaseCount} release(s)</p><p className={row.serializationComplete ? "mt-1 text-ok" : row.serialAllocationRequired ? "mt-1 text-warn" : "mt-1 text-muted"}>{serializationLabel}</p><p className="mt-1 break-words text-[10px] text-muted">{serialSummary}</p>
           </div>
         </div>
         <div className="border-t border-border/70 pt-3">
@@ -71,6 +122,28 @@ function DispatchRecord({ row }: { row: Awaited<ReturnType<typeof listDispatchRe
           <p className="mt-1 break-all text-xs leading-5 text-muted">{downstream}</p>
         </div>
       </div>
+
+      {row.serialAllocationRequired ? (
+        <div className="mt-3 border-t border-border/70 pt-3">
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="min-w-[240px] flex-1 text-[10px] font-semibold uppercase tracking-wider text-subtle">
+              Allocate serial
+              <select className="control mt-1.5 w-full normal-case" value={qualityReleaseId} onChange={(e)=>setQualityReleaseId(e.target.value)}>
+                <option value="">Select current released serial</option>
+                {candidates.map((candidate)=><option key={candidate.qualityReleaseId} value={candidate.qualityReleaseId}>{candidate.serialNumber} · {candidate.qualityReleaseId}</option>)}
+              </select>
+            </label>
+            <button type="button" disabled={busy||!qualityReleaseId||row.serializationComplete} onClick={()=>void allocateSerial()} className="rounded border border-accent px-3 py-2 text-xs font-semibold text-accent disabled:opacity-40">Allocate serial</button>
+          </div>
+          {row.serialAllocations.length ? <div className="mt-3 flex flex-wrap gap-2">
+            {row.serialAllocations.map((allocation)=><span key={allocation.allocationId} className="inline-flex items-center gap-2 rounded-full border border-border px-2.5 py-1 text-[10px]">
+              {allocation.serialNumber}{allocation.currentRelease ? "" : " · superseded release"}
+              {!row.invoiceId ? <button type="button" disabled={busy} onClick={()=>void removeSerial(allocation.qualityReleaseId)} className="font-semibold text-warn">Remove</button> : null}
+            </span>)}
+          </div> : null}
+          {message ? <p role="status" className="mt-2 text-xs text-muted">{message}</p> : null}
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -130,7 +203,7 @@ function LineageRecord({ row }: { row: Awaited<ReturnType<typeof getOperatingLin
 }
 
 function Operations() {
-  const { warnings, lineage, dispatch, quality } = Route.useLoaderData();
+  const { warnings, lineage, dispatch, quality, dispatchSerialCandidates } = Route.useLoaderData();
   const currentDispatch = dispatch.filter((row) => row.status === "posted");
   const openNcr = (quality.ncrs as Row[]).filter(
     (row) => !["closed", "rejected"].includes(text(row, "status")),
@@ -193,7 +266,7 @@ function Operations() {
                 <div className="hidden grid-cols-[minmax(0,.95fr)_minmax(0,1.35fr)_minmax(0,.55fr)_minmax(0,.8fr)_minmax(0,.7fr)_minmax(0,1.45fr)] gap-3 rounded-lg border border-border bg-surface/55 px-3 py-2 text-[9px] font-bold uppercase tracking-[0.12em] text-subtle lg:grid">
                   <span>Shipment</span><span>Order / job</span><span className="text-right">Units</span><span>Quality</span><span>Status</span><span>Finance downstream</span>
                 </div>
-                {dispatch.map((row) => <DispatchRecord key={row.shipmentId} row={row} />)}
+                {dispatch.map((row) => <DispatchRecord key={row.shipmentId} row={row} candidates={dispatchSerialCandidates.filter((candidate) => candidate.shipmentId === row.shipmentId)} />)}
               </div>
             ) : <p className="mt-3 text-sm text-muted">No dispatch has been posted. This is a valid empty canonical register, not an unknown route binding.</p>}
           </details>

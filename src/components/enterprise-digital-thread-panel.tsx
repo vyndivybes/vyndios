@@ -61,7 +61,9 @@ export function EnterpriseDigitalThreadPanel(){
       <div className="rounded-xl border border-border p-4">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-green">Authority boundary</p>
         <p className="mt-2 text-xs leading-5 text-muted">
-          Serial → shipment identity is <strong className="text-fg">not inferred</strong>. Current dispatch authority proves released quantity at Job Card level, but does not represent which released serial was packed into a specific shipment. Package M surfaces that gap explicitly.
+          Serial → shipment identity is <strong className="text-fg">not inferred</strong>. {result.summary.serialShipmentExact
+            ? "Every posted shipment in this matched lineage has exact active serialized allocation evidence."
+            : "Any legacy or incompletely allocated shipment remains an explicit governed gap until exact serial allocation evidence exists."}
         </p>
       </div>
 
