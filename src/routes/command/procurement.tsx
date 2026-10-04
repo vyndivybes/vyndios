@@ -1,19 +1,25 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Panel, Kpi } from "@/components/kpi";
 import { InventoryWorkspaceNav } from "@/components/inventory-workspace-nav";
+import { SupplierRiskPanel } from "@/components/supplier-risk-panel";
 import { getInventoryMslWarnings } from "@/lib/inventory-authority";
 import { getConfiguredDemandShortages } from "@/lib/production-job-card";
+import { getSupplierRiskIntelligence } from "@/lib/supplier-risk-authority";
 
 export const Route = createFileRoute("/command/procurement")({
-  loader: async () => ({
-    warnings: await getInventoryMslWarnings(),
-    demandShortages: await getConfiguredDemandShortages(),
-  }),
+  loader: async () => {
+    const [warnings,demandShortages,supplierRisk]=await Promise.all([
+      getInventoryMslWarnings(),
+      getConfiguredDemandShortages(),
+      getSupplierRiskIntelligence(),
+    ]);
+    return { warnings,demandShortages,supplierRisk };
+  },
   component: Procurement,
 });
 
 function Procurement() {
-  const { warnings, demandShortages } = Route.useLoaderData();
+  const { warnings, demandShortages, supplierRisk } = Route.useLoaderData();
   const critical = warnings.filter((x: any) => x.status === "critical").length;
   const low = warnings.filter((x: any) => x.status === "low").length;
   const shortage = warnings.reduce((sum: number, x: any) => sum + Number(x.shortage_quantity), 0);
@@ -65,6 +71,8 @@ function Procurement() {
         <Kpi label="Below MSL" value={String(low)} hint="Replenishment required" />
         <Kpi label="Total shortfall" value={String(shortage)} hint="Units to reach MSL" />
       </div>
+
+      <div className="mt-6"><SupplierRiskPanel state={supplierRisk} /></div>
 
       <Panel
         title="MSL replenishment queue"

@@ -119,6 +119,11 @@ export function isManufacturingQualityIntelligenceQuestion(question: string) {
   return /quality\s+forecast|defect\s+probab|yield\s+(?:forecast|estimate)|process\s+capability|\bcpk\b|\bcp\b|manufacturing\s+quality\s+intelligence/.test(q);
 }
 
+export function isSupplierRiskIntelligenceQuestion(question: string) {
+  const q = question.toLowerCase();
+  return /supplier\s+risk|single[-\s]source|supplier\s+reliability|late[-\s]delivery\s+probab|lead[-\s]time\s+drift|incoming\s+supplier\s+quality/.test(q);
+}
+
 async function traceabilityExceptionAnswer(sql: Sql) {
   const rows = await sql.query<Record<string, unknown>>(`
     select c.id as job_card_id,
@@ -500,6 +505,54 @@ async function programPlanningAnswer(sql: Sql) {
   ].join("\n\n");
 }
 
+async function supplierRiskIntelligenceAnswer(sql: Sql) {
+  const rows=await sql.query<Record<string,unknown>>(
+    `select id,result_json,source_reference,created_at
+       from vyndi_supplier_risk_runs
+      order by created_at desc,id desc limit 1`,
+  );
+  const row=rows[0];
+  if(!row){
+    return "No governed Supplier Risk snapshot has been captured. Use Procurement → Supplier Risk Intelligence to review approved lane authority plus actual PO/GRN evidence and capture a snapshot before VIBPE reports supplier-risk forecasting.";
+  }
+  const result=row.result_json as {
+    summary:{
+      activeApprovedLaneRevisions:number;coveredSkus:number;singleSourceSkuCount:number;singleSourceSkus:string[];
+      deliveryForecastRatedLanes:number;incomingQualityRatedLanes:number;actualLeadTimeRatedLanes:number;
+    };
+    laneRisks:Array<{
+      supplierId:string;sku:string;alternateRank:number;currency:string;completedDeliveryEvents:number;
+      risk:{
+        singleSource:boolean;approvedLaneCount:number;governedReliabilityPct:number|null;qualityRating:number|null;deliveryRating:number|null;
+        deliveryForecast:{available:boolean;expectedLatePct:number|null;lower90Pct:number|null;upper90Pct:number|null;eventCount:number;reason:string};
+        actualLeadTime:{available:boolean;meanDays:number|null;p80Days:number|null;meanDriftDays:number|null;reason:string};
+        incomingQuality:{available:boolean;expectedDefectPct:number|null;lower90Pct:number|null;upper90Pct:number|null;sampleSize:number;reason:string};
+      };
+    }>;
+  };
+  const top=result.laneRisks.slice(0,6).map((item)=>{
+    const source=item.risk.singleSource?"SINGLE SOURCE":`${item.risk.approvedLaneCount} approved sources`;
+    const late=item.risk.deliveryForecast.available
+      ? `late probability ${item.risk.deliveryForecast.expectedLatePct}%`
+      : "late probability WITHHELD";
+    const drift=item.risk.actualLeadTime.available
+      ? `mean lead-time drift ${item.risk.actualLeadTime.meanDriftDays==null?"unrated":`${item.risk.actualLeadTime.meanDriftDays>=0?"+":""}${item.risk.actualLeadTime.meanDriftDays}d`}`
+      : "lead-time drift WITHHELD";
+    const reject=item.risk.incomingQuality.available
+      ? `incoming reject probability ${item.risk.incomingQuality.expectedDefectPct}%`
+      : "incoming quality probability WITHHELD";
+    return `${item.sku} / ${item.supplierId} — ${source}; governed reliability ${item.risk.governedReliabilityPct??"unrated"}%; ${late}; ${drift}; ${reject}.`;
+  });
+  return [
+    `Latest governed Supplier Risk: ${clean(row.id)} · ${result.summary.coveredSkus} covered SKU(s) · ${result.summary.activeApprovedLaneRevisions} current approved lane revision(s).`,
+    `Single-source exposure: ${result.summary.singleSourceSkuCount} SKU(s)${result.summary.singleSourceSkus.length?` — ${result.summary.singleSourceSkus.join(", ")}`:""}. This is a configuration fact, not a probability.`,
+    `Evidence coverage: delivery forecast rated on ${result.summary.deliveryForecastRatedLanes} lane(s); actual lead-time drift rated on ${result.summary.actualLeadTimeRatedLanes}; incoming quality rated on ${result.summary.incomingQualityRatedLanes}.`,
+    top.length?`Highest current lane exposures: ${top.join(" | ")}`:"No current approved supplier lanes are represented.",
+    `Evidence: ${clean(row.source_reference)} · captured ${clean(row.created_at)}.`,
+    "Boundary: supplier ratings/reliability, empirical delivery, incoming rejection, alternate-source coverage and currency remain separate evidence dimensions. Geographic/geopolitical risk is not inferred without controlled evidence."
+  ].join("\n\n");
+}
+
 async function manufacturingQualityIntelligenceAnswer(sql: Sql) {
   const rows=await sql.query<Record<string,unknown>>(
     `select id,result_json,source_reference,created_at
@@ -816,6 +869,7 @@ export async function tryGovernanceDataAnswer(sql: Sql, question: string) {
   if (isTraceabilityExceptionQuestion(question)) return traceabilityExceptionAnswer(sql);
   if (isGovernanceOperatingStatusQuestion(question)) return governanceOperatingStatusAnswer(sql);
   if (isOverallRagHealthQuestion(question)) return overallRagHealthAnswer(sql);
+  if (isSupplierRiskIntelligenceQuestion(question)) return supplierRiskIntelligenceAnswer(sql);
   if (isRiskIntelligenceQuestion(question)) return riskIntelligenceAnswer(sql);
   if (isProgramPlanningQuestion(question)) return programPlanningAnswer(sql);
   if (isReadinessIntelligenceQuestion(question)) return readinessIntelligenceAnswer(sql);
