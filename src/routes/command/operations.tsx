@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Kpi, Panel } from "@/components/kpi";
 import { getInventoryMslWarnings } from "@/lib/inventory-authority";
 import { getOperatingLineage } from "@/lib/operating-lineage";
@@ -15,8 +15,7 @@ const text = (row: Row, ...keys: string[]) => {
 
 export const Route = createFileRoute("/command/operations")({
   loader: async () => {
-    const warnings = await getInventoryMslWarnings();
-    return { warnings };
+    return {};
   },
   component: Operations,
 });
@@ -197,7 +196,10 @@ function LineageRecord({ row }: { row: Awaited<ReturnType<typeof getOperatingLin
 }
 
 function Operations() {
-  const { warnings } = Route.useLoaderData();
+  Route.useLoaderData();
+  const [warnings, setWarnings] = useState<Awaited<ReturnType<typeof getInventoryMslWarnings>>>([]);
+  const [warningsLoaded, setWarningsLoaded] = useState(false);
+  const [warningsError, setWarningsError] = useState("");
   const [dispatch, setDispatch] = useState<Awaited<ReturnType<typeof listDispatchRegister>>>([]);
   const [dispatchSerialCandidates, setDispatchSerialCandidates] = useState<DispatchSerialCandidate[]>([]);
   const [dispatchLoaded, setDispatchLoaded] = useState(false);
@@ -211,6 +213,24 @@ function Operations() {
   const [lineageLoaded, setLineageLoaded] = useState(false);
   const [lineageBusy, setLineageBusy] = useState(false);
   const [lineageError, setLineageError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    void getInventoryMslWarnings()
+      .then((rows) => {
+        if (!active) return;
+        setWarnings(rows);
+        setWarningsLoaded(true);
+      })
+      .catch((error) => {
+        if (!active) return;
+        setWarningsError(error instanceof Error ? error.message : "Inventory warnings could not be loaded.");
+        setWarningsLoaded(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function loadDispatchRegister() {
     if (dispatchLoaded || dispatchBusy) return;
@@ -273,7 +293,12 @@ function Operations() {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <Kpi label="Committed lineage" value={lineageLoaded ? String(lineage.length) : "On demand"} hint="Open lineage register to load" />
         <Kpi label="Live shortages" value={lineageLoaded ? String(shortages) : "On demand"} hint="Loaded with governed lineage" tone={lineageLoaded && shortages ? "warn" : undefined} />
-        <Kpi label="Inventory alerts" value={String(warnings.length)} hint="MSL / stockout" tone={warnings.length ? "warn" : "ok"} />
+        <Kpi
+          label="Inventory alerts"
+          value={warningsLoaded ? String(warnings.length) : "Loading"}
+          hint={warningsError ? "Inventory warning check unavailable" : "MSL / stockout"}
+          tone={warningsLoaded && warnings.length ? "warn" : warningsLoaded && !warningsError ? "ok" : undefined}
+        />
         <Kpi label="Quality releases" value={qualityLoaded ? String(releases) : "On demand"} hint={qualityLoaded ? `${openNcr} open NCR` : "Load quality authority"} tone={qualityLoaded && openNcr ? "warn" : undefined} />
         <Kpi label="Posted dispatch" value={dispatchLoaded ? String(currentDispatch.length) : "On demand"} hint="Load canonical dispatch register" tone={dispatchLoaded && currentDispatch.length ? "ok" : undefined} />
       </div>
@@ -290,7 +315,25 @@ function Operations() {
           </div>
           <div className="rounded-lg border border-border p-3">
             <p className="text-xs uppercase tracking-wider text-muted">Inventory</p>
-            <p className={warnings.length ? "mt-1 font-semibold text-warn" : "mt-1 font-semibold text-ok"}>{warnings.length ? `${warnings.length} MSL / stock alert(s)` : "No active alert"}</p>
+            <p
+              className={
+                warningsError
+                  ? "mt-1 font-semibold text-warn"
+                  : warningsLoaded && warnings.length
+                    ? "mt-1 font-semibold text-warn"
+                    : warningsLoaded
+                      ? "mt-1 font-semibold text-ok"
+                      : "mt-1 font-semibold text-muted"
+              }
+            >
+              {warningsError
+                ? "Warning check unavailable"
+                : warningsLoaded
+                  ? warnings.length
+                    ? `${warnings.length} MSL / stock alert(s)`
+                    : "No active alert"
+                  : "Checking inventory alerts…"}
+            </p>
           </div>
         </div>
       </Panel>
