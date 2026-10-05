@@ -1,7 +1,6 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { CheckCircle2, ClipboardCheck, LockKeyhole, PackageSearch, TriangleAlert } from "lucide-react";
-import { getCommandRole } from "@/lib/command-access";
 import {
   approveInventoryStocktake,
   getInventoryStocktakeControl,
@@ -14,9 +13,9 @@ import { canPerform } from "@/lib/page-access";
 import { getRouteMeta } from "@/lib/page-metadata";
 
 export const Route = createFileRoute("/command/inventory-stocktake")({
-  loader: async () => {
-    const [control, role] = await Promise.all([getInventoryStocktakeControl(), getCommandRole()]);
-    return { ...control, role };
+  loader: async ({ context }) => {
+    const control = await getInventoryStocktakeControl();
+    return { ...control, role: context.commandRole };
   },
   component: InventoryStocktake,
 });

@@ -11,8 +11,10 @@ const planSnapshot = (state: ReturnType<typeof useVeloxis.getState>) => ({
 });
 
 /** Browser Zustand is an editing cache. Server revisions remain business truth. */
-export function useOperatingPlanSync() {
+export function useOperatingPlanSync(enabled = true) {
   useEffect(() => {
+    if (!enabled) return;
+
     let active = true;
     let unsubscribe: (() => void) | undefined;
     let planTimer: ReturnType<typeof setTimeout> | undefined;
@@ -86,5 +88,5 @@ export function useOperatingPlanSync() {
       if (planTimer) clearTimeout(planTimer);
       unsubscribe?.();
     };
-  }, []);
+  }, [enabled]);
 }

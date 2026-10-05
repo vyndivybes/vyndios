@@ -37,6 +37,21 @@ const CONTROLLED_DOCUMENT_ROUTES = new Set([
   "/command/receivables",
 ]);
 
+const OPERATING_PLAN_SYNC_ROUTES = new Set([
+  "/command",
+  "/command/planning",
+  "/command/founder-control",
+  "/command/founder-command",
+  "/command/ca-audit",
+  "/command/finance-control",
+  "/command/finance-assumptions",
+  "/command/actuals",
+  "/command/sales",
+  "/command/production",
+  "/command/bom",
+  "/command/aluminium-finance",
+]);
+
 const COMMAND_FULL_VIEW_CSS = `
 [data-vyndi-full-view="command-system"] {
   width: 100%;
@@ -173,7 +188,9 @@ function DeferredCommandTools() {
 
 function CommandRoot() {
   const { commandRole } = Route.useRouteContext();
-  useOperatingPlanSync();
+  const { pathname } = useLocation();
+  const syncOperatingPlan = OPERATING_PLAN_SYNC_ROUTES.has(normalizeCommandPath(pathname));
+  useOperatingPlanSync(syncOperatingPlan);
   return (
     <>
       <ProtectedNavigationBridge />

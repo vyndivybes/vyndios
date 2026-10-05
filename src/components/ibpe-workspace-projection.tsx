@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useLocation } from "@tanstack/react-router";
 import { IBPE_ENGINE_VERSION, getIbpeReadiness, getLatestIbpeRun, runGovernedIbpe, type IbpeReadiness, type IbpeRun } from "@/lib/ibpe-authority";
 import { IBPE_CORE_LABEL, VIBPE_COPILOT_LABEL } from "@/lib/ibpe-brand";
@@ -60,42 +60,41 @@ export function IbpeWorkspaceProjection() {
   const current = workspace(pathname);
   const [run,setRun] = useState<IbpeRun|null>(null);
   const [readiness,setReadiness] = useState<IbpeReadiness|null>(null);
-  const [status,setStatus] = useState("Loading IBPE decision packet…");
+  const [status,setStatus] = useState("IBPE status not loaded");
   const [busy,setBusy] = useState(false);
 
-  useEffect(() => {
-    let live=true;
-    void Promise.all([getLatestIbpeRun(),getIbpeReadiness()])
-      .then(([value,nextReadiness]) => {
-        if (!live) return;
-        if (!isUsableReadiness(nextReadiness)) {
-          setReadiness(null);
-          if (isUsableRun(value)) setRun(value); else setRun(null);
-          setStatus("IBPE readiness response unavailable. Refresh or retry; the workspace remains usable.");
-          return;
-        }
-        setReadiness(nextReadiness);
-        if (value == null) {
-          setRun(null);
-          setStatus(readinessStatus(nextReadiness));
-          return;
-        }
-        if (!isUsableRun(value)) {
-          setRun(null);
-          setStatus("Stored IBPE run uses an older or incomplete schema; create a new governed run.");
-          return;
-        }
-        setRun(value);
-        setStatus("Persisted governed run loaded");
-      })
-      .catch((e) => {
-        if (!live) return;
-        setRun(null);
+  async function loadStatus() {
+    setBusy(true);
+    setStatus("Loading governed IBPE status…");
+    try {
+      const [value,nextReadiness] = await Promise.all([getLatestIbpeRun(),getIbpeReadiness()]);
+      if (!isUsableReadiness(nextReadiness)) {
         setReadiness(null);
-        setStatus(e instanceof Error ? e.message : "IBPE unavailable");
-      });
-    return()=>{live=false;};
-  },[]);
+        if (isUsableRun(value)) setRun(value); else setRun(null);
+        setStatus("IBPE readiness response unavailable. The workspace remains usable.");
+        return;
+      }
+      setReadiness(nextReadiness);
+      if (value == null) {
+        setRun(null);
+        setStatus(readinessStatus(nextReadiness));
+        return;
+      }
+      if (!isUsableRun(value)) {
+        setRun(null);
+        setStatus("Stored IBPE run uses an older or incomplete schema; create a new governed run.");
+        return;
+      }
+      setRun(value);
+      setStatus("Persisted governed run loaded");
+    } catch (error) {
+      setRun(null);
+      setReadiness(null);
+      setStatus(error instanceof Error ? error.message : "IBPE unavailable");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   const findings = useMemo(() => {
     if (!run || !Array.isArray(run.result?.findings)) return [];
@@ -157,7 +156,10 @@ export function IbpeWorkspaceProjection() {
         <span className="text-muted">{findings.length > 0 ? findings.map((f)=>f.title).filter(Boolean).join(" · ") : "No workspace findings"}</span>
       </> : <span className={readiness && !readiness.ready ? "text-warn" : "text-muted"}>{status}</span>}
       {!run && blockerActions.map((check)=><Link key={check.actionTo} to={check.actionTo as never} className="font-semibold text-accent hover:underline">Fix {check.label} →</Link>)}
-      <button type="button" disabled={busy} onClick={()=>void execute()} className="ml-auto font-semibold text-accent disabled:opacity-50">{busy?"Checking…":"Run governed IBPE"}</button>
+      <div className="ml-auto flex items-center gap-3">
+        <button type="button" disabled={busy} onClick={()=>void loadStatus()} className="font-semibold text-muted hover:text-accent disabled:opacity-50">{busy?"Loading…":"Load IBPE status"}</button>
+        <button type="button" disabled={busy} onClick={()=>void execute()} className="font-semibold text-accent disabled:opacity-50">{busy?"Checking…":"Run governed IBPE"}</button>
+      </div>
       {run ? <span className="w-full text-[10px] text-subtle">{status} · Advisory only — decisions require authorised action in the owning transaction workspace.</span> : readiness && !readiness.ready ? <span className="w-full text-[10px] text-subtle">The engine is authorised. Complete the highlighted governed prerequisites before a baseline can be persisted.</span> : null}
     </div>
   </div>;

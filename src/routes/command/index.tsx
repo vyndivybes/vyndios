@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Kpi, Panel } from "@/components/kpi";
-import { getCommandRole } from "@/lib/command-access";
 import { FOUNDER_GATES, FOUNDER_STATUS_LABELS, resolveFounderActions } from "@/lib/data/founder-command";
 import { listCanonicalCashAuthority } from "@/lib/finance-governance-authority";
 import { lakh } from "@/lib/format";
@@ -10,14 +9,13 @@ import { getDecisionInboxData } from "@/lib/procure-to-pay-authority";
 import { useVeloxis } from "@/lib/store";
 
 export const Route = createFileRoute("/command/")({
-  loader: async () => {
-    const [role, lineage, inbox, cashAuthority] = await Promise.all([
-      getCommandRole(),
+  loader: async ({ context }) => {
+    const [lineage, inbox, cashAuthority] = await Promise.all([
       getOperatingLineage(),
       getDecisionInboxData(),
       listCanonicalCashAuthority(),
     ]);
-    return { role, lineage, inbox, cashAuthority };
+    return { role: context.commandRole, lineage, inbox, cashAuthority };
   },
   component: CommandCentre,
 });

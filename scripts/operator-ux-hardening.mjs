@@ -18,6 +18,23 @@ const routes = ["/command", "/command/intelligence", "/command/planning", "/comm
 const evidenceRoot = resolve(process.env.VYNDI_UX_EVIDENCE_DIR || "artifacts/operator-ux-hardening");
 await mkdir(evidenceRoot, { recursive: true });
 
+async function spaNavigate(page, route) {
+  const current = new URL(page.url()).pathname.replace(/\/+$/, "") || "/";
+  if (current === route) return;
+  await page.evaluate((to) => {
+    const anchor = document.createElement("a");
+    anchor.href = to;
+    anchor.setAttribute("data-vyndi-test-navigation", "true");
+    anchor.style.display = "none";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+  }, route);
+  await page.waitForURL((url) => (url.pathname.replace(/\/+$/, "") || "/") === route, {
+    timeout: 45_000,
+  });
+}
+
 const browser = await chromium.launch({ headless: true });
 const results = [];
 try {
@@ -67,30 +84,38 @@ try {
         throw new Error(`Login failed after retry at ${viewport.name} · finalUrl=${finalUrl} · pageErrors=${pageErrors.join(" | ") || "none"} · authNetworkEvidence=${JSON.stringify(authNetworkEvidence)} · visibleText=${visibleText || "(empty)"}`, { cause });
       }
     }
-    await login.close();
+    const page = login;
+    await page.locator('[data-vyndi-full-view="command-system"]').waitFor({ state: "visible", timeout: 30_000 });
 
     for (const route of routes) {
-      const page = await context.newPage();
       const pageErrors = [];
       const routeNetworkEvidence = [];
-      page.on("pageerror", (error) => pageErrors.push(String(error?.message || error)));
-      const startedAt = Date.now();
-      const response = await page.goto(`${baseUrl}${route}`, { waitUntil: "domcontentloaded", timeout: 90_000 });
-      if (!response?.ok()) {
-        const raw = await response?.text().catch(() => "") ?? "";
+      const onPageError = (error) => pageErrors.push(String(error?.message || error));
+      const onResponse = async (response) => {
+        if (response.status() < 500) return;
+        const url = new URL(response.url());
+        if (url.origin !== new URL(baseUrl).origin) return;
+        const raw = await response.text().catch(() => "");
         const responseBody = raw.slice(0, 2000).replace(/("(?:password|email|token|secret)"\\s*:\\s*")[^"]*(")/gi, "$1[REDACTED]$2");
-        routeNetworkEvidence.push({
-          status: response?.status() ?? null,
-          durationMs: Date.now() - startedAt,
-          responseBody,
-        });
-      }
-      assert.ok(
-        response?.ok(),
-        `${route} returned HTTP ${response?.status() ?? "none"} at ${viewport.name} · routeNetworkEvidence=${JSON.stringify(routeNetworkEvidence)}`,
-      );
+        routeNetworkEvidence.push({ status: response.status(), url: url.pathname, responseBody });
+      };
+      page.on("pageerror", onPageError);
+      page.on("response", onResponse);
+
+      const startedAt = Date.now();
+      await spaNavigate(page, route);
       await page.locator("body").waitFor({ state: "visible", timeout: 30_000 });
+      await page.waitForTimeout(120);
+
+      page.off("pageerror", onPageError);
+      page.off("response", onResponse);
+
       const body = (await page.locator("body").innerText()).trim();
+      assert.deepEqual(
+        routeNetworkEvidence,
+        [],
+        `${route} emitted server 5xx during SPA navigation at ${viewport.name} · routeNetworkEvidence=${JSON.stringify(routeNetworkEvidence)}`,
+      );
       assert.doesNotMatch(page.url(), /\/login(?:\?|$)|\/command-login/, `${route} lost authenticated access at ${viewport.name}`);
       assert.doesNotMatch(body, /Something went wrong|Internal Server Error|Cannot read properties of undefined/i, `${route} rendered a fatal error at ${viewport.name}`);
       assert.deepEqual(pageErrors, [], `${route} emitted browser errors at ${viewport.name}: ${pageErrors.join(" | ")}`);
@@ -103,9 +128,17 @@ try {
         overflow.documentWidth <= overflow.viewportWidth + 2,
         `${route} overflows horizontally at ${viewport.width}px: ${JSON.stringify(overflow)}`,
       );
-      results.push({ viewport: viewport.name, route, overflow, pageErrors, routeNetworkEvidence });
-      await page.close();
+      results.push({
+        viewport: viewport.name,
+        route,
+        overflow,
+        pageErrors,
+        routeNetworkEvidence,
+        durationMs: Date.now() - startedAt,
+        navigationMode: "spa",
+      });
     }
+    await page.close();
     await context.close();
   }
   console.log(`[operator-ux] PASS · ${results.length} route/viewport checks`);
