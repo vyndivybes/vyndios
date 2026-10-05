@@ -313,7 +313,7 @@ function PeopleOffice() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 max-w-full space-y-6">
       <header className="border-b border-border pb-6">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">
           People & Office · operating administration · canonical authority
@@ -358,7 +358,7 @@ function PeopleOffice() {
             <summary className="cursor-pointer font-semibold text-accent">People Register ({people.length})</summary>
             <p className="mt-2 text-xs text-muted">Identity · function · role · engagement lifecycle · evidence source</p>
             {people.length ? (
-              <div className="mt-3 overflow-x-auto">
+              <div className="mt-3 min-w-0 max-w-full overflow-x-auto" tabIndex={0} role="region" aria-label="Scrollable department register">
                 <table className="w-full min-w-[950px] table-auto text-left text-xs">
                   <thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle">
                     <tr><th className="px-2 py-2">Person / role</th><th className="px-2 py-2">Function</th><th className="px-2 py-2">Engagement</th><th className="px-2 py-2">Timing</th><th className="px-2 py-2">Status</th><th className="px-2 py-2">Controls</th></tr>
@@ -407,7 +407,7 @@ function PeopleOffice() {
             <summary className="cursor-pointer font-semibold text-accent">Office Assets Register ({assets.length})</summary>
             <p className="mt-2 text-xs text-muted">Zero-valued catalogue rows remain registered. Workbook proposals stay draft until invoice/evidence review and approval.</p>
             {assets.length ? (
-              <div className="mt-3 overflow-x-auto">
+              <div className="mt-3 min-w-0 max-w-full overflow-x-auto" tabIndex={0} role="region" aria-label="Scrollable department register">
                 <table className="w-full min-w-[1050px] table-auto text-left text-xs">
                   <thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle"><tr><th className="px-2 py-2">Asset</th><th className="px-2 py-2">Category</th><th className="px-2 py-2">Class</th><th className="px-2 py-2 text-right">Cost</th><th className="px-2 py-2 text-right">Monthly</th><th className="px-2 py-2">Purchase / life</th><th className="px-2 py-2">Status</th><th className="px-2 py-2">Controls</th></tr></thead>
                   <tbody>
@@ -445,11 +445,11 @@ function PeopleOffice() {
             ) : <p className="mt-3 text-sm text-muted">No Office asset has been recorded.</p>}
           </details>
 
-          <details className="rounded-xl border border-border p-3" open>
+          <details className="min-w-0 rounded-xl border border-border p-3">
             <summary className="cursor-pointer font-semibold text-accent">People & Office Cost Register ({costs.length})</summary>
             <p className="mt-2 text-xs text-muted">Edit drafts here. Only approved source records feed Finance.</p>
             {costs.length ? (
-              <div className="mt-3 overflow-x-auto">
+              <div className="mt-3 min-w-0 max-w-full overflow-x-auto" tabIndex={0} role="region" aria-label="Scrollable department register">
                 <table className="w-full min-w-[1150px] table-auto text-left text-xs">
                   <thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle"><tr><th className="px-2 py-2">Item</th><th className="px-2 py-2">Group</th><th className="px-2 py-2">Stage</th><th className="px-2 py-2 text-right">Qty</th><th className="px-2 py-2 text-right">Monthly / unit</th><th className="px-2 py-2">Period</th><th className="px-2 py-2">Status</th><th className="px-2 py-2">Controls</th></tr></thead>
                   <tbody>
@@ -504,7 +504,7 @@ function PeopleOffice() {
             <summary className="cursor-pointer font-semibold text-accent">Audit Evidence ({auditEvents.length})</summary>
             <p className="mt-2 text-xs text-muted">Append-only saves, approvals, supersession events and workbook reconciliation findings.</p>
             {auditEvents.length ? (
-              <div className="mt-3 overflow-x-auto">
+              <div className="mt-3 min-w-0 max-w-full overflow-x-auto" tabIndex={0} role="region" aria-label="Scrollable department register">
                 <table className="w-full min-w-[1050px] text-left text-xs">
                   <thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle"><tr><th className="px-2 py-2">Time</th><th className="px-2 py-2">Action</th><th className="px-2 py-2">Entity</th><th className="px-2 py-2">State</th><th className="px-2 py-2">Actor</th><th className="px-2 py-2">Evidence / reason</th></tr></thead>
                   <tbody>{auditEvents.map((event) => <tr key={text(event, "id")} className="border-t border-border/70"><td className="px-2 py-2 text-muted">{displayDate(text(event, "createdAt", "created_at"))}</td><td className="px-2 py-2 font-semibold">{text(event, "action")}</td><td className="px-2 py-2"><p>{text(event, "entityType", "entity_type")}</p><p className="font-mono text-[10px] text-subtle">{text(event, "entityId", "entity_id")}</p></td><td className="px-2 py-2">{text(event, "previousState", "previous_state") || "—"} → {text(event, "newState", "new_state") || "—"}</td><td className="px-2 py-2 text-muted">{text(event, "actorRole", "actor_role")}</td><td className="max-w-xl px-2 py-2"><p className="break-all text-[10px] text-subtle">{text(event, "sourceReference", "source_reference")}</p><p className={text(event, "reason").includes("REVIEW REQUIRED") || text(event, "entityType", "entity_type") === "people_office_reconciliation" ? "mt-1 font-semibold text-warn" : "mt-1 text-muted"}>{text(event, "reason") || "Recorded audit evidence"}</p></td></tr>)}</tbody>
