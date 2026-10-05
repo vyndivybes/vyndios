@@ -26,7 +26,9 @@ test("deployed PostgreSQL connections cannot be reused across Worker requests", 
   assert.match(databaseSource, /requestSqlCache\.get\(request\)/);
   assert.match(databaseSource, /requestSqlCache\.set\(request, pending\)/);
   assert.match(databaseSource, /new Pool\(requestSafePostgresPoolConfig\(transport\.connectionString\)\)/);
-  assert.match(databaseSource, /await pool\.end\(\)/, "request-local deployed pools must be explicitly closed");
+  assert.equal((databaseSource.match(/new Pool\(requestSafePostgresPoolConfig\(transport\.connectionString\)\)/g) ?? []).length, 1);
+  assert.match(databaseSource, /const request = getRequest\(\)/);
+  assert.match(databaseSource, /requestSqlCache\.set\(request, pending\)/);
   assert.doesNotMatch(databaseSource, /__vyndiLocalPostgresPool__/);
   assert.match(authSource, /requestSafePostgresDialect\(postgresTransport\.connectionString\)/);
   assert.doesNotMatch(authSource, /new Pool\(/);
