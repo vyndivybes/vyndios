@@ -42,7 +42,10 @@ function Manufacturing() {
         </Panel>
       </div>
 
-      <AssetMaintenancePanel state={maintenance} />
+      <details className="min-w-0 rounded-xl border border-border p-4">
+        <summary className="cursor-pointer py-2 font-semibold text-accent">Equipment & Maintenance — plans and work orders</summary>
+        <div className="mt-4 min-w-0"><AssetMaintenancePanel state={maintenance} /></div>
+      </details>
 
       <Panel title="Manufacturing control register">
         <div
