@@ -41,3 +41,32 @@ export function requestSafePostgresPoolConfig(connectionString: string): PoolCon
     connectionTimeoutMillis: 10_000,
   };
 }
+
+
+export const DEFAULT_REQUEST_POSTGRES_CONCURRENCY = 5;
+
+/**
+ * Bound PostgreSQL work inside one Worker request without retaining a pg.Pool.
+ * Hyperdrive is the cross-request pool. Each permitted operation can therefore
+ * use a short-lived pg.Client and close it before the operation completes.
+ */
+export function createRequestPostgresLimiter(limit = DEFAULT_REQUEST_POSTGRES_CONCURRENCY) {
+  if (!Number.isInteger(limit) || limit < 1) throw new Error("PostgreSQL request concurrency limit must be a positive integer.");
+
+  let active = 0;
+  const queue: Array<() => void> = [];
+
+  return async function withPostgresPermit<T>(work: () => Promise<T>): Promise<T> {
+    if (active >= limit) {
+      await new Promise<void>((resolve) => queue.push(resolve));
+    }
+    active += 1;
+    try {
+      return await work();
+    } finally {
+      active -= 1;
+      const next = queue.shift();
+      if (next) next();
+    }
+  };
+}

@@ -1,10 +1,7 @@
 import { getRequest } from "@tanstack/react-start/server";
 import { pendingMigrations } from "../../scripts/migration-plan.mjs";
 import { expectedRuntimeMigrationNames } from "./runtime-schema-migrations";
-import {
-  isLoopbackPostgresConnectionString,
-  requestSafePostgresPoolConfig,
-} from "./postgres-pool";
+import { createRequestPostgresLimiter } from "./postgres-pool";
 import {
   resolvePostgresTransport,
   type PostgresTransport,
@@ -138,36 +135,33 @@ function toSql(run: Run): Sql {
 /**
  * Build the request-local SQL facade.
  *
- * - local/loopback PostgreSQL: one pg.Client per query, fully connected and
- *   closed inside that query's request context;
- * - deployed/non-loopback PostgreSQL: a small request-local pg.Pool, with each
- *   checked-out connection retired after one query. Hyperdrive remains the
- *   shared cross-request pool in deployed Cloudflare environments.
+ * All PostgreSQL transports use a short-lived pg.Client per query. A
+ * request-local semaphore bounds aggregate concurrency while Hyperdrive remains
+ * the shared cross-request connection pool in deployed Cloudflare environments.
+ * No pg.Pool or socket-bearing client survives a completed query.
  */
 async function createPostgresSql(transport: PostgresTransport): Promise<Sql> {
-  const { Client, Pool, types } = await import("pg");
+  const { Client, types } = await import("pg");
   types.setTypeParser(OID_INT8, Number);
   types.setTypeParser(OID_DATE, identity);
   types.setTypeParser(OID_INTERVAL, identity);
 
-  if (isLoopbackPostgresConnectionString(transport.connectionString)) {
-    return toSql(async <T>(text: string, params: unknown[]) => {
-      const client = new Client({ connectionString: transport.connectionString });
-      await client.connect();
+  const withPostgresPermit = createRequestPostgresLimiter();
+  return toSql(async <T>(text: string, params: unknown[]) =>
+    withPostgresPermit(async () => {
+      const client = new Client({
+        connectionString: transport.connectionString,
+        connectionTimeoutMillis: 10_000,
+      });
       try {
+        await client.connect();
         const res = await client.query(text, params);
         return res.rows as T[];
       } finally {
-        await client.end();
+        await client.end().catch(() => undefined);
       }
-    });
-  }
-
-  const pool = new Pool(requestSafePostgresPoolConfig(transport.connectionString));
-  return toSql(async <T>(text: string, params: unknown[]) => {
-    const res = await pool.query(text, params);
-    return res.rows as T[];
-  });
+    }),
+  );
 }
 
 async function createPgliteSql(): Promise<Sql> {

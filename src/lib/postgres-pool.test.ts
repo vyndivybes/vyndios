@@ -2,20 +2,10 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import {
-  isLoopbackPostgresConnectionString,
-  requestSafePostgresPoolConfig,
-} from "./postgres-pool.ts";
+import { isLoopbackPostgresConnectionString } from "./postgres-pool.ts";
 import { selectPostgresTransport } from "./postgres-runtime.ts";
 
-test("deployed PostgreSQL connections cannot be reused across Worker requests", async () => {
-  const config = requestSafePostgresPoolConfig("postgresql://example.invalid/db");
-
-  assert.equal(config.connectionString, "postgresql://example.invalid/db");
-  assert.equal(config.max, 5);
-  assert.equal(config.maxUses, 1);
-  assert.equal(config.connectionTimeoutMillis, 10_000);
-
+test("deployed PostgreSQL keeps request sharing without retaining a pg.Pool", async () => {
   const [databaseSource, authSource] = await Promise.all([
     readFile(new URL("./db.server.ts", import.meta.url), "utf8"),
     readFile(new URL("./auth/server.ts", import.meta.url), "utf8"),
@@ -25,24 +15,25 @@ test("deployed PostgreSQL connections cannot be reused across Worker requests", 
   assert.match(databaseSource, /const request = getRequest\(\)/);
   assert.match(databaseSource, /requestSqlCache\.get\(request\)/);
   assert.match(databaseSource, /requestSqlCache\.set\(request, pending\)/);
-  assert.match(databaseSource, /new Pool\(requestSafePostgresPoolConfig\(transport\.connectionString\)\)/);
-  assert.equal((databaseSource.match(/new Pool\(requestSafePostgresPoolConfig\(transport\.connectionString\)\)/g) ?? []).length, 1);
-  assert.match(databaseSource, /const request = getRequest\(\)/);
-  assert.match(databaseSource, /requestSqlCache\.set\(request, pending\)/);
+  assert.match(databaseSource, /createRequestPostgresLimiter\(\)/);
+  assert.match(databaseSource, /new Client\(\{/);
+  assert.match(databaseSource, /await client\.connect\(\)/);
+  assert.match(databaseSource, /await client\.end\(\)/);
+  assert.doesNotMatch(databaseSource, /new Pool\(/);
   assert.doesNotMatch(databaseSource, /__vyndiLocalPostgresPool__/);
   assert.match(authSource, /requestSafePostgresDialect\(postgresTransport\.connectionString\)/);
   assert.doesNotMatch(authSource, /new Pool\(/);
 });
 
-test("loopback Worker development opens and closes a fresh client per query", async () => {
+test("loopback detection remains available for local transport diagnostics", async () => {
   assert.equal(isLoopbackPostgresConnectionString("postgresql://postgres:postgres@localhost:5432/vyndi"), true);
   assert.equal(isLoopbackPostgresConnectionString("postgresql://postgres:postgres@127.0.0.1:5432/vyndi"), true);
   assert.equal(isLoopbackPostgresConnectionString("postgresql://postgres:postgres@[::1]:5432/vyndi"), true);
   assert.equal(isLoopbackPostgresConnectionString("postgresql://hyperdrive.internal/vyndi"), false);
 
   const databaseSource = await readFile(new URL("./db.server.ts", import.meta.url), "utf8");
-  assert.match(databaseSource, /isLoopbackPostgresConnectionString\(transport\.connectionString\)/);
-  assert.match(databaseSource, /new Client\(\{ connectionString: transport\.connectionString \}\)/);
+  assert.match(databaseSource, /new Client\(\{/);
+  assert.match(databaseSource, /connectionString: transport\.connectionString/);
   assert.match(databaseSource, /await client\.connect\(\)/);
   assert.match(databaseSource, /await client\.end\(\)/);
   assert.doesNotMatch(databaseSource, /__vyndiLocalPostgresPool__/);
