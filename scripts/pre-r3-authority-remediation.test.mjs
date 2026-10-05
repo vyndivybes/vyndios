@@ -149,7 +149,7 @@ test("G4 makes server authority auditable and approval-gated", () => {
   assert.match(peopleOfficeAuthority, /PEOPLE_OFFICE_COST_STATUS_CHANGED/);
   assert.match(peopleOfficeAuthority, /PEOPLE_RECORD_STATUS_CHANGED/);
   assert.match(peopleOfficeAuthority, /PEOPLE_OFFICE_ASSET_STATUS_CHANGED/);
-  assert.match(peopleOfficeAuthority, /canPerform\(role, permission\)/);
+  assert.match(peopleOfficeAuthority, /requireBusinessActor/);\n  assert.match(peopleOfficeAuthority, /created_by.*userId|createdBy.*userId/s);
 });
 
 // G5 — Dispatch ownership.
