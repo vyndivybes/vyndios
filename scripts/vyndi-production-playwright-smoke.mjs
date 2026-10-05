@@ -154,7 +154,16 @@ try {
   await login.getByLabel(/Authorised Email/i).fill(email);
   await login.getByLabel(/^Password$/i).fill(password);
   await login.getByRole("button", { name: /Authorize · Enter Command/i }).click();
-  await login.waitForURL(/\/command(?:\/|$)/, { timeout: 45_000 });
+  try {
+    await login.waitForURL(/\/command(?:\/|$)/, { timeout: 45_000 });
+  } catch (cause) {
+    const finalUrl = login.url();
+    const visibleText = (await login.locator("body").innerText().catch(() => "")).trim().slice(0, 2000);
+    const screenshot = resolve(evidenceRoot, "login-diagnostic.png");
+    await login.screenshot({ path: screenshot, fullPage: true }).catch(() => {});
+    evidence.loginDiagnostic = { finalUrl, visibleText, pageErrors: loginErrors, screenshot };
+    throw new Error(`Login failed · finalUrl=${finalUrl} · pageErrors=${loginErrors.join(" | ") || "none"} · visibleText=${visibleText || "(empty)"}`, { cause });
+  }
   assert.deepEqual(loginErrors, [], `Login emitted browser errors: ${loginErrors.join(" | ")}`);
 
   for (const route of protectedRoutes) {

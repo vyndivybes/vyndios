@@ -48,6 +48,8 @@ const context = await browser.newContext({ viewport: { width: 1440, height: 900 
 
 try {
   const login = await context.newPage();
+  const pageErrors = [];
+  login.on("pageerror", (error) => pageErrors.push(String(error?.message || error)));
   await login.goto(`${baseUrl}/login?returnTo=%2Fcommand`, { waitUntil: "domcontentloaded", timeout: 60_000 });
   // The server-rendered form is visible before React installs onSubmit.
   // Cinematic readiness is set by a mounted effect; wait before entering credentials.
@@ -55,7 +57,16 @@ try {
   await login.getByLabel(/Authorised Email/i).fill(email);
   await login.getByLabel(/^Password$/i).fill(password);
   await login.getByRole("button", { name: /Authorize · Enter Command/i }).click();
-  await login.waitForURL(/\/command(?:\/|$)/, { timeout: 45_000 });
+  try {
+    await login.waitForURL(/\/command(?:\/|$)/, { timeout: 45_000 });
+  } catch (cause) {
+    const finalUrl = login.url();
+    const visibleText = (await login.locator("body").innerText().catch(() => "")).trim().slice(0, 2000);
+    const screenshot = resolve(evidenceRoot, "login-diagnostic.png");
+    await login.screenshot({ path: screenshot, fullPage: true }).catch(() => {});
+    report.loginDiagnostic = { finalUrl, visibleText, pageErrors, screenshot };
+    throw new Error(`Login failed · finalUrl=${finalUrl} · pageErrors=${pageErrors.join(" | ") || "none"} · visibleText=${visibleText || "(empty)"}`, { cause });
+  }
   await login.close();
 
   for (const stage of stages) {
