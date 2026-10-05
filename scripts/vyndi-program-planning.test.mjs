@@ -4,8 +4,9 @@ import { readFile } from "node:fs/promises";
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
-const [planningRoute, component, authority, migration, vibpe, smoke] = await Promise.all([
+const [planningRoute, planningDeck, component, authority, migration, vibpe, smoke] = await Promise.all([
   read("src/routes/command/planning.tsx"),
+  read("src/components/planning-intelligence-deck.tsx"),
   read("src/components/program-gate-plan.tsx"),
   read("src/lib/program-planning-authority.ts"),
   read("migrations/0101_vyndi_program_planning.sql"),
@@ -14,8 +15,9 @@ const [planningRoute, component, authority, migration, vibpe, smoke] = await Pro
 ]);
 
 test("Integrated Operating Plan owns Program and Gate Planning", () => {
-  assert.match(planningRoute, /ProgramGatePlan/);
-  assert.match(planningRoute, /getProgramPlanningState/);
+  assert.match(planningRoute, /PlanningIntelligenceDeck/);
+  assert.match(planningDeck, /ProgramGatePlan/);
+  assert.match(planningDeck, /getProgramPlanningState/);
   assert.match(component, /Program & Gate Planning/);
   assert.match(component, /Program Network/);
   assert.match(component, /CRITICAL/);

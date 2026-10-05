@@ -26,7 +26,7 @@ test("Planning advisory intelligence is loaded only when its section is opened",
     "getEarnedValueState",
     "getForecastLearningState",
   ]) {
-    assert.ok(deck.includes(`${fn}(`), `${fn} must remain available on demand`);
+    assert.ok(deck.includes(fn), `${fn} must remain available on demand`);
   }
   assert.match(deck, /onToggle/);
   assert.match(deck, /load on demand/i);

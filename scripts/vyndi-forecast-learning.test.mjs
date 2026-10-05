@@ -2,12 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 const read=(p)=>readFile(new URL(`../${p}`,import.meta.url),"utf8");
-const [migration,model,authority,panel,planning,intelligence,vibpe,pkg]=await Promise.all([
+const [migration,model,authority,panel,planning,planningDeck,intelligence,vibpe,pkg]=await Promise.all([
   read("migrations/0113_vyndi_forecast_learning.sql"),
   read("src/lib/forecast-learning-model.ts"),
   read("src/lib/forecast-learning-authority.ts"),
   read("src/components/forecast-learning-panel.tsx"),
   read("src/routes/command/planning.tsx"),
+  read("src/components/planning-intelligence-deck.tsx"),
   read("src/routes/command/intelligence.tsx"),
   read("src/lib/vibpe-governance-queries.ts"),
   read("package.json"),
@@ -37,7 +38,9 @@ test("forecast learning computes WAPE bias plan attainment forecast attainment a
 });
 
 test("Planning and Product Intelligence expose the governed learning loop",()=>{
-  assert.match(planning,/ForecastLearningPanel/);
+  assert.match(planning,/PlanningIntelligenceDeck/);
+  assert.match(planningDeck,/ForecastLearningPanel/);
+  assert.match(planningDeck,/getForecastLearningState/);
   assert.match(panel,/Forecast Learning Loop/);
   assert.match(panel,/Capture forecast vintage/);
   assert.match(panel,/Close period/);
