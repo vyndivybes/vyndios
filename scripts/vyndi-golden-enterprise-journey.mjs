@@ -88,7 +88,7 @@ try {
       const screenshot = resolve(evidenceRoot, "login-diagnostic.png");
       await login.screenshot({ path: screenshot, fullPage: true }).catch(() => {});
       report.loginDiagnostic = { finalUrl, visibleText, pageErrors, authNetworkEvidence, screenshot };
-      throw new Error(`Login failed after retry · finalUrl=${finalUrl} · pageErrors=${pageErrors.join(" |pageErrors=${pageErrors.join(" | ") || "none"} · authNetworkEvidence=${JSON.stringify(authNetworkEvidence)} · visibleText=${visibleText || "(empty)"}`, { cause });
+      throw new Error(`Login failed after retry · finalUrl=${finalUrl} · pageErrors=${pageErrors.join(" | ") || "none"} · authNetworkEvidence=${JSON.stringify(authNetworkEvidence)} · visibleText=${visibleText || "(empty)"}`, { cause });
     }
   }
   await login.close();

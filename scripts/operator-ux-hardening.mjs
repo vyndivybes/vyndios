@@ -63,8 +63,8 @@ try {
         const visibleText = (await login.locator("body").innerText().catch(() => "")).trim().slice(0, 2000);
         const screenshot = resolve(evidenceRoot, `${viewport.name}-login-diagnostic.png`);
         await login.screenshot({ path: screenshot, fullPage: true }).catch(() => {});
-        results.push({ viewport: viewport.name, stage: "login", finalUrl, visibleText, pageErrors, screenshot });
-        throw new Error(`Login failed after retry at ${viewport.name} · finalUrl=${finalUrl} · pageErrors=${pageErrors.join(" |pageErrors=${pageErrors.join(" | ") || "none"} · authNetworkEvidence=${JSON.stringify(authNetworkEvidence)} · visibleText=${visibleText || "(empty)"}`, { cause });
+        results.push({ viewport: viewport.name, stage: "login", finalUrl, visibleText, pageErrors, authNetworkEvidence, screenshot });
+        throw new Error(`Login failed after retry at ${viewport.name} · finalUrl=${finalUrl} · pageErrors=${pageErrors.join(" | ") || "none"} · authNetworkEvidence=${JSON.stringify(authNetworkEvidence)} · visibleText=${visibleText || "(empty)"}`, { cause });
       }
     }
     await login.close();

@@ -143,6 +143,18 @@ try {
 
   const login = await context.newPage();
   const loginErrors = [];
+  const authNetworkEvidence = [];
+  const authRequestStartedAt = new Map();
+  login.on("request", (request) => {
+    if (new URL(request.url()).pathname === "/api/auth/sign-in/email") authRequestStartedAt.set(request, Date.now());
+  });
+  login.on("response", async (response) => {
+    if (new URL(response.url()).pathname !== "/api/auth/sign-in/email") return;
+    const request = response.request();
+    const raw = await response.text().catch(() => "");
+    const responseBody = raw.slice(0, 2000).replace(/("(?:password|email|token|secret)"\\s*:\\s*")[^"]*(")/gi, "$1[REDACTED]$2");
+    authNetworkEvidence.push({ status: response.status(), durationMs: Math.max(0, Date.now() - (authRequestStartedAt.get(request) ?? Date.now())), responseBody });
+  });
   login.on("pageerror", (error) => loginErrors.push(String(error?.message || error)));
   const loginResponse = await login.goto(`${baseUrl}/login?returnTo=%2Fcommand`, {
     waitUntil: "domcontentloaded",
@@ -173,7 +185,7 @@ try {
       const screenshot = resolve(evidenceRoot, "login-diagnostic.png");
       await login.screenshot({ path: screenshot, fullPage: true }).catch(() => {});
       evidence.loginDiagnostic = { finalUrl, visibleText, pageErrors: loginErrors, authNetworkEvidence, screenshot };
-      throw new Error(`Login failed after retry · finalUrl=${finalUrl} · pageErrors=${loginErrors.join(" |pageErrors=${pageErrors.join(" | ") || "none"} · authNetworkEvidence=${JSON.stringify(authNetworkEvidence)} · visibleText=${visibleText || "(empty)"}`, { cause });
+      throw new Error(`Login failed after retry · finalUrl=${finalUrl} · pageErrors=${loginErrors.join(" | ") || "none"} · authNetworkEvidence=${JSON.stringify(authNetworkEvidence)} · visibleText=${visibleText || "(empty)"}`, { cause });
     }
   }
   assert.deepEqual(loginErrors, [], `Login emitted browser errors: ${loginErrors.join(" | ")}`);
@@ -181,18 +193,6 @@ try {
   for (const route of protectedRoutes) {
     const page = await context.newPage();
     const pageErrors = [];
-  const authNetworkEvidence = [];
-  const authRequestStartedAt = new Map();
-  login.on("request", (request) => {
-    if (new URL(request.url()).pathname === "/api/auth/sign-in/email") authRequestStartedAt.set(request, Date.now());
-  });
-  login.on("response", async (response) => {
-    if (new URL(response.url()).pathname !== "/api/auth/sign-in/email") return;
-    const request = response.request();
-    const raw = await response.text().catch(() => "");
-    const responseBody = raw.slice(0, 2000).replace(/("(?:password|email|token|secret)"\\s*:\\s*")[^"]*(")/gi, "$1[REDACTED]$2");
-    authNetworkEvidence.push({ status: response.status(), durationMs: Math.max(0, Date.now() - (authRequestStartedAt.get(request) ?? Date.now())), responseBody });
-  });
     page.on("pageerror", (error) => pageErrors.push(String(error?.message || error)));
     const started = Date.now();
     const response = await page.goto(`${baseUrl}${route}`, {
