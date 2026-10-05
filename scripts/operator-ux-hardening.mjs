@@ -72,9 +72,23 @@ try {
     for (const route of routes) {
       const page = await context.newPage();
       const pageErrors = [];
+      const routeNetworkEvidence = [];
       page.on("pageerror", (error) => pageErrors.push(String(error?.message || error)));
+      const startedAt = Date.now();
       const response = await page.goto(`${baseUrl}${route}`, { waitUntil: "domcontentloaded", timeout: 90_000 });
-      assert.ok(response?.ok(), `${route} returned HTTP ${response?.status() ?? "none"}`);
+      if (!response?.ok()) {
+        const raw = await response?.text().catch(() => "") ?? "";
+        const responseBody = raw.slice(0, 2000).replace(/("(?:password|email|token|secret)"\\s*:\\s*")[^"]*(")/gi, "$1[REDACTED]$2");
+        routeNetworkEvidence.push({
+          status: response?.status() ?? null,
+          durationMs: Date.now() - startedAt,
+          responseBody,
+        });
+      }
+      assert.ok(
+        response?.ok(),
+        `${route} returned HTTP ${response?.status() ?? "none"} at ${viewport.name} · routeNetworkEvidence=${JSON.stringify(routeNetworkEvidence)}`,
+      );
       await page.locator("body").waitFor({ state: "visible", timeout: 30_000 });
       const body = (await page.locator("body").innerText()).trim();
       assert.doesNotMatch(page.url(), /\/login(?:\?|$)|\/command-login/, `${route} lost authenticated access at ${viewport.name}`);
@@ -89,7 +103,7 @@ try {
         overflow.documentWidth <= overflow.viewportWidth + 2,
         `${route} overflows horizontally at ${viewport.width}px: ${JSON.stringify(overflow)}`,
       );
-      results.push({ viewport: viewport.name, route, overflow, pageErrors });
+      results.push({ viewport: viewport.name, route, overflow, pageErrors, routeNetworkEvidence });
       await page.close();
     }
     await context.close();

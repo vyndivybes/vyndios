@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Kpi } from "@/components/kpi";
-import { getCommandRole } from "@/lib/command-access";
 import {
   MASTER_INVENTORY_LEDGER_PAGES,
   type MasterInventoryLedgerId,
@@ -30,8 +29,8 @@ import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/command/inventory")({
   loader: async () => {
-    const [items, role] = await Promise.all([getMasterInventoryItems(), getCommandRole()]);
-    return { items, role };
+    const items = await getMasterInventoryItems();
+    return { items };
   },
   component: MasterInventory,
 });
