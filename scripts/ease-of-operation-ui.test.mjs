@@ -184,7 +184,8 @@ test("Operations initial GET defers heavyweight dispatch and quality registers",
 
 
 test("Master Inventory initial GET does not reconstruct FIFO lot audit history", () => {
-  const loaderStart = inventorySource.indexOf("loader: async () =>");
+  const loaderMatch = /loader:\s*async\s*\([^)]*\)\s*=>/.exec(inventorySource);
+  const loaderStart = loaderMatch?.index ?? -1;
   const loaderEnd = inventorySource.indexOf("component: MasterInventory", loaderStart);
   assert.ok(loaderStart >= 0 && loaderEnd > loaderStart);
   const loader = inventorySource.slice(loaderStart, loaderEnd);
