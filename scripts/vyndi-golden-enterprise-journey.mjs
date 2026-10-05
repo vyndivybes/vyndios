@@ -49,6 +49,18 @@ const context = await browser.newContext({ viewport: { width: 1440, height: 900 
 try {
   const login = await context.newPage();
   const pageErrors = [];
+  const authNetworkEvidence = [];
+  const authRequestStartedAt = new Map();
+  login.on("request", (request) => {
+    if (new URL(request.url()).pathname === "/api/auth/sign-in/email") authRequestStartedAt.set(request, Date.now());
+  });
+  login.on("response", async (response) => {
+    if (new URL(response.url()).pathname !== "/api/auth/sign-in/email") return;
+    const request = response.request();
+    const raw = await response.text().catch(() => "");
+    const responseBody = raw.slice(0, 2000).replace(/("(?:password|email|token|secret)"\\s*:\\s*")[^"]*(")/gi, "$1[REDACTED]$2");
+    authNetworkEvidence.push({ status: response.status(), durationMs: Math.max(0, Date.now() - (authRequestStartedAt.get(request) ?? Date.now())), responseBody });
+  });
   login.on("pageerror", (error) => pageErrors.push(String(error?.message || error)));
   await login.goto(`${baseUrl}/login?returnTo=%2Fcommand`, { waitUntil: "domcontentloaded", timeout: 60_000 });
   // The server-rendered form is visible before React installs onSubmit.
@@ -75,8 +87,8 @@ try {
       const visibleText = (await login.locator("body").innerText().catch(() => "")).trim().slice(0, 2000);
       const screenshot = resolve(evidenceRoot, "login-diagnostic.png");
       await login.screenshot({ path: screenshot, fullPage: true }).catch(() => {});
-      report.loginDiagnostic = { finalUrl, visibleText, pageErrors, screenshot };
-      throw new Error(`Login failed after retry · finalUrl=${finalUrl} · pageErrors=${pageErrors.join(" | ") || "none"} · visibleText=${visibleText || "(empty)"}`, { cause });
+      report.loginDiagnostic = { finalUrl, visibleText, pageErrors, authNetworkEvidence, screenshot };
+      throw new Error(`Login failed after retry · finalUrl=${finalUrl} · pageErrors=${pageErrors.join(" |pageErrors=${pageErrors.join(" | ") || "none"} · authNetworkEvidence=${JSON.stringify(authNetworkEvidence)} · visibleText=${visibleText || "(empty)"}`, { cause });
     }
   }
   await login.close();
