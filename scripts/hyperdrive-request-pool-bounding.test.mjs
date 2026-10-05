@@ -10,8 +10,11 @@ test("deployed Postgres creates one bounded Pool per SQL facade, not one Pool pe
   const block = source.slice(start, end);
   assert.ok(start >= 0 && end > start);
   assert.match(block, /const pool = new Pool\(requestSafePostgresPoolConfig\(transport\.connectionString\)\);[\s\S]*return toSql/);
-  const runnerStart = block.indexOf("return toSql(async <T>");
+  assert.equal((block.match(/new Pool\(/g) ?? []).length, 1);
+  const poolDeclaration = block.indexOf("const pool = new Pool(");
+  const runnerStart = block.indexOf("return toSql(async <T>", poolDeclaration);
   const runner = block.slice(runnerStart);
+  assert.ok(poolDeclaration >= 0 && runnerStart > poolDeclaration);
   assert.doesNotMatch(runner, /new Pool\(/);
   assert.match(runner, /await pool\.query\(text, params\)/);
   assert.doesNotMatch(runner, /await pool\.end\(\)/);
