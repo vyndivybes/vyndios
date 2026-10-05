@@ -28,9 +28,9 @@ import {
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/command/inventory")({
-  loader: async () => {
+  loader: async ({ context }) => {
     const items = await getMasterInventoryItems();
-    return { items };
+    return { items, role: context.commandRole };
   },
   component: MasterInventory,
 });
