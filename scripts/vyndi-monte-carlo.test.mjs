@@ -3,13 +3,14 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const read=(path)=>readFile(new URL(`../${path}`,import.meta.url),"utf8");
-const [model,authority,migration,planning,planningDeck,intelligence,vibpe,component]=await Promise.all([
+const [model,authority,migration,planning,planningDeck,intelligence,intelligenceDeck,vibpe,component]=await Promise.all([
   read("src/lib/monte-carlo-model.ts"),
   read("src/lib/monte-carlo-authority.ts"),
   read("migrations/0106_vyndi_monte_carlo.sql"),
   read("src/routes/command/planning.tsx"),
   read("src/components/planning-intelligence-deck.tsx"),
   read("src/routes/command/intelligence.tsx"),
+  read("src/components/intelligence-advisory-deck.tsx"),
   read("src/lib/vibpe-governance-queries.ts"),
   read("src/components/monte-carlo-panel.tsx"),
 ]);
@@ -34,8 +35,9 @@ test("Planning and Product Intelligence expose only governed captured Monte Carl
   assert.match(planningDeck,/MonteCarloPanel/);
   assert.match(planningDeck,/getMonteCarloState/);
   assert.match(component,/Run governed Monte Carlo/);
-  assert.match(intelligence,/Monte Carlo program uncertainty/);
-  assert.match(intelligence,/critical-path recalculation each iteration/);
+  assert.match(intelligence,/IntelligenceAdvisoryDeck/);
+  assert.match(intelligenceDeck,/Monte Carlo program uncertainty/);
+  assert.match(intelligenceDeck,/critical-path recalculation each iteration/);
 });
 
 test("VIBPE can report the latest captured Monte Carlo run",()=>{

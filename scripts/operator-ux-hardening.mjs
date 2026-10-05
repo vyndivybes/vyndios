@@ -21,7 +21,10 @@ await mkdir(evidenceRoot, { recursive: true });
 async function spaNavigate(page, route) {
   const current = new URL(page.url()).pathname.replace(/\/+$/, "") || "/";
   if (current === route) return;
-  await page.evaluate((to) => {
+  await page.waitForFunction(() => document.documentElement.dataset.vyndiNavigationBridge === "ready", null, { timeout: 30_000 });
+  const sentinel = `spa-${route}-${Date.now()}`;
+  await page.evaluate(({ to, sentinelValue }) => {
+    window.__vyndiSpaSentinel = sentinelValue;
     const anchor = document.createElement("a");
     anchor.href = to;
     anchor.setAttribute("data-vyndi-test-navigation", "true");
@@ -29,10 +32,12 @@ async function spaNavigate(page, route) {
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
-  }, route);
+  }, { to: route, sentinelValue: sentinel });
   await page.waitForURL((url) => (url.pathname.replace(/\/+$/, "") || "/") === route, {
     timeout: 45_000,
   });
+  const stayedInDocument = await page.evaluate((sentinelValue) => window.__vyndiSpaSentinel === sentinelValue, sentinel);
+  assert.ok(stayedInDocument, `SPA navigation hard-reloaded while opening ${route}`);
 }
 
 const browser = await chromium.launch({ headless: true });
@@ -86,6 +91,9 @@ try {
     }
     const page = login;
     await page.locator('[data-vyndi-full-view="command-system"]').waitFor({ state: "visible", timeout: 30_000 });
+    await page.waitForFunction(() => document.documentElement.dataset.vyndiNavigationBridge === "ready", null, { timeout: 30_000 });
+    await page.waitForTimeout(120);
+    assert.deepEqual(pageErrors, [], `/command emitted browser errors during initial hydration at ${viewport.name}: ${pageErrors.join(" | ")}`);
 
     for (const route of routes) {
       const pageErrors = [];

@@ -3,13 +3,14 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const read=(path)=>readFile(new URL(`../${path}`,import.meta.url),"utf8");
-const [model,authority,migration,planning,planningDeck,intelligence,vibpe,component]=await Promise.all([
+const [model,authority,migration,planning,planningDeck,intelligence,intelligenceDeck,vibpe,component]=await Promise.all([
   read("src/lib/forecast-model.ts"),
   read("src/lib/forecast-authority.ts"),
   read("migrations/0104_vyndi_forecast_engine.sql"),
   read("src/routes/command/planning.tsx"),
   read("src/components/planning-intelligence-deck.tsx"),
   read("src/routes/command/intelligence.tsx"),
+  read("src/components/intelligence-advisory-deck.tsx"),
   read("src/lib/vibpe-governance-queries.ts"),
   read("src/components/program-forecast-panel.tsx"),
 ]);
@@ -42,10 +43,11 @@ test("Planning owns forecast inputs and captured forecast runs",()=>{
 });
 
 test("Product Intelligence surfaces only captured governed forecast quantiles",()=>{
-  assert.match(intelligence,/Program forecast/);
-  assert.match(intelligence,/Captured/);
-  assert.match(intelligence,/Schedule P50/);
-  assert.match(intelligence,/PERT-normal approximation only/);
+  assert.match(intelligence,/IntelligenceAdvisoryDeck/);
+  assert.match(intelligenceDeck,/Program forecast/);
+  assert.match(intelligenceDeck,/Captured/);
+  assert.match(intelligenceDeck,/Schedule P50/);
+  assert.match(intelligenceDeck,/PERT-normal approximation only/);
 });
 
 test("VIBPE withholds uncaptured quantiles and explains captured PERT boundary",()=>{

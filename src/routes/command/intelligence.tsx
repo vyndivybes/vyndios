@@ -3,36 +3,27 @@ import { ArrowRight, AlertTriangle, GitBranch, ShieldCheck } from "lucide-react"
 import { Kpi, Panel } from "@/components/kpi";
 import { getGovernedIntelligence } from "@/lib/intelligence-data";
 import { getReadinessIntelligenceState } from "@/lib/readiness-authority";
-import { getProgramForecastState } from "@/lib/forecast-authority";
-import { getMonteCarloState } from "@/lib/monte-carlo-authority";
-import { getDecisionIntelligenceState } from "@/lib/decision-intelligence-authority";
-import { getEarnedValueState } from "@/lib/earned-value-authority";
 import { EnterpriseDigitalThreadPanel } from "@/components/enterprise-digital-thread-panel";
-import { ForecastLearningPanel } from "@/components/forecast-learning-panel";
-import { getForecastLearningState } from "@/lib/forecast-learning-authority";
+import { IntelligenceAdvisoryDeck } from "@/components/intelligence-advisory-deck";
 
 export const Route = createFileRoute("/command/intelligence")({
   loader: async () => {
-    const [data, readiness, forecast, monteCarlo, decision, earnedValue, forecastLearning] = await Promise.all([
+    const [data, readiness] = await Promise.all([
       getGovernedIntelligence(),
       getReadinessIntelligenceState(),
-      getProgramForecastState(),
-      getMonteCarloState(),
-      getDecisionIntelligenceState(),
-      getEarnedValueState(),
-      getForecastLearningState(),
     ]);
-    return { data, readiness, forecast, monteCarlo, decision, earnedValue, forecastLearning };
+    return { data, readiness };
   },
   component: Intelligence,
 });
 
 const number = (value: number) => value.toLocaleString("en-IN", { maximumFractionDigits: 1 });
 const money = (value: number) => `₹${number(value)} lakh`;
+const formatEvidenceTimestamp = (value: string) => String(value ?? "").trim().replace("T", " ").replace(/Z$/, " UTC");
 const severityTone = (severity: string) => severity === "critical" || severity === "high" ? "text-danger" : "text-warn";
 
 function Intelligence() {
-  const { data, readiness, forecast, monteCarlo, decision, earnedValue, forecastLearning } = Route.useLoaderData();
+  const { data, readiness } = Route.useLoaderData();
   const readinessPct = (value: number | null) => value == null ? "Not rated" : `${number(value)}%`;
   return <div className="space-y-6">
     <header className="flex flex-col gap-4 border-b border-border pb-6 lg:flex-row lg:items-end lg:justify-between">
@@ -71,77 +62,7 @@ function Intelligence() {
 
     <EnterpriseDigitalThreadPanel />
 
-    <section aria-label="Forecast Learning"><ForecastLearningPanel state={forecastLearning} allowActions={false} /></section>
-
-    <Panel title="Earned Value" kicker={earnedValue.latest ? "Captured " + earnedValue.latest.method + " · as of " + earnedValue.latest.asOfDate : "No immutable EVM snapshot captured"}>
-      {earnedValue.latest ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-8">
-        <Kpi label="BAC" value={money(earnedValue.latest.result.bacLakh)} hint="Budget at completion"/>
-        <Kpi label="PV" value={money(earnedValue.latest.result.pvLakh)} hint="Planned value"/>
-        <Kpi label="EV" value={money(earnedValue.latest.result.evLakh)} hint="Evidence-derived"/>
-        <Kpi label="AC" value={money(earnedValue.latest.result.acLakh)} hint="Actual cost"/>
-        <Kpi label="SPI" value={earnedValue.latest.result.spi==null?"WITHHELD":number(earnedValue.latest.result.spi)} hint="EV / PV" tone={earnedValue.latest.result.spi!=null&&earnedValue.latest.result.spi<1?"warn":"ok"}/>
-        <Kpi label="CPI" value={earnedValue.latest.result.cpi==null?"WITHHELD":number(earnedValue.latest.result.cpi)} hint="EV / AC" tone={earnedValue.latest.result.cpi!=null&&earnedValue.latest.result.cpi<1?"warn":"ok"}/>
-        <Kpi label="EAC" value={earnedValue.latest.result.eacLakh==null?"WITHHELD":money(earnedValue.latest.result.eacLakh)} hint="BAC / CPI"/>
-        <Kpi label="VAC" value={earnedValue.latest.result.vacLakh==null?"WITHHELD":money(earnedValue.latest.result.vacLakh)} hint="BAC - EAC" tone={earnedValue.latest.result.vacLakh!=null&&earnedValue.latest.result.vacLakh<0?"warn":"ok"}/>
-        <p className="sm:col-span-2 xl:col-span-8 text-xs text-muted">Source {earnedValue.latest.sourceReference} · captured {earnedValue.latest.createdAt}. Earned Value is computed from governed task progress/completion and actual-cost evidence; it never authorizes budget, payment, schedule or release actions.</p>
-      </div> : <div className="text-sm text-muted">
-        <p>{earnedValue.live.reason}</p>
-        <p className="mt-2 text-xs">Progress evidence coverage {number(earnedValue.live.progressCoveragePct)}% · actual-cost evidence coverage {number(earnedValue.live.actualCostCoveragePct)}%.</p>
-        <Link to="/command/planning" className="mt-3 inline-block text-xs font-semibold text-accent">Open Earned Value Planning →</Link>
-      </div>}
-    </Panel>
-
-    <Panel title="Program forecast" kicker={forecast.latest ? `Captured ${forecast.latest.method}` : "No governed forecast run captured"}>
-      {forecast.latest ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <Kpi label="Schedule P50" value={forecast.latest.result.schedule.p50Days == null ? "WITHHELD" : `${forecast.latest.result.schedule.p50Days} d`} hint="From program start"/>
-        <Kpi label="Schedule P80" value={forecast.latest.result.schedule.p80Days == null ? "WITHHELD" : `${forecast.latest.result.schedule.p80Days} d`} hint="Planning quantile"/>
-        <Kpi label="Schedule P95" value={forecast.latest.result.schedule.p95Days == null ? "WITHHELD" : `${forecast.latest.result.schedule.p95Days} d`} hint="Planning quantile"/>
-        <Kpi label="Cost P50" value={forecast.latest.result.cost.p50Lakh == null ? "WITHHELD" : money(forecast.latest.result.cost.p50Lakh)} hint="Governed cost inputs"/>
-        <Kpi label="Cost P80" value={forecast.latest.result.cost.p80Lakh == null ? "WITHHELD" : money(forecast.latest.result.cost.p80Lakh)} hint="Planning quantile"/>
-        <Kpi label="Cost P95" value={forecast.latest.result.cost.p95Lakh == null ? "WITHHELD" : money(forecast.latest.result.cost.p95Lakh)} hint="Planning quantile"/>
-        <p className="sm:col-span-2 xl:col-span-6 text-xs text-muted">Source {forecast.latest.sourceReference} · captured {forecast.latest.createdAt}. PERT-normal approximation only; critical-path switching and correlation are not modeled. Compare against the governed Monte Carlo run below when available.</p>
-      </div> : <div className="text-sm text-muted">
-        <p>Schedule coverage {number(forecast.live.schedule.coveragePct)}% · cost coverage {number(forecast.live.cost.coveragePct)}%. Quantiles remain withheld until a governed forecast run is captured from complete three-point inputs.</p>
-        <Link to="/command/planning" className="mt-3 inline-block text-xs font-semibold text-accent">Open Program Forecast →</Link>
-      </div>}
-    </Panel>
-
-    <Panel title="Monte Carlo program uncertainty" kicker={monteCarlo.latest ? `${monteCarlo.latest.iterations.toLocaleString("en-IN")} iterations · seed ${monteCarlo.latest.seed}` : "No captured governed Monte Carlo run"}>
-      {monteCarlo.latest ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <Kpi label="MC Schedule P50" value={monteCarlo.latest.result.schedule.p50Days == null ? "WITHHELD" : `${monteCarlo.latest.result.schedule.p50Days} d`} hint="Critical path resampled"/>
-        <Kpi label="MC Schedule P80" value={monteCarlo.latest.result.schedule.p80Days == null ? "WITHHELD" : `${monteCarlo.latest.result.schedule.p80Days} d`} hint="Planning quantile"/>
-        <Kpi label="MC Schedule P95" value={monteCarlo.latest.result.schedule.p95Days == null ? "WITHHELD" : `${monteCarlo.latest.result.schedule.p95Days} d`} hint="Planning quantile"/>
-        <Kpi label="MC Cost P50" value={monteCarlo.latest.result.cost.p50Lakh == null ? "WITHHELD" : money(monteCarlo.latest.result.cost.p50Lakh)} hint="Cost-required tasks"/>
-        <Kpi label="Dominant path" value={monteCarlo.latest.result.schedule.criticalPathFrequency[0] ? `${number(monteCarlo.latest.result.schedule.criticalPathFrequency[0].frequencyPct)}%` : "—"} hint={monteCarlo.latest.result.schedule.criticalPathFrequency[0]?.path.join(" → ") || "No path evidence"}/>
-        <Kpi label="Run evidence" value={monteCarlo.latest.id.slice(0,12)} hint={monteCarlo.latest.sourceReference}/>
-        <p className="sm:col-span-2 xl:col-span-6 text-xs text-muted">Triangular task distributions with critical-path recalculation each iteration. Cross-task correlation is not yet modeled. This is program uncertainty, not a physical material/FEA/fatigue response model.</p>
-      </div> : <div className="text-sm text-muted">
-        <p>Schedule O/M/P coverage {number(monteCarlo.scheduleInputCoveragePct)}%. Monte Carlo remains withheld until all governed program tasks have complete schedule distributions and a run is captured.</p>
-        <Link to="/command/planning" className="mt-3 inline-block text-xs font-semibold text-accent">Open Monte Carlo Planning →</Link>
-      </div>}
-    </Panel>
-
-    <Panel title="Decision Intelligence" kicker="Advisory options · governance-priority ordering · no automatic approval">
-      <div className="space-y-3">
-        {decision.live.options.map((option, index) => <article key={option.id} className="rounded-xl border border-border p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-green">Option {index + 1} · {option.decisionClass.replaceAll("_"," ")}</p>
-              <h3 className="mt-1 text-sm font-semibold text-fg">{option.title}</h3>
-            </div>
-            {decision.live.primaryAdvisoryOptionId === option.id ? <span className="rounded-full border border-accent/30 bg-accent/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-accent">Primary advisory</span> : null}
-          </div>
-          <p className="mt-2 text-xs leading-5 text-muted">{option.rationale}</p>
-          <div className="mt-3 grid gap-3 lg:grid-cols-2">
-            <div><p className="text-[10px] font-semibold uppercase tracking-wider text-subtle">Actions</p><ul className="mt-1 space-y-1">{option.actions.map((item) => <li key={item} className="text-xs leading-5 text-muted">• {item}</li>)}</ul></div>
-            <div><p className="text-[10px] font-semibold uppercase tracking-wider text-subtle">Consequences / limits</p><ul className="mt-1 space-y-1">{option.consequences.map((item) => <li key={item} className="text-xs leading-5 text-muted">• {item}</li>)}</ul></div>
-          </div>
-          <p className="mt-3 text-[10px] leading-4 text-subtle">{option.authorityRequired}</p>
-          {option.evidenceReferences.length ? <p className="mt-1 break-words text-[10px] text-subtle">Evidence: {option.evidenceReferences.join(" · ")}</p> : null}
-        </article>)}
-        <p className="text-[10px] leading-5 text-subtle">Ranking method: {decision.live.rankingMethod}. No option is an approval, commitment, engineering release, purchase order, funding decision or risk acceptance.</p>
-      </div>
-    </Panel>
+    <IntelligenceAdvisoryDeck />
 
     {!data.available ? <Panel title="Governed snapshot required" kicker="No values inferred">
       <p className="text-sm text-muted">{data.reason}</p>
@@ -149,8 +70,8 @@ function Intelligence() {
     </Panel> : <>
       <section className={`rounded-xl border p-4 text-sm ${data.lineage.sourceCurrent ? "border-green/30 bg-green/5" : "border-warn/40 bg-warn/5"}`}>
         <div className="flex flex-wrap items-center gap-2 font-semibold text-fg"><ShieldCheck className="size-4 text-accent" /> Persisted planning snapshot · {data.lineage.sourceCurrent ? "current deployed source" : "source revision differs from deployment"}</div>
-        <p className="mt-2 break-words text-xs leading-5 text-muted">IBPE {data.lineage.ibpeRunId} · plan {data.lineage.approvedPlanId} revision {data.lineage.approvedPlanRevision} · captured {new Date(data.lineage.snapshotAt).toLocaleString("en-IN")} · {data.lineage.ageHours === null ? "age unavailable" : `${number(data.lineage.ageHours)} hours old`}</p>
-        <p className="mt-1 text-xs text-muted">Read {new Date(data.readAt).toLocaleString("en-IN")} · snapshot source {data.lineage.sourceSha || "unrecorded"} · deployed source {data.lineage.deployedSourceSha || "unrecorded"}</p>
+        <p className="mt-2 break-words text-xs leading-5 text-muted">IBPE {data.lineage.ibpeRunId} · plan {data.lineage.approvedPlanId} revision {data.lineage.approvedPlanRevision} · captured {formatEvidenceTimestamp(data.lineage.snapshotAt)} · {data.lineage.ageHours === null ? "age unavailable" : `${number(data.lineage.ageHours)} hours old`}</p>
+        <p className="mt-1 text-xs text-muted">Read {formatEvidenceTimestamp(data.readAt)} · snapshot source {data.lineage.sourceSha || "unrecorded"} · deployed source {data.lineage.deployedSourceSha || "unrecorded"}</p>
         {!data.lineage.sourceCurrent ? <p className="mt-2 text-xs font-semibold text-warn">Refresh the governed IBPE run before treating these results as current release evidence.</p> : null}
       </section>
 

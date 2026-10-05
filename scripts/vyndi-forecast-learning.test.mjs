@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 const read=(p)=>readFile(new URL(`../${p}`,import.meta.url),"utf8");
-const [migration,model,authority,panel,planning,planningDeck,intelligence,vibpe,pkg]=await Promise.all([
+const [migration,model,authority,panel,planning,planningDeck,intelligence,intelligenceDeck,vibpe,pkg]=await Promise.all([
   read("migrations/0113_vyndi_forecast_learning.sql"),
   read("src/lib/forecast-learning-model.ts"),
   read("src/lib/forecast-learning-authority.ts"),
@@ -10,6 +10,7 @@ const [migration,model,authority,panel,planning,planningDeck,intelligence,vibpe,
   read("src/routes/command/planning.tsx"),
   read("src/components/planning-intelligence-deck.tsx"),
   read("src/routes/command/intelligence.tsx"),
+  read("src/components/intelligence-advisory-deck.tsx"),
   read("src/lib/vibpe-governance-queries.ts"),
   read("package.json"),
 ]);
@@ -46,7 +47,8 @@ test("Planning and Product Intelligence expose the governed learning loop",()=>{
   assert.match(panel,/Close period/);
   assert.match(panel,/WAPE/);
   assert.match(panel,/Forecast Value Added/);
-  assert.match(intelligence,/Forecast Learning/);
+  assert.match(intelligence,/IntelligenceAdvisoryDeck/);
+  assert.match(intelligenceDeck,/Forecast Learning/);
 });
 
 test("VIBPE answers forecast accuracy questions only from governed closed evidence",()=>{

@@ -4,12 +4,13 @@ import { readFile } from "node:fs/promises";
 
 const read=(path)=>readFile(new URL(`../${path}`,import.meta.url),"utf8");
 
-const [migration,model,authority,queries,intelligence]=await Promise.all([
+const [migration,model,authority,queries,intelligence,intelligenceDeck]=await Promise.all([
   read("migrations/0109_vibpe_decision_intelligence.sql"),
   read("src/lib/decision-intelligence-model.ts"),
   read("src/lib/decision-intelligence-authority.ts"),
   read("src/lib/vibpe-governance-queries.ts"),
   read("src/routes/command/intelligence.tsx"),
+  read("src/components/intelligence-advisory-deck.tsx"),
 ]);
 
 test("Decision Intelligence persists advisory packets without transaction authority",()=>{
@@ -39,7 +40,8 @@ test("VIBPE can answer decision-option questions without auto-approving actions"
 });
 
 test("Product Intelligence surfaces governed decision alternatives",()=>{
-  assert.match(intelligence,/Decision Intelligence/);
-  assert.match(intelligence,/Primary advisory/);
-  assert.match(intelligence,/governance-priority ordering/);
+  assert.match(intelligence,/IntelligenceAdvisoryDeck/);
+  assert.match(intelligenceDeck,/Decision Intelligence/);
+  assert.match(intelligenceDeck,/Primary advisory/);
+  assert.match(intelligenceDeck,/Governance-priority ordering/i);
 });

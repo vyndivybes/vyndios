@@ -47,8 +47,12 @@ export function ProtectedNavigationBridge() {
       void navigate({ to: to as never });
     };
 
+    document.documentElement.dataset.vyndiNavigationBridge = "ready";
     document.addEventListener("click", handleClick);
-    return () => document.removeEventListener("click", handleClick);
+    return () => {
+      document.removeEventListener("click", handleClick);
+      delete document.documentElement.dataset.vyndiNavigationBridge;
+    };
   }, [navigate]);
 
   return null;
