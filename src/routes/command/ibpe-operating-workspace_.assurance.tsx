@@ -33,7 +33,7 @@ const toneFor = (value: string) => {
   return "text-muted";
 };
 
-export const Route = createFileRoute("/command/ibpe-operating-workspace/assurance")({
+export const Route = createFileRoute("/command/ibpe-operating-workspace_/assurance")({
   loader: () => getVibpeAssurancePageData(),
   component: VibpeAssurancePage,
 });

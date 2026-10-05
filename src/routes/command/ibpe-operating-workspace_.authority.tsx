@@ -8,7 +8,7 @@ import {
   getAdvancedPlanningAuthorityReadiness,
 } from "@/lib/advanced-planning-authority-controls";
 
-export const Route = createFileRoute("/command/ibpe-operating-workspace/authority")({
+export const Route = createFileRoute("/command/ibpe-operating-workspace_/authority")({
   loader: async () => getAdvancedPlanningAuthorityReadiness(),
   component: AdvancedPlanningAuthorityPage,
 });

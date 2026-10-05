@@ -5,7 +5,7 @@ import { runAdvancedPlanningFromLatestIbpe } from "@/lib/advanced-planning-autho
 import { getAdvancedOptimizerControlState } from "@/lib/advanced-optimizer-control";
 import { runAdvancedOptimizerFromPacket } from "@/lib/advanced-optimizer-execution";
 
-export const Route = createFileRoute("/command/ibpe-operating-workspace/optimizer")({
+export const Route = createFileRoute("/command/ibpe-operating-workspace_/optimizer")({
   loader: async () => getAdvancedOptimizerControlState(),
   component: GovernedOptimizerPage,
 });
