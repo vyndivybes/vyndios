@@ -119,7 +119,7 @@ function DispatchRecord({
       {row.serialAllocationRequired ? (
         <div className="mt-3 border-t border-border/70 pt-3">
           <div className="flex flex-wrap items-end gap-2">
-            <label className="min-w-[240px] flex-1 text-[10px] font-semibold uppercase tracking-wider text-subtle">
+            <label className="min-w-0 basis-full sm:basis-60 flex-1 text-[10px] font-semibold uppercase tracking-wider text-subtle">
               Allocate serial
               <select className="control mt-1.5 w-full normal-case" value={qualityReleaseId} onChange={(e)=>setQualityReleaseId(e.target.value)}>
                 <option value="">Select current released serial</option>
@@ -129,7 +129,7 @@ function DispatchRecord({
             <button type="button" disabled={busy||!qualityReleaseId||row.serializationComplete} onClick={()=>void allocateSerial()} className="rounded border border-accent px-3 py-2 text-xs font-semibold text-accent disabled:opacity-40">Allocate serial</button>
           </div>
           {row.serialAllocations.length ? <div className="mt-3 flex flex-wrap gap-2">
-            {row.serialAllocations.map((allocation)=><span key={allocation.allocationId} className="inline-flex items-center gap-2 rounded-full border border-border px-2.5 py-1 text-[10px]">
+            {row.serialAllocations.map((allocation)=><span key={allocation.allocationId} className="inline-flex max-w-full flex-wrap items-center break-all gap-2 rounded-full border border-border px-2.5 py-1 text-[10px]">
               {allocation.serialNumber}{allocation.currentRelease ? "" : " · superseded release"}
               {!row.invoiceId ? <button type="button" disabled={busy} onClick={()=>void removeSerial(allocation.qualityReleaseId)} className="font-semibold text-warn">Remove</button> : null}
             </span>)}
