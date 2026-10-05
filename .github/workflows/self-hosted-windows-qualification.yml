@@ -1,0 +1,36 @@
+name: Self-hosted Windows Qualification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/self-hosted-windows-qualification.yml"
+
+jobs:
+  qualify-runner:
+    runs-on: [self-hosted, Windows, X64, vyndi-windows]
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify runner toolchain
+        shell: powershell
+        run: |
+          Write-Host "Runner: $env:RUNNER_NAME"
+          node --version
+          npm.cmd --version
+          git --version
+
+      - name: Install dependencies
+        shell: powershell
+        run: npm.cmd ci
+
+      - name: Database syntax validation
+        shell: powershell
+        run: npm.cmd run db:validate
+
+      - name: Department identity regression
+        shell: powershell
+        run: npm.cmd run test:departments:identity
