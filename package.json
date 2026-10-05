@@ -56,7 +56,8 @@
     "qualify:production": "npm run test:production:acceptance",
     "test:production:login-diagnostics": "node --test scripts/production-login-diagnostics.test.mjs",
     "test:production:auth-retry": "node --test scripts/production-auth-retry.test.mjs",
-    "test:production:auth-network-evidence": "node --test scripts/production-auth-network-evidence.test.mjs"
+    "test:production:auth-network-evidence": "node --test scripts/production-auth-network-evidence.test.mjs",
+    "test:auth:rate-limit-boundary": "node --test scripts/auth-rate-limit-failure-boundary.test.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",

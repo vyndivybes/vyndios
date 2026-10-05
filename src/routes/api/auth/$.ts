@@ -3,7 +3,25 @@ import { handleAuthRequest } from "@/lib/auth/server";
 import { authRateLimitDecision } from "@/lib/security/rate-limit";
 
 async function handleProtectedAuthPost(request: Request) {
-  const decision = await authRateLimitDecision(request);
+  let decision;
+  try {
+    decision = await authRateLimitDecision(request);
+  } catch (error) {
+    console.error("[auth] authentication rate-limit backend unavailable", {
+      path: new URL(request.url).pathname,
+      failureCategory: "auth-rate-limit-backend",
+      errorName: error instanceof Error ? error.name : typeof error,
+    });
+    return new Response(JSON.stringify({
+      error: "AUTH_RATE_LIMIT_BACKEND_UNAVAILABLE",
+    }), {
+      status: 503,
+      headers: {
+        "content-type": "application/json",
+        "cache-control": "no-store",
+      },
+    });
+  }
   if (decision && !decision.allowed) {
     return new Response(JSON.stringify({
       error: "Too many authentication attempts. Retry later.",
