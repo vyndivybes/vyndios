@@ -59,4 +59,6 @@ Internal automated qualification is evidence of tested behavior for a specific S
 
 ## Licensing
 
-This is a private company repository. No public software license is granted by the absence of a LICENSE file.
+VYNDI OS is proprietary software of Vāyú Shastr Pvt Ltd. No public or open-source software licence is granted.
+
+See [LICENSE](./LICENSE) for the proprietary software notice. Third-party components remain governed by their respective upstream licences and notices.
