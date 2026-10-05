@@ -9,6 +9,7 @@ const root = join(here, "..");
 const migration = await readFile(join(root, "migrations/0075_iso_quality_compliance.sql"), "utf8");
 const service = await readFile(join(root, "src/lib/iso-quality-compliance.ts"), "utf8");
 const route = await readFile(join(root, "src/routes/command/quality.tsx"), "utf8");
+const deck = await readFile(join(root, "src/components/quality-assurance-deck.tsx"), "utf8");
 
 test("ISO v1 registers the controlled standard set without embedding proprietary acceptance tables", () => {
   for (const standard of ["ISO 4210-2", "ISO 4210-3", "ISO 4210-6", "ISO 9001", "ISO 10012", "ISO/IEC 17025"]) {
@@ -53,10 +54,12 @@ test("VIBPE gets a governed read-only ISO release readiness projection", () => {
   assert.match(route, /VIBPE may report readiness but cannot authorize release automatically/);
 });
 
-test("Quality UI adds ISO compliance without root-shell coupling", () => {
-  assert.match(route, /listIsoQualityCompliance/);
-  assert.match(route, /ISO Standards Register/);
-  assert.match(route, /ISO 4210 Frame & Fork Verification/);
-  assert.match(route, /Product Conformity & Production Release/);
+test("Quality UI keeps ISO compliance governed without root-shell or cold-entry coupling", () => {
+  assert.match(route, /QualityAssuranceDeck/);
+  assert.match(deck, /listIsoQualityCompliance/);
+  assert.match(deck, /ISO Standards Register/);
+  assert.match(deck, /ISO 4210 Frame & Fork Verification/);
+  assert.match(deck, /Product Conformity & Production Release/);
+  assert.match(deck, /onToggle/);
   assert.doesNotMatch(service, /__root/);
 });

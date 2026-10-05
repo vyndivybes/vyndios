@@ -193,19 +193,35 @@ try {
   for (const route of protectedRoutes) {
     const page = await context.newPage();
     const pageErrors = [];
+    const routeNetworkEvidence = [];
     page.on("pageerror", (error) => pageErrors.push(String(error?.message || error)));
     const started = Date.now();
     const response = await page.goto(`${baseUrl}${route}`, {
       waitUntil: "domcontentloaded",
       timeout: route.includes("assurance") ? 90_000 : 60_000,
     });
+    if (!response?.ok()) {
+      const raw = await response?.text().catch(() => "") ?? "";
+      const headers = response?.headers() ?? {};
+      const responseBody = raw.slice(0, 2000).replace(/("(?:password|email|token|secret)"\\s*:\\s*")[^"]*(")/gi, "$1[REDACTED]$2");
+      routeNetworkEvidence.push({
+        status: response?.status() ?? null,
+        durationMs: Date.now() - started,
+        cfRay: headers["cf-ray"] || null,
+        serverTiming: headers["server-timing"] || null,
+        responseBody,
+      });
+    }
     await page.locator("body").waitFor({ state: "visible", timeout: 30_000 });
     await page.waitForFunction(() => (document.body?.innerText || "").trim().length > 40, undefined, {
       timeout: 30_000,
     });
 
     const body = (await page.locator("body").innerText()).trim();
-    assert.ok(response?.ok(), `${route} returned HTTP ${response?.status() ?? "none"}`);
+    assert.ok(
+      response?.ok(),
+      `${route} returned HTTP ${response?.status() ?? "none"} · routeNetworkEvidence=${JSON.stringify(routeNetworkEvidence)}`,
+    );
     assert.doesNotMatch(page.url(), /\/login(?:\?|$)|\/command-login/, `${route} lost authenticated access`);
     assert.doesNotMatch(
       body,
@@ -247,6 +263,7 @@ try {
       durationMs: Date.now() - started,
       screenshot: screenshotPath,
       pageErrors,
+      routeNetworkEvidence,
     });
     await page.close();
   }
