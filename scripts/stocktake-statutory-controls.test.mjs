@@ -118,13 +118,17 @@ test("stocktake maker/checker posts FIFO-safe gain/loss and linked finance varia
   );
 
   const events=await database.query(
-    `select event_type,actor_user_id from epr_inventory_stocktake_events
-      where stocktake_id='STK-2026-09-TEST' order by created_at,id`,
+    `select event_type,actor_user_id,event_seq from epr_inventory_stocktake_events
+      where stocktake_id='STK-2026-09-TEST' order by event_seq`,
   );
   assert.deepEqual(events.rows.map(row=>row.event_type),[
     "started","count_recorded","count_recorded","submitted","approved","posted",
   ]);
   assert.equal(events.rows.at(-2).actor_user_id,"OPS-CHECKER");
+  assert.deepEqual(
+    events.rows.map(row=>Number(row.event_seq)),
+    [...events.rows].map(row=>Number(row.event_seq)).sort((a,b)=>a-b),
+  );
 
   await assert.rejects(
     ()=>database.query(`update epr_inventory_stocktake_events set evidence_reference='tampered' where stocktake_id='STK-2026-09-TEST'`),
