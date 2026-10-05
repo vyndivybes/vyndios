@@ -11,12 +11,12 @@ const [dbServer,helper,health,diagnostic,pkg,migrator]=await Promise.all([
   read("scripts/migrate.mjs"),
 ]);
 
-test("Hyperdrive database requests reconcile the migration ledger before returning SQL",()=>{
-  assert.match(dbServer,/ensureHyperdriveSchemaReady/);
-  assert.match(dbServer,/pg_advisory_xact_lock/);
-  assert.match(dbServer,/create table if not exists _migrations/i);
-  assert.match(dbServer,/planRuntimeSchemaMigrations/);
-  assert.match(dbServer,/await ensureHyperdriveSchemaReady\(transport\)/);
+test("Hyperdrive database requests never execute schema DDL before returning SQL",()=>{
+  const start=dbServer.indexOf("export async function getSqlServer");
+  const end=dbServer.indexOf("export async function getPgliteServer",start);
+  const block=dbServer.slice(start,end);
+  assert.doesNotMatch(block,/ensureHyperdriveSchemaReady/);
+  assert.match(block,/createPostgresSql\(transport\)/);
 });
 
 test("runtime migration policy blocks destructive SQL and only permits Hyperdrive",()=>{
@@ -34,8 +34,9 @@ test("runtime health exposes safe schema parity without database secrets",()=>{
   assert.doesNotMatch(health,/connectionString|DATABASE_URL|HYPERDRIVE.*connection/i);
 });
 
-test("build migrator documents Hyperdrive runtime reconciliation instead of silently claiming schema readiness",()=>{
-  assert.match(migrator,/runtime Hyperdrive reconciliation/i);
+test("build migrator requires a privileged DATABASE_URL path for deployed schema changes",()=>{
+  assert.match(migrator,/privileged DATABASE_URL migration/i);
+  assert.doesNotMatch(migrator,/runtime Hyperdrive reconciliation will enforce schema before queries/i);
 });
 
 test("aggregate test gate includes Hyperdrive schema parity regression",()=>{
@@ -44,16 +45,13 @@ test("aggregate test gate includes Hyperdrive schema parity regression",()=>{
 });
 
 
-test("runtime Hyperdrive migrator uses a transaction-scoped lock per migration and rechecks the ledger",()=>{
-  assert.match(dbServer,/pg_advisory_xact_lock/);
-  assert.match(dbServer,/for\(;;\)/);
-  assert.match(dbServer,/plan\.pending\[0\]/);
-  assert.match(dbServer,/await client\.query\("BEGIN"\)/);
-  assert.match(dbServer,/insert into _migrations\(name\)/i);
-  assert.match(dbServer,/await client\.query\("COMMIT"\)/);
-  assert.match(dbServer,/select name from _migrations/);
-  assert.doesNotMatch(dbServer,/pg_advisory_unlock/);
-  assert.doesNotMatch(dbServer,/pg_advisory_lock\(/);
+test("runtime schema diagnostic detects lag without attempting DDL",()=>{
+  const start=dbServer.indexOf("export async function getRuntimeSchemaDiagnosticServer");
+  const end=dbServer.indexOf("function toSql",start);
+  const block=dbServer.slice(start,end);
+  assert.match(block,/readRuntimeSchemaMigrationStatus/);
+  assert.match(block,/SCHEMA_LAG/);
+  assert.doesNotMatch(block,/client\.query\(|CREATE TABLE|ALTER TABLE|DROP TRIGGER|CREATE TRIGGER/i);
 });
 
 test("safe schema diagnostic route reports migration failure without leaking connection details",()=>{

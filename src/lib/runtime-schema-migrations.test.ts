@@ -57,9 +57,16 @@ test("current Hyperdrive schema is a no-op",()=>{
 });
 
 
-test("Hyperdrive runtime ledger access never requires schema CREATE privilege",()=>{
+test("Hyperdrive runtime schema inspection is detection-only and never requires DDL privilege",()=>{
   const source=readFileSync(new URL("./db.server.ts",import.meta.url),"utf8");
-  const runtimeBlock=source.slice(source.indexOf("async function ensureHyperdriveSchemaReady"),source.indexOf("export async function readRuntimeSchemaMigrationStatus"));
-  assert.doesNotMatch(runtimeBlock,/create\s+table\s+if\s+not\s+exists\s+_migrations/i);
-  assert.match(runtimeBlock,/select name from _migrations/i);
+  const diagnosticStart=source.indexOf("export async function getRuntimeSchemaDiagnosticServer");
+  const diagnosticEnd=source.indexOf("function toSql",diagnosticStart);
+  const diagnosticBlock=source.slice(diagnosticStart,diagnosticEnd);
+  const sqlStart=source.indexOf("export async function getSqlServer");
+  const sqlEnd=source.indexOf("export async function getPgliteServer",sqlStart);
+  const sqlBlock=source.slice(sqlStart,sqlEnd);
+  assert.match(diagnosticBlock,/readRuntimeSchemaMigrationStatus/);
+  assert.match(diagnosticBlock,/SCHEMA_LAG/);
+  assert.doesNotMatch(diagnosticBlock,/create\s+table|alter\s+table|create\s+trigger|drop\s+trigger/i);
+  assert.doesNotMatch(sqlBlock,/ensureHyperdriveSchemaReady|migration\.sql|_migrations\(name\)/i);
 });

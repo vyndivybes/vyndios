@@ -14,9 +14,9 @@ const databaseUrl = process.env.DATABASE_URL;
 const migrationEnvironment = migrationEnvironmentDecision(process.env);
 if (!databaseUrl) {
   if (migrationEnvironment.allowed && (process.env.WORKERS_CI === "1" || process.env.WORKERS_CI_BRANCH === "main")) {
-    console.log("[migrate] DATABASE_URL not set — runtime Hyperdrive reconciliation will enforce schema before queries.");
+    console.log("[migrate] DATABASE_URL not set — privileged DATABASE_URL migration is required; runtime health will report schema lag.");
   } else {
-    console.log("[migrate] DATABASE_URL not set — skipping (PGLite migrates itself; deployed Hyperdrive reconciles at runtime).");
+    console.log("[migrate] DATABASE_URL not set — skipping (PGLite migrates itself; deployed schema requires a privileged DATABASE_URL migration).");
   }
   process.exit(0);
 }
