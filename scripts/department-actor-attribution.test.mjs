@@ -5,7 +5,7 @@ import { stripTypeScriptTypes } from 'node:module';
 
 // Exercise actual authority handlers with mocked authentication/SQL boundaries.
 // This does not qualify database transactions, schema validation or browser flows.
-function loadAuthority(file, identity, denied = false) {
+function loadAuthority(file, identity, denied = false, respond = () => []) {
   let source = readFileSync(new URL(`../src/lib/${file}.ts`, import.meta.url), 'utf8');
   source = stripTypeScriptTypes(source).replace(/^import .*;\s*$/gm, '');
   source = source.replace('await import("@tanstack/react-start/server")', '({ getRequest: () => null })');
@@ -14,7 +14,7 @@ function loadAuthority(file, identity, denied = false) {
   const calls = [];
   const sql = async (strings, ...values) => {
     calls.push({ text: strings.join('?'), values });
-    return [];
+    return respond(strings.join('?'), values);
   };
   const schema = new Proxy(() => {}, { get: () => schema, apply: () => schema });
   const createServerFn = () => ({ validator() { return this; }, handler(fn) { return fn; } });
@@ -65,5 +65,25 @@ for (const file of ['quality-authority', 'people-office-authority']) {
       await assert.rejects(() => handler({ data: {} }), /Permission denied/);
     }
     assert.equal(calls.length, 0);
+  });
+}
+
+for (const openCount of [1, 0]) {
+  test(`Quality release checks EPR holds: ${openCount}`, async () => {
+    const { handlers, calls } = loadAuthority('quality-authority', { userId: 'qa-approver', role: 'qa' }, false, (query) => {
+      if (query.includes('from epr_travellers')) return [{ jobCardId: 'JC-1', serialNumber: 'SN-1', salesOrderId: 'SO-1' }];
+      if (query.includes('from epr_ncr_capa')) return [{ count: openCount }];
+      if (query.includes('from vyndi_quality_inspections')) return [{ count: 1 }];
+      if (query.includes('from vyndi_quality_ncrs')) return [{ count: 0 }];
+      return [];
+    });
+    const run = () => handlers.decideQualityRelease({ data: { id: 'REL-1', travellerId: 'T-1', decision: 'released', decisionReason: 'Inspected', evidenceReference: 'EV-1' } });
+    if (openCount) {
+      await assert.rejects(run, /unresolved EPR NCR/);
+      assert.equal(calls.filter(call => /insert into|update /.test(call.text)).length, 0);
+    } else {
+      assert.equal((await run()).decision, 'released');
+      assert.ok(calls.some(call => /insert into vyndi_quality_releases/.test(call.text)));
+    }
   });
 }
