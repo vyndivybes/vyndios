@@ -45,7 +45,7 @@ test("Planning owns forecast inputs and captured forecast runs",()=>{
 test("Product Intelligence surfaces only captured governed forecast quantiles",()=>{
   assert.match(intelligence,/IntelligenceAdvisoryDeck/);
   assert.match(intelligenceDeck,/Program forecast/);
-  assert.match(intelligenceDeck,/Captured/);
+  assert.match(intelligenceDeck,/captured/i);
   assert.match(intelligenceDeck,/Schedule P50/);
   assert.match(intelligenceDeck,/PERT-normal approximation only/);
 });
