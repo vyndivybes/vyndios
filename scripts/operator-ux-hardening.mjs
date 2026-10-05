@@ -35,7 +35,7 @@ try {
       const request = response.request();
       const raw = await response.text().catch(() => "");
       const responseBody = raw.slice(0, 2000).replace(/("(?:password|email|token|secret)"\\s*:\\s*")[^"]*(")/gi, "$1[REDACTED]$2");
-      authNetworkEvidence.push({ status: response.status(), durationMs: Math.max(0, Date.now() - (authRequestStartedAt.get(request) ?? Date.now())), responseBody });
+      authNetworkEvidence.push({ status: response.status(), durationMs: Math.max(0, Date.now() - (authRequestStartedAt.get(request) ?? Date.now())), responseBody: responseBody });
     });
     login.on("pageerror", (error) => pageErrors.push(String(error?.message || error)));
     await login.goto(`${baseUrl}/login?returnTo=%2Fcommand`, { waitUntil: "domcontentloaded", timeout: 60_000 });
