@@ -121,6 +121,59 @@ function authFailureCategory(error: unknown): string | undefined {
   return "better-auth";
 }
 
+const BETTER_AUTH_REQUIRED_COLUMNS: Record<string, string[]> = {
+  user: ["id", "name", "email", "emailVerified", "image", "createdAt", "updatedAt"],
+  session: ["id", "expiresAt", "token", "createdAt", "updatedAt", "ipAddress", "userAgent", "userId"],
+  account: ["id", "accountId", "providerId", "userId", "accessToken", "refreshToken", "idToken", "accessTokenExpiresAt", "refreshTokenExpiresAt", "scope", "password", "createdAt", "updatedAt"],
+  verification: ["id", "identifier", "value", "expiresAt", "createdAt", "updatedAt"],
+};
+
+async function diagnoseBetterAuthSchema(): Promise<{
+  compatible: boolean;
+  missingTables: string[];
+  missingColumnCount: number;
+  diagnosticState: "compatible" | "incompatible" | "unavailable";
+}> {
+  try {
+    const { getSqlServer } = await import("../db.server.ts");
+    const sql = await getSqlServer();
+    const rows = await sql.query<{ table_name: string; column_name: string }>(
+      `select table_name, column_name
+         from information_schema.columns
+        where table_schema = current_schema()
+          and table_name = any($1::text[])`,
+      [Object.keys(BETTER_AUTH_REQUIRED_COLUMNS)],
+    );
+    const seen = new Map<string, Set<string>>();
+    for (const row of rows) {
+      const set = seen.get(row.table_name) ?? new Set<string>();
+      set.add(row.column_name);
+      seen.set(row.table_name, set);
+    }
+    const missingTables = Object.keys(BETTER_AUTH_REQUIRED_COLUMNS).filter((table) => !seen.has(table));
+    let missingColumnCount = 0;
+    for (const [table, required] of Object.entries(BETTER_AUTH_REQUIRED_COLUMNS)) {
+      const columns = seen.get(table);
+      if (!columns) continue;
+      missingColumnCount += required.filter((column) => !columns.has(column)).length;
+    }
+    const compatible = missingTables.length === 0 && missingColumnCount === 0;
+    return {
+      compatible,
+      missingTables,
+      missingColumnCount,
+      diagnosticState: compatible ? "compatible" : "incompatible",
+    };
+  } catch {
+    return {
+      compatible: false,
+      missingTables: [],
+      missingColumnCount: 0,
+      diagnosticState: "unavailable",
+    };
+  }
+}
+
 function authFailureDetails(request: Request, error?: unknown) {
   const cause = error instanceof Error ? error.cause : undefined;
   const errorCode =
@@ -241,9 +294,29 @@ export async function handleAuthRequest(request: Request): Promise<Response> {
       : await auth.handler(request);
     const failure = response.status >= 500;
     if (failure) {
+      const schemaDiagnostic = await diagnoseBetterAuthSchema();
       console.error("[auth] Better Auth endpoint failed", {
         ...authFailureDetails(request),
         responseStatus: response.status,
+        schemaDiagnosticState: schemaDiagnostic.diagnosticState,
+        missingTableCount: schemaDiagnostic.missingTables.length,
+        missingColumnCount: schemaDiagnostic.missingColumnCount,
+      });
+      const error = schemaDiagnostic.diagnosticState === "incompatible"
+        ? "AUTH_SCHEMA_INCOMPATIBLE"
+        : "BETTER_AUTH_HANDLER_FAILED";
+      return new Response(JSON.stringify({
+        status: schemaDiagnostic.diagnosticState === "incompatible" ? 503 : 500,
+        error,
+        schemaDiagnosticState: schemaDiagnostic.diagnosticState,
+        missingTables: schemaDiagnostic.missingTables,
+        missingColumnCount: schemaDiagnostic.missingColumnCount,
+      }), {
+        status: schemaDiagnostic.diagnosticState === "incompatible" ? 503 : 500,
+        headers: {
+          "content-type": "application/json",
+          "cache-control": "no-store",
+        },
       });
     }
     emitOperationalEvent({
