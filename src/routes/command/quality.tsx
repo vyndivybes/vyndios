@@ -41,6 +41,7 @@ function Quality() {
   const openNcr = ncrs.filter((row) => !["closed", "rejected"].includes(text(row, "status"))).length;
   const openCapa = capas.filter((row) => !["closed", "rejected"].includes(text(row, "status"))).length;
   const released = releases.filter((row) => text(row, "decision", "status") === "released").length;
+  const eprOpenNcrCapa = Number(quality.eprOpenNcrCapa ?? 0);
 
   return (
     <div className="min-w-0 max-w-full space-y-6 break-words">
@@ -57,7 +58,10 @@ function Quality() {
         <Kpi label="Open NCR" value={String(openNcr)} hint="Containment / CAPA" tone={openNcr ? "warn" : "ok"} />
         <Kpi label="Open CAPA" value={String(openCapa)} hint="Effectiveness pending" tone={openCapa ? "warn" : "ok"} />
         <Kpi label="Released serials" value={String(released)} hint="Current Quality decisions" tone={released ? "ok" : "default"} />
+        <Kpi label="EPR holds" value={String(eprOpenNcrCapa)} hint="Open EPR NCR / CAPA" tone={eprOpenNcrCapa ? "warn" : "ok"} />
       </div>
+
+      {eprOpenNcrCapa ? <div className="rounded-lg border border-accent/40 bg-accent/5 p-4 text-sm text-accent">Release gate: {eprOpenNcrCapa} unresolved EPR NCR/CAPA record{eprOpenNcrCapa === 1 ? "" : "s"} remain. A serialized Quality release cannot be posted until the EPR chain is closed or rejected.</div> : null}
 
       <QualityAssuranceDeck />
 
