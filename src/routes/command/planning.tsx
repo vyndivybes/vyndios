@@ -3,22 +3,12 @@ import { useState } from "react";
 import { GovernedLifecycle } from "@/components/governed-lifecycle";
 import { Kpi, Panel } from "@/components/kpi";
 import { PlanningStudio } from "@/components/planning-studio";
-import { ProgramGatePlan } from "@/components/program-gate-plan";
-import { ProgramForecastPanel } from "@/components/program-forecast-panel";
-import { MonteCarloPanel } from "@/components/monte-carlo-panel";
-import { EarnedValuePanel } from "@/components/earned-value-panel";
-import { ForecastLearningPanel } from "@/components/forecast-learning-panel";
+import { PlanningIntelligenceDeck } from "@/components/planning-intelligence-deck";
 import { COMPANY, TRANCHES } from "@/lib/data/company";
-import { getCommandRole } from "@/lib/command-access";
 import { listEngineeringAuthority } from "@/lib/engineering-authority";
 import { getProcurementPlanningReport } from "@/lib/procurement-authority";
 import { approveOperatingPlan, getOperatingPlanState, submitOperatingPlan } from "@/lib/operating-plan-authority";
 import { canPerform } from "@/lib/page-access";
-import { getProgramPlanningState } from "@/lib/program-planning-authority";
-import { getProgramForecastState } from "@/lib/forecast-authority";
-import { getMonteCarloState } from "@/lib/monte-carlo-authority";
-import { getEarnedValueState } from "@/lib/earned-value-authority";
-import { getForecastLearningState } from "@/lib/forecast-learning-authority";
 import {
   DEFAULT_APPROVED_OPERATING_PLAN,
   calendarMonthForPlanMonth,
@@ -27,19 +17,13 @@ import {
 } from "@/lib/planning/operating-plan";
 
 export const Route = createFileRoute("/command/planning")({
-  loader: async () => {
-    const [role, plan, engineering, procurement, program, forecast, monteCarlo, earnedValue, forecastLearning] = await Promise.all([
-      getCommandRole(),
+  loader: async ({ context }) => {
+    const [plan, engineering, procurement] = await Promise.all([
       getOperatingPlanState(),
       listEngineeringAuthority(),
       getProcurementPlanningReport(),
-      getProgramPlanningState(),
-      getProgramForecastState(),
-      getMonteCarloState(),
-      getEarnedValueState(),
-      getForecastLearningState(),
     ]);
-    return { role, plan, engineering, procurement, program, forecast, monteCarlo, earnedValue, forecastLearning };
+    return { role: context.commandRole, plan, engineering, procurement };
   },
   component: MasterPlan,
 });
@@ -65,7 +49,7 @@ const ROADMAP_META = [
 const capitalLadder = TRANCHES.filter((t) => t.id !== "STBY").reduce((s, t) => s + t.amount, 0);
 
 function MasterPlan() {
-  const { role, plan, engineering, procurement, program, forecast, monteCarlo, earnedValue, forecastLearning } = Route.useLoaderData();
+  const { role, plan, engineering, procurement } = Route.useLoaderData();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -217,15 +201,7 @@ function MasterPlan() {
 
     <PlanningStudio role={role} approvedFinance={plan.approved?.finance ?? null} draftFinance={plan.draft?.finance ?? null} draftId={plan.draft?.id ?? null} engineeringCoverage={engineeringCoverage} realityBlockers={realityBlockers} />
 
-    <ForecastLearningPanel state={forecastLearning} />
-
-    <ProgramGatePlan role={role} state={program} />
-
-    <EarnedValuePanel state={earnedValue} />
-
-    <ProgramForecastPanel state={forecast} />
-
-    <MonteCarloPanel state={monteCarlo} />
+    <PlanningIntelligenceDeck role={role} />
 
     <nav className="overflow-x-auto rounded-xl border border-border bg-surface/40 p-1"><div className="flex min-w-max gap-1">{PLAN_TABS.map((tab) => <Link key={tab.label} to={tab.to as never} className={`rounded-lg px-4 py-2 text-xs font-semibold ${tab.to === "/command/planning" ? "bg-accent text-accent-fg" : "text-muted hover:bg-bg/60 hover:text-fg"}`}>{tab.label}</Link>)}</div></nav>
 
