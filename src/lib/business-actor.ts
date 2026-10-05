@@ -1,4 +1,3 @@
-import { getCommandRole } from "@/lib/command-access";
 import { assertSameSiteRequest } from "@/lib/auth/isolation.server";
 import { getSessionUser, UnauthorizedError } from "@/lib/auth/verify.server";
 import { getAssignedCommandRole } from "@/lib/command-user-role.server";
@@ -28,29 +27,17 @@ export async function getBusinessWriteReadiness(verified?: VerifiedBusinessIdent
 }
 
 /**
- * Read-only advisory exploration may still use an authorised legacy Command
- * session. Mutating business commitments require an individually authenticated
- * identity and are same-site validated here so every authority module inherits
- * the CSRF/origin boundary even if it does not repeat the check locally.
+ * Every business read and write requires an individually authenticated identity
+ * with an assigned role. Mutating business commitments are additionally
+ * same-site validated here so every authority module inherits the CSRF/origin
+ * boundary even if it does not repeat the check locally.
  */
 export async function requireBusinessActor(
   permission: CommandPermission,
   verified?: VerifiedBusinessIdentity,
 ): Promise<BusinessActor> {
-  if (permission === "view") {
-    const { user, role: assignedRole } = await getAssignedBusinessIdentity(verified);
-    if (user && assignedRole && canPerform(assignedRole, permission)) {
-      return { userId: user.id, role: assignedRole };
-    }
+  if (permission !== "view") assertSameSiteRequest();
 
-    const legacyRole = await getCommandRole();
-    if (!legacyRole || !canPerform(legacyRole, permission)) {
-      throw new Error(`Business ${permission} permission denied.`);
-    }
-    return { userId: `legacy-command:${legacyRole}`, role: legacyRole };
-  }
-
-  assertSameSiteRequest();
   const { user, role } = await getAssignedBusinessIdentity(verified);
   if (!user) throw new UnauthorizedError();
   if (!role || !canPerform(role, permission)) {

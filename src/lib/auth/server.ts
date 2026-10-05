@@ -48,7 +48,10 @@ function validHttpUrl(value: string | undefined): string | undefined {
   }
 }
 
-const authDisabled = env("VITE_AUTH_ENABLED") === "false";
+const productionRuntime =
+  import.meta.env.PROD ||
+  (env("VYNDI_DEPLOYMENT_ENV") ?? env("NODE_ENV") ?? "").toLowerCase() === "production";
+const authDisabled = !productionRuntime && env("VITE_AUTH_ENABLED") === "false";
 const grokIssuer = validHttpUrl(env("GROK_AUTH_ISSUER")) ?? GROK_ISSUER_DEFAULT;
 const grokClientId = env("GROK_AUTH_CLIENT_ID") ?? PREVIEW_CLIENT_ID;
 const grokClientSecret = env("GROK_AUTH_CLIENT_SECRET") ?? PREVIEW_CLIENT_SECRET;

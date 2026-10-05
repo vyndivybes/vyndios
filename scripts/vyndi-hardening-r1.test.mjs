@@ -39,11 +39,11 @@ test("R1 adds scheduled production assurance telemetry", () => {
   assert.match(workflow, /upload-artifact/);
 });
 
-test("R1 hardens migration release without breaking the Cloudflare Workers build contract", () => {
+test("R1 hardens migration release by separating build from privileged migration", () => {
   const pkg = JSON.parse(read("package.json"));
-  assert.match(pkg.scripts.build, /build:bundle/);
-  assert.match(pkg.scripts.build, /db:migrate/);
-  assert.ok(pkg.scripts["release:migrate"]);
+  assert.equal(pkg.scripts.build, "npm run build:bundle");
+  assert.doesNotMatch(pkg.scripts.build, /db:migrate/);
+  assert.equal(pkg.scripts["release:migrate"], "node scripts/migration-release-gate.mjs");
   assert.ok(existsSync(new URL("./migration-release-gate.mjs", import.meta.url)));
   const gate = read("scripts/migration-release-gate.mjs");
   assert.match(gate, /VYNDI_MIGRATION_BACKUP_REF/);

@@ -30,13 +30,12 @@ export const authClient = createAuthClient({
 });
 
 /**
- * True when sign-in UI should be shown — i.e. whenever `VITE_AUTH_ENABLED` is
- * not `"false"`. The shipped template sets it to `"false"`
- * (`.grok/app-env.json`), which selects the dev user (see `use-current-user`);
- * with the key removed, sign-in is real in preview (baked preview client) and
- * when deployed (injected per-app client).
+ * True when sign-in UI should be shown. Production builds always enable real
+ * authentication. `VITE_AUTH_ENABLED=false` is a development-preview bypass
+ * only and is ignored by production bundles.
  */
-export const authEnabled = import.meta.env.VITE_AUTH_ENABLED !== "false";
+export const authEnabled =
+  import.meta.env.PROD || import.meta.env.VITE_AUTH_ENABLED !== "false";
 
 /** The upstream providers to render sign-in buttons for. */
 export { GROK_PROVIDERS };

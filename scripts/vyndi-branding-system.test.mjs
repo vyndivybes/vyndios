@@ -49,10 +49,8 @@ test("active presentation surfaces contain no superseded VéLOXIS or VINDY label
     "src/components/site-header.tsx",
     "src/routes/login.tsx",
     "src/routes/command-login.tsx",
-    "src/routes/command/demo-company.tsx",
     "src/routes/command/investor-pitch.tsx",
     "src/routes/command/market-survey.tsx",
-    "src/routes/command/platform-walkthrough.tsx",
     "src/routes/command/epr-live.tsx",
     "src/routes/command/bom.tsx",
   ];

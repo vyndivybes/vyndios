@@ -43,7 +43,7 @@ these in a file you create):
 
 | Var | Where | Purpose |
 |---|---|---|
-| `VITE_AUTH_ENABLED` | client | `"false"` in the shipped `.grok/app-env.json` (dev user); drop the key to turn sign-in ON. Only client-visible auth flag |
+| `VITE_AUTH_ENABLED` | client | Development-preview override only. `"false"` may select the local dev user in non-production preview; production bundles ignore the bypass and keep sign-in enabled. |
 | `BETTER_AUTH_URL` | server | app's own public origin; unset in preview (origin is derived per-request) |
 | `BETTER_AUTH_SECRET` | server | signs this app's own sessions (process-stable fallback in preview; survives HMR) |
 | `GROK_AUTH_ISSUER` | server | the shared broker (defaults to `https://auth.grok.me`) |

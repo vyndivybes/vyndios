@@ -42,16 +42,15 @@ export function rateLimitDecisionFromCount(input: {
   };
 }
 
-export async function authRateLimitDecision(
+export async function requestRateLimitDecision(
   request: Request,
-  options: RateLimitOptions = { limit: 8, windowMs: 60_000 },
-): Promise<RateLimitDecision | null> {
-  if (!isSensitiveAuthRequest(request)) return null;
-
+  namespace: string,
+  options: RateLimitOptions,
+): Promise<RateLimitDecision> {
   const limit = Math.max(1, Math.floor(options.limit));
   const windowMs = Math.max(1000, Math.floor(options.windowMs));
   const windowSeconds = windowMs / 1000;
-  const keyHash = requestAbuseKey(request, "auth");
+  const keyHash = requestAbuseKey(request, namespace);
   const { getSqlServer } = await import("../db.server.ts");
   const sql = await getSqlServer();
 
@@ -85,7 +84,7 @@ export async function authRateLimitDecision(
   );
 
   const row = rows[0];
-  if (!row) throw new Error("Authentication rate-limit state update returned no row.");
+  if (!row) throw new Error("Rate-limit state update returned no row.");
 
   return rateLimitDecisionFromCount({
     count: Number(row.attempt_count),
@@ -93,4 +92,12 @@ export async function authRateLimitDecision(
     retryAfterSeconds: Number(row.retry_after_seconds),
     resetAt: Number(row.reset_at_epoch_ms),
   });
+}
+
+export async function authRateLimitDecision(
+  request: Request,
+  options: RateLimitOptions = { limit: 8, windowMs: 60_000 },
+): Promise<RateLimitDecision | null> {
+  if (!isSensitiveAuthRequest(request)) return null;
+  return requestRateLimitDecision(request, "auth", options);
 }

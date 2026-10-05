@@ -390,8 +390,6 @@ export const LEGACY_ROUTES = new Set<string>([
   "/command/investor-pitch-external",
   "/command/investor-board",
   "/command/stakeholder-portal",
-  "/command/demo-company",
-  "/command/platform-walkthrough",
   "/command/knowledge",
   "/command/technical",
   "/command/design-philosophy",

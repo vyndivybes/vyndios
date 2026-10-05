@@ -12,7 +12,7 @@ export type AppUser = {
 
 /**
  * Stable fallback user, used ONLY when auth is disabled
- * (`VITE_AUTH_ENABLED=false`, the shipped default). With auth on, the sandbox
+ * (`VITE_AUTH_ENABLED=false`, development preview only). With auth on, the sandbox
  * live preview does real sign-in via the baked preview client. Its id is
  * `"dev-user"` — the SAME id `verify.server.ts` returns server-side — so per-user
  * rows written in that mode belong to one consistent owner.

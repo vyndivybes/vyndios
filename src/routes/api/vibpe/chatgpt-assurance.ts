@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { getSql } from "@/lib/db";
+import { requestRateLimitDecision } from "@/lib/security/rate-limit";
 
 function json(body: unknown, status = 200, extraHeaders: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), {
@@ -22,6 +24,12 @@ function bearerToken(request: Request): string {
   return header.startsWith("Bearer ") ? header.slice(7).trim() : "";
 }
 
+function tokenMatches(actual: string, expected: string): boolean {
+  const actualDigest = createHash("sha256").update(actual).digest();
+  const expectedDigest = createHash("sha256").update(expected).digest();
+  return timingSafeEqual(actualDigest, expectedDigest);
+}
+
 export const Route = createFileRoute("/api/vibpe/chatgpt-assurance")({
   server: {
     handlers: {
@@ -30,7 +38,24 @@ export const Route = createFileRoute("/api/vibpe/chatgpt-assurance")({
         if (!expectedToken) {
           return json({ ok: false, error: "bridge_not_configured" }, 503);
         }
-        if (bearerToken(request) !== expectedToken) {
+        const limit = await requestRateLimitDecision(
+          request,
+          "vibpe-chatgpt-assurance",
+          { limit: 30, windowMs: 60_000 },
+        );
+        if (!limit.allowed) {
+          return json(
+            { ok: false, error: "rate_limited" },
+            429,
+            {
+              "retry-after": String(limit.retryAfterSeconds),
+              "x-ratelimit-limit": String(limit.limit),
+              "x-ratelimit-remaining": String(limit.remaining),
+            },
+          );
+        }
+
+        if (!tokenMatches(bearerToken(request), expectedToken)) {
           return json(
             { ok: false, error: "unauthorized" },
             401,

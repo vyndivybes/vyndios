@@ -640,24 +640,6 @@ export const routeRegistry: Record<string, RouteMeta> = {
     "keep",
     "Showcase",
   ),
-  "/command/platform-walkthrough": meta(
-    "/command/platform-walkthrough",
-    "Platform Walkthrough",
-    "showcase",
-    "command",
-    "investors",
-    "keep",
-    "Showcase",
-  ),
-  "/command/demo-company": meta(
-    "/command/demo-company",
-    "Demo Company",
-    "showcase",
-    "command",
-    "investors",
-    "keep",
-    "Showcase",
-  ),
   "/command/financial-cockpit": meta(
     "/command/financial-cockpit",
     "Consolidated Finance Overview",
@@ -1009,12 +991,6 @@ export const routeOwnership: Record<string, RouteOwnership> = {
     source: "showcase",
     mutability: "read-only",
     notes: "External read-only narrative separating verified, modeled and pending states.",
-  },
-  "/command/platform-walkthrough": {
-    canonicalRoute: "/command/platform-walkthrough",
-    source: "showcase",
-    mutability: "read-only",
-    notes: "Guided read-only demonstration linking back to command source evidence.",
   },
 };
 export const getRouteOwnership = (route: string) => routeOwnership[route];

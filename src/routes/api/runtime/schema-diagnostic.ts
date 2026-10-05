@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getRuntimeSchemaDiagnostic } from "@/lib/db";
+import { requireBusinessActor } from "@/lib/business-actor";
 import { runtimeSourceSha } from "@/lib/observability/server";
 
 function json(body:unknown){
@@ -16,6 +17,7 @@ export const Route=createFileRoute("/api/runtime/schema-diagnostic")({
   server:{
     handlers:{
       GET:async()=>{
+        await requireBusinessActor("view");
         const [sourceSha,diagnostic]=await Promise.all([
           runtimeSourceSha(),
           getRuntimeSchemaDiagnostic(),
