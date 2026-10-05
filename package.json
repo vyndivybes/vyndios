@@ -54,7 +54,8 @@
     "test:r3:integration": "node --test scripts/r3-bcde-integration.test.mjs",
     "test:production:acceptance": "node scripts/final-production-acceptance.mjs",
     "qualify:production": "npm run test:production:acceptance",
-    "test:production:login-diagnostics": "node --test scripts/production-login-diagnostics.test.mjs"
+    "test:production:login-diagnostics": "node --test scripts/production-login-diagnostics.test.mjs",
+    "test:production:auth-retry": "node --test scripts/production-auth-retry.test.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",

@@ -56,16 +56,28 @@ try {
   await login.locator(".vy-login.is-cinematic").waitFor({ state: "visible", timeout: 30_000 });
   await login.getByLabel(/Authorised Email/i).fill(email);
   await login.getByLabel(/^Password$/i).fill(password);
-  await login.getByRole("button", { name: /Authorize · Enter Command/i }).click();
-  try {
-    await login.waitForURL(/\/command(?:\/|$)/, { timeout: 45_000 });
-  } catch (cause) {
-    const finalUrl = login.url();
-    const visibleText = (await login.locator("body").innerText().catch(() => "")).trim().slice(0, 2000);
-    const screenshot = resolve(evidenceRoot, "login-diagnostic.png");
-    await login.screenshot({ path: screenshot, fullPage: true }).catch(() => {});
-    report.loginDiagnostic = { finalUrl, visibleText, pageErrors, screenshot };
-    throw new Error(`Login failed · finalUrl=${finalUrl} · pageErrors=${pageErrors.join(" | ") || "none"} · visibleText=${visibleText || "(empty)"}`, { cause });
+  // Better Auth can transiently return ?created=false while an existing session
+  // is rotated/settled. Retry the normal credential flow once; never bypass auth.
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    await login.getByRole("button", { name: /Authorize · Enter Command/i }).click();
+    try {
+      await login.waitForURL(/\/command(?:\/|$)/, { timeout: 45_000, waitUntil: "domcontentloaded" });
+      break;
+    } catch (cause) {
+      if (attempt < 2) {
+        await login.goto(`${baseUrl}/login?returnTo=%2Fcommand`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+        await login.locator(".vy-login.is-cinematic").waitFor({ state: "visible", timeout: 30_000 });
+        await login.getByLabel(/Authorised Email/i).fill(email);
+        await login.getByLabel(/^Password$/i).fill(password);
+        continue;
+      }
+      const finalUrl = login.url();
+      const visibleText = (await login.locator("body").innerText().catch(() => "")).trim().slice(0, 2000);
+      const screenshot = resolve(evidenceRoot, "login-diagnostic.png");
+      await login.screenshot({ path: screenshot, fullPage: true }).catch(() => {});
+      report.loginDiagnostic = { finalUrl, visibleText, pageErrors, screenshot };
+      throw new Error(`Login failed after retry · finalUrl=${finalUrl} · pageErrors=${pageErrors.join(" | ") || "none"} · visibleText=${visibleText || "(empty)"}`, { cause });
+    }
   }
   await login.close();
 
