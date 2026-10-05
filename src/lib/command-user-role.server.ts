@@ -1,5 +1,9 @@
 import { getSql } from "@/lib/db";
+import { getRequest } from "@tanstack/react-start/server";
+import { createRequestMemoizer } from "@/lib/request-memo.server";
 import type { CommandRole } from "@/lib/page-access";
+
+const roleRequestMemo = createRequestMemoizer<CommandRole | null>();
 
 function getBootstrapAdminEmails(): string[] {
   return (process.env.VINDY_ADMIN_EMAILS ?? "")
@@ -18,19 +22,25 @@ export async function getAssignedCommandRole(
   userId: string,
   email?: string | null,
 ): Promise<CommandRole | null> {
-  const sql = await getSql();
   const normalizedEmail = email?.trim().toLowerCase();
+  const resolveRole = async (): Promise<CommandRole | null> => {
+    if (normalizedEmail && getBootstrapAdminEmails().includes(normalizedEmail)) {
+      return "admin";
+    }
 
-  if (normalizedEmail && getBootstrapAdminEmails().includes(normalizedEmail)) {
-    await sql`
-      insert into vindy_user_roles (user_id, role) values (${userId}, 'admin')
-      on conflict (user_id) do update set role = 'admin', updated_at = now()
+    const sql = await getSql();
+    const rows = await sql<{ role: string }>`
+      select role from vindy_user_roles where user_id = ${userId} limit 1
     `;
-    return "admin";
-  }
+    return (rows[0]?.role as CommandRole | undefined) ?? null;
+  };
 
-  const rows = await sql<{ role: string }>`
-    select role from vindy_user_roles where user_id = ${userId} limit 1
-  `;
-  return (rows[0]?.role as CommandRole | undefined) ?? null;
+  const request = getRequest();
+  if (!request) return resolveRole();
+
+  return roleRequestMemo(
+    request,
+    `${userId}|${normalizedEmail ?? ""}`,
+    resolveRole,
+  );
 }

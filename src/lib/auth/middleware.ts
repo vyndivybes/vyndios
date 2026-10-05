@@ -26,10 +26,10 @@ export const authMiddleware = createMiddleware({ type: "function" })
   });
 
 /**
- * Optional auth transport for read-only workspaces. It preserves legacy
- * Command-password viewing when no individual identity exists, while allowing a
- * signed-in Better Auth identity to be recognized through the same bearer/cookie
- * transport used by mutations.
+ * Optional auth transport for read-only workspaces. Anonymous callers remain
+ * anonymous; signed-in Better Auth identities are recognized through the same
+ * bearer/cookie transport used by mutations. Business authorities still enforce
+ * their assigned-role requirement after this transport layer.
  */
 export const optionalAuthMiddleware = createMiddleware({ type: "function" })
   .client(async ({ next }) => {

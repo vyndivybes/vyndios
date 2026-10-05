@@ -1,4 +1,5 @@
 import { getRequest } from "@tanstack/react-start/server";
+import { createRequestMemoizer } from "../request-memo.server";
 import { gateIdentityEnabled } from "./gate-identity.server";
 import { auth, authConfigured, logSessionLookupFailure } from "./server";
 
@@ -44,6 +45,8 @@ export class UnauthorizedError extends Error {
 
 export type VerifiedUser = { id: string; email: string | null };
 
+const sessionRequestMemo = createRequestMemoizer<VerifiedUser | null>();
+
 /**
  * Resolve the signed-in user from the current request, or `null` when auth isn't
  * configured / nobody is signed in. Safe to call from server functions and SSR
@@ -65,12 +68,15 @@ export async function getSessionUser(
     headers = new Headers(request.headers);
     headers.set("Authorization", `Bearer ${bearerToken}`);
   }
-  const session = await auth.api.getSession({ headers }).catch((error) => {
-    logSessionLookupFailure(request, error);
-    throw error;
+  const cacheKey = bearerToken ? "bearer" : "cookie";
+  return sessionRequestMemo(request, cacheKey, async () => {
+    const session = await auth.api.getSession({ headers }).catch((error) => {
+      logSessionLookupFailure(request, error);
+      throw error;
+    });
+    if (!session?.user) return null;
+    return { id: session.user.id, email: session.user.email ?? null };
   });
-  if (!session?.user) return null;
-  return { id: session.user.id, email: session.user.email ?? null };
 }
 
 /**
