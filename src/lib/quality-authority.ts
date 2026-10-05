@@ -403,6 +403,14 @@ export const decideQualityRelease = createServerFn({ method: "POST" })
     const traveller = rows[0];
     if (!traveller?.jobCardId) throw new Error("Quality release requires a production Traveller linked to a Job Card.");
     if (data.decision === "released") {
+      const eprOpen = await sql<{ count: number }>`
+        select count(*)::int as count from epr_ncr_capa
+        where traveller_id=${data.travellerId} and status not in ('closed','rejected')
+      `;
+      if (Number(eprOpen[0]?.count ?? 0) > 0) {
+        throw new Error("Quality release is blocked by an unresolved EPR NCR/CAPA record.");
+      }
+
       const finalPass = await sql<{ count: number }>`
         select count(*)::int as count from vyndi_quality_inspections
         where traveller_id=${data.travellerId} and inspection_stage='final' and result='pass'
