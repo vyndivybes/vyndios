@@ -47,8 +47,8 @@ async function seedTraveller(db, suffix) {
 
   await db.query(
     `insert into epr_travellers
-      (id,venture,model_id,model_name,sku,bom_revision,engineering_revision,serial_number,supplier,status,created_by,job_card_id)
-     values ($1,'aluminium','core','Longitude','TEST-SKU',$2,'ENG-TEST',$3,'Test OEM','released','test-user',$4)`,
+      (id,venture,model_id,model_name,sku,bom_revision,engineering_revision,serial_number,supplier,status,created_by,job_card_id,job_card_revision)
+     values ($1,'aluminium','core','Longitude','TEST-SKU',$2,'ENG-TEST',$3,'Test OEM','released','test-user',$4,1)`,
     [travellerId, `BOM-${suffix}`, `SERIAL-${suffix}`, cardId],
   );
 
