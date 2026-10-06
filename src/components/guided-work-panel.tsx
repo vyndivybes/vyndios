@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from "@tanstack/react-router";
-import { BookOpen, ChevronRight, Compass, PlayCircle, Sparkles, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { BookOpen, ChevronRight, Compass, GripHorizontal, PlayCircle, Sparkles, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import {
   GUIDED_WORK_AUTHORITY_NOTICE,
   resolveGuidedWork,
@@ -12,6 +12,37 @@ import { cn } from "@/lib/utils";
 
 const MODE_KEY = "vyndi:guided-work:mode";
 const OPEN_KEY = "vyndi:guided-work:open";
+const POSITION_KEY = "vyndi:guided-work:position";
+
+type FloatingPosition = { x: number; y: number };
+type DragState = { pointerId: number; offsetX: number; offsetY: number };
+
+function initialPosition(): FloatingPosition | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(POSITION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<FloatingPosition>;
+    return typeof parsed.x === "number" &&
+      typeof parsed.y === "number" &&
+      Number.isFinite(parsed.x) &&
+      Number.isFinite(parsed.y)
+      ? { x: parsed.x, y: parsed.y }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function clampPosition(x: number, y: number, width: number, height: number): FloatingPosition {
+  const gutter = 12;
+  const maxX = Math.max(gutter, window.innerWidth - width - gutter);
+  const maxY = Math.max(gutter, window.innerHeight - height - gutter);
+  return {
+    x: Math.min(Math.max(gutter, x), maxX),
+    y: Math.min(Math.max(gutter, y), maxY),
+  };
+}
 
 function initialMode(): GuidedWorkMode {
   if (typeof window === "undefined") return "work";
@@ -28,7 +59,15 @@ export function GuidedWorkPanel({ role }: { role: CommandRole | null }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(initialOpen);
   const [mode, setMode] = useState<GuidedWorkMode>(initialMode);
+  const [position, setPosition] = useState<FloatingPosition | null>(initialPosition);
+  const [isDesktop, setIsDesktop] = useState(false);
+  const panelRef = useRef<HTMLElement | null>(null);
+  const dragRef = useRef<DragState | null>(null);
   const guide = useMemo(() => resolveGuidedWork(role, pathname), [pathname, role]);
+  const floatingStyle = useMemo<CSSProperties | undefined>(
+    () => (isDesktop && position ? { left: position.x, top: position.y, right: "auto", bottom: "auto" } : undefined),
+    [isDesktop, position],
+  );
 
   useEffect(() => {
     window.localStorage.setItem(MODE_KEY, mode);
@@ -37,6 +76,78 @@ export function GuidedWorkPanel({ role }: { role: CommandRole | null }) {
   useEffect(() => {
     window.localStorage.setItem(OPEN_KEY, open ? "1" : "0");
   }, [open]);
+
+  useEffect(() => {
+    if (position) window.localStorage.setItem(POSITION_KEY, JSON.stringify(position));
+  }, [position]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 640px)");
+    const sync = () => setIsDesktop(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+
+  useEffect(() => {
+    if (!open || !isDesktop) return;
+
+    const keepInBounds = () => {
+      const panel = panelRef.current;
+      if (!panel) return;
+      setPosition((current) => {
+        if (!current) return current;
+        const rect = panel.getBoundingClientRect();
+        return clampPosition(current.x, current.y, rect.width, rect.height);
+      });
+    };
+
+    keepInBounds();
+    window.addEventListener("resize", keepInBounds);
+    return () => window.removeEventListener("resize", keepInBounds);
+  }, [isDesktop, open]);
+
+
+  function beginDrag(event: ReactPointerEvent<HTMLElement>) {
+    if (!isDesktop || event.button !== 0) return;
+    if ((event.target as HTMLElement).closest("button")) return;
+
+    const panel = panelRef.current;
+    if (!panel) return;
+    const rect = panel.getBoundingClientRect();
+    dragRef.current = {
+      pointerId: event.pointerId,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+    };
+    setPosition({ x: rect.left, y: rect.top });
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function moveDrag(event: ReactPointerEvent<HTMLElement>) {
+    const drag = dragRef.current;
+    const panel = panelRef.current;
+    if (!drag || !panel || drag.pointerId !== event.pointerId) return;
+
+    const rect = panel.getBoundingClientRect();
+    setPosition(
+      clampPosition(
+        event.clientX - drag.offsetX,
+        event.clientY - drag.offsetY,
+        rect.width,
+        rect.height,
+      ),
+    );
+  }
+
+  function endDrag(event: ReactPointerEvent<HTMLElement>) {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    dragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }
 
   async function openStep(step: GuidedWorkStep) {
     await navigate({ to: step.to as never });
@@ -75,10 +186,18 @@ export function GuidedWorkPanel({ role }: { role: CommandRole | null }) {
 
   return (
     <aside
+      ref={panelRef}
+      style={floatingStyle}
       className="fixed bottom-3 left-3 right-3 z-40 max-h-[78dvh] overflow-hidden rounded-2xl border border-border bg-bg/95 shadow-2xl backdrop-blur-xl sm:bottom-5 sm:left-5 sm:right-auto sm:w-[420px]"
       aria-label="VYNDI Guided Work"
     >
-      <header className="border-b border-border bg-surface/55 px-4 py-3">
+      <header
+        onPointerDown={beginDrag}
+        onPointerMove={moveDrag}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        className="select-none border-b border-border bg-surface/55 px-4 py-3 sm:cursor-move sm:touch-none"
+      >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-green">
@@ -87,6 +206,9 @@ export function GuidedWorkPanel({ role }: { role: CommandRole | null }) {
             <h2 className="mt-0.5 truncate text-base font-semibold text-fg">{guide.department}</h2>
             <p className="mt-1 text-xs leading-5 text-muted">
               Optional operating guidance · current route aware · RBAC filtered
+            </p>
+            <p className="mt-1 hidden items-center gap-1 text-[10px] text-subtle sm:flex">
+              <GripHorizontal className="size-3" /> Drag this header to move the Guide
             </p>
           </div>
           <button
