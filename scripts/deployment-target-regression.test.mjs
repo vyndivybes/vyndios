@@ -62,3 +62,13 @@ test("release browser setup is bounded and can run without waiting for credentia
   assert.match(releaseScript, /VYNDI_TEST_PASSWORD is required in -NonInteractive mode/);
   assert.match(releaseScript, /Playwright Chromium setup preflight PASS/);
 });
+
+
+test("H3 Chromium setup reuses a working browser and bounds fallback installation", () => {
+  const h3Workflow = read(".github/workflows/h3-performance-load.yml");
+  assert.match(h3Workflow, /name: Verify or install Chromium/);
+  assert.match(h3Workflow, /timeout-minutes:\s*4/);
+  assert.match(h3Workflow, /chromium\\\.launch/);
+  assert.match(h3Workflow, /timeout --signal=TERM --kill-after=15s 180s npx playwright install chromium/);
+  assert.doesNotMatch(h3Workflow, /playwright install --with-deps chromium/);
+});
