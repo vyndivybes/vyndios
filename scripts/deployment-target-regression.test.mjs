@@ -58,9 +58,10 @@ test("release browser setup is bounded and can run without waiting for credentia
   assert.match(releaseScript, /\[switch\]\$SetupOnly/);
   assert.match(releaseScript, /SetupTimeoutSeconds/);
   assert.match(releaseScript, /WaitForExit/);
-  assert.match(releaseScript, /\$process\.WaitForExit\(\)/);
-  assert.match(releaseScript, /\$process\.Refresh\(\)/);
+  assert.match(releaseScript, /System\.Diagnostics\.ProcessStartInfo/);
+  assert.match(releaseScript, /System\.Diagnostics\.Process/);
   assert.match(releaseScript, /\$exitCode = \$process\.ExitCode/);
+  assert.doesNotMatch(releaseScript, /Start-Process/);
   assert.doesNotMatch(releaseScript, /if \(\$process\.ExitCode -ne 0\)/);
   assert.match(releaseScript, /Test-ChromiumLaunch/);
   assert.match(releaseScript, /VYNDI_TEST_PASSWORD is required in -NonInteractive mode/);
