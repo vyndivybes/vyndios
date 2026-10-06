@@ -41,5 +41,8 @@ jobs:
       - name: Enterprise authority closure
         run: npm run test:authority-closure
 
+      - name: Execute migrations from empty database
+        run: node --test scripts/migration-execution.test.mjs
+
       - name: Typecheck
         run: npm run typecheck
