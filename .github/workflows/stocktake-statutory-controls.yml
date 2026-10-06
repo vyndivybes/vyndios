@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   stocktake-statutory:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, vyndi-linux]
     timeout-minutes: 25
     services:
       postgres:

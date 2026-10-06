@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   business-chain-and-resilience:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, vyndi-linux]
     timeout-minutes: 25
     steps:
       - name: Checkout
@@ -55,7 +55,7 @@ jobs:
           src/lib/runtime-schema-migrations.test.ts
 
   responsive-browser-acceptance:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, vyndi-linux]
     timeout-minutes: 25
     services:
       postgres:
