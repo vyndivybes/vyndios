@@ -4,10 +4,11 @@ import { readFile } from "node:fs/promises";
 
 const read=(path)=>readFile(new URL(`../${path}`,import.meta.url),"utf8");
 
-const [migration,model,authority,queries,intelligence,intelligenceDeck]=await Promise.all([
+const [migration,model,authority,data,queries,intelligence,intelligenceDeck]=await Promise.all([
   read("migrations/0109_vibpe_decision_intelligence.sql"),
   read("src/lib/decision-intelligence-model.ts"),
   read("src/lib/decision-intelligence-authority.ts"),
+  read("src/lib/decision-intelligence-data.ts"),
   read("src/lib/vibpe-governance-queries.ts"),
   read("src/routes/command/intelligence.tsx"),
   read("src/components/intelligence-advisory-deck.tsx"),
@@ -26,10 +27,10 @@ test("decision model uses governance-priority ordering and withholds invented be
 });
 
 test("Decision Intelligence consumes governed evidence and keeps human authority",()=>{
-  assert.match(authority,/vyndi_risk_intelligence/);
-  assert.match(authority,/vyndi_monte_carlo_runs/);
-  assert.match(authority,/vyndi_supplier_risk_runs/);
-  assert.match(authority,/vyndi_quality_intelligence_runs/);
+  assert.match(data,/vyndi_risk_intelligence/);
+  assert.match(data,/vyndi_monte_carlo_runs/);
+  assert.match(data,/vyndi_supplier_risk_runs/);
+  assert.match(data,/vyndi_quality_intelligence_runs/);
   assert.match(authority,/DECISION_INTELLIGENCE_CAPTURED/);
 });
 
