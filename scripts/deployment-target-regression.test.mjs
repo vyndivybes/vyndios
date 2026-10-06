@@ -52,3 +52,13 @@ test("production smoke waits for hydrated login readiness before credential inte
   assert.ok(emailFill >= 0, "production smoke must fill the authorised email field");
   assert.ok(readiness < emailFill, "login readiness must be established before credentials are entered");
 });
+
+test("release browser setup is bounded and can run without waiting for credentials", () => {
+  assert.match(releaseScript, /\[switch\]\$NonInteractive/);
+  assert.match(releaseScript, /\[switch\]\$SetupOnly/);
+  assert.match(releaseScript, /SetupTimeoutSeconds/);
+  assert.match(releaseScript, /WaitForExit/);
+  assert.match(releaseScript, /Test-ChromiumLaunch/);
+  assert.match(releaseScript, /VYNDI_TEST_PASSWORD is required in -NonInteractive mode/);
+  assert.match(releaseScript, /Playwright Chromium setup preflight PASS/);
+});

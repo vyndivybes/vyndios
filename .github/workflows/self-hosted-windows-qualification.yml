@@ -27,6 +27,15 @@ jobs:
         shell: powershell
         run: npm.cmd ci
 
+      - name: Release browser setup contract
+        shell: powershell
+        run: node --test scripts/deployment-target-regression.test.mjs
+
+      - name: Bounded Chromium launch preflight
+        shell: powershell
+        timeout-minutes: 4
+        run: .\scripts\run-vyndi-release-test.ps1 -SetupOnly -NonInteractive -SetupTimeoutSeconds 180
+
       - name: Database syntax validation
         shell: powershell
         run: npm.cmd run db:validate

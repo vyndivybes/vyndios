@@ -155,6 +155,9 @@ export function parseVibpeIntent(question: string): VibpeScenarioParse {
   const scenarioRequested = Object.keys(patch).length > 0;
   const isFollowUp = /^(next what|then what|what next|why|why so|compare that|and then|what about that)[?!.\s]*$/i.test(question.trim());
   const asksCompare = /\bcompare|versus|\bvs\b|which (?:is|option)|better option|safer option/i.test(q);
+  const asksActualVsPlan =
+    /\b(actual|actuals|transaction-derived|transaction derived|posted|reconciled)\b/i.test(q)
+    && /\b(plan|planned|forecast|variance|reconcile|reconciliation)\b/i.test(q);
   const asksOptimise = /optimise|optimize|best (?:way|option|plan)|minimi[sz]e|reduce funding|lowest funding|fastest viable|safest plan/i.test(q);
   const asksRootCause = /\bwhy\b|root cause|driver|caus(?:e|ed)|what is causing/i.test(q);
   const asksNavigation = /take me to|open (?:the )?(?:page|workspace)|navigate to|go to (?:the )?/i.test(q);
@@ -162,6 +165,7 @@ export function parseVibpeIntent(question: string): VibpeScenarioParse {
   let intent: VibpeIntent = "assessment";
   if (isFollowUp) intent = asksCompare ? "comparison" : "follow-up";
   else if (asksNavigation) intent = "navigation";
+  else if (asksActualVsPlan) intent = "assessment";
   else if (asksCompare) intent = "comparison";
   else if (asksOptimise) intent = "optimisation";
   else if (scenarioRequested || fundingDelayMonths != null) intent = "scenario";
