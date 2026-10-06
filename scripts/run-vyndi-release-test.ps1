@@ -31,8 +31,14 @@ function Invoke-BoundedProcess {
     catch { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue }
     throw "$Description timed out after $TimeoutSeconds seconds."
   }
-  if ($process.ExitCode -ne 0) {
-    throw "$Description failed with exit code $($process.ExitCode)."
+
+  # Windows PowerShell can leave ExitCode unpopulated after the timed overload.
+  # Complete the wait and refresh the process snapshot before evaluating it.
+  $process.WaitForExit()
+  $process.Refresh()
+  $exitCode = $process.ExitCode
+  if ($exitCode -ne 0) {
+    throw "$Description failed with exit code $exitCode."
   }
 }
 
