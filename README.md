@@ -62,3 +62,5 @@ Internal automated qualification is evidence of tested behavior for a specific S
 VYNDI OS is proprietary software of Vāyú Shastr Pvt Ltd. No public or open-source software licence is granted.
 
 See [LICENSE](./LICENSE) for the proprietary software notice. Third-party components remain governed by their respective upstream licences and notices.
+
+<!-- Cloudflare Git integration trigger: 2026-10-07 -->
