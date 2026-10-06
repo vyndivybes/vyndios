@@ -72,8 +72,10 @@ export function isTraceabilityExceptionQuestion(question: string) {
 
 export function isGovernanceOperatingStatusQuestion(question: string) {
   const q = question.toLowerCase();
+  const asksControlTower = /control\s+tower/.test(q)
+    && /blocker|blocked|owner|workspace|next action|status|cross-functional/.test(q);
   const asksControlState = /open\s+actions?|exceptions?|blocked\s+gates?|overdue|incomplete\s+workflows?|workflows?\s+are\s+incomplete|blocking\s+each|what\s+is\s+blocking/.test(q);
-  return asksControlState && /action|exception|gate|overdue|workflow|block/.test(q);
+  return asksControlTower || (asksControlState && /action|exception|gate|overdue|workflow|block/.test(q));
 }
 
 export function isOverallRagHealthQuestion(question: string) {
@@ -304,7 +306,66 @@ function blockerForOrder(row: WorkflowOrderRow) {
   return "complete through collection";
 }
 
-async function governanceOperatingStatusAnswer(sql: Sql) {
+
+function controlTowerOwner(row: WorkflowOrderRow) {
+  const shortage = n(row.open_shortage_units);
+  if (!clean(row.job_card_id)) {
+    return {
+      owner: "Production",
+      workspace: "/command/production",
+      action: "Create or synchronize the governed Job Card from the current confirmed sales-order revision.",
+    };
+  }
+  if (shortage > 0) {
+    return {
+      owner: "Procurement",
+      workspace: "/command/procurement-planning",
+      action: "Resolve the exact committed material gap through governed stock, approved substitution or authorised supply.",
+    };
+  }
+  if (n(row.traveller_count) === 0) {
+    return {
+      owner: "Production",
+      workspace: "/command/production",
+      action: "Start the governed Traveller/build record only after material readiness remains clear.",
+    };
+  }
+  if (n(row.quality_release_count) === 0) {
+    return {
+      owner: "Quality",
+      workspace: "/command/quality",
+      action: "Complete inspection/NCR-CAPA disposition and post the governed Quality Release.",
+    };
+  }
+  if (n(row.shipment_count) === 0) {
+    return {
+      owner: "Supply & Operations",
+      workspace: "/command/operations",
+      action: "Complete the governed dispatch/shipment step from released product evidence.",
+    };
+  }
+  if (n(row.invoice_count) === 0) {
+    return {
+      owner: "Finance",
+      workspace: "/command/sales-ledger",
+      action: "Issue the governed customer invoice from the posted dispatch lineage.",
+    };
+  }
+  if (n(row.collection_count) === 0) {
+    return {
+      owner: "Finance",
+      workspace: "/command/receivables",
+      action: "Post and reconcile collection against the issued customer invoice.",
+    };
+  }
+  return {
+    owner: "Command",
+    workspace: "/command/control-tower",
+    action: "No open order-thread blocker remains; continue monitoring the governed thread.",
+  };
+}
+
+async function governanceOperatingStatusAnswer(sql: Sql, question = "") {
   const [actions, exceptions, orders, gateRows, p2pRows, peopleRows] = await Promise.all([
     activeActions(sql),
     assuranceExceptions(sql),
@@ -346,6 +407,32 @@ async function governanceOperatingStatusAnswer(sql: Sql) {
   const orderBlockers = orders
     .filter((row) => blockerForOrder(row) !== "complete through collection")
     .map((row) => `${clean(row.variant_name)} (${clean(row.job_card_id) || clean(row.sales_order_id)}): ${blockerForOrder(row)}`);
+
+  const controlTower = /control\s+tower/.test(question.toLowerCase());
+  if (controlTower) {
+    const blockers = orders
+      .filter((row) => blockerForOrder(row) !== "complete through collection")
+      .slice(0, 12)
+      .map((row, index) => {
+        const owner = controlTowerOwner(row);
+        return `${index + 1}. ${clean(row.variant_name)} (${clean(row.job_card_id) || clean(row.sales_order_id)}): ${blockerForOrder(row)}. Owner / workspace: ${owner.owner} · ${owner.workspace}. Next action: ${owner.action}`;
+      });
+
+    const governanceBlocker = exceptions.length
+      ? `Governance / workspace: Governance & Assurance · /command/governance. Next action: disposition ${exceptions.length} active assurance exception${exceptions.length === 1 ? "" : "s"} and clear the affected gate evidence.`
+      : "";
+    const actionHygiene = missingOwner.length || missingDue.length || overdue.length
+      ? `Action Inbox / workspace: Command · /command/decision-inbox. Next action: resolve ${missingOwner.length} owner gap(s), ${missingDue.length} due-date gap(s) and ${overdue.length} overdue action(s).`
+      : "";
+
+    return [
+      `CONTROL TOWER · ${blockers.length + (governanceBlocker ? 1 : 0) + (actionHygiene ? 1 : 0)} current governed blocker group(s).`,
+      blockers.length ? `Control Tower blockers:\n${blockers.join("\n")}` : "Control Tower blockers: no incomplete confirmed/delivered order thread is currently represented.",
+      governanceBlocker,
+      actionHygiene,
+      "Authority boundary: VIBPE identifies the owner and governed workspace; it does not execute, approve, release, issue, post or close the controlled action.",
+    ].filter(Boolean).join("\n\n");
+  }
 
   const lines = [
     `Governance operating status: ${actions.length} open action${actions.length === 1 ? "" : "s"}; ${exceptions.length} active VIBPE assurance exception${exceptions.length === 1 ? "" : "s"}; ${n(gate.exception_gates)} registered gate${n(gate.exception_gates) === 1 ? "" : "s"} blocked by assurance exceptions; ${n(gate.production_gate_blocked)} production-release gate row${n(gate.production_gate_blocked) === 1 ? "" : "s"} blocked.`,
@@ -1166,7 +1253,7 @@ async function riskIntelligenceAnswer(sql: Sql) {
 
 export async function tryGovernanceDataAnswer(sql: Sql, question: string) {
   if (isTraceabilityExceptionQuestion(question)) return traceabilityExceptionAnswer(sql);
-  if (isGovernanceOperatingStatusQuestion(question)) return governanceOperatingStatusAnswer(sql);
+  if (isGovernanceOperatingStatusQuestion(question)) return governanceOperatingStatusAnswer(sql, question);
   if (isOverallRagHealthQuestion(question)) return overallRagHealthAnswer(sql);
   if (isForecastLearningQuestion(question)) return forecastLearningAnswer(sql);
   if (isEnterpriseDigitalThreadQuestion(question)) return enterpriseDigitalThreadAnswer(sql, question);

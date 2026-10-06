@@ -8,6 +8,8 @@ export type VibpeIntent =
   | "comparison"
   | "optimisation"
   | "root-cause"
+  | "guided-work"
+  | "control-tower"
   | "demand"
   | "materials"
   | "procurement"
@@ -159,12 +161,16 @@ export function parseVibpeIntent(question: string): VibpeScenarioParse {
     /\b(actual|actuals|transaction-derived|transaction derived|posted|reconciled)\b/i.test(q)
     && /\b(plan|planned|forecast|variance|reconcile|reconciliation)\b/i.test(q);
   const asksOptimise = /optimise|optimize|best (?:way|option|plan)|minimi[sz]e|reduce funding|lowest funding|fastest viable|safest plan/i.test(q);
+  const asksGuidedWork = /guide me through|next governed step|current [^.?!]{0,50} workflow|what still requires explicit human authority|work mode|learn mode/i.test(q);
+  const asksControlTower = /control\s+tower/i.test(q) && /blocker|blocked|owner|workspace|next action|cross-functional|status/i.test(q);
   const asksRootCause = /\bwhy\b|root cause|driver|caus(?:e|ed)|what is causing/i.test(q);
   const asksNavigation = /take me to|open (?:the )?(?:page|workspace)|navigate to|go to (?:the )?/i.test(q);
 
   let intent: VibpeIntent = "assessment";
   if (isFollowUp) intent = asksCompare ? "comparison" : "follow-up";
   else if (asksNavigation) intent = "navigation";
+  else if (asksGuidedWork) intent = "guided-work";
+  else if (asksControlTower) intent = "control-tower";
   else if (asksActualVsPlan) intent = "assessment";
   else if (asksCompare) intent = "comparison";
   else if (asksOptimise) intent = "optimisation";
@@ -221,5 +227,5 @@ function buildScenarioLabel(input: {
 /** Keep hypothetical and conversational requests out of exact-ledger fallback handlers. */
 export function isVibpeContextualRequest(question: string): boolean {
   const parsed = parseVibpeIntent(question);
-  return Boolean(parsed.scenario || parsed.fundingDelayMonths != null || parsed.resetScenario || ["follow-up", "planning-horizon", "conversation", "comparison"].includes(parsed.intent));
+  return Boolean(parsed.scenario || parsed.fundingDelayMonths != null || parsed.resetScenario || ["follow-up", "planning-horizon", "conversation", "comparison", "guided-work"].includes(parsed.intent));
 }

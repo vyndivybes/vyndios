@@ -16,6 +16,8 @@ import { deriveVibpeDegradationState, type VibpeDegradationState, type VibpeSour
 import { compileVedmAuthorityGraph, createVedmR3aSeed } from "@/lib/vedm-authority-graph";
 import { evaluateVibpeAuthorityContext } from "@/lib/vibpe-authority-reasoning";
 import { resolveVibpeEngineeringAnalysis } from "@/lib/vibpe-engineering-analysis";
+import { GUIDED_WORK_AUTHORITY_NOTICE, resolveGuidedWork } from "@/lib/guided-work";
+import type { CommandRole } from "@/lib/page-access";
 
 export type VibpeCopilot2Result = {
   intent: VibpeScenarioParse["intent"];
@@ -162,6 +164,42 @@ function knowledgeAnswer(question: string, evidence: VibpeKnowledgeEvidence[]) {
     lines.push(`Pinned repository lineage: ${primary.sourceRepository}@${primary.sourceCommit.slice(0, 12)} · ${primary.sourcePath ?? "source path unavailable"}.`);
   }
   return lines.join("\n\n");
+}
+
+
+function routeFromGuidedQuestion(question: string) {
+  const explicit = question.match(/\/command(?:\/[a-z0-9/_-]+)?/i)?.[0];
+  if (explicit) return explicit;
+  if (/vibpe|ibpe\s+operating/i.test(question)) return "/command/ibpe-operating-workspace";
+  if (/control\s+tower/i.test(question)) return "/command/control-tower";
+  if (/integrated\s+(?:operating\s+)?plan|planning/i.test(question)) return "/command/planning";
+  return "/command";
+}
+
+function guidedWorkAnswer(question: string, role: CommandRole | null) {
+  const route = routeFromGuidedQuestion(question);
+  const guide = resolveGuidedWork(role, route);
+  const next = guide.accessibleSteps[0];
+
+  const lines = [
+    `GUIDED WORK · ${guide.department}`,
+    `Current workspace: ${route}.`,
+    next
+      ? `Next governed step: ${next.label}.`
+      : "Next governed step: no additional destination is available to the current role from this workflow.",
+    next
+      ? `Owning workspace: ${next.to}.`
+      : "Owning workspace: remain in the current governed workspace and request an authorised owner if action is required.",
+    `Why it matters: ${next?.reason ?? guide.why}`,
+    "Verify before proceeding:",
+    ...guide.procedure.map((step, index) => `${index + 1}. ${step}`),
+    `Human authority: ${GUIDED_WORK_AUTHORITY_NOTICE}`,
+  ];
+
+  if (next) {
+    lines.push(`Ask VYNDI next: ${next.question}`);
+  }
+  return lines.join("\n");
 }
 
 function scenarioAnswer(
@@ -346,7 +384,7 @@ export async function runVibpeCopilot2(
   sql: Sql,
   question: string,
   governedBaseline: IntegratedPlanningResult,
-  options: { sessionKey?: string; ownerKey?: string; uiScenario?: IbpeScenarioRequest; governedRunId?: string } = {},
+  options: { sessionKey?: string; ownerKey?: string; uiScenario?: IbpeScenarioRequest; governedRunId?: string; role?: CommandRole | null } = {},
 ): Promise<VibpeCopilot2Result> {
   const parsed = parseVibpeIntent(question);
   const sessionKey = options.sessionKey ?? "default";
@@ -384,19 +422,26 @@ export async function runVibpeCopilot2(
     }
   };
   const currentDataState = () => deriveVibpeDegradationState(sourceStates);
-  const withDisclosure = (answer?: string) => {
-    if (!answer) return answer;
-    const state = currentDataState();
-    return state.mode === "live" ? answer : `${answer}\n\n${state.disclosure}`;
-  };
+  const withDisclosure = (answer?: string) => answer;
 
   if (resolvedContext.clarification || (contextRequired && !priorScenario && (baselineChanged || contextNotLoaded))) {
     return { intent: parsed.intent, answer: resolvedContext.clarification ?? "The previous scenario cannot be safely restored for this baseline. Restate its assumptions before continuing; no follow-up calculation was performed.", doctrine: vibpeBusinessOperatorContext(), dataState: currentDataState(), advisoryOnly: true };
   }
   if (baselineChanged || parsed.resetScenario) await saveSession({});
 
+  if (parsed.intent === "guided-work") {
+    await saveSession({ lastIntent: parsed.intent, lastQuestion: question });
+    return {
+      intent: parsed.intent,
+      answer: withDisclosure(guidedWorkAnswer(question, options.role ?? null)),
+      doctrine: vibpeBusinessOperatorContext(),
+      dataState: currentDataState(),
+      advisoryOnly: true,
+    };
+  }
+
   // Explicit scenario and conversational requests must not be swallowed by generic ledger handlers.
-  if (!parsed.scenario && parsed.fundingDelayMonths == null && !["follow-up", "planning-horizon", "conversation", "baseline", "comparison"].includes(parsed.intent)) {
+  if (!parsed.scenario && parsed.fundingDelayMonths == null && !["follow-up", "planning-horizon", "conversation", "baseline", "comparison", "guided-work"].includes(parsed.intent)) {
     try {
       const governanceAnswer = await tryGovernanceDataAnswer(sql, question);
       if (governanceAnswer) {

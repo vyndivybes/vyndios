@@ -40,6 +40,10 @@ export type IbpeCopilotResponse = {
   reasoningReceiptId?: string;
   evidenceQuality?: VibpeEvidenceQuality;
   dataMode?: "live" | "partial" | "degraded" | "fixture" | "assumption-dependent";
+  responseArchitecture?: "v3";
+  diagnostics?: string[];
+  methodNote?: string;
+  evidenceAssessment?: string;
   advisoryOnly: true;
 };
 
@@ -440,29 +444,6 @@ function shouldSurfaceKnowledgeEvidence(question: string) {
   return /weekly|status|progress|milestone|design|engineering|geometry|clearance|prototype|manufactur|oem|tooling|incubat|tansam|tancam|launch|readiness|blocker|decision|priority|material change|optimizer|optimiser|highs|milp|advanced planning|accounting|trial balance|balance sheet|cash flow statement|fund flow|gst|itc|configuration authority/i.test(question);
 }
 
-function formatKnowledgeEvidence(evidence: VibpeKnowledgeEvidence[]) {
-  if (!evidence.length) return "";
-  const items = evidence.slice(0, 5).map((item) => {
-    const date = item.reviewDate ? ` · ${item.reviewDate}` : "";
-    const state = item.authority === "controlled-reference"
-      ? "controlled repository reference"
-      : item.authority === "unresolved"
-        ? "unresolved"
-        : "advisory evidence";
-    const tier = item.knowledgeTier ? ` · ${item.knowledgeTier}` : "";
-    const path = item.sourcePath ? ` · ${item.sourcePath}` : "";
-    const lineage = item.sourceRepository && item.sourceCommit
-      ? ` · ${item.sourceRepository}@${item.sourceCommit.slice(0, 12)}`
-      : "";
-    return `• [${state}${tier}] ${item.claimText} — ${item.title}${date}${lineage}${path}`;
-  });
-  return [
-    "VIBPE knowledge evidence (commit-pinned repository snapshots + governed Drive references):",
-    ...items,
-    "Governance: a controlled repository reference governs only inside its owning source domain. VYNDI ERP master/transaction truth and deterministic IBPE truth remain unchanged unless the owning workflow explicitly promotes a change.",
-  ].join("\n");
-}
-
 function systemPrompt() {
   return [
     `You are ${VIBPE_COPILOT_NAME} for Vayu Shastr Private Limited.`,
@@ -586,6 +567,7 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
     }
 
     let answer = "";
+    const diagnostics: string[] = [];
     let mode: "ai" | "deterministic" = "deterministic";
     let scenarioId: string | undefined;
     const scenarioIds = new Set<string>();
@@ -599,6 +581,7 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
           ownerKey: actor.userId,
           governedRunId: row.id,
           uiScenario: data.scenario,
+          role: actor.role,
         });
       } catch (error) {
         runtimeSourceStates.push({
@@ -703,17 +686,14 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
     }
 
     if (knowledgeRefreshWarning) {
-      answer = `${answer}\n\n${knowledgeRefreshWarning}`;
+      diagnostics.push(knowledgeRefreshWarning);
     }
 
     const surfacedKnowledgeEvidence = vibpe2?.evidenceMode === "engineering-analysis"
       ? []
       : shouldSurfaceKnowledgeEvidence(data.question) ? knowledgeEvidence : [];
     if (surfacedKnowledgeEvidence.length) {
-      const evidenceText = formatKnowledgeEvidence(surfacedKnowledgeEvidence);
-      if (evidenceText && !answer.includes("VIBPE knowledge evidence (governed Drive references; not automatic master authority):")) {
-        answer = `${answer}\n\n${evidenceText}`;
-      }
+      diagnostics.push(`Supporting governed knowledge evidence: ${surfacedKnowledgeEvidence.length} source${surfacedKnowledgeEvidence.length === 1 ? "" : "s"} available in the Evidence panel.`);
     }
 
     const combinedSourceStates = [
@@ -721,8 +701,8 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
       ...runtimeSourceStates,
     ];
     let dataState = deriveVibpeDegradationState(combinedSourceStates);
-    if (dataState.mode !== "live" && !answer.includes("Degraded-state disclosure:")) {
-      answer = `${answer}\n\n${dataState.disclosure}`;
+    if (dataState.mode !== "live") {
+      diagnostics.push(dataState.disclosure);
     }
 
     const requestedMethod = requiredVibpeMethod(data.question);
@@ -737,8 +717,8 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
       capturedAt: row.captured_at,
       methodVerified,
     });
-    answer += `\n\n${describeVibpeMethod(requestedMethod, Boolean(vibpe2?.scenarioResult || scenarioIds.size))}`;
-    answer += `\nEvidence assessment: ${evidenceQuality.status.toUpperCase()}. ${evidenceQuality.reasons.join(" ")} This assesses evidence coverage, not a calibrated probability of correctness.`;
+    const methodNote = describeVibpeMethod(requestedMethod, Boolean(vibpe2?.scenarioResult || scenarioIds.size));
+    const evidenceAssessment = `Evidence assessment: ${evidenceQuality.status.toUpperCase()}. ${evidenceQuality.reasons.join(" ")} This assesses evidence coverage, not a calibrated probability of correctness.`;
 
     const reasoningReceiptId = `VIBPE-ANS-${crypto.randomUUID()}`;
     const receipt = buildVibpeAnswerReceipt({
@@ -835,9 +815,7 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
       ]);
       evidenceQuality.status = "withheld";
       evidenceQuality.reasons.push("The immutable answer receipt could not be saved.");
-      if (!answer.includes("answer-receipt unavailable")) {
-        answer = `${answer}\n\nDegraded-state disclosure: answer-receipt unavailable; the advisory answer was returned but its immutable receipt was not persisted. Final evidence assessment: WITHHELD for controlled reliance.`;
-      }
+      diagnostics.push("Degraded-state disclosure: answer-receipt unavailable; the advisory answer was returned but its immutable receipt was not persisted. Final evidence assessment: WITHHELD for controlled reliance.");
     }
 
     const questionHash = createHash("sha256").update(data.question).digest("hex");
@@ -865,6 +843,7 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
             knowledgeRefreshWarning: knowledgeRefreshWarning ?? null,
             knowledgeEvidenceDocumentIds: [...new Set(knowledgeEvidence.map((item) => item.documentId))],
             copilotVersion: handledByVibpe2 ? "2.0" : "legacy-fallback",
+            answerArchitecture: "v3",
             vibpe2FallbackReason: vibpe2FallbackReason ?? null,
           }),
         ],
@@ -884,6 +863,10 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
       reasoningReceiptId: receiptPersisted ? reasoningReceiptId : undefined,
       evidenceQuality,
       dataMode: dataState.mode,
+      responseArchitecture: "v3",
+      diagnostics: [...new Set(diagnostics)],
+      methodNote,
+      evidenceAssessment,
       advisoryOnly: true,
     };
   }));
