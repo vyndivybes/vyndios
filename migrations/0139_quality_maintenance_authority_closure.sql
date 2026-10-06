@@ -144,7 +144,7 @@ create or replace function complete_vyndi_maintenance_work_order(
   p_actor_role text
 )
 returns table (
-  status text,
+  work_order_status text,
   release_status text,
   returned_to_service boolean,
   parts_cost_inr numeric
@@ -172,10 +172,10 @@ declare
   v_corrective_pending_count integer:=0;
   v_release_status text;
 begin
-  select equipment_id,plan_id,work_order_type,status
+  select wo.equipment_id,wo.plan_id,wo.work_order_type,wo.status
     into v_work
-    from vyndi_maintenance_work_orders
-   where id=p_work_order_id
+    from vyndi_maintenance_work_orders wo
+   where wo.id=p_work_order_id
    for update;
 
   if not found then raise exception 'Maintenance work order not found.'; end if;
@@ -327,11 +327,11 @@ begin
     v_release_status:='retired';
   else
     select
-      count(*) filter (where status='in_progress')::int,
-      count(*) filter (where work_order_type='corrective' and status in ('draft','scheduled'))::int
+      count(*) filter (where wo.status='in_progress')::int,
+      count(*) filter (where wo.work_order_type='corrective' and wo.status in ('draft','scheduled'))::int
       into v_active_count,v_corrective_pending_count
-      from vyndi_maintenance_work_orders
-     where equipment_id=v_work.equipment_id;
+      from vyndi_maintenance_work_orders wo
+     where wo.equipment_id=v_work.equipment_id;
 
     if v_active_count>0 then
       v_release_status:='maintenance';
