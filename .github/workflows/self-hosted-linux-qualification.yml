@@ -53,5 +53,5 @@ jobs:
         run: npm run db:validate
 
       - name: Department identity regression
-        run: npm run test:department-identity
+        run: npm run test:departments:identity
 
