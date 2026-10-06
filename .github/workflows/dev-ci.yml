@@ -1,0 +1,42 @@
+name: Development CI
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dev-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  focused-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Validate migrations
+        run: npm run db:validate
+
+      - name: VIBPE answer architecture
+        run: npm run test:vibpe-answer-v3
+
+      - name: VIBPE and Guided Work regressions
+        run: node --test scripts/vibpe-copilot-2-intent.test.mjs scripts/vibpe-operational-status-intent.test.mjs scripts/vibpe-operational-control-guard.test.mjs scripts/guided-work-mode.test.mjs
+
+      - name: Typecheck
+        run: npm run typecheck

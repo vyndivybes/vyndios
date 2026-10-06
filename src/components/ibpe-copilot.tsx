@@ -22,6 +22,10 @@ type Message = {
   meta?: string;
   traceabilityQuery?: string;
   knowledgeEvidence?: KnowledgeEvidence[];
+  diagnostics?: string[];
+  supplementaryEvidence?: string[];
+  methodNote?: string;
+  evidenceAssessment?: string;
 };
 
 type ScenarioEvent = CustomEvent<IbpeScenarioRequest | null>;
@@ -32,9 +36,15 @@ type RoutedAnswer = {
   meta?: string;
   traceabilityQuery?: string;
   knowledgeEvidence?: KnowledgeEvidence[];
+  diagnostics?: string[];
+  supplementaryEvidence?: string[];
+  methodNote?: string;
+  evidenceAssessment?: string;
 };
 
 const suggestions = [
+  "What are the current Control Tower blockers and which governed workspace owns each next action?",
+  "Guide me through the current VIBPE operating review without granting or implying transaction authority.",
   "What is the biggest constraint to the current 36-month plan?",
   "What is the current VEDM geometry authority and what remains open before release?",
   "How do I run the governed ERP optimizer correctly?",
@@ -225,15 +235,16 @@ export function IbpeCopilot() {
     }
 
     const response = await askIbpeCopilot({ data: { question: clean, scenario: scenario ?? undefined } });
-    let responseText = response.ok ? response.answer ?? "No analysis returned." : response.error ?? `${VIBPE_COPILOT_NAME} is unavailable.`;
+    const responseText = response.ok ? response.answer ?? "No analysis returned." : response.error ?? `${VIBPE_COPILOT_NAME} is unavailable.`;
+    const supplementaryEvidence: string[] = [];
     let advancedPacketId: string | null = null;
     if (response.ok && response.lineage && !response.scenarioId) {
       try {
         const advanced = await getAdvancedPlanningVibpeEvidence({
           data: { parentIbpeRunId: response.lineage.governedRunId, question: clean },
         });
-        if (advanced.handled && advanced.text && !responseText.includes("Advanced planning evidence (governed baseline):")) {
-          responseText = `${responseText}\n\n${advanced.text}`;
+        if (advanced.handled && advanced.text) {
+          supplementaryEvidence.push(advanced.text);
           advancedPacketId = advanced.packetId;
         }
       } catch {
@@ -248,6 +259,10 @@ export function IbpeCopilot() {
         ? `Governed R${response.lineage.approvedPlanRevision} · ${response.lineage.inputHash.slice(0, 8)}${response.scenarioId ? ` · scenario ${response.scenarioId}` : ""}${advancedPacketId ? " · advanced evidence linked" : ""}`
         : undefined,
       knowledgeEvidence: response.knowledgeEvidence,
+      diagnostics: response.diagnostics,
+      supplementaryEvidence,
+      methodNote: response.methodNote,
+      evidenceAssessment: response.evidenceAssessment,
     };
   }
 
@@ -305,6 +320,10 @@ export function IbpeCopilot() {
           meta: routed.meta,
           traceabilityQuery: routed.traceabilityQuery,
           knowledgeEvidence: routed.knowledgeEvidence,
+          diagnostics: routed.diagnostics,
+          supplementaryEvidence: routed.supplementaryEvidence,
+          methodNote: routed.methodNote,
+          evidenceAssessment: routed.evidenceAssessment,
         },
       ]);
     } catch (error) {
@@ -383,34 +402,63 @@ export function IbpeCopilot() {
                     <article key={message.id} className={message.role === "user" ? "ml-8 rounded-xl border border-accent/25 bg-accent/8 p-4" : "mr-4 rounded-xl border border-border bg-surface/35 p-4"}>
                       <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-green">{message.role === "user" ? "You" : VIBPE_COPILOT_NAME}</p>
                       <div className="whitespace-pre-wrap text-sm leading-6 text-fg">{message.text}</div>
-                      {message.role === "assistant" && message.knowledgeEvidence?.length ? (
-                        <div className="mt-3 grid gap-2">
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-green">Evidence</p>
-                          {message.knowledgeEvidence.map((evidence) => (
-                            <div key={`${evidence.documentId}-${evidence.sourceLocator ?? evidence.claimText}`} className="rounded-lg border border-border bg-bg/55 p-3">
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <p className="truncate text-xs font-semibold text-fg">{evidence.title}</p>
-                                  <p className="mt-1 text-[10px] text-subtle">
-                                    {evidence.sourceRevision ? `${evidence.sourceRevision} · ` : ""}{evidence.authority} · {evidence.knowledgeTier ?? evidence.sourceKind} · {evidence.reviewDate ?? "undated"}
-                                  </p>
-                                </div>
-                                {evidence.externalUrl ? (
-                                  <a href={evidence.externalUrl} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 rounded-md border border-accent/35 px-2 py-1 text-[10px] font-semibold text-accent hover:bg-accent/10">
-                                    Open source <ExternalLink className="size-3" />
-                                  </a>
-                                ) : null}
+                      {message.role === "assistant" && (
+                        message.knowledgeEvidence?.length ||
+                        message.supplementaryEvidence?.length ||
+                        message.diagnostics?.length ||
+                        message.methodNote ||
+                        message.evidenceAssessment
+                      ) ? (
+                        <details className="mt-3 rounded-xl border border-border bg-bg/40">
+                          <summary className="cursor-pointer select-none px-3 py-2.5 text-xs font-semibold text-muted hover:text-fg">
+                            Evidence & diagnostics
+                          </summary>
+                          <div className="grid gap-3 border-t border-border px-3 py-3">
+                            {message.methodNote ? <p className="text-xs leading-5 text-muted">{message.methodNote}</p> : null}
+                            {message.evidenceAssessment ? <p className="text-xs leading-5 text-muted">{message.evidenceAssessment}</p> : null}
+                            {message.diagnostics?.length ? (
+                              <div className="grid gap-1.5">
+                                {message.diagnostics.map((item) => (
+                                  <p key={item} className="text-[11px] leading-5 text-subtle">{item}</p>
+                                ))}
                               </div>
-                              <p className="mt-2 text-xs leading-5 text-muted">{evidence.claimText}</p>
-                              {evidence.sourceRepository && evidence.sourceCommit ? (
-                                <p className="mt-2 break-all text-[10px] font-medium text-subtle">
-                                  {evidence.sourceRepository}@{evidence.sourceCommit.slice(0, 12)}
-                                </p>
-                              ) : null}
-                              {evidence.sourcePath ? <p className="mt-1 break-all text-[10px] text-subtle">{evidence.sourcePath}</p> : null}
-                            </div>
-                          ))}
-                        </div>
+                            ) : null}
+                            {message.supplementaryEvidence?.map((item, index) => (
+                              <div key={`supplementary-${index}`} className="whitespace-pre-wrap rounded-lg border border-border bg-surface/30 p-3 text-xs leading-5 text-muted">
+                                {item}
+                              </div>
+                            ))}
+                            {message.knowledgeEvidence?.length ? (
+                              <div className="grid gap-2">
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-green">Governed knowledge evidence</p>
+                                {message.knowledgeEvidence.map((evidence) => (
+                                  <div key={`${evidence.documentId}-${evidence.sourceLocator ?? evidence.claimText}`} className="rounded-lg border border-border bg-bg/55 p-3">
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="min-w-0">
+                                        <p className="truncate text-xs font-semibold text-fg">{evidence.title}</p>
+                                        <p className="mt-1 text-[10px] text-subtle">
+                                          {evidence.sourceRevision ? `${evidence.sourceRevision} · ` : ""}{evidence.authority} · {evidence.knowledgeTier ?? evidence.sourceKind} · {evidence.reviewDate ?? "undated"}
+                                        </p>
+                                      </div>
+                                      {evidence.externalUrl ? (
+                                        <a href={evidence.externalUrl} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 rounded-md border border-accent/35 px-2 py-1 text-[10px] font-semibold text-accent hover:bg-accent/10">
+                                          Open source <ExternalLink className="size-3" />
+                                        </a>
+                                      ) : null}
+                                    </div>
+                                    <p className="mt-2 text-xs leading-5 text-muted">{evidence.claimText}</p>
+                                    {evidence.sourceRepository && evidence.sourceCommit ? (
+                                      <p className="mt-2 break-all text-[10px] font-medium text-subtle">
+                                        {evidence.sourceRepository}@{evidence.sourceCommit.slice(0, 12)}
+                                      </p>
+                                    ) : null}
+                                    {evidence.sourcePath ? <p className="mt-1 break-all text-[10px] text-subtle">{evidence.sourcePath}</p> : null}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        </details>
                       ) : null}
                       {message.role === "assistant" ? (
                         <div className="mt-3 flex flex-wrap gap-2 border-t border-border/70 pt-3">
