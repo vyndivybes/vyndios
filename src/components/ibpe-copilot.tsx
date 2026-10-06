@@ -25,6 +25,7 @@ type Message = {
 };
 
 type ScenarioEvent = CustomEvent<IbpeScenarioRequest | null>;
+type CopilotOpenEvent = CustomEvent<{ question?: string; source?: string; route?: string; department?: string } | null>;
 
 type RoutedAnswer = {
   text: string;
@@ -177,6 +178,17 @@ export function IbpeCopilot() {
     };
     window.addEventListener("vyndi:ibpe-scenario", handler);
     return () => window.removeEventListener("vyndi:ibpe-scenario", handler);
+  }, []);
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const custom = event as CopilotOpenEvent;
+      const suggestedQuestion = custom.detail?.question?.trim();
+      if (suggestedQuestion) setQuestion(suggestedQuestion);
+      setOpen(true);
+    };
+    window.addEventListener("vyndi:copilot-open", handler);
+    return () => window.removeEventListener("vyndi:copilot-open", handler);
   }, []);
 
   useEffect(() => {

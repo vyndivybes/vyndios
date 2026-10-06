@@ -31,7 +31,7 @@ const SECTIONS: readonly ManualSection[] = [
     id: "00",
     chapter: "A",
     title: "Cover & Document Control",
-    purpose: "Controlled operating manual for authorised VYNDI OS users. Document VYNDI-UM-001 · Revision 1.4 · baseline 24 September 2026 · VIBPE Co-Pilot 2.0.",
+    purpose: "Controlled operating manual for authorised VYNDI OS users. Document VYNDI-UM-001 · Revision 1.5 · baseline 7 October 2026 · VIBPE Co-Pilot 2.0.",
     controls: [
       "Classification: Controlled Internal Operating Document.",
       "Intended users: Management, Commercial, Operations, Engineering, QA, Finance, Compliance and Admin.",
@@ -39,6 +39,7 @@ const SECTIONS: readonly ManualSection[] = [
       "Revision 1.2 records the GitHub organisation/repository migration to vayu-shastr/vyndios, Cloudflare production rebuild, verified source-lineage stamping, Hyperdrive runtime and Smart Placement.",
       "Revision 1.3 adds the complete ERP optimization operating guide: architecture, governed inputs and objectives, Procurement Planning UI, Scenario Studio UI, Advanced Planning Authority/HiGHS interface, cash/funding governance, rerun rules and VIBPE Co-Pilot optimization operations.",
       "Revision 1.4 adds VIBPE cross-repository knowledge: commit-pinned VEDM engineering authority, ADV finance/governance reference knowledge, current VYNDI optimizer/ERP operations, source-lineage evidence cards and the Repository Knowledge Snapshots register.",
+      "Revision 1.5 adds Guided Work Mode: optional route-aware Learn Mode and Work Mode, RBAC-filtered next-step guidance, contextual Ask VYNDI hand-off and an explicit advisory-only authority boundary.",
     ],
   },
   {
@@ -47,10 +48,10 @@ const SECTIONS: readonly ManualSection[] = [
     title: "Production Platform & Deployment Lineage",
     purpose: "Identify the authoritative production platform, repository source and deployment-lineage controls used to prove which VYNDI OS source is actually running.",
     controls: [
-      "Authoritative Git repository: private organisation repository vayu-shastr/vyndios; production branch: main.",
+      "Authoritative Git repository: private repository shyamsundhar1982/vyndios; production branch: main.",
       "Authoritative production runtime: Cloudflare Worker tiger-field-flora-finch. The legacy Worker name is infrastructure identity only and does not change the VYNDI OS product name.",
       "Cloudflare runtime uses Hyperdrive for production PostgreSQL connectivity and Smart Placement for database-aware Worker placement.",
-      "Workers Builds clones vayu-shastr/vyndios, runs npm run build, then deploys with npx wrangler deploy.",
+      "Workers Builds clones shyamsundhar1982/vyndios, runs npm run build:bundle, then deploys with npx wrangler deploy.",
       "Cloudflare WORKERS_CI_COMMIT_SHA is mapped into VYNDI_SOURCE_SHA during the build so governed runtime lineage is derived from the deployed commit rather than manually asserted.",
     ],
     expected: [
@@ -104,6 +105,28 @@ const SECTIONS: readonly ManualSection[] = [
       "Finance: Consolidated Overview, Cash & Bank, Payables, Receivables, Sales Ledger, Accounting Workbench, Financial Statements, Integrated Operating Plan, Budget vs Forecast vs Actual.",
       "Governance & Assurance: Approvals, Risk, Legal & IP, EPR, QA Verification, Audit & Actions, CA Audit.",
       "Admin: Users & Roles, Master Data, Classification.",
+    ],
+  },
+  {
+    id: "03.1",
+    chapter: "A",
+    title: "Guided Work Mode",
+    purpose: "Optional in-context guidance for learning VYNDI and progressing work through the correct governed workspace without changing user authority.",
+    steps: [
+      "Select Guide from the lower-left of the Command shell.",
+      "Use Learn Mode to understand the current department purpose, why the control exists and the normal procedure.",
+      "Use Work Mode to see only next-step destinations permitted by your current RBAC role.",
+      "Select Open step to navigate to the governed transaction or control surface.",
+      "Select Ask VYNDI to open the existing VIBPE Co-Pilot with a contextual question for advisory explanation.",
+    ],
+    controls: [
+      "Guided Work is route-aware and maps the current page to Management, Commercial, Planning, Engineering, Procurement, Inventory, Production, Quality, Finance, Administration or Governance guidance.",
+      "Next-step links are filtered through the same canAccessRoute RBAC authority used by the Command shell.",
+      "Learn/Work preference and open/closed preference are local UI preferences only; they do not alter governed business state.",
+    ],
+    warnings: [
+      "Guidance never replaces RBAC, maker/checker, evidence or explicit human approval.",
+      "Ask VYNDI remains advisory/read-only. Execute and approve controlled actions only in the owning governed workspace.",
     ],
   },
   {

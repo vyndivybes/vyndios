@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { BrandLockup, VayuMark } from "@/components/brand-lockup";
+import { GuidedWorkPanel } from "@/components/guided-work-panel";
 import { authEnabled, signOut } from "@/lib/auth/client";
 import {
   ADMIN_CONTEXT,
@@ -480,6 +481,7 @@ export function CommandShell({ initialRole }: { initialRole: CommandRole }) {
             <fieldset disabled={viewer} className="m-0 min-w-0 border-0 p-0">
               <Outlet />
             </fieldset>
+            <GuidedWorkPanel role={role} />
           </div>
         </div>
       </div>
