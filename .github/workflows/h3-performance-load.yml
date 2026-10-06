@@ -110,7 +110,7 @@ jobs:
           VYNDI_TEST_BASE_URL: ${{ env.STAGE_D_BASE_URL }}
           VYNDI_TEST_EMAIL: ${{ env.STAGE_D_USER_EMAIL }}
           VYNDI_TEST_PASSWORD: ${{ env.STAGE_D_USER_PASSWORD }}
-          H3_ROUTE_CONCURRENCY: "8"
+          H3_ROUTE_CONCURRENCY: "4"
           H3_ROUTE_SAMPLES: "4"
         run: node scripts/h3-route-load.mjs
 

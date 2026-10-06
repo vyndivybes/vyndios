@@ -5,12 +5,8 @@ import { buildProgramNetwork, type ProgramTaskInput } from "@/lib/program-planni
 import { buildReadinessAssessment } from "@/lib/readiness-model";
 import { analyzeEngineeringImpact } from "@/lib/impact-propagation-model";
 import { buildProgramForecast, type ForecastTask } from "@/lib/forecast-model";
-import { buildDecisionIntelligenceFromSql } from "@/lib/decision-intelligence-authority";
+import { buildDecisionIntelligenceFromSql } from "@/lib/decision-intelligence-data";
 import { buildAssetMaintenanceIntelligence } from "@/lib/asset-maintenance-model";
-import { buildEnterpriseDigitalThreadFromSql } from "@/lib/enterprise-digital-thread-authority";
-import { buildForecastLearningFromSql } from "@/lib/forecast-learning-authority";
-import { buildEngineeringChangeControlFromSql } from "@/lib/engineering-change-control-authority";
-import { buildEngineeringPdmStateFromSql } from "@/lib/engineering-pdm-authority";
 
 type ActiveActionRow = {
   id: string;
@@ -800,6 +796,7 @@ async function programForecastAnswer(sql: Sql) {
 }
 
 async function engineeringPdmAnswer(sql: Sql, question: string) {
+  const { buildEngineeringPdmStateFromSql }=await import("@/lib/engineering-pdm-authority");
   const state=await buildEngineeringPdmStateFromSql(sql);
   const q=question.toLowerCase();
   const selected=state.revisions.find((row)=>
@@ -838,6 +835,7 @@ async function engineeringPdmAnswer(sql: Sql, question: string) {
 }
 
 async function engineeringChangeControlAnswer(sql: Sql, question: string) {
+  const { buildEngineeringChangeControlFromSql }=await import("@/lib/engineering-change-control-authority");
   const state=await buildEngineeringChangeControlFromSql(sql);
   const q=question.toLowerCase();
   const selected=state.changeOrders.find((eco)=>{
@@ -1001,6 +999,7 @@ async function readinessIntelligenceAnswer(sql: Sql) {
 }
 
 async function forecastLearningAnswer(sql: Sql) {
+  const { buildForecastLearningFromSql }=await import("@/lib/forecast-learning-authority");
   const result=await buildForecastLearningFromSql(sql);
   const metric=(value:number|null)=>value==null?"WITHHELD":value.toFixed(2)+"%";
   if(!result.available){
@@ -1023,6 +1022,7 @@ async function forecastLearningAnswer(sql: Sql) {
 }
 
 async function enterpriseDigitalThreadAnswer(sql: Sql, question: string) {
+  const { buildEnterpriseDigitalThreadFromSql }=await import("@/lib/enterprise-digital-thread-authority");
   const result=await buildEnterpriseDigitalThreadFromSql(sql,question);
   if(!result.matched){
     return "No governed enterprise digital-thread lineage matched that reference. Use a Serial, Traveller, Job Card, PO, GRN, supplier, shipment, invoice, equipment or other controlled identifier.";
