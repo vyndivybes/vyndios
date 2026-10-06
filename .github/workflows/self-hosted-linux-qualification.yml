@@ -2,6 +2,9 @@ name: Self-Hosted Linux Qualification
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - feature/department-ledger-recovery-expansion
 
 jobs:
   linux-smoke:
@@ -51,3 +54,4 @@ jobs:
 
       - name: Department identity regression
         run: npm run test:department-identity
+
