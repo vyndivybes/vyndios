@@ -18,6 +18,18 @@ function Require-Command([string]$Name) {
   }
 }
 
+function ConvertTo-ProcessArgument {
+  param([string]$Value)
+
+  if ($Value -match '"') {
+    throw "Bounded process arguments containing double quotes are not supported."
+  }
+  if ($Value -match '\\s') {
+    return '"' + $Value + '"'
+  }
+  return $Value
+}
+
 function Invoke-BoundedProcess {
   param(
     [string]$FilePath,
@@ -25,20 +37,51 @@ function Invoke-BoundedProcess {
     [int]$TimeoutSeconds,
     [string]$Description
   )
-  $process = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -NoNewWindow -PassThru
-  if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
-    try { & taskkill.exe /PID $process.Id /T /F | Out-Null }
-    catch { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue }
-    throw "$Description timed out after $TimeoutSeconds seconds."
+
+  $command = Get-Command $FilePath -ErrorAction Stop
+  $resolvedPath = if ($command.Source) { $command.Source } elseif ($command.Path) { $command.Path } else { $FilePath }
+  $extension = [System.IO.Path]::GetExtension($resolvedPath).ToLowerInvariant()
+
+  $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+  $startInfo.UseShellExecute = $false
+  $startInfo.CreateNoWindow = $true
+
+  $quotedArguments = @($ArgumentList | ForEach-Object { ConvertTo-ProcessArgument ([string]$_) })
+  if ($extension -eq ".cmd" -or $extension -eq ".bat") {
+    $comSpec = if ($env:ComSpec) { $env:ComSpec } else { "cmd.exe" }
+    $startInfo.FileName = $comSpec
+    $commandLine = @((ConvertTo-ProcessArgument $resolvedPath)) + $quotedArguments
+    $startInfo.Arguments = '/d /s /c "' + ($commandLine -join ' ') + '"'
+  }
+  else {
+    $startInfo.FileName = $resolvedPath
+    $startInfo.Arguments = $quotedArguments -join ' '
   }
 
-  # Windows PowerShell can leave ExitCode unpopulated after the timed overload.
-  # Complete the wait and refresh the process snapshot before evaluating it.
-  $process.WaitForExit()
-  $process.Refresh()
-  $exitCode = $process.ExitCode
-  if ($exitCode -ne 0) {
-    throw "$Description failed with exit code $exitCode."
+  $process = New-Object System.Diagnostics.Process
+  $process.StartInfo = $startInfo
+
+  try {
+    if (-not $process.Start()) {
+      throw "$Description failed to start."
+    }
+
+    if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+      try { & taskkill.exe /PID $process.Id /T /F | Out-Null }
+      catch { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue }
+      throw "$Description timed out after $TimeoutSeconds seconds."
+    }
+
+    # System.Diagnostics.Process reliably exposes ExitCode after a completed wait
+    # on Windows PowerShell 5, unlike Start-Process -PassThru in this runner.
+    $process.WaitForExit()
+    $exitCode = $process.ExitCode
+    if ($exitCode -ne 0) {
+      throw "$Description failed with exit code $exitCode."
+    }
+  }
+  finally {
+    $process.Dispose()
   }
 }
 
