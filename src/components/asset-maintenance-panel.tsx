@@ -130,7 +130,6 @@ export function AssetMaintenancePanel({state}:{state:State}){
       parts:hasPart?[{
         sku:draft.partSku!.trim(),
         quantity:Number(draft.partQty||1),
-        unitCostInr:Number(draft.partUnitCost||0),
         sourceReference:draft.partSource?.trim()||draft.evidenceReference?.trim()||"MAINTENANCE:PART",
       }]:[],
       sourceReference:draft.sourceReference?.trim()||"UI:MAINTENANCE_COMPLETE",
@@ -235,7 +234,7 @@ export function AssetMaintenancePanel({state}:{state:State}){
               <label className="text-xs text-muted">External cost ₹<input inputMode="decimal" className="control mt-1.5 w-full" value={draft.externalCostInr??""} onChange={(e)=>patchCompletion(id,"externalCostInr",e.target.value)}/></label>
               <label className="text-xs text-muted">Part SKU<input className="control mt-1.5 w-full" value={draft.partSku??""} onChange={(e)=>patchCompletion(id,"partSku",e.target.value)}/></label>
               <label className="text-xs text-muted">Part qty<input inputMode="decimal" className="control mt-1.5 w-full" value={draft.partQty??""} onChange={(e)=>patchCompletion(id,"partQty",e.target.value)}/></label>
-              <label className="text-xs text-muted">Part unit cost ₹<input inputMode="decimal" className="control mt-1.5 w-full" value={draft.partUnitCost??""} onChange={(e)=>patchCompletion(id,"partUnitCost",e.target.value)}/></label>
+              <div className="self-end rounded border border-border bg-surface px-3 py-2 text-[10px] leading-4 text-subtle">Part cost is posted from canonical inventory FIFO at completion; operators do not enter valuation.</div>
               <button type="button" disabled={busy==="complete:"+id||!draft.actionTaken?.trim()||!draft.evidenceReference?.trim()||!draft.returnToServiceReference?.trim()} onClick={()=>void finish(row)} className="self-end rounded bg-accent px-4 py-2.5 text-xs font-semibold text-bg disabled:opacity-40">Complete & evaluate Return to service</button>
             </div>:null}
           </article>;

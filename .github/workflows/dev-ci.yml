@@ -38,5 +38,11 @@ jobs:
       - name: VIBPE and Guided Work regressions
         run: node --test scripts/vibpe-copilot-2-intent.test.mjs scripts/vibpe-operational-status-intent.test.mjs scripts/vibpe-operational-control-guard.test.mjs scripts/guided-work-mode.test.mjs
 
+      - name: Enterprise authority closure
+        run: npm run test:authority-closure
+
+      - name: Execute migrations from empty database
+        run: node --test scripts/migration-execution.test.mjs
+
       - name: Typecheck
         run: npm run typecheck

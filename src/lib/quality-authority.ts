@@ -405,24 +405,23 @@ export const decideQualityRelease = createServerFn({ method: "POST" })
     const traveller = rows[0];
     if (!traveller?.jobCardId) throw new Error("Quality release requires a production Traveller linked to a Job Card.");
     if (data.decision === "released") {
-      const eprOpen = await sql<{ count: number }>`
-        select count(*)::int as count from epr_ncr_capa
-        where traveller_id=${data.travellerId} and status not in ('closed','rejected')
-      `;
-      if (Number(eprOpen[0]?.count ?? 0) > 0) {
-        throw new Error("Quality release is blocked by an unresolved EPR NCR/CAPA record.");
+      const gateRows = await sql.query<{
+        can_release: boolean;
+        blocking_reason: string | null;
+        final_inspection_id: string | null;
+        final_result: string | null;
+        final_recorded_at: string | null;
+      }>(
+        "select * from vyndi_quality_release_gate($1)",
+        [data.travellerId],
+      );
+      const gate = gateRows[0];
+      if (!gate?.can_release) {
+        throw new Error(
+          gate?.blocking_reason ??
+          "Quality release is blocked: the latest effective final inspection and all subsequent Quality/EPR evidence must remain acceptable.",
+        );
       }
-
-      const finalPass = await sql<{ count: number }>`
-        select count(*)::int as count from vyndi_quality_inspections
-        where traveller_id=${data.travellerId} and inspection_stage='final' and result='pass'
-      `;
-      if (Number(finalPass[0]?.count ?? 0) === 0) throw new Error("Quality release requires at least one passing final inspection.");
-      const openNcr = await sql<{ count: number }>`
-        select count(*)::int as count from vyndi_quality_ncrs
-        where traveller_id=${data.travellerId} and status not in ('closed','rejected')
-      `;
-      if (Number(openNcr[0]?.count ?? 0) > 0) throw new Error("Quality release is blocked by an open NCR/CAPA chain.");
     }
     await sql`update vyndi_quality_releases set superseded_at=now() where traveller_id=${data.travellerId} and superseded_at is null`;
     await sql`
