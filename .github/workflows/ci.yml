@@ -1,5 +1,9 @@
 name: CI
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 # Canonical repository CI. Cloudflare is the production deployment authority.
 # This workflow runs for every main-bound PR and again after changes land on
 # main, so direct pushes cannot remain unobserved even where plan-level branch
@@ -18,7 +22,7 @@ permissions:
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, vyndi-linux]
     timeout-minutes: 25
     steps:
       - name: Checkout

@@ -1,8 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getSql } from "@/lib/db";
-import { getCommandRole } from "@/lib/command-access";
-import { canPerform, type CommandPermission } from "@/lib/page-access";
+import { requireBusinessActor } from "@/lib/business-actor";
+import type { CommandPermission } from "@/lib/page-access";
 
 const stageSchema = z.enum(["incoming", "in_process", "final"]);
 const resultSchema = z.enum(["pass", "fail", "conditional"]);
@@ -21,12 +21,8 @@ async function assertSameSiteRequest() {
 }
 
 async function requirePermission(permission: CommandPermission) {
-  const role = await getCommandRole();
-  if (!role || !canPerform(role, permission)) throw new Error(`Quality ${permission} permission denied.`);
-  return role;
+  return requireBusinessActor(permission);
 }
-
-const actor = (role: string) => `command:${role}`;
 
 type QualityLineage = {
   salesOrderId: string | null;
@@ -108,17 +104,19 @@ export const listQualityAuthority = createServerFn({ method: "GET" }).handler(as
   await assertSameSiteRequest();
   await requirePermission("view");
   const sql = await getSql();
-  const [inspections, ncrs, capas, releases] = await Promise.all([
+  const [inspections, ncrs, capas, releases, eprOpen] = await Promise.all([
     sql`select * from vyndi_quality_inspections order by recorded_at desc limit 500`,
     sql`select * from vyndi_quality_ncrs order by updated_at desc limit 500`,
     sql`select * from vyndi_quality_capas order by updated_at desc limit 500`,
     sql`select * from vyndi_quality_releases where superseded_at is null order by decided_at desc limit 500`,
+    sql<{ count: number }>`select count(*)::int as count from epr_ncr_capa where status not in ('closed','rejected')`,
   ]);
   return {
     inspections: Array.isArray(inspections) ? [...inspections] : [],
     ncrs: Array.isArray(ncrs) ? [...ncrs] : [],
     capas: Array.isArray(capas) ? [...capas] : [],
     releases: Array.isArray(releases) ? [...releases] : [],
+    eprOpenNcrCapa: Number((eprOpen as Array<{ count: number }>)[0]?.count ?? 0),
   };
 });
 
@@ -144,7 +142,7 @@ export const recordQualityInspection = createServerFn({ method: "POST" })
   .validator(inspectionSchema)
   .handler(async ({ data }) => {
     await assertSameSiteRequest();
-    const role = await requirePermission("edit");
+    const { userId, role } = await requirePermission("edit");
     if (data.defectQuantity > data.sampleSize) throw new Error("Defect quantity cannot exceed inspection sample size.");
     if (data.inspectionStage !== "incoming" && !data.jobCardId && !data.travellerId) {
       throw new Error("In-process/final inspection must reference a Job Card or Traveller.");
@@ -163,7 +161,7 @@ export const recordQualityInspection = createServerFn({ method: "POST" })
         ${data.id},${data.inspectionStage},${data.inspectionType},${lineage.salesOrderId},${lineage.jobCardId},
         ${lineage.travellerId},${data.goodsReceiptId ?? null},${lineage.sku},${data.lotNumber ?? null},
         ${lineage.serialNumber},${data.sampleSize},${data.defectQuantity},${data.result},${data.disposition},
-        ${data.criteriaReference},${data.evidenceReference},${data.notes ?? ""},${actor(role)},${role}
+        ${data.criteriaReference},${data.evidenceReference},${data.notes ?? ""},${userId},${role}
       )
     `;
     await sql`
@@ -172,7 +170,7 @@ export const recordQualityInspection = createServerFn({ method: "POST" })
         source_reference,payload_json,correlation_id,gate_id,gate_result,previous_state,new_state,reason
       ) values (
         ${crypto.randomUUID()},'quality_inspection',${data.id},1,'QUALITY_INSPECTION_RECORDED',
-        ${actor(role)},${role},${data.evidenceReference},
+        ${userId},${role},${data.evidenceReference},
         ${JSON.stringify({ stage: data.inspectionStage, result: data.result, disposition: data.disposition, jobCardId: lineage.jobCardId, travellerId: lineage.travellerId, goodsReceiptId: data.goodsReceiptId ?? null, sku: lineage.sku })}::jsonb,
         ${lineage.travellerId ? `TRAVELLER|${lineage.travellerId}` : lineage.jobCardId ? `JOB_CARD|${lineage.jobCardId}` : `QUALITY|${data.id}`},
         'G10-QUALITY',${data.result === "pass" ? "pass" : "fail"},null,${data.disposition},${data.notes ?? null}
@@ -195,7 +193,7 @@ export const createQualityNcr = createServerFn({ method: "POST" })
   .validator(ncrSchema)
   .handler(async ({ data }) => {
     await assertSameSiteRequest();
-    const role = await requirePermission("edit");
+    const { userId, role } = await requirePermission("edit");
     const sql = await getSql();
     const rows = await sql<{
       salesOrderId: string | null;
@@ -218,7 +216,7 @@ export const createQualityNcr = createServerFn({ method: "POST" })
       ) values (
         ${data.id},${data.inspectionId},${inspection.salesOrderId},${inspection.jobCardId},${inspection.travellerId},
         ${inspection.sku},${inspection.lotNumber},${inspection.serialNumber},${data.severity},${data.description},
-        ${data.containment ?? null},${data.disposition ?? null},'open',${data.sourceReference},${actor(role)},${role}
+        ${data.containment ?? null},${data.disposition ?? null},'open',${data.sourceReference},${userId},${role}
       )
     `;
     await sql`
@@ -226,7 +224,7 @@ export const createQualityNcr = createServerFn({ method: "POST" })
         id,entity_type,entity_id,entity_revision,action,actor_user_id,actor_role,source_reference,
         payload_json,correlation_id,gate_id,gate_result,previous_state,new_state,reason
       ) values (
-        ${crypto.randomUUID()},'quality_ncr',${data.id},1,'QUALITY_NCR_CREATED',${actor(role)},${role},${data.sourceReference},
+        ${crypto.randomUUID()},'quality_ncr',${data.id},1,'QUALITY_NCR_CREATED',${userId},${role},${data.sourceReference},
         ${JSON.stringify({ inspectionId: data.inspectionId, severity: data.severity, jobCardId: inspection.jobCardId, travellerId: inspection.travellerId })}::jsonb,
         ${inspection.travellerId ? `TRAVELLER|${inspection.travellerId}` : `NCR|${data.id}`},'G10-QUALITY','fail',null,'open',${data.description}
       )
@@ -245,7 +243,7 @@ export const transitionQualityNcr = createServerFn({ method: "POST" })
   .validator(ncrTransitionSchema)
   .handler(async ({ data }) => {
     await assertSameSiteRequest();
-    const role = await requirePermission(data.toStatus === "closed" || data.toStatus === "rejected" ? "approve" : "edit");
+    const { userId, role } = await requirePermission(data.toStatus === "closed" || data.toStatus === "rejected" ? "approve" : "edit");
     const sql = await getSql();
     const rows = await sql<{ status: string; travellerId: string | null }>`
       select status,traveller_id as "travellerId" from vyndi_quality_ncrs where id=${data.id} limit 1
@@ -265,7 +263,7 @@ export const transitionQualityNcr = createServerFn({ method: "POST" })
     }
     await sql`
       update vyndi_quality_ncrs set status=${data.toStatus},
-        closed_by=case when ${data.toStatus} in ('closed','rejected') then ${actor(role)} else closed_by end,
+        closed_by=case when ${data.toStatus} in ('closed','rejected') then ${userId} else closed_by end,
         closed_at=case when ${data.toStatus} in ('closed','rejected') then now() else closed_at end,
         updated_at=now()
       where id=${data.id}
@@ -275,7 +273,7 @@ export const transitionQualityNcr = createServerFn({ method: "POST" })
         id,entity_type,entity_id,action,actor_user_id,actor_role,source_reference,payload_json,
         correlation_id,gate_id,gate_result,previous_state,new_state,reason
       ) values (
-        ${crypto.randomUUID()},'quality_ncr',${data.id},'QUALITY_NCR_STATUS_CHANGED',${actor(role)},${role},${data.sourceReference},'{}'::jsonb,
+        ${crypto.randomUUID()},'quality_ncr',${data.id},'QUALITY_NCR_STATUS_CHANGED',${userId},${role},${data.sourceReference},'{}'::jsonb,
         ${current.travellerId ? `TRAVELLER|${current.travellerId}` : `NCR|${data.id}`},'G10-QUALITY',
         ${data.toStatus === "closed" || data.toStatus === "rejected" ? "pass" : "fail"},${current.status},${data.toStatus},${data.note}
       )
@@ -299,7 +297,7 @@ export const createQualityCapa = createServerFn({ method: "POST" })
   .validator(capaSchema)
   .handler(async ({ data }) => {
     await assertSameSiteRequest();
-    const role = await requirePermission("edit");
+    const { userId, role } = await requirePermission("edit");
     const sql = await getSql();
     const ncrRows = await sql<{ status: string; travellerId: string | null }>`
       select status,traveller_id as "travellerId" from vyndi_quality_ncrs where id=${data.ncrId} limit 1
@@ -312,7 +310,7 @@ export const createQualityCapa = createServerFn({ method: "POST" })
         status,source_ref,created_by,created_role
       ) values (
         ${data.id},${data.ncrId},${data.rootCause},${data.correctiveAction},${data.preventiveAction},${data.owner},
-        ${data.dueOn ?? null},${data.effectivenessCriteria},'open',${data.sourceReference},${actor(role)},${role}
+        ${data.dueOn ?? null},${data.effectivenessCriteria},'open',${data.sourceReference},${userId},${role}
       )
     `;
     await sql`update vyndi_quality_ncrs set status='under_capa',updated_at=now() where id=${data.ncrId} and status='contained'`;
@@ -321,7 +319,7 @@ export const createQualityCapa = createServerFn({ method: "POST" })
         id,entity_type,entity_id,action,actor_user_id,actor_role,source_reference,payload_json,
         correlation_id,gate_id,gate_result,previous_state,new_state,reason
       ) values (
-        ${crypto.randomUUID()},'quality_capa',${data.id},'QUALITY_CAPA_CREATED',${actor(role)},${role},${data.sourceReference},
+        ${crypto.randomUUID()},'quality_capa',${data.id},'QUALITY_CAPA_CREATED',${userId},${role},${data.sourceReference},
         ${JSON.stringify({ ncrId: data.ncrId, owner: data.owner, dueOn: data.dueOn ?? null })}::jsonb,
         ${ncr.travellerId ? `TRAVELLER|${ncr.travellerId}` : `NCR|${data.ncrId}`},'G10-QUALITY','fail',null,'open',${data.rootCause}
       )
@@ -342,7 +340,7 @@ export const transitionQualityCapa = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await assertSameSiteRequest();
     const approval = data.toStatus === "verified" || data.toStatus === "closed" || data.toStatus === "rejected";
-    const role = await requirePermission(approval ? "approve" : "edit");
+    const { userId, role } = await requirePermission(approval ? "approve" : "edit");
     const sql = await getSql();
     const rows = await sql<{ status: string; ncrId: string }>`
       select status,ncr_id as "ncrId" from vyndi_quality_capas where id=${data.id} limit 1
@@ -360,7 +358,7 @@ export const transitionQualityCapa = createServerFn({ method: "POST" })
     await sql`
       update vyndi_quality_capas set status=${data.toStatus},
         effectiveness_evidence_ref=coalesce(${data.effectivenessEvidenceReference ?? null},effectiveness_evidence_ref),
-        verified_by=case when ${data.toStatus} in ('verified','closed') then ${actor(role)} else verified_by end,
+        verified_by=case when ${data.toStatus} in ('verified','closed') then ${userId} else verified_by end,
         verified_at=case when ${data.toStatus} in ('verified','closed') then now() else verified_at end,
         updated_at=now()
       where id=${data.id}
@@ -370,7 +368,7 @@ export const transitionQualityCapa = createServerFn({ method: "POST" })
         id,entity_type,entity_id,action,actor_user_id,actor_role,source_reference,payload_json,
         correlation_id,gate_id,gate_result,previous_state,new_state,reason
       ) values (
-        ${crypto.randomUUID()},'quality_capa',${data.id},'QUALITY_CAPA_STATUS_CHANGED',${actor(role)},${role},${data.sourceReference},
+        ${crypto.randomUUID()},'quality_capa',${data.id},'QUALITY_CAPA_STATUS_CHANGED',${userId},${role},${data.sourceReference},
         ${JSON.stringify({ effectivenessEvidenceReference: data.effectivenessEvidenceReference ?? null })}::jsonb,
         ${`NCR|${current.ncrId}`},'G10-QUALITY',${data.toStatus === "closed" || data.toStatus === "rejected" ? "pass" : "fail"},
         ${current.status},${data.toStatus},${data.note}
@@ -391,7 +389,7 @@ export const decideQualityRelease = createServerFn({ method: "POST" })
   .validator(releaseSchema)
   .handler(async ({ data }) => {
     await assertSameSiteRequest();
-    const role = await requirePermission("approve");
+    const { userId, role } = await requirePermission("approve");
     const sql = await getSql();
     const rows = await sql<{
       jobCardId: string | null;
@@ -407,6 +405,14 @@ export const decideQualityRelease = createServerFn({ method: "POST" })
     const traveller = rows[0];
     if (!traveller?.jobCardId) throw new Error("Quality release requires a production Traveller linked to a Job Card.");
     if (data.decision === "released") {
+      const eprOpen = await sql<{ count: number }>`
+        select count(*)::int as count from epr_ncr_capa
+        where traveller_id=${data.travellerId} and status not in ('closed','rejected')
+      `;
+      if (Number(eprOpen[0]?.count ?? 0) > 0) {
+        throw new Error("Quality release is blocked by an unresolved EPR NCR/CAPA record.");
+      }
+
       const finalPass = await sql<{ count: number }>`
         select count(*)::int as count from vyndi_quality_inspections
         where traveller_id=${data.travellerId} and inspection_stage='final' and result='pass'
@@ -424,7 +430,7 @@ export const decideQualityRelease = createServerFn({ method: "POST" })
         id,traveller_id,job_card_id,sales_order_id,serial_number,decision,decision_reason,evidence_ref,decided_by,decided_role
       ) values (
         ${data.id},${data.travellerId},${traveller.jobCardId},${traveller.salesOrderId},${traveller.serialNumber},
-        ${data.decision},${data.decisionReason},${data.evidenceReference},${actor(role)},${role}
+        ${data.decision},${data.decisionReason},${data.evidenceReference},${userId},${role}
       )
     `;
     await sql`
@@ -432,7 +438,7 @@ export const decideQualityRelease = createServerFn({ method: "POST" })
         id,entity_type,entity_id,action,actor_user_id,actor_role,source_reference,payload_json,
         correlation_id,gate_id,gate_result,previous_state,new_state,reason
       ) values (
-        ${crypto.randomUUID()},'quality_release',${data.id},'QUALITY_RELEASE_DECIDED',${actor(role)},${role},${data.evidenceReference},
+        ${crypto.randomUUID()},'quality_release',${data.id},'QUALITY_RELEASE_DECIDED',${userId},${role},${data.evidenceReference},
         ${JSON.stringify({ travellerId: data.travellerId, jobCardId: traveller.jobCardId, salesOrderId: traveller.salesOrderId, serialNumber: traveller.serialNumber })}::jsonb,
         ${`TRAVELLER|${data.travellerId}`},'G10-QUALITY',${data.decision === "released" ? "pass" : "fail"},null,${data.decision},${data.decisionReason}
       )

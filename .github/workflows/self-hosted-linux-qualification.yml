@@ -1,0 +1,61 @@
+name: Self-Hosted Linux Qualification
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/department-ledger-recovery-expansion
+
+jobs:
+  linux-smoke:
+    runs-on: [self-hosted, Linux, X64, vyndi-linux]
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: vyndi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d vyndi_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Runner diagnostics
+        run: |
+          uname -a
+          docker --version
+          docker info --format '{{.ServerVersion}}'
+
+      - name: PostgreSQL service check
+        run: |
+          docker ps
+          docker exec $(docker ps -q --filter ancestor=postgres:16) pg_isready -U postgres -d vyndi_test
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Database syntax validation
+        run: npm run db:validate
+
+      - name: Department identity regression
+        run: npm run test:departments:identity
+

@@ -6,7 +6,10 @@ import { PlanningStudio } from "@/components/planning-studio";
 import { PlanningIntelligenceDeck } from "@/components/planning-intelligence-deck";
 import { COMPANY, TRANCHES } from "@/lib/data/company";
 import { listEngineeringAuthority } from "@/lib/engineering-authority";
-import { getProcurementPlanningReport } from "@/lib/procurement-authority";
+import {
+  getProcurementPlanningReport,
+  PROCUREMENT_PLANNING_NO_APPROVED_PLAN_MESSAGE,
+} from "@/lib/procurement-authority";
 import { approveOperatingPlan, getOperatingPlanState, submitOperatingPlan } from "@/lib/operating-plan-authority";
 import { canPerform } from "@/lib/page-access";
 import {
@@ -16,12 +19,32 @@ import {
   operatingPlanHorizonLabel,
 } from "@/lib/planning/operating-plan";
 
+async function getPlanningProcurementReality() {
+  try {
+    const report = await getProcurementPlanningReport();
+    return {
+      planningMappingIssues: report.planningMappingIssues,
+      unprojectedCommitments: report.unprojectedCommitments,
+      blockedMessage: null as string | null,
+    };
+  } catch (error) {
+    if (error instanceof Error && error.message === PROCUREMENT_PLANNING_NO_APPROVED_PLAN_MESSAGE) {
+      return {
+        planningMappingIssues: [],
+        unprojectedCommitments: [],
+        blockedMessage: error.message,
+      };
+    }
+    throw error;
+  }
+}
+
 export const Route = createFileRoute("/command/planning")({
   loader: async ({ context }) => {
     const [plan, engineering, procurement] = await Promise.all([
       getOperatingPlanState(),
       listEngineeringAuthority(),
-      getProcurementPlanningReport(),
+      getPlanningProcurementReality(),
     ]);
     return { role: context.commandRole, plan, engineering, procurement };
   },
@@ -64,11 +87,13 @@ function MasterPlan() {
   );
   const engineeringCoverage = ["longitude", "latitude", "altitude"].filter((family) => releasedFamilies.has(family)).length;
   const openEngineeringChanges = engineering.changes.filter((row) => !["implemented", "rejected"].includes(String(row.status ?? "").toLowerCase())).length;
-  const materialPlanningBlockers = procurement.planningMappingIssues.length;
+  const procurementBlocked = Boolean(procurement.blockedMessage);
+  const materialPlanningBlockers = procurement.planningMappingIssues.length + (procurementBlocked ? 1 : 0);
   const committedDemandExceptions = procurement.unprojectedCommitments.length;
   const realityBlockers = [
     ...(engineeringCoverage < 3 ? [`Engineering release coverage is ${engineeringCoverage}/3 product families.`] : []),
     ...(openEngineeringChanges > 0 ? [`${openEngineeringChanges} engineering change request(s) remain open.`] : []),
+    ...(procurement.blockedMessage ? [procurement.blockedMessage] : []),
     ...procurement.planningMappingIssues,
     ...(committedDemandExceptions > 0 ? [`${committedDemandExceptions} confirmed order(s) are not synchronized to a current released production/BOM state.`] : []),
   ];
@@ -134,13 +159,13 @@ function MasterPlan() {
         <div className="rounded-xl border border-border bg-surface/35 p-4">
           <p className="text-[10px] uppercase tracking-wider text-green">BOM & material feasibility</p>
           <p className="mt-2 text-xl font-semibold text-fg">{materialPlanningBlockers ? "Blocked" : "Mapped"}</p>
-          <p className="mt-1 text-xs text-muted">{materialPlanningBlockers ? `${materialPlanningBlockers} planning-standard BOM mapping issue(s)` : "Planning BOM mappings are available for material calculation."}</p>
+          <p className="mt-1 text-xs text-muted">{procurement.blockedMessage ? "Approve an Integrated Operating Plan before material feasibility can be evaluated." : materialPlanningBlockers ? `${materialPlanningBlockers} planning-standard BOM mapping issue(s)` : "Planning BOM mappings are available for material calculation."}</p>
           <Link to="/command/procurement-planning" className="mt-3 inline-block text-xs font-semibold text-accent">Open Material Requirements →</Link>
         </div>
         <div className="rounded-xl border border-border bg-surface/35 p-4">
           <p className="text-[10px] uppercase tracking-wider text-green">Committed demand</p>
-          <p className="mt-2 text-xl font-semibold text-fg">{committedDemandExceptions ? "Exception" : "Reconciled"}</p>
-          <p className="mt-1 text-xs text-muted">{committedDemandExceptions ? `${committedDemandExceptions} confirmed order(s) need production/BOM synchronization.` : "Confirmed demand is reconciled to released production state."}</p>
+          <p className="mt-2 text-xl font-semibold text-fg">{procurementBlocked ? "Unavailable" : committedDemandExceptions ? "Exception" : "Reconciled"}</p>
+          <p className="mt-1 text-xs text-muted">{procurementBlocked ? "Approve an Integrated Operating Plan before committed demand can be reconciled." : committedDemandExceptions ? `${committedDemandExceptions} confirmed order(s) need production/BOM synchronization.` : "Confirmed demand is reconciled to released production state."}</p>
           <Link to="/command/sales" className="mt-3 inline-block text-xs font-semibold text-accent">Open Demand & Orders →</Link>
         </div>
         <div className="rounded-xl border border-border bg-surface/35 p-4">

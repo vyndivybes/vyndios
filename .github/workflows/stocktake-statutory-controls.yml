@@ -1,5 +1,9 @@
 name: Stocktake Statutory Controls Gate
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 on:
   pull_request:
     branches:
@@ -11,7 +15,7 @@ permissions:
 
 jobs:
   stocktake-statutory:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, vyndi-linux]
     timeout-minutes: 25
     services:
       postgres:

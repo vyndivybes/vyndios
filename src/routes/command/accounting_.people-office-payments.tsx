@@ -27,7 +27,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 const evidenceLines = (value: string) => value.split(";").map((part) => part.trim()).filter(Boolean);
 const fileSize = (value: number) => value < 1024 ? `${value} B` : value < 1024 * 1024 ? `${(value / 1024).toFixed(1)} KB` : `${(value / (1024 * 1024)).toFixed(2)} MB`;
 
-export const Route = createFileRoute("/command/accounting/people-office-payments")({
+export const Route = createFileRoute("/command/accounting_/people-office-payments")({
   loader: () => listPeopleOfficeActualSpend(),
   component: PeopleOfficeActualSpend,
 });

@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Panel } from "@/components/kpi";
 import { getVibpeOptimizerReleaseClosure } from "@/lib/vibpe-optimizer-release-closure";
 
-export const Route = createFileRoute("/command/ibpe-operating-workspace/release")({
+export const Route = createFileRoute("/command/ibpe-operating-workspace_/release")({
   loader: async () => getVibpeOptimizerReleaseClosure(),
   component: VibpeOptimizerReleasePage,
 });

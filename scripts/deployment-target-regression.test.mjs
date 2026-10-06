@@ -52,3 +52,115 @@ test("production smoke waits for hydrated login readiness before credential inte
   assert.ok(emailFill >= 0, "production smoke must fill the authorised email field");
   assert.ok(readiness < emailFill, "login readiness must be established before credentials are entered");
 });
+
+test("release browser setup is bounded and can run without waiting for credentials", () => {
+  assert.match(releaseScript, /\[switch\]\$NonInteractive/);
+  assert.match(releaseScript, /\[switch\]\$SetupOnly/);
+  assert.match(releaseScript, /SetupTimeoutSeconds/);
+  assert.match(releaseScript, /WaitForExit/);
+  assert.match(releaseScript, /System\.Diagnostics\.ProcessStartInfo/);
+  assert.match(releaseScript, /System\.Diagnostics\.Process/);
+  assert.match(releaseScript, /\$exitCode = \$process\.ExitCode/);
+  assert.doesNotMatch(releaseScript, /^\\s*Start-Process\\b/m);
+  assert.doesNotMatch(releaseScript, /if \(\$process\.ExitCode -ne 0\)/);
+  assert.match(releaseScript, /Test-ChromiumLaunch/);
+  assert.match(releaseScript, /VYNDI_TEST_PASSWORD is required in -NonInteractive mode/);
+  assert.match(releaseScript, /Playwright Chromium setup preflight PASS/);
+});
+
+
+test("H3 Chromium setup reuses a working browser and bounds fallback installation", () => {
+  const h3Workflow = read(".github/workflows/h3-performance-load.yml");
+  assert.match(h3Workflow, /name: Verify or install Chromium/);
+  assert.match(h3Workflow, /timeout-minutes:\s*4/);
+  assert.match(h3Workflow, /chromium\.launch/);
+  assert.match(h3Workflow, /timeout --signal=TERM --kill-after=15s 180s npx playwright install chromium/);
+  assert.doesNotMatch(h3Workflow, /playwright install --with-deps chromium/);
+});
+
+
+test("qualification workflows stay on zero-cost self-hosted runners and cancel stale PR runs", () => {
+  const prWorkflows = [
+    ".github/workflows/admin-recovery-centre.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/h2-recovery-drill.yml",
+    ".github/workflows/h3-performance-load.yml",
+    ".github/workflows/h4-iam-access-governance.yml",
+    ".github/workflows/h5-governed-integrations.yml",
+    ".github/workflows/self-hosted-linux-qualification.yml",
+    ".github/workflows/self-hosted-windows-qualification.yml",
+    ".github/workflows/stage-d-acceptance.yml",
+    ".github/workflows/stocktake-statutory-controls.yml",
+    ".github/workflows/vibpe-copilot-2.yml",
+    ".github/workflows/vibpe-optimizer-closure.yml",
+  ];
+  for (const path of prWorkflows) {
+    const workflow = read(path);
+    assert.doesNotMatch(workflow, /runs-on:\s*ubuntu-latest/);
+    assert.match(workflow, /runs-on:\s*\[self-hosted,/);
+    assert.match(workflow, /concurrency:[\s\S]*?cancel-in-progress:\s*true/);
+  }
+});
+
+test("Admin recovery keeps PowerShell parsing on the Windows qualification boundary", () => {
+  const admin = read(".github/workflows/admin-recovery-centre.yml");
+  const windows = read(".github/workflows/self-hosted-windows-qualification.yml");
+  assert.match(admin, /runs-on:\s*\[self-hosted, Linux, X64, vyndi-linux\]/);
+  assert.doesNotMatch(admin, /Parse zero-cost PowerShell recovery helpers/);
+  assert.match(windows, /Parse zero-cost PowerShell recovery helpers/);
+  assert.match(windows, /vyndi-zero-cost-backup\.ps1/);
+  assert.match(windows, /vyndi-zero-cost-restore\.ps1/);
+  assert.match(windows, /Language\.Parser/);
+});
+
+test("automatic governance and production browser workflows avoid hosted-runner and unbounded Chromium dependencies", () => {
+  const governance = read(".github/workflows/main-governance.yml");
+  assert.match(governance, /runs-on:\s*\[self-hosted, Linux, X64, vyndi-linux\]/);
+  assert.match(governance, /actions\/github-script@v7/);
+  assert.doesNotMatch(governance, /\bgh api\b/);
+
+  for (const path of [
+    ".github/workflows/production-assurance.yml",
+    ".github/workflows/production-deployment-certification.yml",
+  ]) {
+    const workflow = read(path);
+    assert.match(workflow, /runs-on:\s*\[self-hosted, Linux, X64, vyndi-linux\]/);
+    assert.match(workflow, /timeout-minutes:\s*4/);
+    assert.match(workflow, /chromium\.launch/);
+    assert.match(workflow, /timeout --signal=TERM --kill-after=15s 180s npx playwright install chromium/);
+    assert.doesNotMatch(workflow, /playwright install --with-deps chromium/);
+  }
+});
+
+
+test("H2 and Stage D browser setup never waits for interactive sudo", () => {
+  for (const path of [
+    ".github/workflows/h2-recovery-drill.yml",
+    ".github/workflows/stage-d-acceptance.yml",
+  ]) {
+    const workflow = read(path);
+    assert.match(workflow, /name: Verify or install Chromium/);
+    assert.match(workflow, /timeout-minutes:\s*4/);
+    assert.match(workflow, /chromium\.launch/);
+    assert.match(workflow, /timeout --signal=TERM --kill-after=15s 180s npx playwright install chromium/);
+    assert.doesNotMatch(workflow, /playwright install --with-deps chromium/);
+  }
+});
+
+
+test("focused qualification gates avoid the full prebuild lifecycle", () => {
+  for (const path of [
+    ".github/workflows/admin-recovery-centre.yml",
+    ".github/workflows/h2-recovery-drill.yml",
+    ".github/workflows/h3-performance-load.yml",
+    ".github/workflows/stage-d-acceptance.yml",
+  ]) {
+    const workflow = read(path);
+    assert.match(workflow, /run:\s*npm run build:bundle/);
+    assert.doesNotMatch(workflow, /run:\s*npm run build\s*$/m);
+  }
+
+  const canonicalCi = read(".github/workflows/ci.yml");
+  assert.match(canonicalCi, /run:\s*npm run typecheck/);
+  assert.match(canonicalCi, /run:\s*npm test/);
+});

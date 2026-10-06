@@ -41,9 +41,10 @@ function Quality() {
   const openNcr = ncrs.filter((row) => !["closed", "rejected"].includes(text(row, "status"))).length;
   const openCapa = capas.filter((row) => !["closed", "rejected"].includes(text(row, "status"))).length;
   const released = releases.filter((row) => text(row, "decision", "status") === "released").length;
+  const eprOpenNcrCapa = Number(quality.eprOpenNcrCapa ?? 0);
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 max-w-full space-y-6 break-words">
       <header className="border-b border-border pb-6">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">Quality · ISO compliance · governed release authority</p>
         <h1 className="mt-1 font-display text-4xl text-accent">Quality & Product Compliance</h1>
@@ -57,7 +58,10 @@ function Quality() {
         <Kpi label="Open NCR" value={String(openNcr)} hint="Containment / CAPA" tone={openNcr ? "warn" : "ok"} />
         <Kpi label="Open CAPA" value={String(openCapa)} hint="Effectiveness pending" tone={openCapa ? "warn" : "ok"} />
         <Kpi label="Released serials" value={String(released)} hint="Current Quality decisions" tone={released ? "ok" : "default"} />
+        <Kpi label="EPR holds" value={String(eprOpenNcrCapa)} hint="Open EPR NCR / CAPA" tone={eprOpenNcrCapa ? "warn" : "ok"} />
       </div>
+
+      {eprOpenNcrCapa ? <div className="rounded-lg border border-accent/40 bg-accent/5 p-4 text-sm text-accent">Release gate: {eprOpenNcrCapa} unresolved EPR NCR/CAPA record{eprOpenNcrCapa === 1 ? "" : "s"} remain. A serialized Quality release cannot be posted until the EPR chain is closed or rejected.</div> : null}
 
       <QualityAssuranceDeck />
 
@@ -65,7 +69,7 @@ function Quality() {
         {inspections.length ? (
           <div className="grid gap-2 lg:grid-cols-2">
             {inspections.map((row) => (
-              <div key={text(row, "id")} className="rounded-lg border border-border p-3">
+              <div key={text(row, "id")} className="min-w-0 rounded-lg border border-border p-3 break-all">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <span className="font-mono text-xs text-accent">{text(row, "id")}</span>
                   <StatusPill value={text(row, "result")} />
@@ -81,11 +85,11 @@ function Quality() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel title="NCR / CAPA Register" kicker="Non-conformance control">
-          {ncrs.length ? <div className="space-y-2">{ncrs.map((row) => <div key={text(row,"id")} className="rounded-lg border border-border p-3"><div className="flex justify-between gap-3"><span className="font-semibold text-accent">{text(row,"id")}</span><span className="text-xs uppercase text-muted">{text(row,"severity")} · {text(row,"status")}</span></div><p className="mt-2 text-sm">{text(row,"description")}</p></div>)}</div> : <p className="text-sm text-muted">No NCR recorded.</p>}
+          {ncrs.length ? <div className="space-y-2">{ncrs.map((row) => <div key={text(row,"id")} className="min-w-0 rounded-lg border border-border p-3 break-all"><div className="flex flex-wrap justify-between gap-3"><span className="font-semibold text-accent">{text(row,"id")}</span><span className="text-xs uppercase text-muted">{text(row,"severity")} · {text(row,"status")}</span></div><p className="mt-2 text-sm">{text(row,"description")}</p></div>)}</div> : <p className="text-sm text-muted">No NCR recorded.</p>}
           {capas.length ? <p className="mt-3 text-xs text-muted">CAPA records: {capas.length} · open {openCapa}</p> : null}
         </Panel>
         <Panel title="Serialized Release Register" kicker="Current production release evidence">
-          {releases.length ? <div className="space-y-2">{releases.map((row) => <div key={text(row,"id")} className="rounded-lg border border-border p-3"><div className="flex justify-between gap-3"><span className="font-mono text-xs text-accent">{text(row,"id")}</span><StatusPill value={text(row,"decision","status")} /></div><p className="mt-2 text-xs text-muted">Traveller {text(row,"traveller_id","travellerId") || "—"} · serial {text(row,"serial_number","serialNumber") || "—"}</p></div>)}</div> : <p className="text-sm text-muted">No serialized Quality release recorded.</p>}
+          {releases.length ? <div className="space-y-2">{releases.map((row) => <div key={text(row,"id")} className="min-w-0 rounded-lg border border-border p-3 break-all"><div className="flex flex-wrap justify-between gap-3"><span className="font-mono text-xs text-accent">{text(row,"id")}</span><StatusPill value={text(row,"decision","status")} /></div><p className="mt-2 text-xs text-muted">Traveller {text(row,"traveller_id","travellerId") || "—"} · serial {text(row,"serial_number","serialNumber") || "—"}</p></div>)}</div> : <p className="text-sm text-muted">No serialized Quality release recorded.</p>}
         </Panel>
       </div>
 

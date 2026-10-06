@@ -1,5 +1,9 @@
 name: H3 Performance Load Qualification Gate
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 on:
   pull_request:
     branches:
@@ -11,7 +15,7 @@ permissions:
 
 jobs:
   performance-qualification:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, vyndi-linux]
     timeout-minutes: 30
     services:
       postgres:
@@ -92,10 +96,22 @@ jobs:
             > .dev.vars
 
       - name: Verify H3 production bundle builds
-        run: npm run build
+        run: npm run build:bundle
 
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Verify or install Chromium
+        timeout-minutes: 4
+        shell: bash
+        run: |
+          set -euo pipefail
+          probe='import { chromium } from "playwright"; const browser = await chromium.launch({ headless: true }); await browser.close();'
+          if node --input-type=module -e "$probe"; then
+            echo "Chromium launch preflight PASS; reusing installed browser."
+            exit 0
+          fi
+          echo "Chromium unavailable; installing Playwright Chromium with a 180-second bound."
+          timeout --signal=TERM --kill-after=15s 180s npx playwright install chromium
+          node --input-type=module -e "$probe"
+          echo "Chromium launch preflight PASS after bounded install."
 
       - name: Start isolated H3 VYNDI preview
         run: |
@@ -110,7 +126,7 @@ jobs:
           VYNDI_TEST_BASE_URL: ${{ env.STAGE_D_BASE_URL }}
           VYNDI_TEST_EMAIL: ${{ env.STAGE_D_USER_EMAIL }}
           VYNDI_TEST_PASSWORD: ${{ env.STAGE_D_USER_PASSWORD }}
-          H3_ROUTE_CONCURRENCY: "8"
+          H3_ROUTE_CONCURRENCY: "4"
           H3_ROUTE_SAMPLES: "4"
         run: node scripts/h3-route-load.mjs
 

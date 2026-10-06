@@ -88,6 +88,9 @@ function plannedSkuRequirements(forecast: ProcurementForecastRow[], mappings: Pl
   return result;
 }
 
+export const PROCUREMENT_PLANNING_NO_APPROVED_PLAN_MESSAGE =
+  "Procurement planning blocked: no approved Integrated Operating Plan exists.";
+
 export const getProcurementPlanningReport = createServerFn({ method: "GET" }).handler(async () => {
   await requireProcurementView();
   const sql = await getSql();
@@ -104,7 +107,7 @@ export const getProcurementPlanningReport = createServerFn({ method: "GET" }).ha
       limit 1`,
   );
   const approvedPlan = approvedPlanRows[0];
-  if (!approvedPlan) throw new Error("Procurement planning blocked: no approved Integrated Operating Plan exists.");
+  if (!approvedPlan) throw new Error(PROCUREMENT_PLANNING_NO_APPROVED_PLAN_MESSAGE);
   if (!approvedPlan.finance_json?.operatingPlan) {
     throw new Error("Procurement planning blocked: approved plan has no operating-plan payload.");
   }

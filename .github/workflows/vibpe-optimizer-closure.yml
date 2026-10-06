@@ -1,5 +1,9 @@
 name: VIBPE Optimizer Closure Gate
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 on:
   pull_request:
     branches: [main]
@@ -10,7 +14,7 @@ permissions:
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, vyndi-linux]
     timeout-minutes: 20
     steps:
       - name: Checkout

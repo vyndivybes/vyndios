@@ -17,7 +17,7 @@ const num = (row: Row, ...keys: string[]) => {
   return 0;
 };
 
-export const Route = createFileRoute("/command/ibpe-operating-workspace/outputs")({
+export const Route = createFileRoute("/command/ibpe-operating-workspace_/outputs")({
   loader: async () => {
     const [authority, optimizer, release, exceptions, backend, ui] = await Promise.all([
       getAdvancedPlanningAuthorityReadiness(),

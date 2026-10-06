@@ -13,7 +13,7 @@ function LegalControl() {
     <div className="space-y-6">
       <div>
         <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Stage 6</p>
-        <h1 className="font-display text-4xl">Legal / IP / CA Control</h1>
+        <h1 className="font-display text-4xl">Legal / IP Control Reference</h1>
         <p className="mt-2 max-w-3xl text-sm text-muted">
           Evidence-controlled legal, intellectual-property, corporate, tax and commercial gates. Planning items are not legal conclusions and must be confirmed by the appropriate CA, CS or counsel before execution.
         </p>
@@ -38,7 +38,7 @@ function LegalControl() {
         </div>
       </Panel>
 
-      <Panel title="Controlled legal register">
+      <Panel title="Legal control reference">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[68rem] text-left text-sm">
             <thead className="text-[11px] uppercase tracking-[0.14em] text-subtle">

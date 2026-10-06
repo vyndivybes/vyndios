@@ -74,6 +74,15 @@ test("global demand instruction replaces prior family overrides", () => {
 for (const question of ["inject 25 lakh", "What if funding arrives 2 months late?", "why?", "compare that", "plan for next 6 months", "reset scenario"]) {
   test(`context request avoids exact-ledger fallback: ${question}`, () => assert.equal(isVibpeContextualRequest(question), true));
 }
+for (const question of [
+  "For recent months, compare transaction actual revenue and units with the approved plan and show the variance.",
+  "An actual-versus-plan variance is large. Can VIBPE rewrite actuals to match the plan?",
+]) {
+  test(`actual-vs-plan comparison stays on the governed truth-contract path: ${question}`, () => {
+    assert.equal(parseVibpeIntent(question).intent, "assessment");
+    assert.equal(isVibpeContextualRequest(question), false);
+  });
+}
 
 const evidence = { sourceCount: 2, unavailableCount: 0, unresolvedCount: 0, lineageComplete: true, capturedAt: "2026-10-04T10:00:00Z", now: Date.parse("2026-10-04T11:00:00Z"), methodVerified: true };
 test("evidence score is explicitly not a correctness probability", () => {
