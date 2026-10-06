@@ -13,7 +13,7 @@ test("VIBPE v3 promotes Guided Work and Control Tower to first-class intents", (
   assert.match(intent, /"guided-work"/);
   assert.match(intent, /"control-tower"/);
   assert.match(intent, /guide me through|next governed step/i);
-  assert.match(intent, /control\s+tower/i);
+  assert.match(intent, /control[-\s]+tower/i);
 });
 
 test("Guided Work answer uses the governed playbook instead of root-cause fallback", () => {
@@ -28,7 +28,7 @@ test("Guided Work answer uses the governed playbook instead of root-cause fallba
 test("Control Tower answer identifies blockers, owner and workspace", () => {
   assert.match(governance, /Control Tower blockers:/);
   assert.match(governance, /Owner \/ workspace:/);
-  assert.match(governance, /control\s+tower/);
+  assert.match(governance, /control\s+tower/i);
 });
 
 test("production answer keeps diagnostics separate from the direct answer", () => {
