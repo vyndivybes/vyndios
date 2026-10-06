@@ -96,7 +96,7 @@ jobs:
             > .dev.vars
 
       - name: Verify H3 production bundle builds
-        run: npm run build
+        run: npm run build:bundle
 
       - name: Verify or install Chromium
         timeout-minutes: 4

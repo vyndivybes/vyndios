@@ -33,5 +33,5 @@ jobs:
       - name: Recovery control regression
         run: npm run test:admin:recovery
 
-      - name: Type and production build compatibility
-        run: npm run build
+      - name: Production bundle compatibility
+        run: npm run build:bundle

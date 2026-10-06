@@ -117,7 +117,7 @@ jobs:
       - name: Verify restored production bundle builds
         env:
           DATABASE_URL: ${{ env.H2_RESTORED_DATABASE_URL }}
-        run: npm run build
+        run: npm run build:bundle
 
       - name: Verify or install Chromium
         timeout-minutes: 4

@@ -141,3 +141,21 @@ test("H2 and Stage D browser setup never waits for interactive sudo", () => {
     assert.doesNotMatch(workflow, /playwright install --with-deps chromium/);
   }
 });
+
+
+test("focused qualification gates avoid the full prebuild lifecycle", () => {
+  for (const path of [
+    ".github/workflows/admin-recovery-centre.yml",
+    ".github/workflows/h2-recovery-drill.yml",
+    ".github/workflows/h3-performance-load.yml",
+    ".github/workflows/stage-d-acceptance.yml",
+  ]) {
+    const workflow = read(path);
+    assert.match(workflow, /run:\s*npm run build:bundle/);
+    assert.doesNotMatch(workflow, /run:\s*npm run build\s*$/m);
+  }
+
+  const canonicalCi = read(".github/workflows/ci.yml");
+  assert.match(canonicalCi, /run:\s*npm run typecheck/);
+  assert.match(canonicalCi, /run:\s*npm test/);
+});

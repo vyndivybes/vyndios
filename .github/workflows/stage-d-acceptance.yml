@@ -130,7 +130,7 @@ jobs:
             > .dev.vars
 
       - name: Verify production bundle builds
-        run: npm run build
+        run: npm run build:bundle
 
       - name: Verify or install Chromium
         timeout-minutes: 4
