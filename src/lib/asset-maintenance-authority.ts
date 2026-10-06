@@ -347,7 +347,6 @@ export const startMaintenanceWorkOrder = createServerFn({ method: "POST" })
 const partSchema=z.object({
   sku:z.string().trim().min(1).max(160),
   quantity:z.number().positive(),
-  unitCostInr:z.number().min(0),
   sourceReference:z.string().trim().min(1).max(800),
 });
 
@@ -366,63 +365,34 @@ export const completeMaintenanceWorkOrder = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const actor=await requireBusinessActor("approve");
     const sql=await getSql();
-    const rows=await sql.query<{equipment_id:string;plan_id:string|null;work_order_type:string;status:string}>(
-      "select equipment_id,plan_id,work_order_type,status from vyndi_maintenance_work_orders where id=$1 limit 1",[data.workOrderId]
+    const rows=await sql.query<{
+      status:string;
+      release_status:string;
+      returned_to_service:boolean;
+      parts_cost_inr:number|string;
+    }>(
+      "select * from complete_vyndi_maintenance_work_order($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11)",
+      [
+        data.workOrderId,
+        data.rootCause ?? null,
+        data.actionTaken,
+        data.labourHours ?? null,
+        data.externalCostInr,
+        data.evidenceReference,
+        data.returnToServiceReference,
+        JSON.stringify(data.parts),
+        data.sourceReference,
+        actor.userId,
+        actor.role,
+      ],
     );
-    const row=rows[0];
-    if(!row) throw new Error("Maintenance work order not found.");
-    if(row.status!=="in_progress") throw new Error("Only in-progress maintenance work may be completed.");
-    if(row.work_order_type==="corrective"&&!data.rootCause) throw new Error("Corrective maintenance completion requires root-cause evidence.");
-
-    const partsCost=data.parts.reduce((sum,part)=>sum+part.quantity*part.unitCostInr,0);
-    await sql.query(
-      "update vyndi_maintenance_work_orders set status='completed',root_cause=$1,action_taken=$2,completed_at=now(),downtime_ended_at=coalesce(downtime_ended_at,now())," +
-      "labour_hours=$3,parts_cost_inr=$4,external_cost_inr=$5,evidence_reference=$6,return_to_service_reference=$7,completed_by=$8,record_revision=record_revision+1,updated_at=now() where id=$9",
-      [data.rootCause ?? null,data.actionTaken,data.labourHours ?? null,partsCost,data.externalCostInr,data.evidenceReference,data.returnToServiceReference,actor.userId,data.workOrderId],
-    );
-    for(const part of data.parts){
-      await sql.query(
-        "insert into vyndi_maintenance_parts(id,work_order_id,sku,quantity,unit_cost_inr,source_reference,recorded_by) values($1,$2,$3,$4,$5,$6,$7)",
-        [crypto.randomUUID(),data.workOrderId,part.sku,part.quantity,part.unitCostInr,part.sourceReference,actor.userId],
-      );
-    }
-
-    if(row.plan_id){
-      const plans=await sql.query<{strategy:string;interval_days:number|null}>(
-        "select strategy,interval_days from vyndi_maintenance_plans where id=$1 and equipment_id=$2 and active=true limit 1",
-        [row.plan_id,row.equipment_id],
-      );
-      const plan=plans[0];
-      if(plan?.interval_days){
-        await sql.query(
-          "update vyndi_maintenance_plans set next_due_at=now()+($1::text||' days')::interval,record_revision=record_revision+1,updated_by=$2,updated_at=now() where id=$3",
-          [plan.interval_days,actor.userId,row.plan_id],
-        );
-      }
-      if(plan?.strategy==="calibration"){
-        await sql.query("update epr_equipment set last_calibrated_at=now() where id=$1",[row.equipment_id]);
-      } else {
-        await sql.query("update epr_equipment set last_maintained_at=now() where id=$1",[row.equipment_id]);
-      }
-    } else if(row.work_order_type==="calibration"){
-      await sql.query("update epr_equipment set last_calibrated_at=now() where id=$1",[row.equipment_id]);
-    } else {
-      await sql.query("update epr_equipment set last_maintained_at=now() where id=$1",[row.equipment_id]);
-    }
-
-    const releaseStatus=await refreshEquipmentReleaseState(sql,row.equipment_id);
-    await sql.query(
-      "update vyndi_maintenance_work_orders set returned_to_service_by=case when $1='available' then $2 else null end where id=$3",
-      [releaseStatus,actor.userId,data.workOrderId],
-    );
-
-    await audit(sql,"maintenance_work_order",data.workOrderId,"MAINTENANCE_WORK_ORDER_COMPLETED",actor.userId,actor.role,data.sourceReference,{
-      equipmentId:row.equipment_id,rootCause:data.rootCause ?? null,partsCostInr:partsCost,releaseStatus,
-    });
-    if(releaseStatus==="available"){
-      await audit(sql,"asset",row.equipment_id,"RETURN_TO_SERVICE",actor.userId,actor.role,data.returnToServiceReference,{
-        workOrderId:data.workOrderId,evidenceReference:data.evidenceReference,
-      });
-    }
-    return {ok:true,status:"completed" as const,releaseStatus,returnedToService:releaseStatus==="available"};
+    const result=rows[0];
+    if(!result) throw new Error("Maintenance completion was not committed.");
+    return {
+      ok:true,
+      status:"completed" as const,
+      releaseStatus:result.release_status,
+      returnedToService:Boolean(result.returned_to_service),
+      partsCostInr:Number(result.parts_cost_inr??0),
+    };
   });
