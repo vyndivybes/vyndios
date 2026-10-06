@@ -44,6 +44,22 @@ test("Guided Work provides optional Learn and Work modes with governed next-step
   assert.match(panel, /vyndi:copilot-open/);
 });
 
+test("Guided Work desktop panel is a movable floating window with remembered safe position", () => {
+  assert.match(panel, /POSITION_KEY/);
+  assert.match(panel, /vyndi:guided-work:position/);
+  assert.match(panel, /onPointerDown/);
+  assert.match(panel, /onPointerMove/);
+  assert.match(panel, /onPointerUp/);
+  assert.match(panel, /setPointerCapture/);
+  assert.match(panel, /clampPosition/);
+  assert.match(panel, /window\.innerWidth/);
+  assert.match(panel, /window\.innerHeight/);
+  assert.match(panel, /cursor-move/);
+  assert.match(panel, /touch-none/);
+  assert.match(panel, /style=\{floatingStyle\}/);
+  assert.match(panel, /sm:right-auto/);
+});
+
 test("Guided Work is mounted once at shell level and receives the live role", () => {
   const imports = shell.match(/import \{ GuidedWorkPanel \} from "@\/components\/guided-work-panel";/g) ?? [];
   const mounts = shell.match(/<GuidedWorkPanel role=\{role\} \/>/g) ?? [];
