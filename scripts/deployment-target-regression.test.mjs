@@ -126,3 +126,18 @@ test("automatic governance and production browser workflows avoid hosted-runner 
     assert.doesNotMatch(workflow, /playwright install --with-deps chromium/);
   }
 });
+
+
+test("H2 and Stage D browser setup never waits for interactive sudo", () => {
+  for (const path of [
+    ".github/workflows/h2-recovery-drill.yml",
+    ".github/workflows/stage-d-acceptance.yml",
+  ]) {
+    const workflow = read(path);
+    assert.match(workflow, /name: Verify or install Chromium/);
+    assert.match(workflow, /timeout-minutes:\s*4/);
+    assert.match(workflow, /chromium\.launch/);
+    assert.match(workflow, /timeout --signal=TERM --kill-after=15s 180s npx playwright install chromium/);
+    assert.doesNotMatch(workflow, /playwright install --with-deps chromium/);
+  }
+});
