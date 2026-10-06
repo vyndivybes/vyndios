@@ -1,7 +1,12 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { Kpi, Panel } from "@/components/kpi";
-import { getProcurementPlanningReport, setProcurementSkuAction, type ReconciledRequirementRow } from "@/lib/procurement-authority";
+import {
+  getProcurementPlanningReport,
+  PROCUREMENT_PLANNING_NO_APPROVED_PLAN_MESSAGE,
+  setProcurementSkuAction,
+  type ReconciledRequirementRow,
+} from "@/lib/procurement-authority";
 import {
   approveProcurementPrice,
   getProcurementCostAuthorityReport,
@@ -21,7 +26,7 @@ export const Route=createFileRoute("/command/procurement-planning")({
       };
     } catch (error) {
       const message=error instanceof Error?error.message:String(error);
-      if(message==="Procurement planning blocked: no approved Integrated Operating Plan exists."){
+      if(message===PROCUREMENT_PLANNING_NO_APPROVED_PLAN_MESSAGE){
         return {blocked:true as const,blockedMessage:message};
       }
       throw error;
