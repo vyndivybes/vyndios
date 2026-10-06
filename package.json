@@ -74,7 +74,7 @@
     "test:departments:identity": "node --test scripts/department-actor-attribution.test.mjs",
     "test:guided-work": "node --test scripts/guided-work-mode.test.mjs",
     "test:vibpe-answer-v3": "node --test scripts/vibpe-answer-architecture-v3.test.mjs",
-    "test:authority-closure": "node --test scripts/enterprise-authority-closure.test.mjs"
+    "test:authority-closure": "node --test scripts/enterprise-authority-closure.test.mjs scripts/enterprise-authority-closure-integration.test.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
