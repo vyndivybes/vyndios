@@ -81,7 +81,8 @@
     "test:writer-route-consolidation": "node --test scripts/writer-route-consolidation.test.mjs scripts/writer-route-consolidation-integration.test.mjs",
     "test:runtime-hyperdrive": "node --test scripts/runtime-hyperdrive-reconciliation.test.mjs",
     "uat:prod:auth": "node scripts/vyndi-production-auth-setup.mjs",
-    "uat:prod": "node scripts/vyndi-production-uat.mjs"
+    "uat:prod": "node scripts/vyndi-production-uat.mjs",
+    "test:production:transactional-uat": "node --test scripts/production-transactional-uat.test.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
