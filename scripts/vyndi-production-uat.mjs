@@ -105,10 +105,28 @@ try {
 
     const interactions = [];
     if (spec.interact === "inventory") {
-      const open = page.getByRole("button", { name: /Item \/ manual receipt/i });
-      await open.waitFor({ state: "visible", timeout: 15_000 });
-      await open.click();
-      await page.getByRole("region", { name: /Single inventory entry/i }).waitFor({ state: "visible", timeout: 15_000 });
+      const panel = page.getByRole("region", { name: /Single inventory entry/i });
+      const close = page.getByRole("button", { name: /Close entry/i });
+      let opened = false;
+
+      for (let attempt = 0; attempt < 2 && !opened; attempt += 1) {
+        const open = page.getByRole("button", { name: /Item \/ manual receipt/i });
+        await open.waitFor({ state: "visible", timeout: 15_000 });
+        await open.click();
+
+        opened = await Promise.race([
+          panel.waitFor({ state: "visible", timeout: 4_000 }).then(() => true).catch(() => false),
+          close.waitFor({ state: "visible", timeout: 4_000 }).then(() => true).catch(() => false),
+        ]);
+
+        if (!opened && attempt === 0) {
+          await page.waitForLoadState("load", { timeout: 15_000 }).catch(() => {});
+          await page.waitForTimeout(500);
+        }
+      }
+
+      assert.equal(opened, true, "Inventory entry did not open after hydrated retry.");
+      await panel.waitFor({ state: "visible", timeout: 15_000 });
       await page.getByText(/Receipt reference/i).first().waitFor({ state: "visible", timeout: 15_000 });
       interactions.push("inventory-entry-controls-opened-without-submit");
     }
@@ -180,7 +198,7 @@ try {
   assert.equal(transactionalResult?.ok, true, "Transactional UAT did not report ok=true");
   assert.equal(transactionalResult?.rolledBack, true, "Transactional UAT did not prove rollback");
   assert.equal(Number(transactionalResult?.remainingFixtureCount), 0, "Transactional UAT left fixture rows behind");
-  for (const domain of ["funding", "peopleOffice", "inventory", "quality"]) {
+  for (const domain of ["funding", "peopleOffice", "inventory", "quality", "finance", "hrPayroll"]) {
     assert.equal(transactionalResult?.domains?.[domain]?.status, "PASS", `Transactional UAT domain ${domain} did not pass`);
   }
   assert.deepEqual(transactionalErrors, [], `Transactional UAT emitted page errors: ${transactionalErrors.join(" | ")}`);
