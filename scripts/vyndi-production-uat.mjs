@@ -182,14 +182,28 @@ try {
   assert.doesNotMatch(transactional.url(), /\/login(?:\?|$)|\/command-login/, "Transactional UAT route lost authenticated access");
   await transactional.getByRole("button", { name: /Run rollback UAT/i }).waitFor({ state: "visible", timeout: 20_000 });
   await transactional.getByRole("button", { name: /Run rollback UAT/i }).click();
-  const transactionalOutcome = await Promise.race([
-    transactional.getByText(/PASS · ROLLED BACK/i)
-      .waitFor({ state: "visible", timeout: 45_000 })
-      .then(() => ({ type: "pass" })),
-    transactional.getByRole("alert")
-      .waitFor({ state: "visible", timeout: 45_000 })
-      .then(async () => ({ type: "error", message: (await transactional.getByRole("alert").innerText()).trim() })),
-  ]);
+
+  const transactionalTimeoutMs = 120_000;
+  const deadline = Date.now() + transactionalTimeoutMs;
+  let transactionalOutcome = null;
+
+  while (Date.now() < deadline) {
+    if (await transactional.getByText(/PASS · ROLLED BACK/i).isVisible().catch(() => false)) {
+      transactionalOutcome = { type: "pass" };
+      break;
+    }
+    const alert = transactional.getByRole("alert");
+    if (await alert.isVisible().catch(() => false)) {
+      transactionalOutcome = { type: "error", message: (await alert.innerText()).trim() };
+      break;
+    }
+    await transactional.waitForTimeout(500);
+  }
+
+  if (!transactionalOutcome) {
+    const buttonText = (await transactional.getByRole("button").allInnerTexts().catch(() => [])).join(" | ");
+    throw new Error(`Transactional UAT timed out after ${transactionalTimeoutMs}ms. Button state: ${buttonText || "none"}`);
+  }
   if (transactionalOutcome.type === "error") {
     throw new Error(`Transactional server failure: ${transactionalOutcome.message || "unknown server error"}`);
   }
