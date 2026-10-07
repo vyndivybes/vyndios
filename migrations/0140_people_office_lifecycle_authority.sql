@@ -323,7 +323,7 @@ create or replace function record_vyndi_people_employment_event(
   p_evidence_ref text,
   p_actor text,
   p_role text
-) returns table (new_revision integer, operational_status text)
+) returns table (new_revision integer, resulting_operational_status text)
 language plpgsql
 as $$
 declare
