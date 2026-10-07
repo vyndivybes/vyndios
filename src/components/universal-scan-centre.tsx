@@ -40,6 +40,11 @@ type UploadReceipt = {
 
 const WEDGE_GAP_MS = 80;
 const MIN_WEDGE_LENGTH = 4;
+const MODE_TABS = [
+  { value: "code" as const, Icon: QrCode, label: "Code" },
+  { value: "camera" as const, Icon: Camera, label: "Camera" },
+  { value: "document" as const, Icon: FileText, label: "Document" },
+];
 
 function editableTarget(target: EventTarget | null) {
   const element = target instanceof HTMLElement ? target : null;
@@ -312,19 +317,15 @@ export function UniversalScanCentre() {
               </div>
 
               <div className="mt-3 grid grid-cols-3 gap-1 rounded-lg border border-border bg-bg p-1" role="tablist" aria-label="Scanner mode">
-                {[
-                  ["code", QrCode, "Code"],
-                  ["camera", Camera, "Camera"],
-                  ["document", FileText, "Document"],
-                ].map(([value, Icon, label]) => (
+                {MODE_TABS.map(({ value, Icon, label }) => (
                   <button
-                    key={String(value)}
+                    key={value}
                     type="button"
                     role="tab"
                     aria-selected={mode === value}
                     onClick={() => {
                       if (value !== "camera") stopCamera();
-                      setMode(value as Mode);
+                      setMode(value);
                       setError("");
                     }}
                     className={`flex min-h-11 items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition-colors ${mode === value ? "bg-accent/10 text-accent" : "text-muted hover:bg-surface hover:text-fg"}`}
