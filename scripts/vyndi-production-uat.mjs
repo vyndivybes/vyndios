@@ -164,7 +164,17 @@ try {
   assert.doesNotMatch(transactional.url(), /\/login(?:\?|$)|\/command-login/, "Transactional UAT route lost authenticated access");
   await transactional.getByRole("button", { name: /Run rollback UAT/i }).waitFor({ state: "visible", timeout: 20_000 });
   await transactional.getByRole("button", { name: /Run rollback UAT/i }).click();
-  await transactional.getByText(/PASS · ROLLED BACK/i).waitFor({ state: "visible", timeout: 90_000 });
+  const transactionalOutcome = await Promise.race([
+    transactional.getByText(/PASS · ROLLED BACK/i)
+      .waitFor({ state: "visible", timeout: 45_000 })
+      .then(() => ({ type: "pass" })),
+    transactional.getByRole("alert")
+      .waitFor({ state: "visible", timeout: 45_000 })
+      .then(async () => ({ type: "error", message: (await transactional.getByRole("alert").innerText()).trim() })),
+  ]);
+  if (transactionalOutcome.type === "error") {
+    throw new Error(`Transactional server failure: ${transactionalOutcome.message || "unknown server error"}`);
+  }
   const transactionalJson = await transactional.getByTestId("uat-result").innerText();
   const transactionalResult = JSON.parse(transactionalJson);
   assert.equal(transactionalResult?.ok, true, "Transactional UAT did not report ok=true");
