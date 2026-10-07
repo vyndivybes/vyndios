@@ -422,7 +422,7 @@ begin
     p_id,p_grant_id,trim(p_condition_code),trim(p_condition_title),p_condition_status,p_due_on,v_revision,
     p_evidence_reference,coalesce(p_notes,''),p_actor_user_id,p_actor_role
   );
-  select open_condition_count into v_open from vyndi_funding_grant_balance where grant_id=p_grant_id;
+  select b.open_condition_count into v_open from vyndi_funding_grant_balance b where b.grant_id=p_grant_id;
   if p_condition_status='breached' then update vyndi_funding_grants set status='breached',updated_at=now() where id=p_grant_id; end if;
   return query select v_revision,coalesce(v_open,0);
 end;
