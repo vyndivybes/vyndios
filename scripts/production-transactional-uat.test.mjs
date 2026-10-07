@@ -87,3 +87,23 @@ test("browser UAT retries the rollback action until hydration accepts the click"
   assert.match(runner, /rollback action did not start after hydrated retry/i);
   assert.match(runner, /for \(let attempt = 0; attempt < 2 && !transactionalStarted; attempt \+= 1\)/);
 });
+
+
+test("browser UAT renders the core Finance workspaces before transactional certification", () => {
+  for (const route of [
+    "/command/financial-cockpit",
+    "/command/accounting",
+    "/command/payables",
+    "/command/receivables",
+    "/command/cash",
+    "/command/accounting-statements",
+  ]) {
+    assert.match(runner, new RegExp(route.replaceAll("/", "\\/")));
+  }
+  assert.match(runner, /Consolidated Finance/i);
+  assert.match(runner, /Accounting Workbench/i);
+  assert.match(runner, /Accounts Payable/i);
+  assert.match(runner, /Accounts Receivable/i);
+  assert.match(runner, /Cash & Working Capital/i);
+  assert.match(runner, /Financial Statements/i);
+});
