@@ -67,13 +67,26 @@ test("People operational ledgers derive current state and reject stale person re
   );
   const leave=await sql.query("select balance_days from vyndi_people_leave_balance where person_id='P-1' and leave_type='annual'");
   assert.equal(Number(leave.rows[0].balance_days),18);
+  await assert.rejects(
+    sql.query(
+      "select * from post_vyndi_people_leave_transaction($1,$2,$3,$4,$5,$6,$7::date,$8,$9,$10,$11,$12,$13)",
+      ["LV-OVER","P-1","annual","approved_leave","debit",19,"2026-10-06","LEAVE-OVER","","TEST:LEAVE","EVID:OVER","hr-user","management"],
+    ),
+    /Insufficient leave balance/i,
+  );
 
   await sql.query(
     "select record_vyndi_people_qualification($1,$2,$3,$4,$5,$6::date,$7::date,$8,$9,$10,$11,$12,$13)",
     ["QUAL-1","P-1","AV-001","Avionics Safety","obtained","2026-01-01","2027-01-01","CERT-001","","TEST:QUAL","EVID:QUAL","hr-user","management"],
   );
-  const qualification=await sql.query("select currently_valid from vyndi_people_qualification_current where person_id='P-1' and qualification_code='AV-001'");
+  let qualification=await sql.query("select currently_valid from vyndi_people_qualification_current where person_id='P-1' and qualification_code='AV-001'");
   assert.equal(qualification.rows[0].currently_valid,true);
+  await sql.query(
+    "select record_vyndi_people_qualification($1,$2,$3,$4,$5,$6::date,$7::date,$8,$9,$10,$11,$12,$13)",
+    ["QUAL-2","P-1","AV-001","Avionics Safety","superseded","2026-10-06","2027-01-01","CERT-001","","TEST:QUAL","EVID:QUAL-2","hr-user","management"],
+  );
+  qualification=await sql.query("select currently_valid from vyndi_people_qualification_current where person_id='P-1' and qualification_code='AV-001'");
+  assert.equal(qualification.rows[0].currently_valid,false);
 });
 
 test("People exit is fail-closed until asset access payroll leave handover and department controls clear",async(t)=>{
@@ -140,7 +153,19 @@ test("People exit is fail-closed until asset access payroll leave handover and d
     ["ACC-2","P-EXIT","vyndi-admin","revoke","admin","2026-10-30T11:00:00Z","","TEST:ACCESS","EVID:ACC-2","hr-user","management"],
   );
 
-  const readiness=await sql.query("select * from vyndi_people_exit_readiness where exit_case_id='EXIT-1'");
+  await sql.query(
+    "select record_vyndi_people_payroll_readiness($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9)",
+    ["PAY-HOLD","P-EXIT","2026-11","hold",JSON.stringify({reason:"final adjustment"}),"TEST:PAY","EVID:PAY-HOLD","payroll-user","finance"],
+  );
+  let readiness=await sql.query("select * from vyndi_people_exit_readiness where exit_case_id='EXIT-1'");
+  assert.equal(readiness.rows[0].can_finalize,false);
+  assert.equal(readiness.rows[0].payroll_settled,false);
+
+  await sql.query(
+    "select record_vyndi_people_payroll_readiness($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9)",
+    ["PAY-FINAL","P-EXIT","2026-11","settled",JSON.stringify({attendanceReconciled:true,leaveReconciled:true}),"TEST:PAY","EVID:PAY-FINAL","payroll-user","finance"],
+  );
+  readiness=await sql.query("select * from vyndi_people_exit_readiness where exit_case_id='EXIT-1'");
   assert.equal(readiness.rows[0].can_finalize,true);
 
   const finalized=await sql.query(
