@@ -1,0 +1,97 @@
+name: Production Assurance
+
+on:
+  schedule:
+    - cron: '17 1 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-assurance
+  cancel-in-progress: true
+
+jobs:
+  assurance:
+    runs-on: [self-hosted, Linux, X64, vyndi-linux]
+    timeout-minutes: 35
+    env:
+      VYNDI_TEST_BASE_URL: https://vyndios.vayushastr.workers.dev
+      VYNDI_TEST_EMAIL: ${{ secrets.VYNDI_TEST_EMAIL }}
+      VYNDI_TEST_PASSWORD: ${{ secrets.VYNDI_TEST_PASSWORD }}
+      VYNDI_TEST_EXPECTED_SHA: ${{ github.sha }}
+      VYNDI_SLO_ENFORCE_LATENCY: "1"
+      VYNDI_SLO_SAMPLE_COUNT: "5"
+      VYNDI_SLO_ROUTE_P95_LIMIT_MS: "4000"
+      VYNDI_SLO_ROUTE_P99_LIMIT_MS: "8000"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Verify assurance configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$VYNDI_TEST_EMAIL"
+          test -n "$VYNDI_TEST_PASSWORD"
+          test -n "$VYNDI_TEST_EXPECTED_SHA"
+
+      - name: Exact production health and schema gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          const base=(process.env.VYNDI_TEST_BASE_URL||"").replace(/\/$/,"");
+          const expected=(process.env.VYNDI_TEST_EXPECTED_SHA||"").toLowerCase();
+          const response=await fetch(`${base}/api/runtime/health`,{headers:{"cache-control":"no-cache"}});
+          const health=await response.json();
+          if(!response.ok||health?.ok!==true) throw new Error(`production health failed: HTTP ${response.status}`);
+          if(String(health?.sourceSha||"").toLowerCase()!==expected) throw new Error(`production SHA mismatch: expected ${expected}, got ${health?.sourceSha||"missing"}`);
+          if(Number(health?.pendingMigrationCount)!==0) throw new Error(`pending migrations: ${health?.pendingMigrationCount}`);
+          if(health?.checks?.database!=="ok"||health?.checks?.schema!=="current") throw new Error("database/schema readiness failed");
+          console.log(`Production health PASS · SHA ${health.sourceSha} · migrations ${health.migrationCounts?.applied}/${health.migrationCounts?.expected}`);
+          NODE
+
+      - name: Verify or install Chromium
+        timeout-minutes: 4
+        shell: bash
+        run: |
+          set -euo pipefail
+          probe='import { chromium } from "playwright"; const browser = await chromium.launch({ headless: true }); await browser.close();'
+          if node --input-type=module -e "$probe"; then
+            echo "Chromium launch preflight PASS; reusing installed browser."
+            exit 0
+          fi
+          timeout --signal=TERM --kill-after=15s 180s npx playwright install chromium
+          node --input-type=module -e "$probe"
+
+      - name: Authenticated protected-route smoke
+        run: npm run test:browser:production
+
+      - name: Production SLO observation
+        run: npm run observe:slo
+
+      - name: Operator UX viewport qualification
+        run: npm run test:ux:production
+
+      - name: Preserve assurance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-assurance-${{ github.run_id }}
+          path: |
+            artifacts/
+            .grok/evidence/
+          retention-days: 30
+          if-no-files-found: warn

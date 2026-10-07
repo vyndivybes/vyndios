@@ -24,6 +24,18 @@ test("FIFO-issued Production material stays fulfilled and leaves outstanding pro
   t.after(() => db.close());
 
   await db.query(
+    `insert into master_data_records(
+      id,domain,code,name,revision,status,owner_role,approver_role,effective_from,
+      source_ref,attributes,created_by,approved_by,approved_at
+    ) values (
+      '00000000-0000-0000-0000-000000000145','inventory','ISSUE-SKU-TEST',
+      'Issue semantics component',1,'approved','operations','operations',null,
+      'TEST:MASTER:ISSUE-SKU',$1::jsonb,'test-user','test-admin',now()
+    )`,
+    [JSON.stringify({category:"handlebar",unit:"ea",controlState:"controlled"})],
+  );
+
+  await db.query(
     `select * from save_vyndi_master_inventory_entry(
       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::date,$14::date,$15::date,$16,$17,$18,$19
     )`,

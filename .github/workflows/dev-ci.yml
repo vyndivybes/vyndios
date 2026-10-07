@@ -15,7 +15,7 @@ concurrency:
 jobs:
   focused-validation:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,6 +31,9 @@ jobs:
 
       - name: Validate migrations
         run: npm run db:validate
+
+      - name: Reconcile migration lineage
+        run: npm run test:migration-lineage
 
       - name: VIBPE answer architecture
         run: npm run test:vibpe-answer-v3
@@ -59,8 +62,20 @@ jobs:
       - name: Hyperdrive runtime reconciliation
         run: npm run test:runtime-hyperdrive
 
+      - name: Golden MES qualification
+        run: npm run test:mes:golden
+
+      - name: H4 IAM / SoD qualification
+        run: npm run test:h4:iam
+
       - name: Universal scanner input
         run: npm run test:scanner
 
+      - name: Enterprise assurance control regression
+        run: npm run test:assurance:closure
+
       - name: Typecheck
         run: npm run typecheck
+
+      - name: Cloudflare production bundle
+        run: npm run build:bundle
