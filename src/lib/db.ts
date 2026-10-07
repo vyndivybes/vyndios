@@ -45,6 +45,23 @@ export const getSql = createServerOnlyFn(async (): Promise<Sql> => {
   return getSqlServer();
 });
 
+export type SqlTransactionOptions = {
+  alwaysRollback?: boolean;
+  isolationLevel?: "read committed" | "repeatable read" | "serializable";
+};
+
+export const withSqlTransaction = createServerOnlyFn(
+  async <T>(
+    work: (sql: Sql) => Promise<T>,
+    options: SqlTransactionOptions = {},
+  ): Promise<T> => {
+    await syncCloudflareRuntimeEnv();
+    const { withSqlTransactionServer } = await import("./db.server.ts");
+    return withSqlTransactionServer(work, options);
+  },
+);
+
+
 /** Shared embedded Postgres instance for local/preview fallback only. */
 export const getPglite = createServerOnlyFn(async (): Promise<PGlite> => {
   await syncCloudflareRuntimeEnv();
