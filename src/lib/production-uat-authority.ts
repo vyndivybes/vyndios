@@ -495,6 +495,8 @@ export const runProductionTransactionalUat = createServerFn({ method: "POST" })
          (select count(*) from epr_inventory_movements where id=$6) +
          (select count(*) from vyndi_quality_inspections where id=$7) +
          (select count(*) from vyndi_audit_events where source_reference like $8) +
+         (select count(*) from vyndi_monthly_actuals where source_reference like $8) +
+         (select count(*) from vyndi_monthly_actual_revisions where source_reference like $8) +
          (select count(*) from epr_finance_journals where id in ($9,$10)) +
          (select count(*) from vyndi_people_office_cost_items where id=$11) +
          (select count(*) from vyndi_people_office_actual_expenditures where id=$12) +
@@ -513,7 +515,7 @@ export const runProductionTransactionalUat = createServerFn({ method: "POST" })
         ids.inventoryItem,
         ids.inventoryMovement,
         ids.qualityInspection,
-        `${evidenceReference}%`,
+        `%${evidenceReference}%`,
         ids.financeSalesJournal,
         ids.financeReceiptJournal,
         ids.payrollCostItem,
