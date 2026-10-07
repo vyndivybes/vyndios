@@ -5,20 +5,36 @@
 create or replace function guard_vyndi_master_inventory_identity()
 returns trigger
 language plpgsql
-as $$
+as $
+declare
+  v_master record;
+  v_category text;
+  v_unit text;
 begin
-  if not exists (
-    select 1
-      from master_data_records m
-     where m.domain='inventory'
-       and upper(trim(m.code))=upper(trim(new.sku))
-       and m.status='approved'
-  ) then
+  select m.name,m.attributes
+    into v_master
+    from master_data_records m
+   where m.domain='inventory'
+     and upper(trim(m.code))=upper(trim(new.sku))
+     and m.status='approved'
+   order by m.revision desc,m.updated_at desc
+   limit 1;
+
+  if not found then
     raise exception 'New ERP SKU identity requires an approved Inventory Master record for SKU %.',new.sku;
   end if;
+
+  v_category:=nullif(trim(coalesce(v_master.attributes->>'category','')),'');
+  v_unit:=nullif(trim(coalesce(v_master.attributes->>'unit','')),'');
+  if trim(new.name)<>trim(v_master.name)
+     or (v_category is not null and trim(new.category)<>v_category)
+     or (v_unit is not null and vyndi_canonical_unit(new.unit)<>vyndi_canonical_unit(v_unit)) then
+    raise exception 'New ERP SKU identity metadata must match the approved Inventory Master record for SKU %.',new.sku;
+  end if;
+
   return new;
 end;
-$$;
+$;
 
 drop trigger if exists trg_vyndi_master_inventory_identity on master_inventory_items;
 create trigger trg_vyndi_master_inventory_identity
