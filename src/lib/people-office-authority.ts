@@ -32,15 +32,16 @@ async function audit(
     previousState?: string | null;
     newState?: string | null;
     reason?: string | null;
+    entityRevision?: number | null;
     payload?: Record<string, unknown>;
   },
 ) {
   await sql`
     insert into vyndi_audit_events (
-      id,entity_type,entity_id,action,actor_user_id,actor_role,source_reference,payload_json,
+      id,entity_type,entity_id,entity_revision,action,actor_user_id,actor_role,source_reference,payload_json,
       correlation_id,previous_state,new_state,reason
     ) values (
-      ${crypto.randomUUID()},${input.entityType},${input.entityId},${input.action},${input.userId},${input.role},
+      ${crypto.randomUUID()},${input.entityType},${input.entityId},${input.entityRevision ?? null},${input.action},${input.userId},${input.role},
       ${input.sourceReference},${JSON.stringify(input.payload ?? {})}::jsonb,
       ${`PEOPLE_OFFICE|${input.entityType}|${input.entityId}`},${input.previousState ?? null},${input.newState ?? null},${input.reason ?? null}
     )
@@ -51,12 +52,13 @@ export const listPeopleOfficeAuthority = createServerFn({ method: "GET" }).handl
   await assertSameSiteRequest();
   await requirePermission("view");
   const sql = await getSql();
-  const [people, costs, assets, financeFeed, summary, auditEvents] = await Promise.all([
-    sql`select * from vyndi_people_records order by updated_at desc`,
-    sql`select * from vyndi_people_office_cost_items order by cost_group,name`,
-    sql`select * from vyndi_people_office_assets order by asset_class,category,name`,
-    sql`select * from vyndi_people_office_finance_feed order by plan_month`,
+  const [people, costs, assets, financeFeed, summary, operationalSummary, auditEvents] = await Promise.all([
+    sql`select * from vyndi_people_records order by updated_at desc limit 250`,
+    sql`select * from vyndi_people_office_cost_items order by cost_group,name limit 500`,
+    sql`select * from vyndi_people_office_assets order by asset_class,category,name limit 500`,
+    sql`select * from vyndi_people_office_finance_feed order by plan_month limit 36`,
     sql`select * from vyndi_people_office_authority_summary`,
+    sql`select * from vyndi_people_office_operational_summary`,
     sql`
       select id,
              entity_type as "entityType",
@@ -83,6 +85,7 @@ export const listPeopleOfficeAuthority = createServerFn({ method: "GET" }).handl
     assets: Array.isArray(assets) ? [...assets] : [],
     financeFeed: Array.isArray(financeFeed) ? [...financeFeed] : [],
     summary: summary[0] ?? null,
+    operationalSummary: operationalSummary[0] ?? null,
     auditEvents: Array.isArray(auditEvents) ? [...auditEvents] : [],
   };
 });
@@ -122,6 +125,7 @@ const personSchema = z.object({
   endMonth: z.number().int().min(1).max(36).nullable().optional(),
   sourceReference: z.string().min(1).max(500),
   notes: z.string().max(2000).optional(),
+  expectedRevision: z.number().int().positive().nullable().optional(),
 });
 
 export const savePeopleRecordDraft = createServerFn({ method: "POST" })
@@ -131,24 +135,42 @@ export const savePeopleRecordDraft = createServerFn({ method: "POST" })
     const { userId, role } = await requirePermission("edit");
     if (data.startMonth && data.endMonth && data.endMonth < data.startMonth) throw new Error("People record end month cannot precede start month.");
     const sql = await getSql();
-    const existing = await sql<{ lifecycleStatus: string }>`select lifecycle_status as "lifecycleStatus" from vyndi_people_records where id=${data.id} limit 1`;
-    if (existing[0] && existing[0].lifecycleStatus !== "draft") throw new Error("Only draft People records may be edited; create a controlled superseding record instead.");
-    await sql`
-      insert into vyndi_people_records (
-        id,display_name,function_name,role_title,engagement_type,lifecycle_status,start_month,end_month,
-        source_ref,notes,created_by
-      ) values (
-        ${data.id},${data.displayName},${data.functionName},${data.roleTitle},${data.engagementType},'draft',
-        ${data.startMonth ?? null},${data.endMonth ?? null},${data.sourceReference},${data.notes ?? ""},${userId}
-      )
-      on conflict (id) do update set
-        display_name=excluded.display_name,function_name=excluded.function_name,role_title=excluded.role_title,
-        engagement_type=excluded.engagement_type,start_month=excluded.start_month,end_month=excluded.end_month,
-        source_ref=excluded.source_ref,notes=excluded.notes,updated_at=now()
-      where vyndi_people_records.lifecycle_status='draft'
+    const existing = await sql<{ lifecycleStatus: string; revision:number }>`
+      select lifecycle_status as "lifecycleStatus",record_revision as revision
+      from vyndi_people_records where id=${data.id} limit 1
     `;
-    await audit(sql,{ entityType:"people_record",entityId:data.id,action:"PEOPLE_RECORD_DRAFT_SAVED",role,userId,sourceReference:data.sourceReference,newState:"draft",payload:{ engagementType:data.engagementType } });
-    return { ok:true,id:data.id,status:"draft" as const };
+    const current=existing[0];
+    if (current && current.lifecycleStatus !== "draft") throw new Error("Only draft People records may be edited; create a controlled superseding record instead.");
+    if (current && data.expectedRevision == null) throw new Error("People record update requires expectedRevision.");
+    if (current && current.revision !== data.expectedRevision) {
+      throw new Error(`Stale People record revision: expected ${data.expectedRevision}, current ${current.revision}.`);
+    }
+
+    if (!current) {
+      await sql`
+        insert into vyndi_people_records (
+          id,display_name,function_name,role_title,engagement_type,lifecycle_status,start_month,end_month,
+          source_ref,notes,created_by,record_revision
+        ) values (
+          ${data.id},${data.displayName},${data.functionName},${data.roleTitle},${data.engagementType},'draft',
+          ${data.startMonth ?? null},${data.endMonth ?? null},${data.sourceReference},${data.notes ?? ""},${userId},1
+        )
+      `;
+      await audit(sql,{ entityType:"people_record",entityId:data.id,entityRevision:1,action:"PEOPLE_RECORD_DRAFT_SAVED",role,userId,sourceReference:data.sourceReference,newState:"draft",payload:{ engagementType:data.engagementType } });
+      return { ok:true,id:data.id,status:"draft" as const,recordRevision:1 };
+    }
+
+    const updated=await sql<{ revision:number }>`
+      update vyndi_people_records set
+        display_name=${data.displayName},function_name=${data.functionName},role_title=${data.roleTitle},
+        engagement_type=${data.engagementType},start_month=${data.startMonth ?? null},end_month=${data.endMonth ?? null},
+        source_ref=${data.sourceReference},notes=${data.notes ?? ""},record_revision=record_revision+1,updated_at=now()
+      where id=${data.id} and lifecycle_status='draft' and record_revision=${data.expectedRevision}
+      returning record_revision as revision
+    `;
+    if(!updated[0]) throw new Error("Stale People record revision; reload before saving.");
+    await audit(sql,{ entityType:"people_record",entityId:data.id,entityRevision:updated[0].revision,action:"PEOPLE_RECORD_DRAFT_SAVED",role,userId,sourceReference:data.sourceReference,previousState:"draft",newState:"draft",payload:{ engagementType:data.engagementType } });
+    return { ok:true,id:data.id,status:"draft" as const,recordRevision:updated[0].revision };
   });
 
 const costSchema = z.object({
@@ -248,6 +270,10 @@ const transitionSchema = z.object({
   note: z.string().min(1).max(2000),
 });
 
+const personTransitionSchema = transitionSchema.extend({
+  expectedRevision: z.number().int().positive(),
+});
+
 function validTransition(fromStatus: string, toStatus: string) {
   return (fromStatus === "draft" && toStatus === "pending_approval")
     || (fromStatus === "pending_approval" && ["draft", "approved"].includes(toStatus))
@@ -283,15 +309,28 @@ export const transitionPeopleOfficeAsset = createServerFn({ method: "POST" })
   });
 
 export const transitionPeopleRecord = createServerFn({ method: "POST" })
-  .validator(transitionSchema)
+  .validator(personTransitionSchema)
   .handler(async ({ data }) => {
     await assertSameSiteRequest();
     const { userId, role } = await requirePermission(["approved","superseded"].includes(data.toStatus) ? "approve" : "edit");
     const sql = await getSql();
-    const rows = await sql<{ status:string }>`select lifecycle_status as status from vyndi_people_records where id=${data.id} limit 1`;
+    const rows = await sql<{ status:string; revision:number }>`
+      select lifecycle_status as status,record_revision as revision
+      from vyndi_people_records where id=${data.id} limit 1
+    `;
     const current=rows[0]; if(!current) throw new Error("People record not found.");
+    if(current.revision!==data.expectedRevision) throw new Error(`Stale People record revision: expected ${data.expectedRevision}, current ${current.revision}.`);
     if(!validTransition(current.status,data.toStatus)) throw new Error(`Invalid People record transition: ${current.status} → ${data.toStatus}`);
-    await sql`update vyndi_people_records set lifecycle_status=${data.toStatus},approved_by=case when ${data.toStatus}='approved' then ${userId} else approved_by end,updated_at=now() where id=${data.id}`;
-    await audit(sql,{entityType:"people_record",entityId:data.id,action:"PEOPLE_RECORD_STATUS_CHANGED",role,userId,sourceReference:data.sourceReference,previousState:current.status,newState:data.toStatus,reason:data.note});
-    return {ok:true,fromStatus:current.status,toStatus:data.toStatus};
+    const updated=await sql<{revision:number}>`
+      update vyndi_people_records set
+        lifecycle_status=${data.toStatus},
+        record_revision=record_revision+1,
+        approved_by=case when ${data.toStatus}='approved' then ${userId} else approved_by end,
+        updated_at=now()
+      where id=${data.id} and record_revision=${data.expectedRevision}
+      returning record_revision as revision
+    `;
+    if(!updated[0]) throw new Error("Stale People record revision; reload before changing lifecycle.");
+    await audit(sql,{entityType:"people_record",entityId:data.id,entityRevision:updated[0].revision,action:"PEOPLE_RECORD_STATUS_CHANGED",role,userId,sourceReference:data.sourceReference,previousState:current.status,newState:data.toStatus,reason:data.note});
+    return {ok:true,fromStatus:current.status,toStatus:data.toStatus,recordRevision:updated[0].revision};
   });
