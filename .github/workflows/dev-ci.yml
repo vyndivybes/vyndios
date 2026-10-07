@@ -44,5 +44,8 @@ jobs:
       - name: Execute migrations from empty database
         run: node --test scripts/migration-execution.test.mjs
 
+      - name: People and Office lifecycle authority
+        run: npm run test:people-office-lifecycle
+
       - name: Typecheck
         run: npm run typecheck

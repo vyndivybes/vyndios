@@ -44,6 +44,7 @@ interface PersonForm {
   endMonth: string;
   sourceReference: string;
   notes: string;
+  recordRevision: number;
 }
 
 interface CostForm {
@@ -89,6 +90,7 @@ function PeopleOffice() {
   const assets = data.assets as Row[];
   const financeFeed = data.financeFeed as Row[];
   const auditEvents = data.auditEvents as Row[];
+  const operationalSummary = (data.operationalSummary ?? {}) as Row;
   const approvedCosts = costs.filter((row) => statusOf(row) === "approved");
   const approvedAssets = assets.filter((row) => statusOf(row) === "approved");
   const feedOpex = financeFeed.reduce(
@@ -130,6 +132,7 @@ function PeopleOffice() {
       endMonth: text(row, "end_month", "endMonth"),
       sourceReference: sourceOf(row),
       notes: text(row, "notes"),
+      recordRevision: num(row, "record_revision", "recordRevision") || 1,
     });
   }
 
@@ -202,6 +205,7 @@ function PeopleOffice() {
             endMonth: nullableMonth(personForm.endMonth),
             sourceReference: personForm.sourceReference,
             notes: personForm.notes,
+            expectedRevision: personForm.recordRevision,
           },
         }),
       "People draft saved and appended to the audit trail.",
@@ -268,7 +272,11 @@ function PeopleOffice() {
     await runMutation(
       id,
       () => {
-        if (kind === "person") return transitionPeopleRecord({ data });
+        if (kind === "person") {
+          return transitionPeopleRecord({
+            data: { ...data, expectedRevision: num(row, "record_revision", "recordRevision") || 1 },
+          });
+        }
         if (kind === "cost") return transitionPeopleOfficeCost({ data });
         return transitionPeopleOfficeAsset({ data });
       },
@@ -330,11 +338,22 @@ function PeopleOffice() {
         </div>
       </header>
 
-      <div className="grid gap-3 sm:grid-cols-4">
-        <Kpi label="People records" value={String(people.length)} hint="Editable while draft" />
-        <Kpi label="Approved cost items" value={String(approvedCosts.length)} hint={`${costs.length} total`} />
-        <Kpi label="Approved assets" value={String(approvedAssets.length)} hint={`${assets.length} total`} />
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Kpi label="People records" value={String(people.length)} hint="Canonical master · revision controlled" />
+        <Kpi label="Active people" value={String(num(operationalSummary,"active_people_count","activePeopleCount"))} hint={`${num(operationalSummary,"exiting_people_count","exitingPeopleCount")} exiting`} />
+        <Kpi label="Exit blockers" value={String(num(operationalSummary,"blocked_exit_count","blockedExitCount"))} hint="Custody · access · payroll · clearance" tone={num(operationalSummary,"blocked_exit_count","blockedExitCount") ? "warn" : "ok"} />
         <Kpi label="Approved 36M feed" value={money(feedOpex)} hint="Finance-consumable OPEX" tone={financeFeed.length ? "ok" : "warn"} />
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Kpi label="Present today" value={String(num(operationalSummary,"present_today_count","presentTodayCount"))} hint="Present · remote · travel" />
+        <Kpi label="Assets in custody" value={String(num(operationalSummary,"open_asset_custody_count","openAssetCustodyCount"))} hint="Must close before exit" tone={num(operationalSummary,"open_asset_custody_count","openAssetCustodyCount") ? "warn" : "ok"} />
+        <Kpi label="Active access" value={String(num(operationalSummary,"active_access_count","activeAccessCount"))} hint="Grant/change/suspend requiring revocation" />
+        <Kpi label="Invalid qualifications" value={String(num(operationalSummary,"invalid_qualification_count","invalidQualificationCount"))} hint="Expired or revoked current qualification" tone={num(operationalSummary,"invalid_qualification_count","invalidQualificationCount") ? "warn" : "ok"} />
+      </div>
+
+      <div className="rounded-xl border border-border bg-surface p-4 text-xs leading-5 text-muted">
+        <strong className="text-fg">Operational ledgers:</strong> employment, attendance, leave, training/qualification, asset custody, access/IAM, payroll readiness and exit clearance now sit under the same People master. Leave balances and current states are ledger-derived; exit finalization fails closed while custody, access, payroll or required clearances remain open.
       </div>
 
       {message ? (
@@ -374,7 +393,7 @@ function PeopleOffice() {
                             <td className="px-2 py-2">{text(row, "function_name", "functionName")}</td>
                             <td className="px-2 py-2">{text(row, "engagement_type", "engagementType")}</td>
                             <td className="px-2 py-2 text-muted">M{text(row, "start_month", "startMonth") || "—"} → M{text(row, "end_month", "endMonth") || "—"}</td>
-                            <td className="px-2 py-2 font-semibold uppercase">{statusOf(row)}</td>
+                            <td className="px-2 py-2"><p className="font-semibold uppercase">{statusOf(row)}</p><p className="text-[10px] text-muted">{text(row,"operational_status","operationalStatus") || "planned"} · r{text(row,"record_revision","recordRevision") || "1"}</p></td>
                             <td className="px-2 py-2">{lifecycleControls("person", row, () => beginPersonEdit(row))}</td>
                           </tr>
                           {editing ? (
