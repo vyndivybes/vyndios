@@ -51,11 +51,26 @@ test("new ERP inventory SKU requires approved Inventory Master identity and deri
     [JSON.stringify({category:"approved-category",unit:"ea",controlState:"controlled"})],
   );
 
+  await assert.rejects(
+    sql.query(
+      `select * from save_vyndi_master_inventory_entry(
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::date,$14::date,$15::date,$16,$17,$18,$19
+      )`,
+      args,
+    ),
+    /metadata must match the approved Inventory Master/i,
+  );
+
+  const canonicalArgs=[
+    "ITEM-CONSOLIDATION","MOV-CONSOLIDATION","LED-CONSOLIDATION","components",
+    "SKU-CONSOLIDATED","Canonical Approved Part","approved-category","ea",1,1,2,50,
+    "2026-10-07",null,null,"TEST:RECEIPT","route consolidation","inventory-user","operations",
+  ];
   await sql.query(
     `select * from save_vyndi_master_inventory_entry(
       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::date,$14::date,$15::date,$16,$17,$18,$19
     )`,
-    args,
+    canonicalArgs,
   );
 
   const item=await sql.query(
