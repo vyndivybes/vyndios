@@ -267,6 +267,9 @@ export async function withSqlTransactionServer<T>(
         ? "REPEATABLE READ"
         : "READ COMMITTED";
     await client.query(`SET TRANSACTION ISOLATION LEVEL ${isolationSql}`);
+    await client.query("SET LOCAL lock_timeout = '5s'");
+    await client.query("SET LOCAL statement_timeout = '25s'");
+    await client.query("SET LOCAL idle_in_transaction_session_timeout = '30s'");
 
     const sql = toSql(async <R>(text: string, params: unknown[]) => {
       const result = await client.query(text, params);
