@@ -72,6 +72,17 @@ export type RecoveryEventRow = {
   created_at:string;
 };
 
+export type RecoveryQualificationSummaryRow = {
+  request_id:string;
+  department_scope_count:number;
+  matched_department_count:number;
+  configuration_match_count:number;
+  attachment_match_count:number;
+  mismatch_count:number;
+  source_attachment_bytes:number;
+  restored_attachment_bytes:number;
+};
+
 export type RecoverySupportRow = {
   entityType:string;
   label:string;
@@ -84,6 +95,7 @@ export type RecoveryCentreWorkspace = {
   checkpoints:RecoveryCheckpointRow[];
   requests:RecoveryRequestRow[];
   events:RecoveryEventRow[];
+  qualificationSummary:RecoveryQualificationSummaryRow[];
   summary:{
     latest_checkpoint_at:string|null;
     checkpoint_count:number;
@@ -178,7 +190,7 @@ const selectiveRecoverySupport:RecoverySupportRow[]=[
 ];
 
 async function readWorkspace(sql:Awaited<ReturnType<typeof getSql>>) {
-  const [checkpoints,requests,events,summary]=await Promise.all([
+  const [checkpoints,requests,events,qualificationSummary,summary]=await Promise.all([
     sql.query<RecoveryCheckpointRow>(
       `select id,checkpoint_type,captured_at::text,source_sha,source_reference,storage_reference,
               checksum,size_bytes,notes,recorded_by,created_at::text
@@ -199,6 +211,13 @@ async function readWorkspace(sql:Awaited<ReturnType<typeof getSql>>) {
          from vyndi_recovery_events
         order by created_at desc limit 150`,
     ),
+    sql.query<RecoveryQualificationSummaryRow>(
+      `select request_id,department_scope_count::int,matched_department_count::int,
+              configuration_match_count::int,attachment_match_count::int,mismatch_count::int,
+              source_attachment_bytes::bigint,restored_attachment_bytes::bigint
+         from vyndi_recovery_qualification_summary
+        order by request_id desc limit 100`,
+    ),
     sql.query<{
       latest_checkpoint_at:string|null;
       checkpoint_count:number;
@@ -215,6 +234,7 @@ async function readWorkspace(sql:Awaited<ReturnType<typeof getSql>>) {
     checkpoints,
     requests,
     events,
+    qualificationSummary,
     summary:summary[0] ?? {
       latest_checkpoint_at:null,
       checkpoint_count:0,
@@ -455,6 +475,39 @@ export const executeVindySelectiveRecovery = createServerFn({method:"POST"})
     return {ok:true,entityType:rows[0]?.entity_type,entityId:rows[0]?.entity_id,newRevision:Number(rows[0]?.new_revision ?? 0)};
   });
 
+export const recordVindyRecoveryQualificationEvidence = createServerFn({method:"POST"})
+  .validator(z.object({
+    requestId,
+    evidenceKind:z.enum(["department","configuration","attachment"]),
+    scopeName:z.string().trim().min(1).max(160),
+    sourceHash:z.string().regex(/^[0-9a-f]{64}$/),
+    restoredHash:z.string().regex(/^[0-9a-f]{64}$/),
+    sourceCount:z.number().int().nonnegative(),
+    restoredCount:z.number().int().nonnegative(),
+    sourceBytes:z.number().int().nonnegative().nullable().optional(),
+    restoredBytes:z.number().int().nonnegative().nullable().optional(),
+    sourceReference:reference,
+    evidenceReference:reference,
+  }))
+  .middleware([authMiddleware])
+  .handler(async({data,context})=>{
+    const actor=await requireAdmin(context.userId,context.userEmail);
+    const sql=await getSql();
+    const id=`REC-Q-${crypto.randomUUID()}`;
+    const rows=await sql.query<{evidence_revision:number;matched:boolean}>(
+      `select * from register_vyndi_recovery_qualification_evidence(
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14
+      )`,
+      [
+        id,data.requestId,data.evidenceKind,data.scopeName,data.sourceHash,data.restoredHash,
+        data.sourceCount,data.restoredCount,data.sourceBytes ?? null,data.restoredBytes ?? null,
+        data.sourceReference,data.evidenceReference,actor.userId,actor.role,
+      ],
+    );
+    const row=rows[0];
+    return {ok:true,id,revision:Number(row?.evidence_revision ?? 0),matched:Boolean(row?.matched)};
+  });
+
 export const validateVindyFullRestore = createServerFn({method:"POST"})
   .validator(z.object({
     requestId,
@@ -482,7 +535,11 @@ export const validateVindyFullRestore = createServerFn({method:"POST"})
       `select validate_vyndi_full_restore($1,$2::jsonb,$3,$4,$5) as status`,
       [data.requestId,JSON.stringify(evidence),data.evidenceReference,actor.userId,actor.role],
     );
-    return {ok:true,status:rows[0]?.status ?? "cutover_ready"};
+    const qualification=await sql.query<RecoveryQualificationSummaryRow>(
+      `select * from vyndi_recovery_qualification_summary where request_id=$1`,
+      [data.requestId],
+    );
+    return {ok:true,status:rows[0]?.status ?? "cutover_ready",qualificationSummary:qualification[0] ?? null};
   });
 
 export const recordVindyFullRestoreCutover = createServerFn({method:"POST"})
