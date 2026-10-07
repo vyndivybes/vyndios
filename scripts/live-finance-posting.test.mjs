@@ -17,6 +17,7 @@ const founderPaidMigration = read("migrations/0094_founder_paid_expense_authorit
 const manualExpenseMigration = read("migrations/0096_manual_operating_expense.sql");
 const expenseEvidenceMigration = read("migrations/0097_expense_evidence_attachments.sql");
 const nestedEvidenceMigration = read("migrations/0098_nested_finance_evidence.sql");
+const financePeriodValidationMigration = read("migrations/0144_finance_period_validation.sql");
 const expenseEvidenceApi = read("src/routes/api/finance/expense-evidence.ts");
 const expenseClassification = read("src/lib/finance/expense-classification.ts");
 const authority = read("src/lib/finance/accounting-authority.ts");
@@ -89,6 +90,30 @@ test("asset and payroll controls cannot create parallel accounting truth", () =>
   assert.match(workbench, /read-only for financial source truth/);
   assert.match(workbench, /Governed payroll expenditure ID/);
   assert.match(workbench, /does not post cash/);
+});
+
+test("Finance period validation uses unambiguous calendar-month patterns", () => {
+  assert.match(
+    financePeriodValidationMigration,
+    /Payroll period must use YYYY-MM/,
+  );
+  assert.match(
+    financePeriodValidationMigration,
+    /\^\[0-9\]\{4\}-\(0\[1-9\]\|1\[0-2\]\)\$/,
+  );
+  assert.match(
+    financePeriodValidationMigration,
+    /epr_finance_payroll_period_format_check/,
+  );
+  assert.match(
+    financePeriodValidationMigration,
+    /vyndi_tooling_depreciation_period_format_check/,
+  );
+  assert.match(
+    authority,
+    /period: z\.string\(\)\.regex\(\/\^\[0-9\]\{4\}-\(0\[1-9\]\|1\[0-2\]\)\$\/\)/,
+  );
+  assert.doesNotMatch(authority, /period: z\.string\(\)\.regex\(\/\^\\\\d/);
 });
 
 test("Finance Control links to the accounting workbench", () => {
