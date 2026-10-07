@@ -48,12 +48,14 @@ test("certification route is hidden admin-only and Playwright executes it", () =
   assert.match(runner, /transactional write phase/i);
 });
 
-test("transactional UAT surfaces server failures instead of timing out blindly", () => {
+test("transactional UAT surfaces server failures and allows the expanded rollback transaction to finish", () => {
   assert.match(dbServer, /lock_timeout/i);
   assert.match(dbServer, /statement_timeout/i);
   assert.match(runner, /transactional server failure/i);
-  assert.match(runner, /Promise\.race/);
+  assert.match(runner, /transactionalTimeoutMs\s*=\s*120_000/);
   assert.match(runner, /getByRole\("alert"\)/);
+  assert.match(runner, /transactional UAT timed out/i);
+  assert.doesNotMatch(runner, /Promise\.race/);
 });
 
 
