@@ -21,7 +21,7 @@ test("transactional UAT has a dedicated single-connection rollback primitive", (
   assert.match(dbServer, /alwaysRollback/);
 });
 
-test("transactional UAT is admin-only and exercises four production authorities", () => {
+test("transactional UAT is admin-only and exercises governed production authorities", () => {
   assert.match(authority, /requireBusinessActor\("admin"\)/);
   assert.match(authority, /RUN_ROLLBACK_UAT/);
   assert.match(authority, /create_vyndi_funding_grant/);
@@ -48,12 +48,15 @@ test("certification route is hidden admin-only and Playwright executes it", () =
   assert.match(runner, /transactional write phase/i);
 });
 
-test("transactional UAT surfaces server failures instead of timing out blindly", () => {
+test("transactional UAT surfaces server failures and allows the expanded rollback transaction to finish", () => {
   assert.match(dbServer, /lock_timeout/i);
   assert.match(dbServer, /statement_timeout/i);
   assert.match(runner, /transactional server failure/i);
-  assert.match(runner, /Promise\.race/);
+  assert.match(runner, /transactionalTimeoutMs\s*=\s*120_000/);
   assert.match(runner, /getByRole\("alert"\)/);
+  assert.match(runner, /transactional UAT timed out/i);
+  assert.match(runner, /while \(Date\.now\(\) < deadline\)/);
+  assert.doesNotMatch(runner, /timeout:\s*45_000/);
 });
 
 
@@ -69,4 +72,38 @@ test("transactional UAT exercises Finance and HR/payroll production authorities"
   assert.match(authority, /customer_receipt/);
   assert.match(route, /Finance/i);
   assert.match(route, /Payroll/i);
+});
+
+
+test("browser UAT tolerates inventory hydration and requires Finance and HR/payroll domain PASS", () => {
+  assert.match(runner, /inventory entry did not open after hydrated retry/i);
+  assert.match(runner, /Close entry/i);
+  assert.match(runner, /"finance", "hrPayroll"/);
+});
+
+
+test("browser UAT retries the rollback action until hydration accepts the click", () => {
+  assert.match(runner, /Running rollback UAT/i);
+  assert.match(runner, /rollback action did not start after hydrated retry/i);
+  assert.match(runner, /for \(let attempt = 0; attempt < 2 && !transactionalStarted; attempt \+= 1\)/);
+});
+
+
+test("browser UAT renders the core Finance workspaces before transactional certification", () => {
+  for (const route of [
+    "/command/financial-cockpit",
+    "/command/accounting",
+    "/command/payables",
+    "/command/receivables",
+    "/command/cash",
+    "/command/accounting-statements",
+  ]) {
+    assert.match(runner, new RegExp(route.replaceAll("/", "\\/")));
+  }
+  assert.match(runner, /Consolidated Finance/i);
+  assert.match(runner, /Accounting Workbench/i);
+  assert.match(runner, /Accounts Payable/i);
+  assert.match(runner, /Accounts Receivable/i);
+  assert.match(runner, /Cash & Working Capital/i);
+  assert.match(runner, /Financial Statements/i);
 });
