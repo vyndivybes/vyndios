@@ -56,5 +56,8 @@ jobs:
       - name: Writer and route consolidation
         run: npm run test:writer-route-consolidation
 
+      - name: Hyperdrive runtime reconciliation
+        run: npm run test:runtime-hyperdrive
+
       - name: Typecheck
         run: npm run typecheck
