@@ -80,3 +80,10 @@ test("browser UAT tolerates inventory hydration and requires Finance and HR/payr
   assert.match(runner, /Close entry/i);
   assert.match(runner, /"finance", "hrPayroll"/);
 });
+
+
+test("browser UAT retries the rollback action until hydration accepts the click", () => {
+  assert.match(runner, /Running rollback UAT/i);
+  assert.match(runner, /rollback action did not start after hydrated retry/i);
+  assert.match(runner, /for \(let attempt = 0; attempt < 2 && !transactionalStarted; attempt \+= 1\)/);
+});
