@@ -99,7 +99,7 @@ test("People exit is fail-closed until asset access payroll leave handover and d
   );
   await sql.query(
     "select record_vyndi_people_payroll_readiness($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9)",
-    ["PAY-1","P-EXIT","2026-10","settled",JSON.stringify({attendance:"reconciled"}),"TEST:PAY","EVID:PAY","payroll-user","finance"],
+    ["PAY-1","P-EXIT","2026-10","settled",JSON.stringify({attendanceReconciled:true,leaveReconciled:true}),"TEST:PAY","EVID:PAY","payroll-user","finance"],
   );
 
   const initiated=await sql.query(
