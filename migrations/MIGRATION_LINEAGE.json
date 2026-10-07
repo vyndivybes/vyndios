@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "purpose": "Preserve immutable production migration history when a historical ledger entry is intentionally no longer a deployable root migration.",
+  "historicalAppliedOnly": [
+    {
+      "name": "0023_operating_plan_versions.sql",
+      "status": "superseded",
+      "databaseLedgerPolicy": "retain",
+      "sourceFilePolicy": "do-not-recreate",
+      "reason": "Historical production migration ledger entry retained for audit lineage. It is not part of the current deployable root migration set and must not be deleted from an already-applied production ledger or recreated as a new migration."
+    }
+  ]
+}
