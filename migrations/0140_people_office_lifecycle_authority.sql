@@ -23,6 +23,14 @@ create unique index if not exists vyndi_people_records_employee_code_uq
   on vyndi_people_records(employee_code)
   where employee_code is not null and btrim(employee_code)<>'';
 
+update vyndi_people_records
+set operational_status=case
+  when lifecycle_status='approved' and engagement_type<>'planned_role' then 'active'
+  when lifecycle_status in ('inactive','superseded') then 'inactive'
+  else 'planned'
+end
+where operational_status='planned';
+
 create table if not exists vyndi_people_employment_ledger (
   id text primary key,
   person_id text not null references vyndi_people_records(id) on delete restrict,
@@ -56,7 +64,8 @@ create table if not exists vyndi_people_attendance_ledger (
   recorded_by text not null,
   recorded_role text not null,
   created_at timestamptz not null default now(),
-  unique(person_id,work_date,revision)
+  unique(person_id,work_date,revision),
+  check (worked_hours + overtime_hours <= 24)
 );
 create index if not exists vyndi_people_attendance_person_date_idx
   on vyndi_people_attendance_ledger(person_id,work_date desc,revision desc);
@@ -209,7 +218,7 @@ select distinct on (person_id,qualification_code)
   id,person_id,qualification_code,qualification_title,event_type,effective_on,valid_until,
   certificate_ref,notes,source_ref,evidence_ref,recorded_by,recorded_role,created_at,
   case
-    when event_type='revoked' then false
+    when event_type in ('revoked','superseded') then false
     when valid_until is null then true
     else valid_until>=current_date
   end as currently_valid
@@ -250,14 +259,14 @@ select
   c.status as exit_status,
   coalesce(cust.open_asset_custody_count,0)::int as open_asset_custody_count,
   coalesce(acc.active_access_count,0)::int as active_access_count,
-  coalesce(pay.payroll_settled,false) as payroll_settled,
+  (coalesce(pay.payroll_settled,false) or coalesce(clr.payroll_clearance_ready,false)) as payroll_settled,
   coalesce(clr.handover_ready,false) as handover_ready,
   coalesce(clr.leave_reconciled,false) as leave_reconciled,
   coalesce(clr.department_clearance_ready,false) as department_clearance_ready,
   (
     coalesce(cust.open_asset_custody_count,0)=0
     and coalesce(acc.active_access_count,0)=0
-    and coalesce(pay.payroll_settled,false)
+    and (coalesce(pay.payroll_settled,false) or coalesce(clr.payroll_clearance_ready,false))
     and coalesce(clr.handover_ready,false)
     and coalesce(clr.leave_reconciled,false)
     and coalesce(clr.department_clearance_ready,false)
@@ -274,16 +283,19 @@ left join lateral (
   where aa.person_id=c.person_id and aa.requires_exit_revocation
 ) acc on true
 left join lateral (
-  select exists(
-    select 1
+  select coalesce((
+    select pr.readiness_status='settled'
     from vyndi_people_payroll_readiness_current pr
-    where pr.person_id=c.person_id and pr.readiness_status='settled'
-  ) as payroll_settled
+    where pr.person_id=c.person_id
+    order by pr.created_at desc,pr.period_key desc,pr.id desc
+    limit 1
+  ),false) as payroll_settled
 ) pay on true
 left join lateral (
   select
     coalesce(bool_or(clearance_type='handover' and clearance_status in ('cleared','waived')),false) as handover_ready,
     coalesce(bool_or(clearance_type='leave_reconciliation' and clearance_status in ('cleared','waived')),false) as leave_reconciled,
+    coalesce(bool_or(clearance_type='payroll_settlement' and clearance_status in ('cleared','waived')),false) as payroll_clearance_ready,
     coalesce(bool_or(clearance_type='department_clearance' and clearance_status in ('cleared','waived')),false) as department_clearance_ready
   from vyndi_people_exit_clearance_current ec
   where ec.exit_case_id=c.id
@@ -319,10 +331,10 @@ declare
   v_next_revision integer;
   v_status text;
 begin
-  select id,record_revision,operational_status
+  select pr.id,pr.record_revision,pr.operational_status
     into v_person
-    from vyndi_people_records
-   where id=p_person_id
+    from vyndi_people_records pr
+   where pr.id=p_person_id
    for update;
   if not found then raise exception 'People record not found.'; end if;
   if v_person.record_revision<>p_expected_revision then
@@ -379,10 +391,16 @@ create or replace function post_vyndi_people_leave_transaction(
   p_effective_on date,p_related_reference text,p_notes text,p_source_ref text,p_evidence_ref text,p_actor text,p_role text
 ) returns table (balance_days numeric)
 language plpgsql
-as $$
+as $
 declare v_balance numeric;
 begin
   if not exists(select 1 from vyndi_people_records where id=p_person_id) then raise exception 'People record not found.'; end if;
+  perform pg_advisory_xact_lock(hashtext(p_person_id || '|' || lower(trim(p_leave_type)))::bigint);
+  select coalesce(sum(case when direction='credit' then quantity_days else -quantity_days end),0)
+    into v_balance from vyndi_people_leave_ledger where person_id=p_person_id and leave_type=p_leave_type;
+  if p_direction='debit' and v_balance<p_quantity_days then
+    raise exception 'Insufficient leave balance for %: available %, requested %.',p_leave_type,v_balance,p_quantity_days;
+  end if;
   insert into vyndi_people_leave_ledger(
     id,person_id,leave_type,transaction_type,direction,quantity_days,effective_on,related_reference,notes,
     source_ref,evidence_ref,recorded_by,recorded_role
@@ -460,6 +478,13 @@ language plpgsql
 as $$
 begin
   if not exists(select 1 from vyndi_people_records where id=p_person_id) then raise exception 'People record not found.'; end if;
+  if p_readiness_status in ('ready','settled')
+     and (
+       coalesce((p_basis_json->>'attendanceReconciled')::boolean,false)=false
+       or coalesce((p_basis_json->>'leaveReconciled')::boolean,false)=false
+     ) then
+    raise exception 'Payroll readiness requires attendance and leave reconciliation evidence.';
+  end if;
   insert into vyndi_people_payroll_readiness_ledger(
     id,person_id,period_key,readiness_status,basis_json,source_ref,evidence_ref,recorded_by,recorded_role
   ) values (
