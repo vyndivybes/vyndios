@@ -334,3 +334,206 @@ export const transitionPeopleRecord = createServerFn({ method: "POST" })
     await audit(sql,{entityType:"people_record",entityId:data.id,entityRevision:updated[0].revision,action:"PEOPLE_RECORD_STATUS_CHANGED",role,userId,sourceReference:data.sourceReference,previousState:current.status,newState:data.toStatus,reason:data.note});
     return {ok:true,fromStatus:current.status,toStatus:data.toStatus,recordRevision:updated[0].revision};
   });
+
+const operationsPageSchema=z.object({
+  page:z.number().int().min(0).default(0),
+  pageSize:z.number().int().min(1).max(100).default(50),
+  personId:z.string().min(1).max(120).nullable().optional(),
+});
+
+export const listPeopleOfficeOperations=createServerFn({method:"GET"})
+  .validator(operationsPageSchema)
+  .handler(async({data})=>{
+    await assertSameSiteRequest();
+    await requirePermission("view");
+    const sql=await getSql();
+    const limit=data.pageSize;
+    const offset=data.page*data.pageSize;
+    const person=data.personId??null;
+    const where=person?" where person_id=$3":"";
+    const params=person?[limit,offset,person]:[limit,offset];
+    const [employment,attendance,leave,qualifications,custody,access,payroll,exitCases]=await Promise.all([
+      sql.query(`select * from vyndi_people_employment_ledger${where} order by effective_on desc,created_at desc limit $1 offset $2`,params),
+      sql.query(`select * from vyndi_people_attendance_current${where} order by work_date desc,created_at desc limit $1 offset $2`,params),
+      sql.query(`select * from vyndi_people_leave_ledger${where} order by effective_on desc,created_at desc limit $1 offset $2`,params),
+      sql.query(`select * from vyndi_people_qualification_current${where} order by qualification_code,created_at desc limit $1 offset $2`,params),
+      sql.query(`select * from vyndi_people_asset_custody_current${where} order by occurred_at desc,created_at desc limit $1 offset $2`,params),
+      sql.query(`select * from vyndi_people_access_current${where} order by occurred_at desc,created_at desc limit $1 offset $2`,params),
+      sql.query(`select * from vyndi_people_payroll_readiness_current${where} order by period_key desc,created_at desc limit $1 offset $2`,params),
+      sql.query(`select c.*,r.can_finalize,r.open_asset_custody_count,r.active_access_count,r.payroll_settled,r.handover_ready,r.leave_reconciled,r.department_clearance_ready
+        from vyndi_people_exit_cases c
+        left join vyndi_people_exit_readiness r on r.exit_case_id=c.id
+        ${person?"where c.person_id=$3":""}
+        order by c.created_at desc limit $1 offset $2`,params),
+    ]);
+    return {page:data.page,pageSize:data.pageSize,employment,attendance,leave,qualifications,custody,access,payroll,exitCases};
+  });
+
+const operationalEvidence=z.object({
+  personId:z.string().min(1).max(120),
+  sourceReference:z.string().min(1).max(500),
+  evidenceReference:z.string().min(1).max(500),
+});
+
+export const recordEmploymentEvent=createServerFn({method:"POST"})
+  .validator(operationalEvidence.extend({
+    eventType:z.enum(["joined","role_change","transfer","promotion","compensation_change","status_change"]),
+    effectiveOn:z.string().date(),
+    details:z.record(z.string(),z.unknown()).default({}),
+    operationalStatus:z.enum(["planned","active","on_leave","exiting","inactive"]).nullable().optional(),
+    expectedRevision:z.number().int().positive(),
+  }))
+  .handler(async({data})=>{
+    await assertSameSiteRequest();
+    const actor=await requirePermission("edit");
+    const sql=await getSql();
+    const id=crypto.randomUUID();
+    const rows=await sql.query<{new_revision:number;operational_status:string}>(
+      "select * from record_vyndi_people_employment_event($1,$2,$3,$4::date,$5::jsonb,$6,$7,$8,$9,$10,$11)",
+      [id,data.personId,data.eventType,data.effectiveOn,JSON.stringify(data.details),data.operationalStatus??null,data.expectedRevision,data.sourceReference,data.evidenceReference,actor.userId,actor.role],
+    );
+    const row=rows[0]; if(!row) throw new Error("Employment event was not recorded.");
+    await audit(sql,{entityType:"people_employment",entityId:id,entityRevision:Number(row.new_revision),action:"PEOPLE_EMPLOYMENT_EVENT_RECORDED",role:actor.role,userId:actor.userId,sourceReference:data.sourceReference,payload:{personId:data.personId,eventType:data.eventType,evidenceReference:data.evidenceReference}});
+    return {ok:true,id,recordRevision:Number(row.new_revision),operationalStatus:row.operational_status};
+  });
+
+export const recordAttendance=createServerFn({method:"POST"})
+  .validator(operationalEvidence.extend({
+    workDate:z.string().date(),
+    attendanceStatus:z.enum(["present","absent","leave","holiday","remote","travel"]),
+    workedHours:z.number().min(0).max(24).default(0),
+    overtimeHours:z.number().min(0).max(24).default(0),
+    notes:z.string().max(2000).default(""),
+  }))
+  .handler(async({data})=>{
+    await assertSameSiteRequest(); const actor=await requirePermission("edit"); const sql=await getSql(); const id=crypto.randomUUID();
+    const rows=await sql.query<{attendance_revision:number}>(
+      "select * from record_vyndi_people_attendance($1,$2,$3::date,$4,$5,$6,$7,$8,$9,$10,$11)",
+      [id,data.personId,data.workDate,data.attendanceStatus,data.workedHours,data.overtimeHours,data.notes,data.sourceReference,data.evidenceReference,actor.userId,actor.role],
+    );
+    const revision=Number(rows[0]?.attendance_revision??0);
+    await audit(sql,{entityType:"people_attendance",entityId:id,entityRevision:revision,action:"PEOPLE_ATTENDANCE_RECORDED",role:actor.role,userId:actor.userId,sourceReference:data.sourceReference,payload:{personId:data.personId,workDate:data.workDate,status:data.attendanceStatus,evidenceReference:data.evidenceReference}});
+    return {ok:true,id,revision};
+  });
+
+export const postLeaveTransaction=createServerFn({method:"POST"})
+  .validator(operationalEvidence.extend({
+    leaveType:z.string().min(1).max(120),
+    transactionType:z.enum(["entitlement","accrual","approved_leave","cancellation","adjustment","expiry"]),
+    direction:z.enum(["credit","debit"]),
+    quantityDays:z.number().positive(),
+    effectiveOn:z.string().date(),
+    relatedReference:z.string().max(300).nullable().optional(),
+    notes:z.string().max(2000).default(""),
+  }))
+  .handler(async({data})=>{
+    await assertSameSiteRequest(); const actor=await requirePermission("edit"); const sql=await getSql(); const id=crypto.randomUUID();
+    const rows=await sql.query<{balance_days:number|string}>(
+      "select * from post_vyndi_people_leave_transaction($1,$2,$3,$4,$5,$6,$7::date,$8,$9,$10,$11,$12,$13)",
+      [id,data.personId,data.leaveType,data.transactionType,data.direction,data.quantityDays,data.effectiveOn,data.relatedReference??null,data.notes,data.sourceReference,data.evidenceReference,actor.userId,actor.role],
+    );
+    await audit(sql,{entityType:"people_leave",entityId:id,action:"PEOPLE_LEAVE_TRANSACTION_POSTED",role:actor.role,userId:actor.userId,sourceReference:data.sourceReference,payload:{personId:data.personId,leaveType:data.leaveType,transactionType:data.transactionType,direction:data.direction,quantityDays:data.quantityDays,evidenceReference:data.evidenceReference}});
+    return {ok:true,id,balanceDays:Number(rows[0]?.balance_days??0)};
+  });
+
+export const recordQualification=createServerFn({method:"POST"})
+  .validator(operationalEvidence.extend({
+    qualificationCode:z.string().min(1).max(120),
+    qualificationTitle:z.string().min(1).max(300),
+    eventType:z.enum(["obtained","renewed","superseded","revoked"]),
+    effectiveOn:z.string().date(),
+    validUntil:z.string().date().nullable().optional(),
+    certificateReference:z.string().max(500).nullable().optional(),
+    notes:z.string().max(2000).default(""),
+  }))
+  .handler(async({data})=>{
+    await assertSameSiteRequest(); const actor=await requirePermission("edit"); const sql=await getSql(); const id=crypto.randomUUID();
+    await sql.query("select record_vyndi_people_qualification($1,$2,$3,$4,$5,$6::date,$7::date,$8,$9,$10,$11,$12,$13)",[id,data.personId,data.qualificationCode,data.qualificationTitle,data.eventType,data.effectiveOn,data.validUntil??null,data.certificateReference??null,data.notes,data.sourceReference,data.evidenceReference,actor.userId,actor.role]);
+    await audit(sql,{entityType:"people_qualification",entityId:id,action:"PEOPLE_QUALIFICATION_RECORDED",role:actor.role,userId:actor.userId,sourceReference:data.sourceReference,payload:{personId:data.personId,qualificationCode:data.qualificationCode,eventType:data.eventType,evidenceReference:data.evidenceReference}});
+    return {ok:true,id};
+  });
+
+export const recordAssetCustodyEvent=createServerFn({method:"POST"})
+  .validator(operationalEvidence.extend({
+    assetId:z.string().min(1).max(120),
+    eventType:z.enum(["issue","transfer_in","transfer_out","return"]),
+    occurredAt:z.string().datetime().nullable().optional(),
+    notes:z.string().max(2000).default(""),
+  }))
+  .handler(async({data})=>{
+    await assertSameSiteRequest(); const actor=await requirePermission("edit"); const sql=await getSql(); const id=crypto.randomUUID();
+    await sql.query("select record_vyndi_people_asset_custody($1,$2,$3,$4,$5::timestamptz,$6,$7,$8,$9,$10)",[id,data.personId,data.assetId,data.eventType,data.occurredAt??null,data.notes,data.sourceReference,data.evidenceReference,actor.userId,actor.role]);
+    await audit(sql,{entityType:"people_asset_custody",entityId:id,action:"PEOPLE_ASSET_CUSTODY_RECORDED",role:actor.role,userId:actor.userId,sourceReference:data.sourceReference,payload:{personId:data.personId,assetId:data.assetId,eventType:data.eventType,evidenceReference:data.evidenceReference}});
+    return {ok:true,id};
+  });
+
+export const recordAccessEvent=createServerFn({method:"POST"})
+  .validator(operationalEvidence.extend({
+    accessReference:z.string().min(1).max(300),
+    eventType:z.enum(["grant","change","suspend","revoke"]),
+    roleScope:z.string().max(300).default(""),
+    occurredAt:z.string().datetime().nullable().optional(),
+    notes:z.string().max(2000).default(""),
+  }))
+  .handler(async({data})=>{
+    await assertSameSiteRequest(); const actor=await requirePermission("approve"); const sql=await getSql(); const id=crypto.randomUUID();
+    await sql.query("select record_vyndi_people_access_event($1,$2,$3,$4,$5,$6::timestamptz,$7,$8,$9,$10,$11)",[id,data.personId,data.accessReference,data.eventType,data.roleScope,data.occurredAt??null,data.notes,data.sourceReference,data.evidenceReference,actor.userId,actor.role]);
+    await audit(sql,{entityType:"people_access",entityId:id,action:"PEOPLE_ACCESS_EVENT_RECORDED",role:actor.role,userId:actor.userId,sourceReference:data.sourceReference,payload:{personId:data.personId,accessReference:data.accessReference,eventType:data.eventType,evidenceReference:data.evidenceReference}});
+    return {ok:true,id};
+  });
+
+export const recordPayrollReadiness=createServerFn({method:"POST"})
+  .validator(operationalEvidence.extend({
+    periodKey:z.string().min(1).max(40),
+    readinessStatus:z.enum(["pending","ready","hold","settled"]),
+    basis:z.record(z.string(),z.unknown()).default({}),
+  }))
+  .handler(async({data})=>{
+    await assertSameSiteRequest(); const actor=await requirePermission("approve"); const sql=await getSql(); const id=crypto.randomUUID();
+    await sql.query("select record_vyndi_people_payroll_readiness($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9)",[id,data.personId,data.periodKey,data.readinessStatus,JSON.stringify(data.basis),data.sourceReference,data.evidenceReference,actor.userId,actor.role]);
+    await audit(sql,{entityType:"people_payroll_readiness",entityId:id,action:"PEOPLE_PAYROLL_READINESS_RECORDED",role:actor.role,userId:actor.userId,sourceReference:data.sourceReference,payload:{personId:data.personId,periodKey:data.periodKey,status:data.readinessStatus,evidenceReference:data.evidenceReference}});
+    return {ok:true,id};
+  });
+
+export const initiatePeopleExit=createServerFn({method:"POST"})
+  .validator(operationalEvidence.extend({effectiveOn:z.string().date(),expectedRevision:z.number().int().positive()}))
+  .handler(async({data})=>{
+    await assertSameSiteRequest(); const actor=await requirePermission("approve"); const sql=await getSql(); const id=crypto.randomUUID();
+    const rows=await sql.query<{new_revision:number}>("select * from initiate_vyndi_people_exit($1,$2,$3::date,$4,$5,$6,$7,$8)",[id,data.personId,data.effectiveOn,data.expectedRevision,data.sourceReference,data.evidenceReference,actor.userId,actor.role]);
+    const revision=Number(rows[0]?.new_revision??0);
+    await audit(sql,{entityType:"people_exit",entityId:id,entityRevision:revision,action:"PEOPLE_EXIT_INITIATED",role:actor.role,userId:actor.userId,sourceReference:data.sourceReference,newState:"open",payload:{personId:data.personId,effectiveOn:data.effectiveOn,evidenceReference:data.evidenceReference}});
+    return {ok:true,id,recordRevision:revision};
+  });
+
+export const recordExitClearance=createServerFn({method:"POST"})
+  .validator(z.object({
+    exitCaseId:z.string().min(1).max(120),
+    clearanceType:z.enum(["handover","leave_reconciliation","payroll_settlement","asset_return","access_revocation","department_clearance"]),
+    clearanceStatus:z.enum(["pending","cleared","waived","blocked"]),
+    notes:z.string().max(2000).default(""),
+    sourceReference:z.string().min(1).max(500),
+    evidenceReference:z.string().min(1).max(500),
+  }))
+  .handler(async({data})=>{
+    await assertSameSiteRequest(); const actor=await requirePermission("approve"); const sql=await getSql(); const id=crypto.randomUUID();
+    const rows=await sql.query<{clearance_revision:number}>("select * from record_vyndi_people_exit_clearance($1,$2,$3,$4,$5,$6,$7,$8,$9)",[id,data.exitCaseId,data.clearanceType,data.clearanceStatus,data.notes,data.sourceReference,data.evidenceReference,actor.userId,actor.role]);
+    const revision=Number(rows[0]?.clearance_revision??0);
+    await audit(sql,{entityType:"people_exit_clearance",entityId:id,entityRevision:revision,action:"PEOPLE_EXIT_CLEARANCE_RECORDED",role:actor.role,userId:actor.userId,sourceReference:data.sourceReference,payload:{exitCaseId:data.exitCaseId,clearanceType:data.clearanceType,status:data.clearanceStatus,evidenceReference:data.evidenceReference}});
+    return {ok:true,id,revision};
+  });
+
+export const finalizePeopleExit=createServerFn({method:"POST"})
+  .validator(z.object({
+    exitCaseId:z.string().min(1).max(120),
+    expectedRevision:z.number().int().positive(),
+    sourceReference:z.string().min(1).max(500),
+    evidenceReference:z.string().min(1).max(500),
+  }))
+  .handler(async({data})=>{
+    await assertSameSiteRequest(); const actor=await requirePermission("approve"); const sql=await getSql();
+    const rows=await sql.query<{new_revision:number;person_status:string}>("select * from finalize_vyndi_people_exit($1,$2,$3,$4,$5,$6)",[data.exitCaseId,data.expectedRevision,data.sourceReference,data.evidenceReference,actor.userId,actor.role]);
+    const row=rows[0]; if(!row) throw new Error("People exit was not finalized.");
+    await audit(sql,{entityType:"people_exit",entityId:data.exitCaseId,entityRevision:Number(row.new_revision),action:"PEOPLE_EXIT_FINALIZED",role:actor.role,userId:actor.userId,sourceReference:data.sourceReference,previousState:"open",newState:"closed",payload:{personStatus:row.person_status,evidenceReference:data.evidenceReference}});
+    return {ok:true,recordRevision:Number(row.new_revision),personStatus:row.person_status};
+  });
+
