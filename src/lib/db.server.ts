@@ -92,63 +92,57 @@ async function ensureHyperdriveSchemaReady(transport: PostgresTransport):Promise
         cause:error,
       });
     }
+
     try{
       await client.query("BEGIN");
       inTransaction=true;
       await client.query("select pg_advisory_xact_lock($1,$2)",[1982,1505]);
-      await client.query(
-        "create table if not exists _migrations (name text primary key, applied_at timestamptz not null default now())",
-      );
-      const appliedRows=await client.query<{name:string}>("select name from _migrations");
+
+      let appliedRows:{rows:Array<{name:string}>};
+      try{
+        appliedRows=await client.query<{name:string}>("select name from _migrations");
+      }catch(error){
+        throw new RuntimeSchemaMigrationError({
+          stage:"bootstrap",
+          migrationName:null,
+          sqlState:sqlStateOf(error),
+          cause:error,
+        });
+      }
+
       const plan=planRuntimeSchemaMigrations({
         transportSource:"hyperdrive",
         migrations:bundledMigrations,
         applied:appliedRows.rows.map((row)=>row.name),
       });
-      if(!plan.allowed&&plan.blocked.length){
-        const detail=plan.blocked
-          .map((row)=>row.name+" ["+row.classes.join(", ")+"]")
-          .join("; ");
+
+      if(plan.blocked.length){
+        const first=plan.blocked[0];
         throw new RuntimeSchemaMigrationError({
           stage:"apply",
-          migrationName:plan.blocked[0]?.name??null,
+          migrationName:first?.name??null,
           sqlState:"DESTRUCTIVE_MIGRATION_BLOCKED",
-          cause:new Error("Runtime Hyperdrive migration blocked by destructive migration policy: "+detail),
+          cause:new Error(
+            "Runtime schema parity found a destructive pending migration; owner migration is required.",
+          ),
         });
       }
-      for(const migration of plan.pending){
-        if(!migration.sql.trim()){
-          throw new RuntimeSchemaMigrationError({
-            stage:"apply",
-            migrationName:migration.name,
-            sqlState:"EMPTY_MIGRATION",
-          });
-        }
-        try{
-          await client.query(migration.sql);
-          await client.query(
-            "insert into _migrations(name) values($1) on conflict(name) do nothing",
-            [migration.name],
-          );
-        }catch(error){
-          throw new RuntimeSchemaMigrationError({
-            stage:"apply",
-            migrationName:migration.name,
-            sqlState:sqlStateOf(error),
-            cause:error,
-          });
-        }
+
+      if(plan.pending.length){
+        throw new RuntimeSchemaMigrationError({
+          stage:"apply",
+          migrationName:plan.pending[0]?.name??null,
+          sqlState:"SCHEMA_LAG",
+          cause:new Error(
+            "Runtime schema parity is lagging by "+
+            plan.pending.length+
+            " migration(s); apply migrations with the database owner before serving traffic.",
+          ),
+        });
       }
+
       await client.query("COMMIT");
       inTransaction=false;
-      if(plan.pending.length){
-        console.log(
-          "[db] runtime Hyperdrive reconciliation applied "+
-          plan.pending.length+
-          " migration(s): "+
-          plan.pending.map((row)=>row.name).join(", "),
-        );
-      }
     }catch(error){
       if(inTransaction){
         try{
