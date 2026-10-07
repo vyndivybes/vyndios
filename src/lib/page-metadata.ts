@@ -198,6 +198,16 @@ export const routeRegistry: Record<string, RouteMeta> = {
     "Command",
     { adminOnly: true },
   ),
+  "/command/uat-certification": meta(
+    "/command/uat-certification",
+    "Production UAT Certification",
+    "operate",
+    "admin",
+    "founder",
+    "keep",
+    "Command",
+    { navHidden: true, adminOnly: true },
+  ),
   "/command/investor-board": meta(
     "/command/investor-board",
     "Investor / Board",
