@@ -6,7 +6,7 @@ import {
   resolvePostgresTransport,
   type PostgresTransport,
 } from "./postgres-runtime";
-import type { Sql, SqlRow } from "./db.ts";
+import type { Sql, SqlRow, SqlTransactionOptions } from "./db.ts";
 
 const globalRef = globalThis as typeof globalThis & {
   __pgliteInstance__?: Promise<import("@electric-sql/pglite").PGlite>;
@@ -233,6 +233,74 @@ function toSql(run: Run): Sql {
  * the shared cross-request connection pool in deployed Cloudflare environments.
  * No pg.Pool or socket-bearing client survives a completed query.
  */
+export async function withSqlTransactionServer<T>(
+  work: (sql: Sql) => Promise<T>,
+  options: SqlTransactionOptions = {},
+): Promise<T> {
+  const transport = await resolvePostgresTransport();
+  if (!transport) {
+    throw new Error("Transactional production UAT requires a PostgreSQL transport; embedded PGLite is not certification evidence.");
+  }
+
+  await ensureHyperdriveSchemaReady(transport);
+
+  const { Client, types } = await import("pg");
+  types.setTypeParser(OID_INT8, Number);
+  types.setTypeParser(OID_DATE, identity);
+  types.setTypeParser(OID_INTERVAL, identity);
+
+  const client = new Client({
+    connectionString: transport.connectionString,
+    connectionTimeoutMillis: 10_000,
+  });
+
+  let inTransaction = false;
+  try {
+    await client.connect();
+    await client.query("BEGIN");
+    inTransaction = true;
+
+    const isolation = options.isolationLevel ?? "read committed";
+    const isolationSql = isolation === "serializable"
+      ? "SERIALIZABLE"
+      : isolation === "repeatable read"
+        ? "REPEATABLE READ"
+        : "READ COMMITTED";
+    await client.query(`SET TRANSACTION ISOLATION LEVEL ${isolationSql}`);
+
+    const sql = toSql(async <R>(text: string, params: unknown[]) => {
+      const result = await client.query(text, params);
+      return result.rows as R[];
+    });
+
+    const result = await work(sql);
+
+    if (options.alwaysRollback) {
+      await client.query("ROLLBACK");
+      inTransaction = false;
+      return result;
+    }
+
+    await client.query("COMMIT");
+    inTransaction = false;
+    return result;
+  } catch (error) {
+    if (inTransaction) {
+      try {
+        await client.query("ROLLBACK");
+        inTransaction = false;
+      } catch (rollbackError) {
+        throw new Error("SQL transaction failed and rollback also failed.", {
+          cause: rollbackError instanceof Error ? rollbackError : error,
+        });
+      }
+    }
+    throw error;
+  } finally {
+    await client.end().catch(() => undefined);
+  }
+}
+
 async function createPostgresSql(transport: PostgresTransport): Promise<Sql> {
   const { Client, types } = await import("pg");
   types.setTypeParser(OID_INT8, Number);
