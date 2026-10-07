@@ -107,6 +107,18 @@ test("Maintenance closeout rolls back inventory and work-order state when FIFO s
   t.after(() => db.close());
 
   await db.query(
+    `insert into master_data_records(
+      id,domain,code,name,revision,status,owner_role,approver_role,effective_from,
+      source_ref,attributes,created_by,approved_by,approved_at
+    ) values (
+      '00000000-0000-0000-0000-000000000144','inventory','MAINT-PART-TEST',
+      'Maintenance test part',1,'approved','operations','operations',null,
+      'TEST:MAINT:MASTER',$1::jsonb,'inventory-user','inventory-approver',now()
+    )`,
+    [JSON.stringify({category:"service-part",unit:"ea",controlState:"controlled"})],
+  );
+
+  await db.query(
     `select * from save_vyndi_master_inventory_entry(
       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::date,$14::date,$15::date,$16,$17,$18,$19
     )`,

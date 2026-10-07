@@ -53,5 +53,8 @@ jobs:
       - name: Funding lifecycle authority
         run: npm run test:funding-lifecycle
 
+      - name: Writer and route consolidation
+        run: npm run test:writer-route-consolidation
+
       - name: Typecheck
         run: npm run typecheck
