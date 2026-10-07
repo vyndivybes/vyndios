@@ -70,3 +70,10 @@ test("transactional UAT exercises Finance and HR/payroll production authorities"
   assert.match(route, /Finance/i);
   assert.match(route, /Payroll/i);
 });
+
+
+test("browser UAT tolerates inventory hydration and requires Finance and HR/payroll domain PASS", () => {
+  assert.match(runner, /inventory entry did not open after hydrated retry/i);
+  assert.match(runner, /Close entry/i);
+  assert.match(runner, /"finance", "hrPayroll"/);
+});
