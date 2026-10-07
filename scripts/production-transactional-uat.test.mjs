@@ -21,7 +21,7 @@ test("transactional UAT has a dedicated single-connection rollback primitive", (
   assert.match(dbServer, /alwaysRollback/);
 });
 
-test("transactional UAT is admin-only and exercises four production authorities", () => {
+test("transactional UAT is admin-only and exercises governed production authorities", () => {
   assert.match(authority, /requireBusinessActor\("admin"\)/);
   assert.match(authority, /RUN_ROLLBACK_UAT/);
   assert.match(authority, /create_vyndi_funding_grant/);
