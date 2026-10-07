@@ -31,11 +31,11 @@ function UatCertification() {
         <p className="text-xs font-bold uppercase tracking-wide text-orange-600">Admin certification · rollback-only</p>
         <h1 className="mt-2 text-3xl font-semibold">Production Transactional UAT</h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-          Runs real Funding, People & Office, Inventory and Quality authority mutations inside one serializable PostgreSQL transaction.
+          Runs real Funding, People & Office, Finance, HR/Payroll, Inventory and Quality authority mutations inside one serializable PostgreSQL transaction.
           The transaction is forcibly rolled back and a second connection must prove that zero UAT fixture rows remain.
         </p>
         <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
-          This route is admin-only and hidden from normal navigation. It never commits certification fixtures.
+          This route is admin-only and hidden from normal navigation. Finance, payroll and operational certification fixtures are always rolled back and never committed.
         </div>
         <button
           type="button"

@@ -22,11 +22,17 @@ type TransactionalUatResult = {
     peopleOffice: DomainProbe;
     inventory: DomainProbe;
     quality: DomainProbe;
+    finance: DomainProbe;
+    hrPayroll: DomainProbe;
   };
 };
 
 function requireExactlyOne(label: string, count: number) {
   if (count !== 1) throw new Error(`${label} expected exactly one UAT row; observed ${count}.`);
+}
+
+function requireExactlyTwo(label: string, count: number) {
+  if (count !== 2) throw new Error(`${label} expected exactly two balanced journal lines; observed ${count}.`);
 }
 
 async function count(sql: Sql, text: string, params: unknown[]): Promise<number> {
@@ -56,6 +62,16 @@ export const runProductionTransactionalUat = createServerFn({ method: "POST" })
       inventoryMovement: `REC-${runId}`,
       inventoryLedger: `LED-${runId}`,
       qualityInspection: `QI-${runId}`,
+      financeSalesJournal: `FIN-UAT-AR-${runId}`,
+      financeReceiptJournal: `FIN-UAT-COL-${runId}`,
+      payrollCostItem: `PAYCOST-${runId}`,
+      payrollExpenditure: `PAYEXP-${runId}`,
+      payrollPayment: `PAYPMT-${runId}`,
+      payrollControl: `PAYCTRL-${runId}`,
+      supplier: `SUP-${runId}`,
+      purchaseOrder: `PO-${runId}`,
+      supplierInvoice: `AP-${runId}`,
+      supplierPayment: `SPAY-${runId}`,
     };
 
     const domains = await withSqlTransaction(
@@ -144,6 +160,205 @@ export const runProductionTransactionalUat = createServerFn({ method: "POST" })
         requireExactlyOne(
           "People master revision",
           await count(sql, "select count(*)::int as count from vyndi_people_records where id=$1 and record_revision=2 and operational_status='active'", [ids.person]),
+        );
+
+        // FINANCE + HR/PAYROLL: exercise posted GL, verified cash, AP settlement and governed payroll linkage.
+        const financePlanMonth = 36;
+        const payrollPaymentEvidence = `${evidenceReference}|PAYROLL-BANK`;
+
+        await sql.query(
+          "select save_vyndi_monthly_actual($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)",
+          [
+            financePlanMonth,
+            null,
+            null,
+            null,
+            null,
+            100,
+            null,
+            null,
+            null,
+            `${evidenceReference}|CASH-BASELINE`,
+            true,
+            actor.userId,
+            actor.role,
+          ],
+        );
+
+        await sql.query(
+          "select post_vyndi_finance_journal($1,$2::date,'sales_invoice',$3,$4,$5::jsonb) as journal_id",
+          [
+            ids.financeSalesJournal,
+            today,
+            `AR-${runId}`,
+            `Rollback UAT sales invoice ${runId}`,
+            JSON.stringify([
+              { accountCode: "1100", debitInr: 1000, memo: "Rollback UAT receivable" },
+              { accountCode: "4000", creditInr: 1000, memo: "Rollback UAT revenue" },
+            ]),
+          ],
+        );
+        await sql.query(
+          "select post_vyndi_finance_journal($1,$2::date,'customer_receipt',$3,$4,$5::jsonb) as journal_id",
+          [
+            ids.financeReceiptJournal,
+            today,
+            `COL-${runId}`,
+            `Rollback UAT customer receipt ${runId}`,
+            JSON.stringify([
+              { accountCode: "1000", debitInr: 1000, memo: "Rollback UAT bank receipt" },
+              { accountCode: "1100", creditInr: 1000, memo: "Rollback UAT receivable settlement" },
+            ]),
+          ],
+        );
+        await sql.query(
+          "select * from apply_vyndi_verified_cash_movement($1,$2,$3,$4,$5)",
+          [financePlanMonth, 0.01, `customer-receipt:${runId}; ${evidenceReference}|AR-CASH`, actor.userId, actor.role],
+        );
+        requireExactlyOne(
+          "Finance sales journal",
+          await count(sql, "select count(*)::int as count from epr_finance_journals where id=$1 and source_type='sales_invoice'", [ids.financeSalesJournal]),
+        );
+        requireExactlyOne(
+          "Finance customer receipt journal",
+          await count(sql, "select count(*)::int as count from epr_finance_journals where id=$1 and source_type='customer_receipt'", [ids.financeReceiptJournal]),
+        );
+        const financeBalanceRows = await sql.query<{ debit_inr: number | string; credit_inr: number | string }>(
+          `select coalesce(sum(debit_inr),0) as debit_inr,coalesce(sum(credit_inr),0) as credit_inr
+             from epr_finance_journal_lines where journal_id in ($1,$2)`,
+          [ids.financeSalesJournal, ids.financeReceiptJournal],
+        );
+        if (Math.abs(Number(financeBalanceRows[0]?.debit_inr ?? 0) - Number(financeBalanceRows[0]?.credit_inr ?? 0)) > 0.01) {
+          throw new Error("Finance UAT journals are not balanced.");
+        }
+        requireExactlyOne(
+          "Verified cash receipt movement",
+          await count(sql, "select count(*)::int as count from vyndi_monthly_actuals where plan_month=$1 and verified=true and closing_cash=100.01", [financePlanMonth]),
+        );
+
+        await sql.query(
+          `insert into vyndi_suppliers
+             (id,name,currency,payment_terms_days,lead_time_days,approval_status,source_reference,created_by,updated_by)
+           values ($1,$2,'INR',30,30,'approved',$3,$4,$4)`,
+          [ids.supplier, `Rollback UAT Supplier ${runId}`, `${evidenceReference}|SUPPLIER`, actor.userId],
+        );
+        await sql.query(
+          `insert into vyndi_purchase_orders
+             (id,supplier_id,requirement_month,sku,unit,quantity,unit_price_inr,order_date,expected_receipt_on,
+              payment_terms_days,status,source_reference,notes,created_by,updated_by)
+           values ($1,$2,$3,$4,'ea',1,2500,$5::date,$5::date,30,'approved',$6,'',$7,$7)`,
+          [ids.purchaseOrder, ids.supplier, financePlanMonth, `UAT-AP-${suffix}`, today, `${evidenceReference}|PO`, actor.userId],
+        );
+        await sql.query(
+          `insert into vyndi_supplier_invoices
+             (id,purchase_order_id,invoice_number,invoice_on,due_on,quantity_invoiced,amount_ex_gst_inr,gst_inr,
+              status,match_message,source_reference,created_by)
+           values ($1,$2,$3,$4::date,$4::date,1,2500,0,'approved','Rollback UAT matched invoice',$5,$6)`,
+          [ids.supplierInvoice, ids.purchaseOrder, `SUPINV-${runId}`, today, `${evidenceReference}|AP`, actor.userId],
+        );
+        const supplierPaymentRows = await sql.query<{
+          payment_id: string;
+          journal_id: string;
+          new_closing_cash_lakh: number | string;
+          invoice_status: string;
+        }>(
+          "select * from post_vyndi_supplier_payment($1,$2,$3,$4::date,$5,$6,$7,$8)",
+          [
+            ids.supplierPayment,
+            ids.supplierInvoice,
+            financePlanMonth,
+            today,
+            2500,
+            `${evidenceReference}|AP-BANK`,
+            actor.userId,
+            actor.role,
+          ],
+        );
+        if (supplierPaymentRows[0]?.payment_id !== ids.supplierPayment || supplierPaymentRows[0]?.invoice_status !== "paid") {
+          throw new Error("Supplier payment authority did not fully settle the UAT invoice.");
+        }
+        requireExactlyTwo(
+          "Supplier payment journal",
+          await count(sql, "select count(*)::int as count from epr_finance_journal_lines where journal_id=$1", [supplierPaymentRows[0]?.journal_id]),
+        );
+
+        await sql.query(
+          `insert into vyndi_people_office_cost_items (
+             id,cost_group,person_id,name,stage,quantity,monthly_unit_cost_lakh,start_month,end_month,
+             one_time_cost_lakh,one_time_month,lifecycle_status,record_revision,source_ref,notes,created_by,approved_by
+           ) values ($1,'payroll',$2,$3,'uat',1,0,1,36,0,1,'approved',1,$4,'Rollback-only payroll certification fixture.',$5,$5)`,
+          [ids.payrollCostItem, ids.person, `Rollback UAT Payroll ${runId}`, `${evidenceReference}|PAYROLL-COST`, actor.userId],
+        );
+        await sql.query(
+          "select create_vyndi_people_office_actual_expenditure($1,'cost_item',$2,$3,$4::date,$5,$6,$7,$8,$9,$10)",
+          [
+            ids.payrollExpenditure,
+            ids.payrollCostItem,
+            financePlanMonth,
+            today,
+            `Rollback UAT payroll obligation ${runId}`,
+            1000,
+            `${evidenceReference}|PAYROLL-EXP`,
+            "Rollback-only production payroll certification fixture.",
+            actor.userId,
+            actor.role,
+          ],
+        );
+        await sql.query(
+          "select submit_vyndi_people_office_actual_expenditure($1,$2,$3)",
+          [ids.payrollExpenditure, actor.userId, actor.role],
+        );
+        await sql.query(
+          "select approve_vyndi_people_office_actual_expenditure($1,$2,$3)",
+          [ids.payrollExpenditure, actor.userId, actor.role],
+        );
+        const payrollPaymentRows = await sql.query<{
+          payment_id: string;
+          journal_id: string;
+          expenditure_status: string;
+        }>(
+          "select * from post_vyndi_people_office_actual_payment($1,$2,$3,$4::date,$5,$6,$7,$8)",
+          [
+            ids.payrollPayment,
+            ids.payrollExpenditure,
+            financePlanMonth,
+            today,
+            1000,
+            payrollPaymentEvidence,
+            actor.userId,
+            actor.role,
+          ],
+        );
+        if (payrollPaymentRows[0]?.payment_id !== ids.payrollPayment || payrollPaymentRows[0]?.expenditure_status !== "paid") {
+          throw new Error("People & Office payroll payment authority did not fully settle the UAT obligation.");
+        }
+        await sql.query(
+          "select save_vyndi_linked_payroll_control($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",
+          [
+            ids.payrollControl,
+            ids.payrollExpenditure,
+            today.slice(0, 7),
+            900,
+            100,
+            1000,
+            100,
+            payrollPaymentEvidence,
+            `${evidenceReference}|PAYROLL-RETURN`,
+            actor.userId,
+            actor.role,
+          ],
+        );
+        requireExactlyOne(
+          "Payroll compliance control",
+          await count(
+            sql,
+            "select count(*)::int as count from epr_finance_payroll_controls where payroll_id=$1 and source_expenditure_id=$2 and payment_reference=$3",
+            [ids.payrollControl, ids.payrollExpenditure, payrollPaymentEvidence],
+          ),
+        );
+        requireExactlyTwo(
+          "Payroll bank journal",
+          await count(sql, "select count(*)::int as count from epr_finance_journal_lines where journal_id=$1", [payrollPaymentRows[0]?.journal_id]),
         );
 
         // INVENTORY: create an approved UAT master identity inside this rollback-only transaction,
@@ -255,6 +470,14 @@ export const runProductionTransactionalUat = createServerFn({ method: "POST" })
           peopleOffice: { status: "PASS" as const, assertions: ["draft master created", "employment revision advanced", "employment ledger appended"] },
           inventory: { status: "PASS" as const, assertions: ["approved master identity enforced", "receipt posted", "FIFO layer created"] },
           quality: { status: "PASS" as const, assertions: ["incoming inspection recorded", "quality audit emitted"] },
+          finance: {
+            status: "PASS" as const,
+            assertions: ["sales/receipt journals balanced", "verified cash moved", "supplier payment settled"],
+          },
+          hrPayroll: {
+            status: "PASS" as const,
+            assertions: ["payroll obligation accrued", "bank payment posted", "payroll control linked"],
+          },
         };
       },
       { alwaysRollback: true, isolationLevel: "serializable" },
@@ -271,7 +494,18 @@ export const runProductionTransactionalUat = createServerFn({ method: "POST" })
          (select count(*) from master_inventory_items where id=$5) +
          (select count(*) from epr_inventory_movements where id=$6) +
          (select count(*) from vyndi_quality_inspections where id=$7) +
-         (select count(*) from vyndi_audit_events where source_reference=$8)
+         (select count(*) from vyndi_audit_events where source_reference like $8) +
+         (select count(*) from vyndi_monthly_actuals where source_reference like $8) +
+         (select count(*) from vyndi_monthly_actual_revisions where source_reference like $8) +
+         (select count(*) from epr_finance_journals where id in ($9,$10)) +
+         (select count(*) from vyndi_people_office_cost_items where id=$11) +
+         (select count(*) from vyndi_people_office_actual_expenditures where id=$12) +
+         (select count(*) from vyndi_people_office_actual_payments where id=$13) +
+         (select count(*) from epr_finance_payroll_controls where payroll_id=$14) +
+         (select count(*) from vyndi_suppliers where id=$15) +
+         (select count(*) from vyndi_purchase_orders where id=$16) +
+         (select count(*) from vyndi_supplier_invoices where id=$17) +
+         (select count(*) from vyndi_supplier_payments where id=$18)
        )::int as count`,
       [
         ids.grant,
@@ -281,7 +515,17 @@ export const runProductionTransactionalUat = createServerFn({ method: "POST" })
         ids.inventoryItem,
         ids.inventoryMovement,
         ids.qualityInspection,
-        evidenceReference,
+        `%${evidenceReference}%`,
+        ids.financeSalesJournal,
+        ids.financeReceiptJournal,
+        ids.payrollCostItem,
+        ids.payrollExpenditure,
+        ids.payrollPayment,
+        ids.payrollControl,
+        ids.supplier,
+        ids.purchaseOrder,
+        ids.supplierInvoice,
+        ids.supplierPayment,
       ],
     );
     const remainingFixtureCount = Number(remainingRows[0]?.count ?? -1);

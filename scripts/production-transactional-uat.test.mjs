@@ -55,3 +55,18 @@ test("transactional UAT surfaces server failures instead of timing out blindly",
   assert.match(runner, /Promise\.race/);
   assert.match(runner, /getByRole\("alert"\)/);
 });
+
+
+test("transactional UAT exercises Finance and HR/payroll production authorities", () => {
+  assert.match(authority, /post_vyndi_finance_journal/);
+  assert.match(authority, /apply_vyndi_verified_cash_movement/);
+  assert.match(authority, /post_vyndi_supplier_payment/);
+  assert.match(authority, /post_vyndi_people_office_actual_payment/);
+  assert.match(authority, /save_vyndi_linked_payroll_control/);
+  assert.match(authority, /epr_finance_journal_lines/);
+  assert.match(authority, /epr_finance_payroll_controls/);
+  assert.match(authority, /sales_invoice/);
+  assert.match(authority, /customer_receipt/);
+  assert.match(route, /Finance/i);
+  assert.match(route, /Payroll/i);
+});
