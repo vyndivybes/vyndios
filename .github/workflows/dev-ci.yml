@@ -50,5 +50,8 @@ jobs:
       - name: Expanded H2 recovery qualification
         run: npm run test:h2:recovery:expanded
 
+      - name: Funding lifecycle authority
+        run: npm run test:funding-lifecycle
+
       - name: Typecheck
         run: npm run typecheck
