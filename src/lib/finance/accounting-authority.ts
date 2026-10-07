@@ -309,7 +309,7 @@ export const savePayrollControl = createServerFn({ method: "POST" })
   .validator(z.object({
     payrollId: id,
     sourceExpenditureId: id,
-    period: z.string().regex(/^\\d{4}-\\d{2}$/),
+    period: z.string().regex(/^[0-9]{4}-(0[1-9]|1[0-2])$/),
     grossPayInr: z.number().finite().min(0).max(1_000_000_000_000),
     deductionsInr: z.number().finite().min(0).max(1_000_000_000_000),
     employerCostInr: z.number().finite().min(0).max(1_000_000_000_000),
@@ -479,7 +479,7 @@ export const approveToolingCostProfile = createServerFn({ method: "POST" })
 export const postToolingDepreciation = createServerFn({ method: "POST" })
   .validator(z.object({
     profileId: id,
-    period: z.string().regex(/^\\d{4}-(0[1-9]|1[0-2])$/),
+    period: z.string().regex(/^[0-9]{4}-(0[1-9]|1[0-2])$/),
     sourceReference: reference,
   }))
   .handler(async ({ data }) => {
