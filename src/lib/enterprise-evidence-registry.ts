@@ -15,5 +15,6 @@ export const enterpriseEvidenceRegistry:EnterpriseEvidenceDomain[]=[
  {domain:"people-office",classification:"AUTHORITATIVE",canonicalStores:["vyndi_people_records","vyndi_people_office_cost_items","vyndi_people_office_assets"]},
  {domain:"supplier",classification:"AUTHORITATIVE",canonicalStores:["vyndi_suppliers","vyndi_supplier_lane_revisions"]},
  {domain:"vibe",classification:"EVIDENCE",canonicalStores:["vyndi_vibpe_answer_receipts","vyndi_vibpe_answer_quality_events","vyndi_vibe_decisions","vyndi_vibe_outcomes","vyndi_vibe_historical_replays","vyndi_vibe_comparator_observations","vyndi_vibe_certification_runs"]},
+ {domain:"scan-evidence",classification:"EVIDENCE",canonicalStores:["vyndi_scan_evidence_attachments"]},
 ];
 export const enterpriseEvidenceBoundary="Registry references owning canonical stores; it creates no duplicate operational transaction truth.";

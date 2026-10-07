@@ -22,6 +22,11 @@ const LazyTraceabilityDocumentCentre = lazy(async () => {
   return { default: module.TraceabilityDocumentCentreV2 };
 });
 
+const LazyUniversalScanCentre = lazy(async () => {
+  const module = await import("@/components/universal-scan-centre");
+  return { default: module.UniversalScanCentre };
+});
+
 const LazyIbpeCopilot = lazy(async () => {
   const module = await import("@/components/ibpe-copilot");
   return { default: module.IbpeCopilot };
@@ -180,6 +185,7 @@ function DeferredCommandTools() {
   return (
     <Suspense fallback={null}>
       {CONTROLLED_DOCUMENT_ROUTES.has(routePath) ? <LazyControlledDocumentToolbar /> : null}
+      <LazyUniversalScanCentre />
       <LazyTraceabilityDocumentCentre />
       <LazyIbpeCopilot />
     </Suspense>

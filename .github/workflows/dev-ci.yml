@@ -59,5 +59,8 @@ jobs:
       - name: Hyperdrive runtime reconciliation
         run: npm run test:runtime-hyperdrive
 
+      - name: Universal scanner input
+        run: npm run test:scanner
+
       - name: Typecheck
         run: npm run typecheck
