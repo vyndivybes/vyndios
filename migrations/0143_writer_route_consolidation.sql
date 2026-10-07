@@ -5,7 +5,7 @@
 create or replace function guard_vyndi_master_inventory_identity()
 returns trigger
 language plpgsql
-as $
+as $$
 declare
   v_master record;
   v_category text;
@@ -34,7 +34,7 @@ begin
 
   return new;
 end;
-$;
+$$;
 
 drop trigger if exists trg_vyndi_master_inventory_identity on master_inventory_items;
 create trigger trg_vyndi_master_inventory_identity
