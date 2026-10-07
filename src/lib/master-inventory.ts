@@ -227,12 +227,41 @@ export const saveMasterInventoryEntry = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const actor = await requireInventoryWrite();
     const sql = await getSql();
+
+    const existing = await sql.query<{ id:string }>(
+      `select id from master_inventory_items
+        where upper(trim(sku))=upper(trim($1)) and active=true
+        limit 1`,
+      [data.sku],
+    );
+
+    let canonicalName=data.name;
+    let canonicalCategory=data.category;
+    let canonicalUnit=data.unit;
+    if(!existing[0]){
+      const approved = await sql.query<{ name:string; attributes:Record<string,unknown> }>(
+        `select name,attributes from master_data_records
+          where domain='inventory'
+            and upper(trim(code))=upper(trim($1))
+            and status='approved'
+          order by revision desc,updated_at desc
+          limit 1`,
+        [data.sku],
+      );
+      if(!approved[0]){
+        throw new Error("New ERP SKU identity requires an approved Inventory Master record before stock can be posted.");
+      }
+      canonicalName=approved[0].name;
+      canonicalCategory=String(approved[0].attributes?.category ?? data.category);
+      canonicalUnit=String(approved[0].attributes?.unit ?? data.unit);
+    }
+
     const itemId = `inventory-${crypto.randomUUID()}`;
     const movementId = `REC-${crypto.randomUUID()}`;
     const ledgerEntryId = `LED-${crypto.randomUUID()}`;
     const rows = await sql.query<{ item_id: string; lot_id: string | null }>(
       `select * from save_vyndi_master_inventory_entry($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::date,$14::date,$15::date,$16,$17,$18,$19)`,
-      [itemId,movementId,ledgerEntryId,data.ledgerId,data.sku,data.name,data.category,data.unit,
+      [itemId,movementId,ledgerEntryId,data.ledgerId,data.sku,canonicalName,canonicalCategory,canonicalUnit,
        data.minimumStockLevel,data.plannedMonthlyUse,data.quantityReceived,data.unitCostInr,data.receivedOn,
        data.expiryOn || null,data.nextInspectionOn || null,data.reference,data.notes,actor.userId,actor.role],
     );
