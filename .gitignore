@@ -9,3 +9,4 @@ src/routeTree.gen.ts
 src/generated/highs.wasm
 .grok/preview.log
 .grok/status
+.auth/
