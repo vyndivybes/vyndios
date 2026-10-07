@@ -1,6 +1,6 @@
 import { getRequest } from "@tanstack/react-start/server";
 import { pendingMigrations } from "../../scripts/migration-plan.mjs";
-import { expectedRuntimeMigrationNames } from "./runtime-schema-migrations";
+import { expectedRuntimeMigrationNames, planRuntimeSchemaMigrations } from "./runtime-schema-migrations";
 import { createRequestPostgresLimiter } from "./postgres-pool";
 import {
   resolvePostgresTransport,
@@ -11,6 +11,7 @@ import type { Sql, SqlRow } from "./db.ts";
 const globalRef = globalThis as typeof globalThis & {
   __pgliteInstance__?: Promise<import("@electric-sql/pglite").PGlite>;
   __pgliteMigrateChain__?: Promise<void>;
+  __hyperdriveMigrationReady__?: Promise<void>;
 };
 
 /**
@@ -71,6 +72,104 @@ export function safeRuntimeSchemaMigrationFailure(error:unknown){
     return {stage:error.stage,migrationName:error.migrationName,sqlState:error.sqlState};
   }
   return {stage:"unknown" as const,migrationName:null,sqlState:sqlStateOf(error)};
+}
+
+async function ensureHyperdriveSchemaReady(transport: PostgresTransport):Promise<void>{
+  if(transport.source!=="hyperdrive") return;
+  globalRef.__hyperdriveMigrationReady__ ??= (async()=>{
+    const { Client }=await import("pg");
+    const client=new Client({
+      connectionString:transport.connectionString,
+      connectionTimeoutMillis:10_000,
+    });
+    let inTransaction=false;
+    try{
+      await client.connect();
+    }catch(error){
+      throw new RuntimeSchemaMigrationError({
+        stage:"connect",
+        sqlState:sqlStateOf(error),
+        cause:error,
+      });
+    }
+    try{
+      await client.query("BEGIN");
+      inTransaction=true;
+      await client.query("select pg_advisory_xact_lock($1,$2)",[1982,1505]);
+      await client.query(
+        "create table if not exists _migrations (name text primary key, applied_at timestamptz not null default now())",
+      );
+      const appliedRows=await client.query<{name:string}>("select name from _migrations");
+      const plan=planRuntimeSchemaMigrations({
+        transportSource:"hyperdrive",
+        migrations:bundledMigrations,
+        applied:appliedRows.rows.map((row)=>row.name),
+      });
+      if(!plan.allowed&&plan.blocked.length){
+        const detail=plan.blocked
+          .map((row)=>row.name+" ["+row.classes.join(", ")+"]")
+          .join("; ");
+        throw new RuntimeSchemaMigrationError({
+          stage:"apply",
+          migrationName:plan.blocked[0]?.name??null,
+          sqlState:"DESTRUCTIVE_MIGRATION_BLOCKED",
+          cause:new Error("Runtime Hyperdrive migration blocked by destructive migration policy: "+detail),
+        });
+      }
+      for(const migration of plan.pending){
+        if(!migration.sql.trim()){
+          throw new RuntimeSchemaMigrationError({
+            stage:"apply",
+            migrationName:migration.name,
+            sqlState:"EMPTY_MIGRATION",
+          });
+        }
+        try{
+          await client.query(migration.sql);
+          await client.query(
+            "insert into _migrations(name) values($1) on conflict(name) do nothing",
+            [migration.name],
+          );
+        }catch(error){
+          throw new RuntimeSchemaMigrationError({
+            stage:"apply",
+            migrationName:migration.name,
+            sqlState:sqlStateOf(error),
+            cause:error,
+          });
+        }
+      }
+      await client.query("COMMIT");
+      inTransaction=false;
+      if(plan.pending.length){
+        console.log(
+          "[db] runtime Hyperdrive reconciliation applied "+
+          plan.pending.length+
+          " migration(s): "+
+          plan.pending.map((row)=>row.name).join(", "),
+        );
+      }
+    }catch(error){
+      if(inTransaction){
+        try{
+          await client.query("ROLLBACK");
+        }catch(rollbackError){
+          throw new RuntimeSchemaMigrationError({
+            stage:"unlock",
+            sqlState:sqlStateOf(rollbackError),
+            cause:error,
+          });
+        }
+      }
+      throw error;
+    }finally{
+      await client.end().catch(()=>undefined);
+    }
+  })().catch((error)=>{
+    globalRef.__hyperdriveMigrationReady__=undefined;
+    throw error;
+  });
+  await globalRef.__hyperdriveMigrationReady__;
 }
 
 export async function readRuntimeSchemaMigrationStatus(sql:Sql){
@@ -214,6 +313,7 @@ export async function getSqlServer(): Promise<Sql> {
   const transport = await resolvePostgresTransport();
   if (!transport) return createPgliteSql();
 
+  await ensureHyperdriveSchemaReady(transport);
 
   const request = getRequest();
   if (!request) return createPostgresSql(transport);
