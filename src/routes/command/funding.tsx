@@ -1,10 +1,27 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Kpi, Panel } from "@/components/kpi";
 import { FUNDING_DOCUMENTS, FUNDING_LADDER, FUNDING_PIPELINE, FUNDING_STATUS_LABELS } from "@/lib/data/funding-control";
+import { listCashFundingReceipts, listFundingLifecycle } from "@/lib/cash-funding-authority";
 
-export const Route = createFileRoute("/command/funding")({ component: Funding });
+export const Route = createFileRoute("/command/funding")({
+  loader: async () => {
+    const [cashReceipts,lifecycle]=await Promise.all([listCashFundingReceipts(),listFundingLifecycle()]);
+    return {cashReceipts,lifecycle};
+  },
+  component: Funding,
+});
 
 function Funding() {
+  const data=Route.useLoaderData();
+  const loans=data.lifecycle.loans as Array<Record<string,unknown>>;
+  const grants=data.lifecycle.grants as Array<Record<string,unknown>>;
+  const cashReceipts=data.cashReceipts as Array<Record<string,unknown>>;
+  const n=(value:unknown)=>Number(value??0)||0;
+  const loanPrincipal=loans.reduce((sum,row)=>sum+n(row.principal_outstanding_lakh),0);
+  const loanInterest=loans.reduce((sum,row)=>sum+n(row.accrued_interest_lakh),0);
+  const grantReceived=grants.reduce((sum,row)=>sum+n(row.received_lakh),0);
+  const grantUtilised=grants.reduce((sum,row)=>sum+n(row.utilised_lakh),0);
+  const grantAvailable=grants.reduce((sum,row)=>sum+n(row.available_to_utilise_lakh),0);
   const ready = FUNDING_PIPELINE.filter((x) => x.status === "application-ready").length;
   const verify = FUNDING_PIPELINE.filter((x) => x.status === "verify").length;
   const closed = FUNDING_PIPELINE.filter((x) => x.status === "closed").length;
@@ -23,6 +40,29 @@ function Funding() {
         <Kpi label="Verify" value={String(verify)} hint="Current terms must be checked" />
         <Kpi label="Closed" value={String(closed)} hint="Excluded from active plan" />
       </div>
+
+      <Panel title="Actual funding lifecycle" kicker="Verified receipts · debt obligations · grant utilisation">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Kpi label="Verified receipts" value={String(cashReceipts.length)} hint="Canonical cash evidence" />
+          <Kpi label="Loan principal outstanding" value={`₹${loanPrincipal.toFixed(2)}L`} hint={`Accrued interest ₹${loanInterest.toFixed(2)}L`} />
+          <Kpi label="Grant received" value={`₹${grantReceived.toFixed(2)}L`} hint={`Utilised ₹${grantUtilised.toFixed(2)}L`} />
+          <Kpi label="Grant available" value={`₹${grantAvailable.toFixed(2)}L`} hint="Received less governed utilisation" />
+        </div>
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <div className="overflow-x-auto rounded-md border border-border">
+            <table className="w-full min-w-[42rem] text-left text-xs">
+              <thead className="text-[10px] uppercase tracking-wide text-subtle"><tr><th className="p-2">Loan</th><th className="p-2">Principal</th><th className="p-2">Interest</th><th className="p-2">Total</th><th className="p-2">Status</th></tr></thead>
+              <tbody>{loans.map((row)=><tr key={String(row.loan_id)} className="border-t border-border"><td className="p-2">{String(row.lender_name??row.loan_id)}</td><td className="p-2">₹{n(row.principal_outstanding_lakh).toFixed(2)}L</td><td className="p-2">₹{n(row.accrued_interest_lakh).toFixed(2)}L</td><td className="p-2">₹{n(row.total_outstanding_lakh).toFixed(2)}L</td><td className="p-2 uppercase">{String(row.status??"")}</td></tr>)}</tbody>
+            </table>
+          </div>
+          <div className="overflow-x-auto rounded-md border border-border">
+            <table className="w-full min-w-[46rem] text-left text-xs">
+              <thead className="text-[10px] uppercase tracking-wide text-subtle"><tr><th className="p-2">Grant</th><th className="p-2">Award</th><th className="p-2">Received</th><th className="p-2">Utilised</th><th className="p-2">Available</th><th className="p-2">Conditions</th></tr></thead>
+              <tbody>{grants.map((row)=><tr key={String(row.grant_id)} className="border-t border-border"><td className="p-2">{String(row.grant_name??row.grant_id)}</td><td className="p-2">₹{n(row.awarded_lakh).toFixed(2)}L</td><td className="p-2">₹{n(row.received_lakh).toFixed(2)}L</td><td className="p-2">₹{n(row.utilised_lakh).toFixed(2)}L</td><td className="p-2">₹{n(row.available_to_utilise_lakh).toFixed(2)}L</td><td className="p-2">{n(row.open_condition_count)} open · {n(row.breached_condition_count)} breached</td></tr>)}</tbody>
+            </table>
+          </div>
+        </div>
+      </Panel>
 
       <Panel title="Funding pipeline" kicker="Status discipline">
         <div className="overflow-x-auto">
