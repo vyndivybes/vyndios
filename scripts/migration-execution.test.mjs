@@ -35,6 +35,7 @@ test("every deploy-time migration executes from an empty database in production 
   assert.ok(migrations.some(({ path }) => path === "0072_verified_management_actuals.sql"));
   assert.ok(migrations.some(({ path }) => path === "0081_sales_ledger_spare_components.sql"));
   assert.ok(migrations.some(({ path }) => path === "0082_spare_sales_identity_fifo_fix.sql"));
+  assert.ok(migrations.some(({ path }) => path === "0144_finance_period_validation.sql"));
   assert.ok(!migrations.some(({ path }) => path.startsWith("auth/")));
 
   for (const { name, path } of migrations) {
@@ -137,4 +138,68 @@ test("every deploy-time migration executes from an empty database in production 
   assert.equal(Number(canonicalCash.rows[0].closing_cash_lakh), 5);
   assert.equal(canonicalCash.rows[0].verified, true);
   assert.match(String(canonicalCash.rows[0].source_reference), /founder-bank-balance:500000/);
+
+  // Finance YYYY-MM controls must accept real calendar periods and reject
+  // malformed or impossible month values. This guards the escaped-\\d defect
+  // found by authenticated production UAT.
+  await db.query(
+    `insert into vyndi_people_office_actual_expenditures(
+      id,source_type,source_id,source_label,source_category,plan_month,incurred_on,description,
+      amount_inr,debit_account_code,liability_account_code,lifecycle_status,source_reference,notes,created_by
+    ) values (
+      'PAYROLL-PERIOD-SOURCE','cost_item','COST-PERIOD','Payroll period fixture','payroll',10,'2026-10-01',
+      'Payroll period validation fixture',1000,'6100','2200','approved','TEST:PAYROLL-PERIOD','','test-user'
+    )`,
+  );
+
+  const validPayrollPeriod = await db.query(
+    `select save_vyndi_linked_payroll_control(
+      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11
+    ) as payroll_id`,
+    [
+      "PAYCTRL-PERIOD-VALID","PAYROLL-PERIOD-SOURCE","2026-10",
+      900,100,1000,100,null,null,"test-user","finance",
+    ],
+  );
+  assert.equal(validPayrollPeriod.rows[0].payroll_id, "PAYCTRL-PERIOD-VALID");
+
+  await assert.rejects(
+    db.query(
+      `select save_vyndi_linked_payroll_control(
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11
+      )`,
+      [
+        "PAYCTRL-PERIOD-BAD","PAYROLL-PERIOD-SOURCE","2026/10",
+        900,100,1000,100,null,null,"test-user","finance",
+      ],
+    ),
+    /Payroll period must use YYYY-MM/i,
+  );
+  await assert.rejects(
+    db.query(
+      `select save_vyndi_linked_payroll_control(
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11
+      )`,
+      [
+        "PAYCTRL-PERIOD-MONTH","PAYROLL-PERIOD-SOURCE","2026-13",
+        900,100,1000,100,null,null,"test-user","finance",
+      ],
+    ),
+    /Payroll period must use YYYY-MM/i,
+  );
+
+  await assert.rejects(
+    db.query(
+      "select * from post_vyndi_tooling_depreciation($1,$2,$3,$4,$5)",
+      ["MISSING-TOOLING-PROFILE","2026-10","TEST:TOOLING-PERIOD","test-user","finance"],
+    ),
+    /Approved tooling cost profile not found/i,
+  );
+  await assert.rejects(
+    db.query(
+      "select * from post_vyndi_tooling_depreciation($1,$2,$3,$4,$5)",
+      ["MISSING-TOOLING-PROFILE","2026/10","TEST:TOOLING-PERIOD","test-user","finance"],
+    ),
+    /Tooling depreciation period must be YYYY-MM/i,
+  );
 });
