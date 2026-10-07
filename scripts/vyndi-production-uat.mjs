@@ -34,16 +34,15 @@ const routeSpecs = [
 
 const evidence = {
   test: "VYNDI authenticated production UAT",
-  mode: "read-only-authenticated",
+  mode: "authenticated-transactional-rollback",
   baseUrl,
   expectedSha: expectedSha || null,
   startedAt: new Date().toISOString(),
   preflight: {},
   routes: [],
   writePhase: {
-    result: "BLOCKED",
-    reason:
-      "No silent destructive production writes are permitted. Funding and Quality are currently browser read projections, People & Office edits existing controlled records, and Inventory writes require an approved canonical SKU. A dedicated UAT fixture/record is required before transactional mutation certification.",
+    result: "PENDING",
+    mode: "rollback-transactional",
   },
   result: "RUNNING",
 };
@@ -154,10 +153,45 @@ try {
     await page.close();
   }
 
+  const transactional = await context.newPage();
+  const transactionalErrors = [];
+  transactional.on("pageerror", (error) => transactionalErrors.push(sanitize(error?.message || error)));
+  const transactionalResponse = await transactional.goto(`${baseUrl}/command/uat-certification`, {
+    waitUntil: "domcontentloaded",
+    timeout: 60_000,
+  });
+  assert.ok(transactionalResponse?.ok(), `Transactional UAT route returned HTTP ${transactionalResponse?.status() ?? "none"}`);
+  assert.doesNotMatch(transactional.url(), /\/login(?:\?|$)|\/command-login/, "Transactional UAT route lost authenticated access");
+  await transactional.getByRole("button", { name: /Run rollback UAT/i }).waitFor({ state: "visible", timeout: 20_000 });
+  await transactional.getByRole("button", { name: /Run rollback UAT/i }).click();
+  await transactional.getByText(/PASS · ROLLED BACK/i).waitFor({ state: "visible", timeout: 90_000 });
+  const transactionalJson = await transactional.getByTestId("uat-result").innerText();
+  const transactionalResult = JSON.parse(transactionalJson);
+  assert.equal(transactionalResult?.ok, true, "Transactional UAT did not report ok=true");
+  assert.equal(transactionalResult?.rolledBack, true, "Transactional UAT did not prove rollback");
+  assert.equal(Number(transactionalResult?.remainingFixtureCount), 0, "Transactional UAT left fixture rows behind");
+  for (const domain of ["funding", "peopleOffice", "inventory", "quality"]) {
+    assert.equal(transactionalResult?.domains?.[domain]?.status, "PASS", `Transactional UAT domain ${domain} did not pass`);
+  }
+  assert.deepEqual(transactionalErrors, [], `Transactional UAT emitted page errors: ${transactionalErrors.join(" | ")}`);
+  const transactionalScreenshot = resolve(evidenceRoot, "command__uat-certification.png");
+  await transactional.screenshot({ path: transactionalScreenshot, fullPage: true });
+  evidence.writePhase = {
+    result: "PASS",
+    mode: "rollback-transactional",
+    confirmation: "RUN_ROLLBACK_UAT",
+    runId: transactionalResult.runId,
+    rolledBack: transactionalResult.rolledBack,
+    remainingFixtureCount: transactionalResult.remainingFixtureCount,
+    domains: transactionalResult.domains,
+    screenshot: transactionalScreenshot,
+  };
+  await transactional.close();
+
   evidence.result = "PASS";
   evidence.completedAt = new Date().toISOString();
-  console.log(`[vyndi-uat] PASS · authenticated read-only production UAT · SHA ${evidence.releaseMarker?.sourceSha || "unknown"}`);
-  console.log(`[vyndi-uat] transactional write phase: ${evidence.writePhase.result} · ${evidence.writePhase.reason}`);
+  console.log(`[vyndi-uat] PASS · authenticated production UAT · SHA ${evidence.releaseMarker?.sourceSha || "unknown"}`);
+  console.log(`[vyndi-uat] transactional write phase: ${evidence.writePhase.result} · rollback=${evidence.writePhase.rolledBack ?? false} · remaining=${evidence.writePhase.remainingFixtureCount ?? "unknown"}`);
   console.log(`[vyndi-uat] evidence: ${evidenceRoot}`);
 } catch (error) {
   evidence.result = "FAIL";
