@@ -25,6 +25,12 @@ await mkdir(evidenceRoot, { recursive: true });
 const routeSpecs = [
   { route: "/command", evidence: /Command Centre|Command/i },
   { route: "/command/ibpe-operating-workspace", evidence: /IBPE|VIBPE|planning/i },
+  { route: "/command/financial-cockpit", evidence: /Consolidated Finance/i },
+  { route: "/command/accounting", evidence: /Accounting Workbench/i },
+  { route: "/command/payables", evidence: /Accounts Payable/i },
+  { route: "/command/receivables", evidence: /Accounts Receivable/i },
+  { route: "/command/cash", evidence: /Cash & Working Capital/i },
+  { route: "/command/accounting-statements", evidence: /Financial Statements/i },
   { route: "/command/inventory", evidence: /Master Inventory/i, interact: "inventory" },
   { route: "/command/funding", evidence: /Grants & Funding|Actual funding lifecycle/i, interact: "funding" },
   { route: "/command/people-office", evidence: /People|Operating administration registers/i, interact: "people" },
