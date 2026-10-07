@@ -55,7 +55,8 @@ test("transactional UAT surfaces server failures and allows the expanded rollbac
   assert.match(runner, /transactionalTimeoutMs\s*=\s*120_000/);
   assert.match(runner, /getByRole\("alert"\)/);
   assert.match(runner, /transactional UAT timed out/i);
-  assert.doesNotMatch(runner, /Promise\.race/);
+  assert.match(runner, /while \(Date\.now\(\) < deadline\)/);
+  assert.doesNotMatch(runner, /timeout:\s*45_000/);
 });
 
 
