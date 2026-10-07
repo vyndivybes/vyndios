@@ -180,21 +180,49 @@ try {
   });
   assert.ok(transactionalResponse?.ok(), `Transactional UAT route returned HTTP ${transactionalResponse?.status() ?? "none"}`);
   assert.doesNotMatch(transactional.url(), /\/login(?:\?|$)|\/command-login/, "Transactional UAT route lost authenticated access");
-  await transactional.getByRole("button", { name: /Run rollback UAT/i }).waitFor({ state: "visible", timeout: 20_000 });
-  await transactional.getByRole("button", { name: /Run rollback UAT/i }).click();
+  const runRollbackButton = transactional.getByRole("button", { name: /Run rollback UAT/i });
+  const runningRollbackButton = transactional.getByRole("button", { name: /Running rollback UAT/i });
+  const passRollback = transactional.getByText(/PASS · ROLLED BACK/i);
+  const rollbackAlert = transactional.getByRole("alert");
+
+  await runRollbackButton.waitFor({ state: "visible", timeout: 20_000 });
+
+  let transactionalStarted = false;
+  for (let attempt = 0; attempt < 2 && !transactionalStarted; attempt += 1) {
+    await runRollbackButton.click();
+
+    const acceptanceDeadline = Date.now() + 5_000;
+    while (Date.now() < acceptanceDeadline) {
+      if (
+        await runningRollbackButton.isVisible().catch(() => false) ||
+        await passRollback.isVisible().catch(() => false) ||
+        await rollbackAlert.isVisible().catch(() => false)
+      ) {
+        transactionalStarted = true;
+        break;
+      }
+      await transactional.waitForTimeout(250);
+    }
+
+    if (!transactionalStarted && attempt === 0) {
+      await transactional.waitForLoadState("load", { timeout: 15_000 }).catch(() => {});
+      await transactional.waitForTimeout(500);
+    }
+  }
+
+  assert.equal(transactionalStarted, true, "Rollback action did not start after hydrated retry.");
 
   const transactionalTimeoutMs = 120_000;
   const deadline = Date.now() + transactionalTimeoutMs;
   let transactionalOutcome = null;
 
   while (Date.now() < deadline) {
-    if (await transactional.getByText(/PASS · ROLLED BACK/i).isVisible().catch(() => false)) {
+    if (await passRollback.isVisible().catch(() => false)) {
       transactionalOutcome = { type: "pass" };
       break;
     }
-    const alert = transactional.getByRole("alert");
-    if (await alert.isVisible().catch(() => false)) {
-      transactionalOutcome = { type: "error", message: (await alert.innerText()).trim() };
+    if (await rollbackAlert.isVisible().catch(() => false)) {
+      transactionalOutcome = { type: "error", message: (await rollbackAlert.innerText()).trim() };
       break;
     }
     await transactional.waitForTimeout(500);
