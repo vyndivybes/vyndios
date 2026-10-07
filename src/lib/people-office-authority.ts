@@ -388,13 +388,13 @@ export const recordEmploymentEvent=createServerFn({method:"POST"})
     const actor=await requirePermission("edit");
     const sql=await getSql();
     const id=crypto.randomUUID();
-    const rows=await sql.query<{new_revision:number;operational_status:string}>(
+    const rows=await sql.query<{new_revision:number;resulting_operational_status:string}>(
       "select * from record_vyndi_people_employment_event($1,$2,$3,$4::date,$5::jsonb,$6,$7,$8,$9,$10,$11)",
       [id,data.personId,data.eventType,data.effectiveOn,JSON.stringify(data.details),data.operationalStatus??null,data.expectedRevision,data.sourceReference,data.evidenceReference,actor.userId,actor.role],
     );
     const row=rows[0]; if(!row) throw new Error("Employment event was not recorded.");
     await audit(sql,{entityType:"people_employment",entityId:id,entityRevision:Number(row.new_revision),action:"PEOPLE_EMPLOYMENT_EVENT_RECORDED",role:actor.role,userId:actor.userId,sourceReference:data.sourceReference,payload:{personId:data.personId,eventType:data.eventType,evidenceReference:data.evidenceReference}});
-    return {ok:true,id,recordRevision:Number(row.new_revision),operationalStatus:row.operational_status};
+    return {ok:true,id,recordRevision:Number(row.new_revision),operationalStatus:row.resulting_operational_status};
   });
 
 export const recordAttendance=createServerFn({method:"POST"})
