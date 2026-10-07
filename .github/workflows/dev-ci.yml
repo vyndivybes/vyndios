@@ -47,5 +47,8 @@ jobs:
       - name: People and Office lifecycle authority
         run: npm run test:people-office-lifecycle
 
+      - name: Expanded H2 recovery qualification
+        run: npm run test:h2:recovery:expanded
+
       - name: Typecheck
         run: npm run typecheck
