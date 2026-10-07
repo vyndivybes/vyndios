@@ -391,7 +391,7 @@ create or replace function post_vyndi_people_leave_transaction(
   p_effective_on date,p_related_reference text,p_notes text,p_source_ref text,p_evidence_ref text,p_actor text,p_role text
 ) returns table (balance_days numeric)
 language plpgsql
-as $
+as $$
 declare v_balance numeric;
 begin
   if not exists(select 1 from vyndi_people_records where id=p_person_id) then raise exception 'People record not found.'; end if;
