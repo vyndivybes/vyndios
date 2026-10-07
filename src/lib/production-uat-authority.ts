@@ -31,6 +31,10 @@ function requireExactlyOne(label: string, count: number) {
   if (count !== 1) throw new Error(`${label} expected exactly one UAT row; observed ${count}.`);
 }
 
+function requireExactlyTwo(label: string, count: number) {
+  if (count !== 2) throw new Error(`${label} expected exactly two balanced journal lines; observed ${count}.`);
+}
+
 async function count(sql: Sql, text: string, params: unknown[]): Promise<number> {
   const rows = await sql.query<{ count: number | string }>(text, params);
   return Number(rows[0]?.count ?? 0);
@@ -273,7 +277,7 @@ export const runProductionTransactionalUat = createServerFn({ method: "POST" })
         if (supplierPaymentRows[0]?.payment_id !== ids.supplierPayment || supplierPaymentRows[0]?.invoice_status !== "paid") {
           throw new Error("Supplier payment authority did not fully settle the UAT invoice.");
         }
-        requireExactlyOne(
+        requireExactlyTwo(
           "Supplier payment journal",
           await count(sql, "select count(*)::int as count from epr_finance_journal_lines where journal_id=$1", [supplierPaymentRows[0]?.journal_id]),
         );
@@ -352,7 +356,7 @@ export const runProductionTransactionalUat = createServerFn({ method: "POST" })
             [ids.payrollControl, ids.payrollExpenditure, payrollPaymentEvidence],
           ),
         );
-        requireExactlyOne(
+        requireExactlyTwo(
           "Payroll bank journal",
           await count(sql, "select count(*)::int as count from epr_finance_journal_lines where journal_id=$1", [payrollPaymentRows[0]?.journal_id]),
         );
