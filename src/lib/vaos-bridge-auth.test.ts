@@ -4,7 +4,7 @@ import {
   canonicalVaosBridgeSignatureInput,
   verifyVaosBridgeSignature,
   VAOS_BRIDGE_KEY_ID,
-} from "./vaos-bridge-auth";
+} from "./vaos-bridge-auth.ts";
 
 test("canonical VAOS bridge signature input is stable", () => {
   assert.equal(
