@@ -22,7 +22,7 @@ test("qualified P-256 signature verifies and rejects tampering", async () => {
     timestamp: "1760000000000",
     nonce: "nonce-test-1234567890",
     bodySha256: "a".repeat(64),
-    signature: "NQRDW84vVH_fgwkABIIzcSvXsHsv71FgnHhJgJCN3nl6cwWj3QcOh7WEERcb5Fg9X2q8oreTeOt44TDoynP-xw",
+    signature: "O9AsoyJXrit_uxgZpJL6_-2NrglJfQqmPUQ5Dv4Zo20KUD0lIPXSJ723wCd7EC3Z4rEiHXaoLbPqRSYSBvKlNA",
     keyId: VAOS_BRIDGE_KEY_ID,
     now: new Date(1760000000000),
   };
@@ -38,7 +38,7 @@ test("stale signed requests fail before bridge execution", async () => {
     timestamp: "1760000000000",
     nonce: "nonce-test-1234567890",
     bodySha256: "a".repeat(64),
-    signature: "NQRDW84vVH_fgwkABIIzcSvXsHsv71FgnHhJgJCN3nl6cwWj3QcOh7WEERcb5Fg9X2q8oreTeOt44TDoynP-xw",
+    signature: "O9AsoyJXrit_uxgZpJL6_-2NrglJfQqmPUQ5Dv4Zo20KUD0lIPXSJ723wCd7EC3Z4rEiHXaoLbPqRSYSBvKlNA",
     keyId: VAOS_BRIDGE_KEY_ID,
     now: new Date(1760001000000),
   });
