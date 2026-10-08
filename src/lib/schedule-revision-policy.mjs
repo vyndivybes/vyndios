@@ -5,8 +5,11 @@ const ALLOWED_FIELDS = new Set([
   "durationDays", "predecessors", "budgetLakh", "milestoneMonth", "scenario",
   "scope", "status", "deferUntil"
 ]);
+/** @param {unknown} v */
 const present = (v) => typeof v === "string" && v.trim().length > 0;
+/** @param {object} v @param {string} k */
 const hasOwn = (v, k) => Object.prototype.hasOwnProperty.call(v, k);
+/** @param {any} revision */
 export function validateScheduleRevision(revision) {
   const errors = [];
   if (!revision || typeof revision !== "object") return {ok:false,errors:["Revision required"]};
@@ -32,6 +35,7 @@ export function validateScheduleRevision(revision) {
   }
   return {ok:errors.length===0,errors};
 }
+/** @param {any} revision */
 export function canMonitorSchedule(revision) {
   if (!validateScheduleRevision(revision).ok || revision.status !== "approved") return false;
   return present(revision.baselineHash) &&
