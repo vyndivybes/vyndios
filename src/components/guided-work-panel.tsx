@@ -210,7 +210,7 @@ export function GuidedWorkPanel({ role }: { role: CommandRole | null }) {
     <aside
       ref={panelRef}
       style={floatingStyle}
-      className="fixed bottom-[env(safe-area-inset-bottom,0px)] left-2 right-2 z-50 max-h-[85dvh] overflow-hidden rounded-2xl border border-border bg-bg/95 shadow-2xl backdrop-blur-xl sm:bottom-5 sm:left-5 sm:right-auto sm:w-[420px]"
+      className="fixed bottom-[env(safe-area-inset-bottom,0px)] left-2 right-2 z-50 flex max-h-[85dvh] flex-col overflow-hidden rounded-2xl border border-border bg-bg/95 shadow-2xl backdrop-blur-xl sm:bottom-5 sm:left-5 sm:right-auto sm:w-[420px]"
       aria-label="VYNDI Guided Work"
       role="dialog"
       aria-modal="false"
@@ -221,7 +221,7 @@ export function GuidedWorkPanel({ role }: { role: CommandRole | null }) {
         onPointerMove={moveDrag}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
-        className="select-none border-b border-border bg-surface/55 px-4 py-3 sm:cursor-move sm:touch-none"
+        className="shrink-0 select-none border-b border-border bg-surface/55 px-4 py-3 sm:cursor-move sm:touch-none"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -272,11 +272,11 @@ export function GuidedWorkPanel({ role }: { role: CommandRole | null }) {
         </div>
       </header>
 
-      <nav className="flex gap-2 border-b border-border px-4 py-2" aria-label="Guide scope">
+      <nav className="flex shrink-0 gap-2 border-b border-border px-4 py-2" aria-label="Guide scope">
         <button type="button" onClick={() => setScope("all")} aria-pressed={scope === "all"} className={cn("rounded-lg px-3 py-2 text-xs font-semibold", scope === "all" ? "bg-accent/15 text-accent" : "text-muted")}>All Features</button>
         <button type="button" onClick={() => setScope("page")} aria-pressed={scope === "page"} className={cn("rounded-lg px-3 py-2 text-xs font-semibold", scope === "page" ? "bg-accent/15 text-accent" : "text-muted")}>On this page</button>
       </nav>
-      <div className="max-h-[55dvh] overflow-y-auto px-4 py-4 [scrollbar-width:thin]">
+      <div className="min-h-0 max-h-[55dvh] flex-1 overflow-y-auto px-4 py-4 [scrollbar-width:thin]">
         {scope === "all" ? (
           <div className="space-y-3">
             <p className="text-xs text-muted">{features.length} authorised destinations · based on VYNDI OS navigation</p>
@@ -394,9 +394,10 @@ export function GuidedWorkPanel({ role }: { role: CommandRole | null }) {
         )}
       </div>
 
-      <footer className="border-t border-border bg-surface/45 px-4 py-3">
+      <footer className="shrink-0 border-t border-border bg-surface/45 px-4 py-3">
         <p className="text-[10px] leading-4 text-subtle">{GUIDED_WORK_AUTHORITY_NOTICE}</p>
       </footer>
     </aside>
   );
 }
+
