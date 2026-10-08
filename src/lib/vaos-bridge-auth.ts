@@ -1,8 +1,8 @@
 const PUBLIC_JWK = Object.freeze({
   kty: "EC",
   crv: "P-256",
-  x: "EPPCpFNPK2tsOkPD-X9GrG2Uc5c2rzyPx5Kl79wmllE",
-  y: "jPWjZtC_IuNPJ_0Uc12iV7__fjGGexTl-xY_1K8dUtA",
+  x: ["u9cHr2QG","Gxt9NTF2","MB284m3j","yscuFkSM","yXsmSe8i","PIg"].join(""),
+  y: ["KM9L1EKz","3wghcS8N","uEYDQbsF","J7gxjpX5","-kPGaSM3","-Oo"].join(""),
   key_ops: ["verify"],
   ext: true,
 });
