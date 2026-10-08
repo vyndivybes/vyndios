@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getSql } from "@/lib/db";
+import {normalizeVaosScheduleExport,validateScheduleProjectInput} from "@/lib/vaos-schedule-export";
 import {
   sha256Hex,
   validateVaosBridgeSignedContext,
@@ -18,6 +19,7 @@ const READ_ACTIONS = new Set([
   "FINANCE.OBSERVE_LEDGER",
   "PEOPLE.OBSERVE_WORKFORCE",
   "ENGINEERING.OBSERVE_CONFIGURATION",
+  "PROJECT.OBSERVE_SCHEDULE",
 ]);
 
 const EXPECTED_EMPLOYEE: Record<string, string> = {
@@ -29,6 +31,7 @@ const EXPECTED_EMPLOYEE: Record<string, string> = {
   "FINANCE.OBSERVE_LEDGER": "finance",
   "PEOPLE.OBSERVE_WORKFORCE": "people",
   "ENGINEERING.OBSERVE_CONFIGURATION": "engineering-configuration",
+  "PROJECT.OBSERVE_SCHEDULE": "project",
 };
 
 const SOURCE_AUTHORITY: Record<string, string> = {
@@ -40,6 +43,7 @@ const SOURCE_AUTHORITY: Record<string, string> = {
   "FINANCE.OBSERVE_LEDGER": "getAccountingWorkbench",
   "PEOPLE.OBSERVE_WORKFORCE": "listPeopleOfficeAuthority",
   "ENGINEERING.OBSERVE_CONFIGURATION": "getEngineeringChangeControlState",
+  "PROJECT.OBSERVE_SCHEDULE": "readGovernedProgramSchedule",
 };
 
 function json(body: unknown, status = 200) {
@@ -63,7 +67,20 @@ async function executeRead(
   sql: Awaited<ReturnType<typeof getSql>>,
   actionType: string,
   limit: number,
+  input: Record<string, unknown> = {},
 ) {
+  if (actionType === "PROJECT.OBSERVE_SCHEDULE") {
+    const {projectId}=validateScheduleProjectInput(input);
+    const rows=await sql.query<{record:Record<string,unknown>;captured_at:string}>(
+      `select to_jsonb(t) as record, current_timestamp as captured_at
+         from vyndi_program_tasks t where t.program_id=$1
+         order by t.id limit $2`,
+      [projectId,limit],
+    );
+    const capturedAt=rows.length?new Date(rows[0].captured_at).toISOString():new Date().toISOString();
+    return normalizeVaosScheduleExport({projectId,capturedAt,records:rows.map(row=>row.record)});
+  }
+
   if (actionType === "COMMERCIAL.OBSERVE_PIPELINE") {
     const rows = await sql.query<{ record: unknown }>(
       "select to_jsonb(s) as record from vyndi_sales_orders s order by s.updated_at desc limit $1",
@@ -319,7 +336,7 @@ export const Route = createFileRoute("/api/vaos/bridge")({
         const input = payload.input && typeof payload.input === "object" && !Array.isArray(payload.input)
           ? payload.input as Record<string, unknown>
           : {};
-        const data = await executeRead(sql, actionType, boundedLimit(input.limit));
+        const data = await executeRead(sql, actionType, boundedLimit(input.limit), input);
 
         return json({
           ok: true,
