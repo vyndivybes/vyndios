@@ -88,7 +88,7 @@
     "test:mes:golden": "node --test --test-name-pattern=\"Stage 2 order\" scripts/canonical-business-truth.test.mjs && node --test scripts/issued-material-fulfillment.test.mjs scripts/production-batch-release.test.mjs scripts/operating-lineage-quality.test.mjs scripts/iso-quality-compliance.test.mjs scripts/vyndi-serialized-dispatch-thread.test.mjs",
     "test:assurance:closure": "node --test scripts/enterprise-assurance-closure.test.mjs",
     "test:vaos-write-authority": "node --test scripts/vaos-operational-write-authority.test.mjs",
-    "test:vaos-bridge:read": "node --experimental-strip-types --test src/lib/vaos-bridge-auth.test.ts && node --test scripts/vaos-read-bridge-contract.test.mjs"
+    "test:vaos-bridge:read": "node --experimental-strip-types --test src/lib/vaos-bridge-auth.test.ts && node --test scripts/vaos-read-bridge-contract.test.mjs && node --experimental-strip-types --test scripts/vaos-schedule-export.test.mjs scripts/vaos-schedule-bridge-gate.test.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
