@@ -101,6 +101,42 @@ export const rejectScheduleRevision = createServerFn({method:"POST"})
     return {ok:true,id:data.id,state:"rejected"};
   });
 
-// Intentionally no approve/publish endpoint here. Only an independently verified,
-// date-complete, immutable hash-bound snapshot can become the published baseline.
-// VAOS must not infer approval from state or user-supplied hashes.
+
+/**
+ * Approval is intentionally restricted to a date-complete snapshot of the canonical
+ * task set. The digest is generated on the server, never supplied by the browser.
+ * An approval creates an immutable named schedule baseline; it does not mutate
+ * tasks or change the financial Master Plan.
+ */
+export const approveScheduleRevision = createServerFn({method:"POST"})
+ .validator(revisionId.extend({approvalReference:z.string().trim().min(5).max(500),timezone:z.literal("Asia/Kolkata")}))
+ .handler(async({data})=>{
+  const actor=await requireBusinessActor("approve");
+  const sql=await getSql();
+  const revision=await sql`select id,state,proposed_by,document_json from vyndi_schedule_revisions
+    where id=${data.id} and program_id=${PROGRAM_ID} limit 1`;
+  if(revision.length!==1 || revision[0].state!=="submitted") throw new Error("Submitted revision required.");
+  if(revision[0].proposed_by===actor.userId) throw new Error("Self-approval prohibited.");
+  const tasks=await sql`select id,planned_start::text as planned_start,planned_finish::text as planned_finish,
+    duration_days,record_revision from vyndi_program_tasks where program_id=${PROGRAM_ID} order by id`;
+  if(tasks.length===0 || tasks.some(t=>!t.planned_start || !t.planned_finish))
+    throw new Error("Every program task must have approved planned dates before baseline approval.");
+  const deps=await sql`select predecessor_id,successor_id,lag_days from vyndi_program_dependencies
+    where program_id=${PROGRAM_ID} order by predecessor_id,successor_id`;
+  const payload=JSON.stringify({programId:PROGRAM_ID,revisionId:data.id,timezone:data.timezone,tasks:[...tasks],dependencies:[...deps]});
+  const bytes=new TextEncoder().encode(payload);
+  const digest=await crypto.subtle.digest("SHA-256",bytes);
+  const hash="sha256:"+Array.from(new Uint8Array(digest)).map(x=>x.toString(16).padStart(2,"0")).join("");
+  const result=await sql`update vyndi_schedule_revisions
+    set state='approved',reviewed_by=${actor.userId},reviewed_at=now(),
+    approval_reference=${data.approvalReference},approved_at=now(),
+    approved_timezone=${data.timezone},baseline_hash=${hash},
+    document_json=jsonb_set(document_json,'{approvedSnapshot}',${payload}::jsonb,true)
+    where id=${data.id} and state='submitted' and program_id=${PROGRAM_ID}
+      and proposed_by<>${actor.userId} and not exists(
+      select 1 from vyndi_schedule_revisions where program_id=${PROGRAM_ID} and state='approved')
+    returning id,state,baseline_hash`;
+  if(result.length!==1) throw new Error("Approval conflict or existing approved baseline.");
+  return {ok:true,id:data.id,state:"approved",baselineHash:hash};
+ });
+
