@@ -121,6 +121,20 @@ export const approveScheduleRevision = createServerFn({method:"POST"})
     duration_days,record_revision from vyndi_program_tasks where program_id=${PROGRAM_ID} order by id`;
   if(tasks.length===0 || tasks.some(t=>!t.planned_start || !t.planned_finish))
     throw new Error("Every program task must have approved planned dates before baseline approval.");
+  const changes=revision[0].document_json?.changes;
+  if(!Array.isArray(changes) || changes.length===0) throw new Error("Revision requires documented changes.");
+  // Approval can certify only an already-applied, independently inspected schedule.
+  // Proposed values that do not match current canonical records must never be published.
+  const taskById=new Map(tasks.map(t=>[String(t.id),t]));
+  for(const change of changes){
+    const row=taskById.get(String(change.taskId));
+    if(!row) throw new Error("Revision references a missing canonical task.");
+    const scheduleFields={plannedStart:"planned_start",plannedFinish:"planned_finish",durationDays:"duration_days"};
+    const canonicalField=scheduleFields[change.field];
+    if(!canonicalField) throw new Error("Change needs a qualified application/reconciliation step before approval.");
+    const actual=row[canonicalField];
+    if(String(actual ?? "")!==String(change.after ?? "")) throw new Error("Revision changes are not reconciled with canonical schedule.");
+  }
   const deps=await sql`select predecessor_id,successor_id,lag_days from vyndi_program_dependencies
     where program_id=${PROGRAM_ID} order by predecessor_id,successor_id`;
   const payload=JSON.stringify({programId:PROGRAM_ID,revisionId:data.id,timezone:data.timezone,tasks:[...tasks],dependencies:[...deps]});
