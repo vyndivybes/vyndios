@@ -5,7 +5,6 @@ import { requireBusinessActor } from "@/lib/business-actor";
 import { validateScheduleRevision } from "@/lib/schedule-revision-policy.mjs";
 
 const PROGRAM_ID = "VYNDI-MASTER-PROGRAM";
-const state = z.enum(["draft","submitted","rejected","approved","superseded"]);
 const field = z.enum(["title","domain","workPackage","owner","plannedStart","plannedFinish","durationDays","predecessors","budgetLakh","milestoneMonth","scenario","scope","status","deferUntil"]);
 const change = z.object({
   taskId:z.string().trim().min(2).max(120),
@@ -43,6 +42,24 @@ export const proposeScheduleRevision = createServerFn({method:"POST"})
     });
     if(!check.ok) throw new Error(check.errors.join("; "));
     const sql=await getSql();
+    const taskIds=[...new Set(data.changes.map((item)=>item.taskId))];
+    const programTasks=await sql`select id from vyndi_program_tasks where program_id=${PROGRAM_ID} and id=any(${taskIds})`;
+    if(programTasks.length !== taskIds.length) throw new Error("Proposal contains unknown program task IDs.");
+    const availableTasks=await sql`select id,title,domain,work_package,owner,duration_days,planned_start,planned_finish,status
+      from vyndi_program_tasks where program_id=${PROGRAM_ID} and id=any(${taskIds})`;
+    const fieldMap:Record<string,string>={title:"title",domain:"domain",workPackage:"work_package",
+      owner:"owner",durationDays:"duration_days",plannedStart:"planned_start",plannedFinish:"planned_finish",status:"status"};
+    for(const item of data.changes){
+      if(!Object.hasOwn(fieldMap,item.field)) continue;
+      const row=availableTasks.find((candidate)=>candidate.id===item.taskId);
+      if(!row) throw new Error("Unknown source task.");
+      const sourceValue=row[fieldMap[item.field]];
+      const expected=item.before == null || item.before === "" ? null : item.before;
+      const actual=sourceValue==null ? null : String(sourceValue).slice(0,10);
+      if(String(expected ?? "") !== String(actual ?? "")){
+        throw new Error(`Stale proposal: ${item.taskId} ${item.field} changed in production.`);
+      }
+    }
     // Proposals do not modify canonical program tasks or the Rev 9 financial plan.
     const results=await sql`
       insert into vyndi_schedule_revisions
