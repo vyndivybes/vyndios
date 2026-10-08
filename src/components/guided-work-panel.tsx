@@ -307,7 +307,7 @@ export function GuidedWorkPanel({ role }: { role: CommandRole | null }) {
             {!filteredFeatures.length && <p role="status" className="text-sm text-muted">No authorised features match this search.</p>}
           </div>
         ) : (
-
+          <>
         {mode === "learn" ? (
           <div className="space-y-4">
             <section>
@@ -390,6 +390,8 @@ export function GuidedWorkPanel({ role }: { role: CommandRole | null }) {
             )}
           </div>
         )}
+        )}
+          </>
         )}
       </div>
 
