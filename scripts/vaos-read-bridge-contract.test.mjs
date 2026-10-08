@@ -40,3 +40,22 @@ test("VAOS read bridge enforces protocol-v2 signed context before executing", as
   assert.equal(source.includes("signed_context_invalid"), true);
   assert.equal(source.includes("employee_context_mismatch"), true);
 });
+
+test("Stage-3 qualification-only write bridge is atomic, compensated and does not commission operational writes", async () => {
+  const source = await readFile(join(root, "src/routes/api/vaos/bridge.ts"), "utf8");
+  const sql = await readFile(join(root, "migrations/0148_vaos_write_qualification_canary.sql"), "utf8");
+
+  assert.equal(source.includes('purpose === "write-qualify"'), true);
+  assert.equal(source.includes("qualify_vaos_commercial_write_canary"), true);
+  assert.equal(source.includes("write_execution_not_commissioned"), true);
+  assert.equal(source.includes("COMMERCIAL_WRITE_CANARY_V1"), true);
+
+  assert.match(sql,/create table if not exists vyndi_vaos_write_qualifications/i);
+  assert.match(sql,/create or replace function qualify_vaos_commercial_write_canary/i);
+  assert.match(sql,/VAOS-CANARY-SO-/);
+  assert.match(sql,/COMMERCIAL_WRITE_CANARY_V1/);
+  assert.match(sql,/save_vyndi_sales_order/);
+  assert.match(sql,/'lead'/);
+  assert.match(sql,/'cancelled'/);
+  assert.match(sql,/COMPENSATED/);
+});
