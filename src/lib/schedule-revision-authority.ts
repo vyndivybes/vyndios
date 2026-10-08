@@ -45,7 +45,7 @@ export const proposeScheduleRevision = createServerFn({method:"POST"})
     const taskIds=[...new Set(data.changes.map((item)=>item.taskId))];
     const programTasks=await sql`select id from vyndi_program_tasks where program_id=${PROGRAM_ID} and id=any(${taskIds})`;
     if(programTasks.length !== taskIds.length) throw new Error("Proposal contains unknown program task IDs.");
-    const availableTasks=await sql`select id,title,domain,work_package,owner,duration_days,planned_start,planned_finish,status
+    const availableTasks=await sql`select id,title,domain,work_package,owner,duration_days,planned_start::text as planned_start,planned_finish::text as planned_finish,status
       from vyndi_program_tasks where program_id=${PROGRAM_ID} and id=any(${taskIds})`;
     const fieldMap:Record<string,string>={title:"title",domain:"domain",workPackage:"work_package",
       owner:"owner",durationDays:"duration_days",plannedStart:"planned_start",plannedFinish:"planned_finish",status:"status"};
@@ -55,7 +55,7 @@ export const proposeScheduleRevision = createServerFn({method:"POST"})
       if(!row) throw new Error("Unknown source task.");
       const sourceValue=row[fieldMap[item.field]];
       const expected=item.before == null || item.before === "" ? null : item.before;
-      const actual=sourceValue==null ? null : String(sourceValue).slice(0,10);
+      const actual=sourceValue==null ? null : String(sourceValue);
       if(String(expected ?? "") !== String(actual ?? "")){
         throw new Error(`Stale proposal: ${item.taskId} ${item.field} changed in production.`);
       }
