@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   canonicalVaosBridgeSignatureInput,
+  validateVaosBridgeSignedContext,
   verifyVaosBridgeSignature,
   VAOS_BRIDGE_KEY_ID,
   VAOS_BRIDGE_PUBLIC_JWK,
@@ -59,3 +60,115 @@ test("stale signed requests fail before bridge execution", async () => {
   });
   assert.deepEqual(result, { ok: false, error: "timestamp_out_of_window" });
 });
+
+test("signed bridge context validator binds protocol, route and execution identity", () => {
+  const payload = {
+    protocolVersion: "vaos-vyndi-bridge.v2",
+    serviceIdentity: "vaos",
+    audience: "vyndi-os",
+    method: "POST",
+    path: "/api/vaos/bridge",
+    purpose: "read-observe",
+    actionType: "INVENTORY.OBSERVE_STOCK",
+    employeeId: "inventory",
+    intentId: "intent-v2-1",
+    executionJobId: "job-v2-1",
+    approvalId: null,
+    missionId: "mission-v2-1",
+    input: { limit: 1 },
+  };
+
+  assert.deepEqual(
+    validateVaosBridgeSignedContext({
+      payload,
+      requestMethod: "POST",
+      requestPath: "/api/vaos/bridge",
+      expectedPurpose: "read-observe",
+    }),
+    { ok: true },
+  );
+
+  const cases: Array<[Record<string, unknown>, string]> = [
+    [{ ...payload, protocolVersion: "vaos-vyndi-bridge.v1" }, "protocol_version_mismatch"],
+    [{ ...payload, serviceIdentity: "other-service" }, "service_identity_mismatch"],
+    [{ ...payload, audience: "other-audience" }, "audience_mismatch"],
+    [{ ...payload, method: "GET" }, "method_binding_mismatch"],
+    [{ ...payload, path: "/api/other" }, "path_binding_mismatch"],
+    [{ ...payload, purpose: "write-execute" }, "purpose_mismatch"],
+    [{ ...payload, actionType: "" }, "action_type_missing"],
+    [{ ...payload, intentId: "" }, "intent_id_missing"],
+    [{ ...payload, executionJobId: "" }, "execution_job_id_missing"],
+    [{ ...payload, approvalId: "APP-READ" }, "read_approval_forbidden"],
+  ];
+
+  for (const [candidate, error] of cases) {
+    assert.deepEqual(
+      validateVaosBridgeSignedContext({
+        payload: candidate,
+        requestMethod: "POST",
+        requestPath: "/api/vaos/bridge",
+        expectedPurpose: "read-observe",
+      }),
+      { ok: false, error },
+    );
+  }
+
+  assert.deepEqual(
+    validateVaosBridgeSignedContext({
+      payload,
+      requestMethod: "GET",
+      requestPath: "/api/vaos/bridge",
+      expectedPurpose: "read-observe",
+    }),
+    { ok: false, error: "request_method_mismatch" },
+  );
+
+  assert.deepEqual(
+    validateVaosBridgeSignedContext({
+      payload,
+      requestMethod: "POST",
+      requestPath: "/api/vaos/other",
+      expectedPurpose: "read-observe",
+    }),
+    { ok: false, error: "request_path_mismatch" },
+  );
+});
+
+test("write-purpose signed context requires approval identity without commissioning writes", () => {
+  const payload: Record<string, unknown> = {
+    protocolVersion: "vaos-vyndi-bridge.v2",
+    serviceIdentity: "vaos",
+    audience: "vyndi-os",
+    method: "POST",
+    path: "/api/vaos/bridge",
+    purpose: "write-execute",
+    actionType: "INVENTORY.RESERVE_MATERIAL",
+    employeeId: "inventory",
+    intentId: "intent-write-v2-1",
+    executionJobId: "job-write-v2-1",
+    approvalId: "APP-WRITE-1",
+    missionId: "mission-write-v2-1",
+    input: {},
+  };
+
+  assert.deepEqual(
+    validateVaosBridgeSignedContext({
+      payload,
+      requestMethod: "POST",
+      requestPath: "/api/vaos/bridge",
+      expectedPurpose: "write-execute",
+    }),
+    { ok: true },
+  );
+
+  assert.deepEqual(
+    validateVaosBridgeSignedContext({
+      payload: { ...payload, approvalId: null },
+      requestMethod: "POST",
+      requestPath: "/api/vaos/bridge",
+      expectedPurpose: "write-execute",
+    }),
+    { ok: false, error: "write_approval_required" },
+  );
+});
+

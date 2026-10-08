@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { getSql } from "@/lib/db";
 import {
   sha256Hex,
+  validateVaosBridgeSignedContext,
   verifyVaosBridgeSignature,
   VAOS_BRIDGE_MAX_SKEW_SECONDS,
 } from "@/lib/vaos-bridge-auth";
@@ -16,6 +17,17 @@ const READ_ACTIONS = new Set([
   "PEOPLE.OBSERVE_WORKFORCE",
   "ENGINEERING.OBSERVE_CONFIGURATION",
 ]);
+
+const EXPECTED_EMPLOYEE: Record<string, string> = {
+  "COMMERCIAL.OBSERVE_PIPELINE": "commercial",
+  "PROCUREMENT.OBSERVE_SHORTAGE": "procurement",
+  "INVENTORY.OBSERVE_STOCK": "inventory",
+  "PRODUCTION.OBSERVE_WIP": "production",
+  "MAINTENANCE.OBSERVE_ASSET": "maintenance",
+  "FINANCE.OBSERVE_LEDGER": "finance",
+  "PEOPLE.OBSERVE_WORKFORCE": "people",
+  "ENGINEERING.OBSERVE_CONFIGURATION": "engineering-configuration",
+};
 
 const SOURCE_AUTHORITY: Record<string, string> = {
   "COMMERCIAL.OBSERVE_PIPELINE": "listSalesOrders",
@@ -166,10 +178,29 @@ export const Route = createFileRoute("/api/vaos/bridge")({
           return json({ ok: false, error: signatureCheck.error }, 401);
         }
 
-        const payload = JSON.parse(bodyText || "{}") as Record<string, unknown>;
+        let payload: Record<string, unknown>;
+        try {
+          payload = JSON.parse(bodyText || "{}") as Record<string, unknown>;
+        } catch {
+          return json({ ok: false, error: "invalid_json" }, 400);
+        }
+
+        const signedContext = validateVaosBridgeSignedContext({
+          payload,
+          requestMethod: request.method,
+          requestPath: new URL(request.url).pathname,
+          expectedPurpose: "read-observe",
+        });
+        if (!signedContext.ok) {
+          return json({ ok: false, error: "signed_context_invalid" }, 401);
+        }
+
         const actionType = String(payload.actionType ?? "").trim();
         if (!READ_ACTIONS.has(actionType)) {
           return json({ ok: false, error: "action_not_commissioned" }, 403);
+        }
+        if (String(payload.employeeId ?? "").trim() !== EXPECTED_EMPLOYEE[actionType]) {
+          return json({ ok: false, error: "employee_context_mismatch" }, 403);
         }
 
         const sql = await getSql();
@@ -190,6 +221,7 @@ export const Route = createFileRoute("/api/vaos/bridge")({
 
         return json({
           ok: true,
+          protocolVersion: payload.protocolVersion,
           actionType,
           effectClass: "read",
           sourceAuthority: SOURCE_AUTHORITY[actionType],
