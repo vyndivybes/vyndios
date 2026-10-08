@@ -9,6 +9,7 @@ import {
 } from "@/lib/vaos-bridge-auth";
 
 const WRITE_QUALIFICATION_PROFILE = "COMMERCIAL_WRITE_CANARY_V1";
+const OPERATIONAL_WRITE_PROFILE = "PEOPLE_DRAFT_MASTER_V1";
 
 const READ_ACTIONS = new Set([
   "COMMERCIAL.OBSERVE_PIPELINE",
@@ -205,11 +206,12 @@ export const Route = createFileRoute("/api/vaos/bridge")({
         }
 
         const purpose = String(payload.purpose ?? "").trim();
-        if (purpose === "write-execute") {
-          return json({ ok: false, error: "write_execution_not_commissioned" }, 403);
-        }
-
-        const expectedPurpose = purpose === "write-qualify" ? "write-qualify" : "read-observe";
+        const expectedPurpose =
+          purpose === "write-qualify"
+            ? "write-qualify"
+            : purpose === "write-execute"
+              ? "write-execute"
+              : "read-observe";
         const signedContext = validateVaosBridgeSignedContext({
           payload,
           requestMethod: request.method,
@@ -224,6 +226,129 @@ export const Route = createFileRoute("/api/vaos/bridge")({
         const sql = await getSql();
         const timestampMs = Number(timestamp.length === 10 ? Number(timestamp) * 1000 : Number(timestamp));
         const expiresAt = new Date(timestampMs + VAOS_BRIDGE_MAX_SKEW_SECONDS * 1000).toISOString();
+
+        if (purpose === "write-execute") {
+          if (
+            actionType !== "PEOPLE.CHANGE_EMPLOYEE_MASTER"
+            || String(payload.employeeId ?? "").trim() !== "people"
+            || payload.operationalWriteProfile !== OPERATIONAL_WRITE_PROFILE
+          ) {
+            return json({ ok: false, error: "operational_write_scope_denied" }, 403);
+          }
+
+          const executionJobId = String(payload.executionJobId ?? "").trim();
+          const intentId = String(payload.intentId ?? "").trim();
+          const approvalId = String(payload.approvalId ?? "").trim();
+          const idempotencyKey = String(payload.idempotencyKey ?? "").trim();
+          const requestedByHash = String(payload.requestedByHash ?? "").trim().toLowerCase();
+          const approvedByHash = String(payload.approvedByHash ?? "").trim().toLowerCase();
+          const input = payload.input && typeof payload.input === "object" && !Array.isArray(payload.input)
+            ? payload.input as Record<string, unknown>
+            : {};
+
+          const expectedKeys = [
+            "displayName","endMonth","engagementType","expectedRevision","functionName",
+            "id","notes","roleTitle","sourceReference","startMonth",
+          ].sort().join(",");
+          const inputKeys = Object.keys(input).sort().join(",");
+          const expectedRevision = Number(input.expectedRevision);
+          const startMonth = input.startMonth == null ? null : Number(input.startMonth);
+          const endMonth = input.endMonth == null ? null : Number(input.endMonth);
+          const expectedSourceReference = `VAOS|${intentId}|${executionJobId}`;
+
+          if (
+            !executionJobId
+            || !intentId
+            || !approvalId
+            || idempotencyKey.length < 4
+            || idempotencyKey.length > 160
+            || !/^[0-9a-f]{64}$/.test(requestedByHash)
+            || !/^[0-9a-f]{64}$/.test(approvedByHash)
+            || requestedByHash === approvedByHash
+            || inputKeys !== expectedKeys
+            || typeof input.id !== "string"
+            || !input.id.trim()
+            || !Number.isInteger(expectedRevision)
+            || expectedRevision < 1
+            || typeof input.displayName !== "string"
+            || !input.displayName.trim()
+            || typeof input.functionName !== "string"
+            || !input.functionName.trim()
+            || typeof input.roleTitle !== "string"
+            || !input.roleTitle.trim()
+            || !["employee","contractor","consultant","planned_role"].includes(String(input.engagementType ?? ""))
+            || (startMonth !== null && (!Number.isInteger(startMonth) || startMonth < 1 || startMonth > 36))
+            || (endMonth !== null && (!Number.isInteger(endMonth) || endMonth < 1 || endMonth > 36))
+            || (startMonth !== null && endMonth !== null && endMonth < startMonth)
+            || input.sourceReference !== expectedSourceReference
+            || typeof input.notes !== "string"
+          ) {
+            return json({ ok: false, error: "operational_write_input_invalid" }, 422);
+          }
+
+          const claimed = await sql.query<{ claimed: boolean }>(
+            "select claim_vyndi_vaos_bridge_nonce($1,$2,$3,$4,$5::timestamptz) as claimed",
+            [nonce, keyId, bodySha256, actionType, expiresAt],
+          );
+          if (claimed[0]?.claimed !== true) {
+            return json({ ok: false, error: "replay_detected" }, 409);
+          }
+
+          const rows = await sql.query<{ result: Record<string, unknown> }>(
+            `select execute_vaos_people_master_draft_change(
+              $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17
+            ) as result`,
+            [
+              executionJobId,
+              intentId,
+              approvalId,
+              idempotencyKey,
+              requestedByHash,
+              approvedByHash,
+              OPERATIONAL_WRITE_PROFILE,
+              String(input.id).trim(),
+              expectedRevision,
+              String(input.displayName),
+              String(input.functionName),
+              String(input.roleTitle),
+              String(input.engagementType),
+              startMonth,
+              endMonth,
+              String(input.sourceReference),
+              String(input.notes),
+            ],
+          );
+          const result = rows[0]?.result;
+          if (
+            !result
+            || result.outcome !== "EXECUTED"
+            || result.finalState !== "draft"
+            || result.resourceId !== String(input.id).trim()
+            || Number(result.initialRevision) !== expectedRevision
+            || Number(result.finalRevision) <= expectedRevision
+          ) {
+            return json({ ok: false, error: "operational_write_verification_failed" }, 500);
+          }
+
+          return json({
+            ok: true,
+            protocolVersion: payload.protocolVersion,
+            actionType,
+            effectClass: "operational-mutation",
+            sourceAuthority: "savePeopleRecordDraft",
+            operationalWrite: true,
+            operationalWriteProfile: OPERATIONAL_WRITE_PROFILE,
+            readOnly: false,
+            nonce,
+            bodySha256,
+            resourceId: result.resourceId,
+            outcome: result.outcome,
+            finalState: result.finalState,
+            initialRevision: result.initialRevision,
+            finalRevision: result.finalRevision,
+            replay: result.replay === true,
+          });
+        }
 
         if (purpose === "write-qualify") {
           if (
