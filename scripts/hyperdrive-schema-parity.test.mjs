@@ -15,7 +15,14 @@ test("Hyperdrive database requests never execute schema DDL before returning SQL
   const start=dbServer.indexOf("export async function getSqlServer");
   const end=dbServer.indexOf("export async function getPgliteServer",start);
   const block=dbServer.slice(start,end);
-  assert.doesNotMatch(block,/ensureHyperdriveSchemaReady/);
+  assert.match(block, /await ensureHyperdriveSchemaReady\(transport\)/);
+  const gateStart=dbServer.indexOf("async function ensureHyperdriveSchemaReady");
+  const gateEnd=dbServer.indexOf("export async function readRuntimeSchemaMigrationStatus",gateStart);
+  assert.ok(gateStart>=0 && gateEnd>gateStart);
+  const gate=dbServer.slice(gateStart,gateEnd);
+  assert.match(gate,/SCHEMA_LAG/);
+  assert.match(gate,/plan\.pending/);
+  assert.doesNotMatch(gate,/create table|alter table|insert into _migrations|client\.query\(migration\.sql/i);
   assert.match(block,/createPostgresSql\(transport\)/);
 });
 
@@ -60,3 +67,4 @@ test("safe schema diagnostic route reports migration failure without leaking con
   assert.match(diagnostic,/sqlState/);
   assert.doesNotMatch(diagnostic,/connectionString|DATABASE_URL|password|HYPERDRIVE.*connection/i);
 });
+

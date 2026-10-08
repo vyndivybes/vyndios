@@ -10,6 +10,9 @@ async function sourceModule(path, replacements = {}) {
   for (const [specifier, replacement] of Object.entries(replacements)) source = source.replaceAll(JSON.stringify(specifier), JSON.stringify(replacement));
   return url(source);
 }
+const pageMetadataUrl = await sourceModule("src/lib/page-metadata.ts");
+const pageAccessUrl = await sourceModule("src/lib/page-access.ts", { "./page-metadata.ts": pageMetadataUrl });
+const guidedWorkUrl = await sourceModule("src/lib/guided-work.ts", { "@/lib/page-access": pageAccessUrl });
 const intentUrl = await sourceModule("src/lib/vibpe-intent.ts");
 const contextUrl = await sourceModule("src/lib/vibpe-scenario-context.ts");
 const qualityUrl = await sourceModule("src/lib/vibpe-answer-quality.ts");
@@ -146,6 +149,7 @@ globalThis.__vibpeReliabilityFixture = {
   governance: async () => { governedCalls++; return null; },
 };
 const copilotUrl = await sourceModule("src/lib/vibpe-copilot-2.ts", {
+  "@/lib/guided-work": guidedWorkUrl,
   "@/lib/ibpe-scenario-lab": url("export const evaluateScenario=(...args)=>globalThis.__vibpeReliabilityFixture.evaluateScenario(...args);"),
   "@/lib/vibpe-intent": intentUrl,
   "@/lib/vibpe-scenario-context": contextUrl,
@@ -201,7 +205,7 @@ test("scenario persistence failure discloses degraded mode without discarding th
   const result = await runVibpeCopilot2(sql, "inject 25 lakh", baseline, { ownerKey: "save-fails", sessionKey: "save-fails", governedRunId: "run-1" });
   assert.equal(result.scenario.cashInjectionLakh, 25);
   assert.equal(result.dataState.mode, "degraded");
-  assert.match(result.answer, /not saved/);
+  assert.match(result.dataState.disclosure, /not saved/);
 });
 test("record-source failure cannot silently become a planning conclusion", async () => {
   const original = globalThis.__vibpeReliabilityFixture.governance;
@@ -273,7 +277,7 @@ test("production entry point returns a traceable scenario answer and persists it
   assert.equal(result.ok, true);
   assert.equal(result.lineage.governedRunId, "run-1");
   assert.equal(result.evidenceQuality.status, "limited");
-  assert.match(result.answer, /deterministic scenario recalculation/);
+  assert.match(result.methodNote, /deterministic scenario recalculation/);
   assert.equal(sql.captured.length, 1);
   assert.equal(sql.captured[0].confidence, result.evidenceQuality.coverageScore);
   assert.equal(sql.captured[0].evidence[0].effectiveDate, "2026-09-01T10:00:00Z");
@@ -292,7 +296,7 @@ test("unsaved receipt never returns a receipt ID", async () => {
   assert.equal(result.ok, true);
   assert.equal(result.reasoningReceiptId, undefined);
   assert.equal(result.dataMode, "degraded");
-  assert.match(result.answer, /not persisted/);
+  assert.match(result.diagnostics.join("\n"), /not persisted/);
 });
 test("required audit failure returns a safe error instead of an unaudited success", async () => {
   globalThis.__vibpeReliabilityFixture.sql = mainDatabase({ failAudit: true });
@@ -310,3 +314,4 @@ test("RBAC denial precedes baseline or context access", async () => {
     assert.equal(queried, false);
   } finally { globalThis.__vibpeReliabilityFixture.deny = false; }
 });
+

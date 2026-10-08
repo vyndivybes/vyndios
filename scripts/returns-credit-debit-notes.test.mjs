@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { PGlite } from "@electric-sql/pglite";
+import { approveInventoryMaster } from "./inventory-master-fixture.mjs";
 import { pendingMigrations } from "./migration-plan.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -28,6 +29,7 @@ async function seedCash(db, closingCashLakh = 10) {
 }
 
 async function seedInventoryItem(db, { id, sku, name }) {
+  await approveInventoryMaster(db,{sku,name,category:"Test",unit:"ea"});
   await db.query(
     `insert into master_inventory_items
       (id,ledger_id,sku,name,category,unit,minimum_stock_level,planned_monthly_use,active,created_by,updated_by)
@@ -187,3 +189,4 @@ test("source authorities expose non-destructive returns and explicit cash-month 
   assert.match(salesRoute,/Quarantine\/scrap never silently increase available stock/);
   assert.match(payablesRoute,/Debit note offsets AP first; any excess becomes Supplier Recoverable/);
 });
+

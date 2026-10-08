@@ -10,7 +10,14 @@ test("normal Hyperdrive SQL never performs runtime schema DDL", () => {
   const end = dbServer.indexOf("export async function getPgliteServer", start);
   const block = dbServer.slice(start, end);
   assert.ok(start >= 0 && end > start);
-  assert.doesNotMatch(block, /ensureHyperdriveSchemaReady/);
+  assert.match(block, /await ensureHyperdriveSchemaReady\(transport\)/);
+  const gateStart=dbServer.indexOf("async function ensureHyperdriveSchemaReady");
+  const gateEnd=dbServer.indexOf("export async function readRuntimeSchemaMigrationStatus",gateStart);
+  assert.ok(gateStart>=0 && gateEnd>gateStart);
+  const gate=dbServer.slice(gateStart,gateEnd);
+  assert.match(gate,/SCHEMA_LAG/);
+  assert.match(gate,/plan\.pending/);
+  assert.doesNotMatch(gate,/create table|alter table|insert into _migrations|client\.query\(migration\.sql/i);
   assert.match(block, /createPostgresSql\(transport\)/);
 });
 
@@ -28,3 +35,4 @@ test("deploy migrator no longer claims restricted runtime role will apply DDL", 
   assert.doesNotMatch(migrator, /runtime Hyperdrive reconciliation will enforce schema before queries/i);
   assert.match(migrator, /privileged DATABASE_URL migration/i);
 });
+

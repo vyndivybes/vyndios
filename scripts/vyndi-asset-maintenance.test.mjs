@@ -28,13 +28,15 @@ test("maintenance model exposes evidence-backed reliability and withholds unsupp
   assert.doesNotMatch(model,/Math\.random/);
 });
 
-test("maintenance authority governs asset plans work orders completion and return to service",()=>{
+test("maintenance authority governs asset plans work orders completion and return to service",async()=>{
   for(const token of ["registerEquipmentAsset","createMaintenancePlan","createMaintenanceWorkOrder","startMaintenanceWorkOrder","cancelMaintenanceWorkOrder","completeMaintenanceWorkOrder"]) assert.match(authority,new RegExp(token));
   assert.match(authority,/ASSET_REGISTERED/);
   assert.match(authority,/MAINTENANCE_PLAN_CREATED/);
   assert.match(authority,/MAINTENANCE_WORK_ORDER_CANCELLED/);
-  assert.match(authority,/MAINTENANCE_WORK_ORDER_COMPLETED/);
-  assert.match(authority,/RETURN_TO_SERVICE/);
+  assert.match(authority,/select \* from complete_vyndi_maintenance_work_order/);
+  const closure=await read("migrations/0139_quality_maintenance_authority_closure.sql");
+  assert.match(closure,/MAINTENANCE_WORK_ORDER_COMPLETED/);
+  assert.match(closure,/RETURN_TO_SERVICE/);
   assert.match(authority,/epr_operation_controls/);
 });
 
@@ -84,3 +86,4 @@ test("Asset maintenance GET state crosses the server boundary with JSON-serializ
   assert.match(authority,/parts: .*toSerializableRow/);
   assert.doesNotMatch(authority,/return \{ sql, assets: \[\.\.\.assets\], plans: \[\.\.\.plans\], workOrders: \[\.\.\.workOrders\], parts: \[\.\.\.parts\]/);
 });
+

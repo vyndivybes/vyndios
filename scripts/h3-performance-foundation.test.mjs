@@ -9,7 +9,7 @@ test("H3 qualifies bounded DB, route and optimizer load without weakening govern
     read("scripts/h3-db-performance.mjs"),
     read("scripts/h3-route-load.mjs"),
     read("scripts/h3-optimizer-performance.mjs"),
-    read(".github/workflows/h3-performance-load.yml"),
+    read(".github/workflows-enterprise/h3-performance-load.yml"),
     read("docs/VYNDI-H3-PERFORMANCE-LOAD-QUALIFICATION-REV1.md"),
     read("src/lib/postgres-pool.ts"),
     read("src/lib/optimizer-resource-budget.ts"),
@@ -45,7 +45,7 @@ test("H3 qualifies bounded DB, route and optimizer load without weakening govern
 
 test("H3 evidence remains isolated from production and preserves safe-degradation rules", async()=>{
   const [workflow,policy]=await Promise.all([
-    read(".github/workflows/h3-performance-load.yml"),
+    read(".github/workflows-enterprise/h3-performance-load.yml"),
     read("docs/VYNDI-H3-PERFORMANCE-LOAD-QUALIFICATION-REV1.md"),
   ]);
   assert.match(workflow,/postgresql:\/\/postgres:postgres@localhost:5432\/vyndi_h3/);
@@ -54,3 +54,4 @@ test("H3 evidence remains isolated from production and preserves safe-degradatio
   assert.match(policy,/cannot grant transaction authority/i);
   assert.match(policy,/No automatic retry of a heavy optimizer request/i);
 });
+

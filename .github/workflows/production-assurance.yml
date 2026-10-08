@@ -47,6 +47,9 @@ jobs:
           test -n "$VYNDI_TEST_PASSWORD"
           test -n "$VYNDI_TEST_EXPECTED_SHA"
 
+      - name: Golden Enterprise transaction regression
+        run: npm run test:golden-enterprise:transaction
+
       - name: Exact production health and schema gate
         shell: bash
         run: |
@@ -95,3 +98,4 @@ jobs:
             .grok/evidence/
           retention-days: 30
           if-no-files-found: warn
+

@@ -19,7 +19,7 @@ test("R2 runs a real transaction Golden Enterprise qualification", () => {
   assert.match(pkg.scripts["test:golden-enterprise:transaction"], /canonical-business-truth/);
   assert.match(pkg.scripts["test:golden-enterprise:transaction"], /Stage 2 order/);
   assert.match(pkg.scripts["test:golden-enterprise:transaction"], /recommendation.*PO approval/i);
-  const stageD = read(".github/workflows/stage-d-acceptance.yml");
+  const stageD = read(".github/workflows-enterprise/stage-d-acceptance.yml");
   assert.match(stageD, /test:golden-enterprise:transaction/);
 });
 
@@ -29,7 +29,7 @@ test("R2 strengthens coverage scope beyond the original R1 subset", () => {
   assert.match(pkg.scripts["test:coverage:enterprise"], /master-ledger\.test\.ts/);
   assert.match(pkg.scripts["test:coverage:enterprise"], /advanced-planning-highs-adapter\.test\.ts/);
   assert.match(pkg.scripts["test:coverage:enterprise"], /vibpe-carbon-bike-material-gate\.test\.ts/);
-  assert.match(read(".github/workflows/ci.yml"), /test:coverage:enterprise/);
+  assert.match(read(".github/workflows-enterprise/ci.yml"), /test:coverage:enterprise/);
 });
 
 test("R2 expands VIBPE benchmark to at least 48 cases", async () => {
@@ -46,8 +46,8 @@ test("R2 adds optimizer backtest framework and fixtures", () => {
 });
 
 test("R2 adds main-branch governance tripwire", () => {
-  assert.ok(existsSync(new URL("../.github/workflows/main-governance.yml", import.meta.url)));
-  const wf = read(".github/workflows/main-governance.yml");
+  assert.ok(existsSync(new URL("../.github/workflows-enterprise/main-governance.yml", import.meta.url)));
+  const wf = read(".github/workflows-enterprise/main-governance.yml");
   assert.match(wf, /push:/);
   assert.match(wf, /pull_request|merge/i);
   assert.match(wf, /main/);
@@ -59,3 +59,4 @@ test("R2 production assurance includes transaction qualification and release SHA
   assert.match(wf, /VYNDI_TEST_EXPECTED_SHA/);
   assert.match(wf, /observe:slo/);
 });
+

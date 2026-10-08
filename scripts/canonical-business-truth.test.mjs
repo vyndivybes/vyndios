@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { PGlite } from "@electric-sql/pglite";
+import { approveInventoryMaster } from "./inventory-master-fixture.mjs";
 import { pendingMigrations } from "./migration-plan.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -50,8 +51,21 @@ async function createReleasedCard(db, { orderId, cardId, lineId, quantity }) {
   );
 }
 
+test("ERP SKU creation rejects missing approval and mismatched Inventory Master metadata", async (t) => {
+  const db=await createCanonicalDb(); t.after(()=>db.close());
+  const create=()=>db.query(`insert into master_inventory_items
+    (id,ledger_id,sku,name,category,unit,minimum_stock_level,planned_monthly_use,created_by,updated_by)
+    values ('ITEM-UNAPPROVED','components','UNAPPROVED-SKU','Unapproved part','test','ea',0,0,'test','test')`);
+  await assert.rejects(create,/requires an approved Inventory Master/i);
+  await approveInventoryMaster(db,{sku:"UNAPPROVED-SKU",name:"Different approved name",category:"test",unit:"ea"});
+  await assert.rejects(create,/metadata must match the approved Inventory Master/i);
+  const rows=await db.query("select id from master_inventory_items where sku='UNAPPROVED-SKU'");
+  assert.equal(rows.rows.length,0);
+});
+
 test("canonical order → reservation → ATP → FIFO/COGS and stale-order controls stay consistent", async (t) => {
   const db = await createCanonicalDb(); t.after(()=>db.close());
+  await approveInventoryMaster(db,{sku:"TEST-SKU",name:"Test controlled component",category:"groupset",unit:"ea"});
   await db.query(`select * from save_vyndi_master_inventory_entry($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::date,$14::date,$15::date,$16,$17,$18,$19)`,[
     "ITEM-TEST","REC-TEST-1","LED-REC-TEST-1","components","TEST-SKU","Test controlled component","groupset","unit",1,1,5,10,"2026-01-01",null,null,"PO-TEST-1","canonical integration receipt","test-user","operations",
   ]);
@@ -274,6 +288,7 @@ test("Stage 2 order → production → quality → dispatch → invoice → rece
 
 test("recommendation → PO approval → GRN/FIFO → three-way match → payment is controlled", async (t) => {
   const db=await createCanonicalDb(); t.after(()=>db.close());
+  await approveInventoryMaster(db,{sku:"P2P-SKU",name:"Controlled P2P item",category:"test",unit:"ea"});
   await db.query(`insert into master_inventory_items
     (id,ledger_id,sku,name,category,unit,minimum_stock_level,planned_monthly_use,created_by,updated_by)
     values ('ITEM-P2P','components','P2P-SKU','Controlled P2P item','test','ea',1,1,'test','test')`);
