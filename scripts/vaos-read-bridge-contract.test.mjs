@@ -7,7 +7,7 @@ import test from "node:test";
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
 
-test("VAOS read bridge exposes exactly the eight commissioned read actions", async () => {
+test("VAOS bridge preserves the original eight reads and the governed project schedule read", async () => {
   const source = await readFile(join(root, "src/routes/api/vaos/bridge.ts"), "utf8");
   const actions = [
     "COMMERCIAL.OBSERVE_PIPELINE",
@@ -18,6 +18,7 @@ test("VAOS read bridge exposes exactly the eight commissioned read actions", asy
     "FINANCE.OBSERVE_LEDGER",
     "PEOPLE.OBSERVE_WORKFORCE",
     "ENGINEERING.OBSERVE_CONFIGURATION",
+    "PROJECT.OBSERVE_SCHEDULE",
   ];
   for (const action of actions) assert.equal(source.includes(action), true, action);
   assert.equal(source.includes("action_not_commissioned"), true);
