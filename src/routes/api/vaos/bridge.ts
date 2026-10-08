@@ -7,6 +7,8 @@ import {
   VAOS_BRIDGE_MAX_SKEW_SECONDS,
 } from "@/lib/vaos-bridge-auth";
 
+const WRITE_QUALIFICATION_PROFILE = "COMMERCIAL_WRITE_CANARY_V1";
+
 const READ_ACTIONS = new Set([
   "COMMERCIAL.OBSERVE_PIPELINE",
   "PROCUREMENT.OBSERVE_SHORTAGE",
@@ -185,17 +187,120 @@ export const Route = createFileRoute("/api/vaos/bridge")({
           return json({ ok: false, error: "invalid_json" }, 400);
         }
 
+        const purpose = String(payload.purpose ?? "").trim();
+        if (purpose === "write-execute") {
+          return json({ ok: false, error: "write_execution_not_commissioned" }, 403);
+        }
+
+        const expectedPurpose = purpose === "write-qualify" ? "write-qualify" : "read-observe";
         const signedContext = validateVaosBridgeSignedContext({
           payload,
           requestMethod: request.method,
           requestPath: new URL(request.url).pathname,
-          expectedPurpose: "read-observe",
+          expectedPurpose,
         });
         if (!signedContext.ok) {
           return json({ ok: false, error: "signed_context_invalid" }, 401);
         }
 
         const actionType = String(payload.actionType ?? "").trim();
+        const sql = await getSql();
+        const timestampMs = Number(timestamp.length === 10 ? Number(timestamp) * 1000 : Number(timestamp));
+        const expiresAt = new Date(timestampMs + VAOS_BRIDGE_MAX_SKEW_SECONDS * 1000).toISOString();
+
+        if (purpose === "write-qualify") {
+          if (
+            actionType !== "COMMERCIAL.COMMIT_ORDER"
+            || String(payload.employeeId ?? "").trim() !== "commercial"
+            || payload.qualificationProfile !== WRITE_QUALIFICATION_PROFILE
+          ) {
+            return json({ ok: false, error: "write_qualification_scope_denied" }, 403);
+          }
+
+          const executionJobId = String(payload.executionJobId ?? "").trim();
+          const intentId = String(payload.intentId ?? "").trim();
+          const approvalId = String(payload.approvalId ?? "").trim();
+          const idempotencyKey = String(payload.idempotencyKey ?? "").trim();
+          const requestedByHash = String(payload.requestedByHash ?? "").trim().toLowerCase();
+          const approvedByHash = String(payload.approvedByHash ?? "").trim().toLowerCase();
+          const input = payload.input && typeof payload.input === "object" && !Array.isArray(payload.input)
+            ? payload.input as Record<string, unknown>
+            : {};
+          const canaryId = `VAOS-CANARY-SO-${executionJobId}`;
+          const inputKeys = Object.keys(input).sort().join(",");
+          const expectedKeys = ["aspLakh","channel","id","month","product","status","units"].sort().join(",");
+
+          if (
+            !executionJobId
+            || !intentId
+            || !approvalId
+            || idempotencyKey.length < 4
+            || idempotencyKey.length > 160
+            || !/^[0-9a-f]{64}$/.test(requestedByHash)
+            || !/^[0-9a-f]{64}$/.test(approvedByHash)
+            || requestedByHash === approvedByHash
+            || inputKeys !== expectedKeys
+            || input.id !== canaryId
+            || input.month !== 36
+            || input.product !== "aluminium"
+            || input.units !== 1
+            || input.aspLakh !== 0
+            || input.channel !== "direct"
+            || input.status !== "lead"
+          ) {
+            return json({ ok: false, error: "write_qualification_input_invalid" }, 422);
+          }
+
+          const claimed = await sql.query<{ claimed: boolean }>(
+            "select claim_vyndi_vaos_bridge_nonce($1,$2,$3,$4,$5::timestamptz) as claimed",
+            [nonce, keyId, bodySha256, actionType, expiresAt],
+          );
+          if (claimed[0]?.claimed !== true) {
+            return json({ ok: false, error: "replay_detected" }, 409);
+          }
+
+          const rows = await sql.query<{ result: Record<string, unknown> }>(
+            "select qualify_vaos_commercial_write_canary($1,$2,$3,$4,$5,$6,$7,$8) as result",
+            [
+              executionJobId,
+              intentId,
+              approvalId,
+              idempotencyKey,
+              requestedByHash,
+              approvedByHash,
+              canaryId,
+              WRITE_QUALIFICATION_PROFILE,
+            ],
+          );
+          const result = rows[0]?.result;
+          if (
+            !result
+            || result.outcome !== "COMPENSATED"
+            || result.finalState !== "cancelled"
+            || result.canaryId !== canaryId
+          ) {
+            return json({ ok: false, error: "write_qualification_verification_failed" }, 500);
+          }
+
+          return json({
+            ok: true,
+            protocolVersion: payload.protocolVersion,
+            actionType,
+            effectClass: "qualification-mutation",
+            sourceAuthority: "saveSalesOrder",
+            qualificationOnly: true,
+            qualificationProfile: WRITE_QUALIFICATION_PROFILE,
+            readOnly: false,
+            nonce,
+            bodySha256,
+            canaryId,
+            outcome: result.outcome,
+            finalState: result.finalState,
+            initialRevision: result.initialRevision,
+            finalRevision: result.finalRevision,
+          });
+        }
+
         if (!READ_ACTIONS.has(actionType)) {
           return json({ ok: false, error: "action_not_commissioned" }, 403);
         }
@@ -203,9 +308,6 @@ export const Route = createFileRoute("/api/vaos/bridge")({
           return json({ ok: false, error: "employee_context_mismatch" }, 403);
         }
 
-        const sql = await getSql();
-        const timestampMs = Number(timestamp.length === 10 ? Number(timestamp) * 1000 : Number(timestamp));
-        const expiresAt = new Date(timestampMs + VAOS_BRIDGE_MAX_SKEW_SECONDS * 1000).toISOString();
         const claimed = await sql.query<{ claimed: boolean }>(
           "select claim_vyndi_vaos_bridge_nonce($1,$2,$3,$4,$5::timestamptz) as claimed",
           [nonce, keyId, bodySha256, actionType, expiresAt],

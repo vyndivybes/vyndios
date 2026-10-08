@@ -19,7 +19,7 @@ export function validateVaosBridgeSignedContext(input: {
   payload: Record<string, unknown>;
   requestMethod: string;
   requestPath: string;
-  expectedPurpose: "read-observe" | "write-execute";
+  expectedPurpose: "read-observe" | "write-execute" | "write-qualify";
 }) {
   const payload = input.payload ?? {};
   if (payload.protocolVersion !== VAOS_BRIDGE_PROTOCOL_VERSION) {
@@ -67,6 +67,13 @@ export function validateVaosBridgeSignedContext(input: {
     }
   } else if (typeof payload.approvalId !== "string" || !payload.approvalId.trim()) {
     return { ok: false as const, error: "write_approval_required" };
+  }
+
+  if (
+    input.expectedPurpose === "write-qualify"
+    && payload.qualificationProfile !== "COMMERCIAL_WRITE_CANARY_V1"
+  ) {
+    return { ok: false as const, error: "write_qualification_profile_invalid" };
   }
   return { ok: true as const };
 }

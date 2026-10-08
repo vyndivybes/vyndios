@@ -172,3 +172,51 @@ test("write-purpose signed context requires approval identity without commission
   );
 });
 
+test("write-qualification signed context requires approval and the exact qualification profile", () => {
+  const payload: Record<string, unknown> = {
+    protocolVersion: "vaos-vyndi-bridge.v2",
+    serviceIdentity: "vaos",
+    audience: "vyndi-os",
+    method: "POST",
+    path: "/api/vaos/bridge",
+    purpose: "write-qualify",
+    actionType: "COMMERCIAL.COMMIT_ORDER",
+    employeeId: "commercial",
+    intentId: "00000000-0000-4000-8000-000000000052",
+    executionJobId: "00000000-0000-4000-8000-000000000051",
+    approvalId: "00000000-0000-4000-8000-000000000053",
+    missionId: "write-qualification:00000000-0000-4000-8000-000000000052",
+    qualificationProfile: "COMMERCIAL_WRITE_CANARY_V1",
+    input: {},
+  };
+
+  assert.deepEqual(
+    validateVaosBridgeSignedContext({
+      payload,
+      requestMethod: "POST",
+      requestPath: "/api/vaos/bridge",
+      expectedPurpose: "write-qualify",
+    }),
+    { ok: true },
+  );
+
+  assert.deepEqual(
+    validateVaosBridgeSignedContext({
+      payload: { ...payload, approvalId: null },
+      requestMethod: "POST",
+      requestPath: "/api/vaos/bridge",
+      expectedPurpose: "write-qualify",
+    }),
+    { ok: false, error: "write_approval_required" },
+  );
+
+  assert.deepEqual(
+    validateVaosBridgeSignedContext({
+      payload: { ...payload, qualificationProfile: "WRONG" },
+      requestMethod: "POST",
+      requestPath: "/api/vaos/bridge",
+      expectedPurpose: "write-qualify",
+    }),
+    { ok: false, error: "write_qualification_profile_invalid" },
+  );
+});
