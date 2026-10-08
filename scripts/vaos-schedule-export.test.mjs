@@ -25,7 +25,7 @@ test("invalid project identifiers, empty rows and duplicate tasks fail closed",(
  assert.throws(()=>validateScheduleProjectInput({projectId:"' OR 1=1 --"}),/SCHEDULE_PROJECT_ID_INVALID/);
  assert.throws(()=>validateScheduleProjectInput({projectId:""}),/SCHEDULE_PROJECT_ID_INVALID/);
  assert.throws(()=>normalizeVaosScheduleExport({projectId:"VYNDI-MASTER-PROGRAM",capturedAt:"2026-10-08T14:00:00.000Z",records:[]}),/SCHEDULE_SOURCE_EMPTY/);
- assert.throws(()=>normalizeVaosScheduleExport({projectId:"VYNDI-MASTER-PROGRAM",capturedAt:"2026-10-08T14:00:00.000Z",records:[{id:"A"},{id:"A"}]}),/SCHEDULE_DUPLICATE_TASK/);
+ assert.throws(()=>normalizeVaosScheduleExport({projectId:"VYNDI-MASTER-PROGRAM",capturedAt:"2026-10-08T14:00:00.000Z",records:[{id:"A",status:"ready"},{id:"A",status:"ready"}]}),/SCHEDULE_DUPLICATE_TASK/);
 });
 test("reject unsupported source statuses, invalid date fields and non-UTC poll timestamps",()=>{
  const args={projectId:"VYNDI-MASTER-PROGRAM",capturedAt:"2026-10-08T14:00:00.000Z",records:[{id:"A",status:"invented",planned_finish:"2026-10-08"}]};
