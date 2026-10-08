@@ -30,3 +30,12 @@ test("migration is additive and records evidence, reviewer and immutable baselin
   assert.match(migration,/baseline_hash/);
   assert.doesNotMatch(migration,/drop table|truncate table/i);
 });
+
+test("approval is independent, based on complete dates and server-computed digest",()=>{
+  assert.match(authority,/requireBusinessActor\("approve"\)/);
+  assert.match(authority,/Self-approval prohibited/);
+  assert.match(authority,/Every program task must have approved planned dates/);
+  assert.match(authority,/crypto\.subtle\.digest\("SHA-256"/);
+  assert.match(authority,/Revision changes are not reconciled with canonical schedule/);
+  assert.match(authority,/not exists\(/);
+});
