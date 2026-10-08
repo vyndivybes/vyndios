@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   canonicalVaosBridgeSignatureInput,
+  validateVaosBridgeSignedContext,
   verifyVaosBridgeSignature,
   VAOS_BRIDGE_KEY_ID,
   VAOS_BRIDGE_PUBLIC_JWK,
