@@ -7,7 +7,8 @@ import {
   type GuidedWorkMode,
   type GuidedWorkStep,
 } from "@/lib/guided-work";
-import type { CommandRole } from "@/lib/page-access";
+import { canAccessRoute, type CommandRole } from "@/lib/page-access";
+import { WORKSPACE_NAVIGATION } from "@/lib/operating-workflow";
 import { cn } from "@/lib/utils";
 
 const MODE_KEY = "vyndi:guided-work:mode";
@@ -59,11 +60,32 @@ export function GuidedWorkPanel({ role }: { role: CommandRole | null }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(initialOpen);
   const [mode, setMode] = useState<GuidedWorkMode>(initialMode);
+  const [scope, setScope] = useState<"all" | "page">("all");
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("all");
   const [position, setPosition] = useState<FloatingPosition | null>(initialPosition);
   const [isDesktop, setIsDesktop] = useState(false);
   const panelRef = useRef<HTMLElement | null>(null);
   const dragRef = useRef<DragState | null>(null);
   const guide = useMemo(() => resolveGuidedWork(role, pathname), [pathname, role]);
+  const features = useMemo(() => {
+    const entries = new Map<string, { to: string; label: string; section: string; workspace: string }>();
+    for (const [workspace, sections] of Object.entries(WORKSPACE_NAVIGATION)) {
+      if (workspace === "admin" && role !== "admin") continue;
+      for (const section of sections) {
+        for (const item of section.items) {
+          if (canAccessRoute(role, item.to) && !entries.has(item.to)) {
+            entries.set(item.to, { ...item, section: section.label, workspace });
+          }
+        }
+      }
+    }
+    return [...entries.values()];
+  }, [role]);
+  const filteredFeatures = useMemo(() => features.filter((feature) =>
+    (category === "all" || feature.workspace === category) &&
+    `${feature.label} ${feature.section} ${feature.workspace}`.toLowerCase().includes(query.trim().toLowerCase())
+  ), [category, features, query]);
   const floatingStyle = useMemo<CSSProperties | undefined>(
     () => (isDesktop && position ? { left: position.x, top: position.y, right: "auto", bottom: "auto" } : undefined),
     [isDesktop, position],
@@ -175,7 +197,7 @@ export function GuidedWorkPanel({ role }: { role: CommandRole | null }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed bottom-5 left-3 z-40 inline-flex min-h-12 items-center gap-2 rounded-full border border-accent/35 bg-bg/95 px-4 py-3 text-sm font-semibold text-fg shadow-2xl backdrop-blur-xl transition hover:border-accent hover:bg-surface sm:left-5"
+        className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] right-4 z-50 inline-flex min-h-12 items-center gap-2 rounded-full border border-accent/35 bg-bg/95 px-4 py-3 text-sm font-semibold text-fg shadow-2xl backdrop-blur-xl transition hover:border-accent hover:bg-surface sm:bottom-5 sm:right-5"
         aria-label="Open VYNDI Guided Work"
       >
         <Compass className="size-4 text-accent" />
@@ -188,8 +210,11 @@ export function GuidedWorkPanel({ role }: { role: CommandRole | null }) {
     <aside
       ref={panelRef}
       style={floatingStyle}
-      className="fixed bottom-3 left-3 right-3 z-40 max-h-[78dvh] overflow-hidden rounded-2xl border border-border bg-bg/95 shadow-2xl backdrop-blur-xl sm:bottom-5 sm:left-5 sm:right-auto sm:w-[420px]"
+      className="fixed bottom-[env(safe-area-inset-bottom,0px)] left-2 right-2 z-50 max-h-[85dvh] overflow-hidden rounded-2xl border border-border bg-bg/95 shadow-2xl backdrop-blur-xl sm:bottom-5 sm:left-5 sm:right-auto sm:w-[420px]"
       aria-label="VYNDI Guided Work"
+      role="dialog"
+      aria-modal="false"
+      onKeyDown={(event) => { if (event.key === "Escape") setOpen(false); }}
     >
       <header
         onPointerDown={beginDrag}
@@ -247,7 +272,42 @@ export function GuidedWorkPanel({ role }: { role: CommandRole | null }) {
         </div>
       </header>
 
-      <div className="max-h-[56dvh] overflow-y-auto px-4 py-4 [scrollbar-width:thin]">
+      <nav className="flex gap-2 border-b border-border px-4 py-2" aria-label="Guide scope">
+        <button type="button" onClick={() => setScope("all")} aria-pressed={scope === "all"} className={cn("rounded-lg px-3 py-2 text-xs font-semibold", scope === "all" ? "bg-accent/15 text-accent" : "text-muted")}>All Features</button>
+        <button type="button" onClick={() => setScope("page")} aria-pressed={scope === "page"} className={cn("rounded-lg px-3 py-2 text-xs font-semibold", scope === "page" ? "bg-accent/15 text-accent" : "text-muted")}>On this page</button>
+      </nav>
+      <div className="max-h-[55dvh] overflow-y-auto px-4 py-4 [scrollbar-width:thin]">
+        {scope === "all" ? (
+          <div className="space-y-3">
+            <p className="text-xs text-muted">{features.length} authorised destinations · based on VYNDI OS navigation</p>
+            <input type="search" value={query} onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search VYNDI features" aria-label="Search VYNDI features"
+              className="control w-full" />
+            <select value={category} onChange={(event) => setCategory(event.target.value)}
+              aria-label="Filter features by workspace" className="control w-full">
+              <option value="all">All workspaces</option>
+              {[...new Set(features.map((item) => item.workspace))].map((workspace) => (
+                <option key={workspace} value={workspace}>{workspace.replaceAll("-", " & ")}</option>
+              ))}
+            </select>
+            {filteredFeatures.map((feature) => (
+              <article key={feature.to} className="rounded-xl border border-border bg-surface/30 p-3">
+                <p className="text-sm font-semibold text-fg">{feature.label}</p>
+                <p className="mt-1 text-xs text-muted">{feature.section} · {feature.workspace.replaceAll("-", " & ")}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button type="button" onClick={() => { void navigate({ to: feature.to as never }); setOpen(false); }}
+                    className="rounded-lg border border-accent/35 px-3 py-2 text-xs font-semibold text-accent">Open feature</button>
+                  <button type="button" onClick={() => askVyndi({
+                    label: feature.label, to: feature.to, reason: feature.section,
+                    question: `Explain the ${feature.label} feature in VYNDI OS, its workflow and required authority. Do not execute actions or assume approval.`
+                  })} className="rounded-lg border border-border px-3 py-2 text-xs text-muted">Ask VYNDI</button>
+                </div>
+              </article>
+            ))}
+            {!filteredFeatures.length && <p role="status" className="text-sm text-muted">No authorised features match this search.</p>}
+          </div>
+        ) : (
+          <>
         {mode === "learn" ? (
           <div className="space-y-4">
             <section>
@@ -329,6 +389,8 @@ export function GuidedWorkPanel({ role }: { role: CommandRole | null }) {
               </div>
             )}
           </div>
+        )}
+          </>
         )}
       </div>
 
