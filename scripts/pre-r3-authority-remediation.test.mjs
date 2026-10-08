@@ -97,8 +97,10 @@ test("G3 derives traveller lineage and enforces passing final inspection before 
   assert.match(qualityAuthority, /resolveQualityLineage/);
   assert.match(qualityAuthority, /t\.job_card_id as "jobCardId"/);
   assert.match(qualityAuthority, /c\.sales_order_id as "salesOrderId"/);
-  assert.match(qualityAuthority, /Quality release requires at least one passing final inspection/);
-  assert.match(qualityAuthority, /Quality release is blocked by an open NCR\/CAPA chain/);
+  // Release authorization is centralized in the database gate; the client must not substitute its own stale checks.
+  assert.match(qualityAuthority, /select \* from vyndi_quality_release_gate\(\$1\)/);
+  assert.match(qualityAuthority, /if \(!gate\?\.can_release\)/);
+  assert.match(qualityAuthority, /gate\?\.blocking_reason/);
   assert.match(qualityAuthority, /'G10-QUALITY'/);
   assert.match(qualityAuthority, /QUALITY_RELEASE_DECIDED/);
 });
