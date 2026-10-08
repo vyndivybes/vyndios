@@ -71,6 +71,9 @@ jobs:
       - name: Universal scanner input
         run: npm run test:scanner
 
+      - name: VAOS operational write authority
+        run: npm run test:vaos-write-authority
+
       - name: Enterprise assurance control regression
         run: npm run test:assurance:closure
 
