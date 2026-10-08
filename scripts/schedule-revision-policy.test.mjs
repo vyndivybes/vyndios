@@ -17,7 +17,7 @@ test("revision requires nonempty changed field and an explicit prior value",()=>
 test("monitoring requires approved dated immutable baseline and independent verifier",()=>{
   const approved={...base,status:"approved",reviewer:"auditor",approvedBy:"auditor",approvalEvidence:"approval-321",effectiveRevision:"REV-10"};
   assert.equal(canMonitorSchedule(approved),false);
-  assert.equal(canMonitorSchedule({...approved,baselineHash:"sha256:abc",approvedTimezone:"Asia/Kolkata",approvedDates:true,independentVerifier:"third-party"}),true);
+  assert.equal(canMonitorSchedule({...approved,baselineHash:"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",approvedTimezone:"Asia/Kolkata",approvedDates:true,independentVerifier:"third-party"}),true);
 });
 test("unsupported arbitrary field changes are rejected",()=>{
   assert.equal(validateScheduleRevision({...base,changes:[{taskId:"AL-002",field:"deleteDatabase",before:0,after:1}]}).ok,false);
