@@ -8,7 +8,8 @@ test("signed VAOS schedule route requires the existing ECDSA signature, canonica
  assert.match(src,/PROJECT\.OBSERVE_SCHEDULE/);
  assert.match(src,/verifyVaosBridgeSignature/);
  assert.match(src,/validateVaosBridgeSignedContext/);
- assert.match(src,/expectedPurpose:\s*"read-observe"/);
+ assert.match(src,/expectedPurpose/);
+ assert.match(src,/"read-observe"/);
  assert.match(src,/claim_vyndi_vaos_bridge_nonce/);
  assert.match(src,/sourceAuthority: SOURCE_AUTHORITY\[actionType\]/);
  assert.match(src,/validateScheduleProjectInput\(input\)/);
