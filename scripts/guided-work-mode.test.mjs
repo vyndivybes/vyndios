@@ -86,3 +86,21 @@ test("Guided Work regression is part of the canonical suite and has a focused co
   assert.match(pkg.scripts.test, /scripts\/guided-work-mode\.test\.mjs/);
   assert.equal(pkg.scripts["test:guided-work"], "node --test scripts/guided-work-mode.test.mjs");
 });
+
+test("Guide defaults to an RBAC-filtered global catalogue rather than three local steps", () => {
+  assert.match(panel, /WORKSPACE_NAVIGATION/);
+  assert.match(panel, /canAccessRoute\(role, item.to\)/);
+  assert.match(panel, /All Features/);
+  assert.match(panel, /On this page/);
+  assert.match(panel, /Search VYNDI features/);
+  assert.match(panel, /filteredFeatures\.map/);
+  assert.match(panel, /aria-label="Open VYNDI Guided Work"/);
+});
+
+test("Guide preserves the existing VIBPE boundary and a mobile-safe floating launcher", () => {
+  assert.match(panel, /vyndi:copilot-open/);
+  assert.match(panel, /safe-area-inset-bottom/);
+  assert.match(panel, /role="dialog"/);
+  assert.match(panel, /aria-modal="false"/);
+  assert.match(panel, /onKeyDown/);
+});
