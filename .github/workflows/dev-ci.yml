@@ -74,6 +74,9 @@ jobs:
       - name: VAOS operational write authority
         run: npm run test:vaos-write-authority
 
+      - name: VAOS signed read bridge
+        run: npm run test:vaos-bridge:read
+
       - name: Enterprise assurance control regression
         run: npm run test:assurance:closure
 
