@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -280,6 +281,24 @@ test("full restore is new-target, maker/checker, evidence-gated and cutover-reco
     /requires hash match, database health, Golden Order and authenticated smoke/i,
   );
 
+  const validation={hashMatch:true,databaseHealth:true,goldenOrder:true,authenticatedSmoke:true};
+  await assert.rejects(
+    ()=>database.query(`select validate_vyndi_full_restore('DR-1',$1::jsonb,'VAL-INCOMPLETE','ADMIN-CHECKER','admin')`,[JSON.stringify(validation)]),
+    /at least four department recovery scopes/i,
+  );
+  for(const [kind,scope] of [
+    ['department','sales'],['department','inventory'],['department','production'],['department','finance'],
+    ['configuration','runtime'],['attachment','controlled-document'],
+  ]) {
+    const source=JSON.stringify({scope,records:['restore-fixture-1']});
+    const restored=JSON.stringify(JSON.parse(source));
+    const hash=(value)=>createHash('sha256').update(value).digest('hex');
+    await database.query(
+      `select * from register_vyndi_recovery_qualification_evidence($1,'DR-1',$2,$3,$4,$5,1,1,$6,$7,'restore-source-fixture','restore-evidence-fixture','ADMIN-CHECKER','admin')`,
+      [`QUAL-${scope}`,kind,scope,hash(source),hash(restored),kind==='attachment'?Buffer.byteLength(source):null,kind==='attachment'?Buffer.byteLength(restored):null],
+    );
+  }
+
   await database.query(
     `select validate_vyndi_full_restore('DR-1',$1::jsonb,'VAL-PASS','ADMIN-CHECKER','admin')`,
     [JSON.stringify({
@@ -345,3 +364,4 @@ test("recovery evidence is append-only and UI preserves the canonical authority 
   assert.match(workflow,/\/command\/recovery/);
   assert.match(metadata,/["']\/command\/recovery["'][\s\S]{0,300}adminOnly: true/);
 });
+

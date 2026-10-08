@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { PGlite } from "@electric-sql/pglite";
+import { approveInventoryMaster } from "./inventory-master-fixture.mjs";
 import { pendingMigrations } from "./migration-plan.mjs";
 
 const here=dirname(fileURLToPath(import.meta.url));
@@ -21,6 +22,7 @@ async function db() {
 }
 
 async function inventoryItem(database,{item,sku,quantity,cost}) {
+  await approveInventoryMaster(database,{sku,name:`Stocktake test ${sku}`,category:"stocktake-test",unit:"ea"});
   await database.query(
     `select * from save_vyndi_master_inventory_entry(
       $1,$2,$3,'components',$4,$5,'stocktake-test','ea',0,0,$6,$7,$8::date,null,null,$9,'stocktake gate test',$10,$11
@@ -185,3 +187,4 @@ test("statutory hard-close authority and CA evidence include stocktake readiness
   assert.match(route,/Approve independently/);
   assert.match(metadata,/Inventory Stocktake/);
 });
+

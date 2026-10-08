@@ -16,6 +16,11 @@ function loadAuthority(file, identity, denied = false, respond = () => []) {
     calls.push({ text: strings.join('?'), values });
     return respond(strings.join('?'), values);
   };
+  // Mirror the production SQL adapter's parameterized query method.
+  sql.query = async (query, values = []) => {
+    calls.push({ text: query, values });
+    return respond(query, values);
+  };
   const schema = new Proxy(() => {}, { get: () => schema, apply: () => schema });
   const createServerFn = () => ({ validator() { return this; }, handler(fn) { return fn; } });
   const requireBusinessActor = async () => {
@@ -72,7 +77,7 @@ for (const openCount of [1, 0]) {
   test(`Quality release checks EPR holds: ${openCount}`, async () => {
     const { handlers, calls } = loadAuthority('quality-authority', { userId: 'qa-approver', role: 'qa' }, false, (query) => {
       if (query.includes('from epr_travellers')) return [{ jobCardId: 'JC-1', serialNumber: 'SN-1', salesOrderId: 'SO-1' }];
-      if (query.includes('from epr_ncr_capa')) return [{ count: openCount }];
+      if (query.includes('vyndi_quality_release_gate')) return [{ can_release: openCount === 0, blocking_reason: openCount ? 'Quality release blocked by unresolved EPR NCR/CAPA' : null }];
       if (query.includes('from vyndi_quality_inspections')) return [{ count: 1 }];
       if (query.includes('from vyndi_quality_ncrs')) return [{ count: 0 }];
       return [];

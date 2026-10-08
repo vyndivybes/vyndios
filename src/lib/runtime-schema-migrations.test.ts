@@ -68,5 +68,14 @@ test("Hyperdrive runtime schema inspection is detection-only and never requires 
   assert.match(diagnosticBlock,/readRuntimeSchemaMigrationStatus/);
   assert.match(diagnosticBlock,/SCHEMA_LAG/);
   assert.doesNotMatch(diagnosticBlock,/create\s+table|alter\s+table|create\s+trigger|drop\s+trigger/i);
-  assert.doesNotMatch(sqlBlock,/ensureHyperdriveSchemaReady|migration\.sql|_migrations\(name\)/i);
+  assert.match(sqlBlock,/await ensureHyperdriveSchemaReady\(transport\)/);
+  assert.doesNotMatch(sqlBlock,/migration\.sql|_migrations\(name\)/i);
+  const gateStart=source.indexOf("async function ensureHyperdriveSchemaReady");
+  const gateEnd=source.indexOf("export async function readRuntimeSchemaMigrationStatus",gateStart);
+  assert.ok(gateStart>=0 && gateEnd>gateStart);
+  const gate=source.slice(gateStart,gateEnd);
+  assert.match(gate,/SCHEMA_LAG/);
+  assert.match(gate,/plan\.pending/);
+  assert.doesNotMatch(gate,/create\s+table|alter\s+table|create\s+trigger|drop\s+trigger|migration\.sql|insert\s+into\s+_migrations/i);
 });
+

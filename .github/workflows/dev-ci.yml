@@ -80,8 +80,12 @@ jobs:
       - name: Enterprise assurance control regression
         run: npm run test:assurance:closure
 
+      - name: Complete canonical regression suite
+        run: npm test
+
       - name: Typecheck
         run: npm run typecheck
 
       - name: Cloudflare production bundle
         run: npm run build:bundle
+
