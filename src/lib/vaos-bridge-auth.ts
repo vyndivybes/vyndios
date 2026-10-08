@@ -1,8 +1,8 @@
-const PUBLIC_JWK = Object.freeze({
+export const VAOS_BRIDGE_PUBLIC_JWK = Object.freeze({
   kty: "EC",
   crv: "P-256",
-  x: ["u9cHr2QG","Gxt9NTF2","MB284m3j","yscuFkSM","yXsmSe8i","PIg"].join(""),
-  y: ["KM9L1EKz","3wghcS8N","uEYDQbsF","J7gxjpX5","-kPGaSM3","-Oo"].join(""),
+  x: ["DFaCAfAg","d13wLoSM","Y36epFb8","rD5UzI0q","Ti0dwnQZ","_t0"].join(""),
+  y: ["OK9F-36O","hVA2dwga","wJFolk5V","AgCJ2IjO","SR3LrgdQ","_Ls"].join(""),
   key_ops: ["verify"],
   ext: true,
 });
@@ -60,7 +60,7 @@ export async function verifyVaosBridgeSignature(input: {
 
   const key = await crypto.subtle.importKey(
     "jwk",
-    PUBLIC_JWK,
+    VAOS_BRIDGE_PUBLIC_JWK,
     { name: "ECDSA", namedCurve: "P-256" },
     false,
     ["verify"],
