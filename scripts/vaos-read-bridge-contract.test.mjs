@@ -33,3 +33,10 @@ test("migration 0147 provides durable nonce replay protection", async () => {
   assert.equal(sql.includes("claim_vyndi_vaos_bridge_nonce"), true);
   assert.equal(sql.toLowerCase().includes("on conflict (nonce) do nothing"), true);
 });
+
+test("VAOS read bridge enforces protocol-v2 signed context before executing", async () => {
+  const source = await readFile(join(root, "src/routes/api/vaos/bridge.ts"), "utf8");
+  assert.equal(source.includes("validateVaosBridgeSignedContext"), true);
+  assert.equal(source.includes("signed_context_invalid"), true);
+  assert.equal(source.includes("employee_context_mismatch"), true);
+});
