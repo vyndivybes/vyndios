@@ -1,14 +1,17 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
-import { proposeScheduleRevision, submitScheduleRevision, rejectScheduleRevision } from "@/lib/schedule-revision-authority";
+import { listScheduleRevisions, proposeScheduleRevision, submitScheduleRevision, rejectScheduleRevision } from "@/lib/schedule-revision-authority";
 import { canPerform, type CommandRole } from "@/lib/page-access";
 
 type Revision = {id:string;state:string;proposed_by?:string;scenario?:string;rationale?:string};
 type ChangeField = "title"|"domain"|"workPackage"|"owner"|"plannedStart"|"plannedFinish"|"durationDays"|"predecessors"|"budgetLakh"|"milestoneMonth"|"scenario"|"scope"|"status"|"deferUntil";
-export function ScheduleRevisionEditor({role,revisions=[]}:{role:CommandRole|null;revisions?:Revision[]}) {
+export function ScheduleRevisionEditor({role}:{role:CommandRole|null}) {
   const router=useRouter();
   const [form,setForm]=useState({id:"",baseRevision:"REV9-FINANCE-REFERENCE",scenario:"base",reason:"",sourceReference:"",taskId:"",field:"durationDays" as ChangeField,before:"",after:""});
   const [reviewReference,setReviewReference]=useState("");
+  const [revisions,setRevisions]=useState<Revision[]>([]);
+  async function refresh(){ try { const response=await listScheduleRevisions(); setRevisions(response.revisions as Revision[]); } catch { setMessage("Revision history unavailable; database migration may still be pending."); }}
+  useEffect(()=>{void refresh();},[]);
   const [busy,setBusy]=useState(false);
   const [message,setMessage]=useState("");
   const editable=Boolean(role && canPerform(role,"edit"));
@@ -23,6 +26,7 @@ export function ScheduleRevisionEditor({role,revisions=[]}:{role:CommandRole|nul
         changes:[{taskId:form.taskId,field:form.field,before:form.before,after:form.after}]
       }});
       setMessage("Draft proposal saved. Existing program tasks and approved plans were not changed.");
+      await refresh();
       await router.invalidate();
     } catch(e){setMessage(e instanceof Error?e.message:"Proposal failed");}
     finally{setBusy(false);}
