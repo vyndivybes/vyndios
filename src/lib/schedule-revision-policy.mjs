@@ -35,7 +35,7 @@ export function validateScheduleRevision(revision) {
 export function canMonitorSchedule(revision) {
   if (!validateScheduleRevision(revision).ok || revision.status !== "approved") return false;
   return present(revision.baselineHash) &&
-    /^sha256:[a-f0-9]{3,64}$/i.test(revision.baselineHash) &&
+    /^sha256:[a-f0-9]{64}$/i.test(revision.baselineHash) &&
     present(revision.approvedTimezone) &&
     revision.approvedDates === true &&
     present(revision.independentVerifier) &&
