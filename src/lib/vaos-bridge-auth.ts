@@ -10,11 +10,15 @@ const PUBLIC_JWK = Object.freeze({
 export const VAOS_BRIDGE_KEY_ID = "vyndi-primary-p256-v1";
 export const VAOS_BRIDGE_MAX_SKEW_SECONDS = 300;
 
-function base64urlBytes(value: string): Uint8Array {
+function base64urlBytes(value: string): ArrayBuffer {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
   const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
   const binary = atob(padded);
-  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes.buffer;
 }
 
 function hex(bytes: ArrayBuffer): string {
