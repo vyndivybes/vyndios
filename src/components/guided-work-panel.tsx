@@ -390,7 +390,6 @@ export function GuidedWorkPanel({ role }: { role: CommandRole | null }) {
             )}
           </div>
         )}
-        )}
           </>
         )}
       </div>
