@@ -121,7 +121,9 @@ export const approveScheduleRevision = createServerFn({method:"POST"})
     duration_days,record_revision from vyndi_program_tasks where program_id=${PROGRAM_ID} order by id`;
   if(tasks.length===0 || tasks.some(t=>!t.planned_start || !t.planned_finish))
     throw new Error("Every program task must have approved planned dates before baseline approval.");
-  const changes=revision[0].document_json?.changes;
+  const parsedDocument=z.object({changes:z.array(change).min(1)}).safeParse(revision[0].document_json);
+  if(!parsedDocument.success) throw new Error("Revision document contains invalid changes.");
+  const changes=parsedDocument.data.changes;
   if(!Array.isArray(changes) || changes.length===0) throw new Error("Revision requires documented changes.");
   // Approval can certify only an already-applied, independently inspected schedule.
   // Proposed values that do not match current canonical records must never be published.
@@ -129,7 +131,7 @@ export const approveScheduleRevision = createServerFn({method:"POST"})
   for(const change of changes){
     const row=taskById.get(String(change.taskId));
     if(!row) throw new Error("Revision references a missing canonical task.");
-    const scheduleFields={plannedStart:"planned_start",plannedFinish:"planned_finish",durationDays:"duration_days"};
+    const scheduleFields:Record<string,"planned_start"|"planned_finish"|"duration_days">={plannedStart:"planned_start",plannedFinish:"planned_finish",durationDays:"duration_days"};
     const canonicalField=scheduleFields[change.field];
     if(!canonicalField) throw new Error("Change needs a qualified application/reconciliation step before approval.");
     const actual=row[canonicalField];
