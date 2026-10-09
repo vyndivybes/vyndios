@@ -177,7 +177,12 @@ export const getApprovedScheduleBaseline = createServerFn({method:"GET"}).handle
   const computed="sha256:"+Array.from(new Uint8Array(digest)).map(v=>v.toString(16).padStart(2,"0")).join("");
   if(computed!==row.baseline_hash) return {status:"not_commissioned" as const};
   if(!Array.isArray(snapshot.tasks) || snapshot.tasks.length===0 ||
-     snapshot.tasks.some(t=>!t.planned_start || !t.planned_finish))
+     snapshot.tasks.some((task: unknown) => {
+       if (!task || typeof task !== "object" || Array.isArray(task)) return true;
+       const record = task as Record<string, unknown>;
+       return typeof record.planned_start !== "string" || !record.planned_start.trim() ||
+         typeof record.planned_finish !== "string" || !record.planned_finish.trim();
+     }))
     return {status:"not_commissioned" as const};
   return {status:"approved" as const,revisionId:String(row.id),
     baselineHash:computed,timezone:String(row.approved_timezone),snapshot};
