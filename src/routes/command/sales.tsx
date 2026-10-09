@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Kpi, Panel } from "@/components/kpi";
+import { CrmWorkspace } from "@/components/commercial/crm-workspace";
 import { requireArrayResponse, requireRecordResponse } from "@/lib/commercial-response-contract";
 import { listMonthlyActuals } from "@/lib/actuals-authority";
 import { MODELS } from "@/lib/data/models";
@@ -259,6 +260,8 @@ function Commercial() {
       ) : null}
 
       {message ? <div role="status" className="rounded-lg border border-border bg-surface px-4 py-3 text-sm text-muted">{message}</div> : null}
+
+      <CrmWorkspace orders={orders} canWrite={canWrite} />
 
       <Panel title="Create bicycle demand / order" kicker="Persist Commercial truth first · then synchronize Production">
         <div className="grid gap-3 rounded-xl border border-border bg-surface p-4 md:grid-cols-5">
