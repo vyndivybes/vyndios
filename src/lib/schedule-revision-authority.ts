@@ -156,3 +156,29 @@ export const approveScheduleRevision = createServerFn({method:"POST"})
   return {ok:true,id:data.id,state:"approved",baselineHash:hash};
  });
 
+
+export const getApprovedScheduleBaseline = createServerFn({method:"GET"}).handler(async()=>{
+  await requireBusinessActor("view");
+  const sql=await getSql();
+  const rows=await sql`select id,baseline_hash,approved_timezone,reviewed_by,proposed_by,
+    approval_reference,document_json from vyndi_schedule_revisions
+    where program_id=${PROGRAM_ID} and state='approved' limit 2`;
+  if(rows.length!==1) return {status:"not_commissioned" as const};
+  const row=rows[0];
+  if(!row.reviewed_by || row.reviewed_by===row.proposed_by ||
+    typeof row.baseline_hash!=="string" || !/^sha256:[0-9a-f]{64}$/.test(row.baseline_hash))
+    return {status:"not_commissioned" as const};
+  const snapshot=row.document_json && typeof row.document_json==="object" &&
+    !Array.isArray(row.document_json) ? row.document_json.approvedSnapshot : null;
+  if(!snapshot || typeof snapshot!=="object" || Array.isArray(snapshot))
+    return {status:"not_commissioned" as const};
+  const canonical=JSON.stringify(snapshot);
+  const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(canonical));
+  const computed="sha256:"+Array.from(new Uint8Array(digest)).map(v=>v.toString(16).padStart(2,"0")).join("");
+  if(computed!==row.baseline_hash) return {status:"not_commissioned" as const};
+  if(!Array.isArray(snapshot.tasks) || snapshot.tasks.length===0 ||
+     snapshot.tasks.some(t=>!t.planned_start || !t.planned_finish))
+    return {status:"not_commissioned" as const};
+  return {status:"approved" as const,revisionId:String(row.id),
+    baselineHash:computed,timezone:String(row.approved_timezone),snapshot};
+});
