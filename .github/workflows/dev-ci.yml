@@ -30,7 +30,7 @@ jobs:
         run: npm ci
 
       - name: Production exact-SHA fail-closed regression
-        run: node --test scripts/production-deployment-readiness.test.mjs
+        run: node --test scripts/production-deployment-readiness.test.mjs scripts/production-assurance-policy.test.mjs
 
       - name: Validate migrations
         run: npm run db:validate
