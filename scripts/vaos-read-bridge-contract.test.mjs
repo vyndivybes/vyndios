@@ -7,7 +7,7 @@ import test from "node:test";
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
 
-test("VAOS read bridge exposes exactly the eight commissioned read actions", async () => {
+test("VAOS bridge preserves the original eight reads and the governed project schedule read", async () => {
   const source = await readFile(join(root, "src/routes/api/vaos/bridge.ts"), "utf8");
   const actions = [
     "COMMERCIAL.OBSERVE_PIPELINE",
@@ -18,6 +18,7 @@ test("VAOS read bridge exposes exactly the eight commissioned read actions", asy
     "FINANCE.OBSERVE_LEDGER",
     "PEOPLE.OBSERVE_WORKFORCE",
     "ENGINEERING.OBSERVE_CONFIGURATION",
+    "PROJECT.OBSERVE_SCHEDULE",
   ];
   for (const action of actions) assert.equal(source.includes(action), true, action);
   assert.equal(source.includes("action_not_commissioned"), true);
@@ -41,14 +42,17 @@ test("VAOS read bridge enforces protocol-v2 signed context before executing", as
   assert.equal(source.includes("employee_context_mismatch"), true);
 });
 
-test("Stage-3 qualification-only write bridge is atomic, compensated and does not commission operational writes", async () => {
+test("Stage-3 compensated qualification remains intact while Stage-4 commissions only People draft writes", async () => {
   const source = await readFile(join(root, "src/routes/api/vaos/bridge.ts"), "utf8");
   const sql = await readFile(join(root, "migrations/0148_vaos_write_qualification_canary.sql"), "utf8");
 
   assert.equal(source.includes('purpose === "write-qualify"'), true);
   assert.equal(source.includes("qualify_vaos_commercial_write_canary"), true);
-  assert.equal(source.includes("write_execution_not_commissioned"), true);
   assert.equal(source.includes("COMMERCIAL_WRITE_CANARY_V1"), true);
+  assert.equal(source.includes('actionType !== "PEOPLE.CHANGE_EMPLOYEE_MASTER"'), true);
+  assert.equal(source.includes('payload.operationalWriteProfile !== OPERATIONAL_WRITE_PROFILE'), true);
+  assert.equal(source.includes("operational_write_scope_denied"), true);
+  assert.equal(source.includes("execute_vaos_people_master_draft_change"), true);
 
   assert.match(sql,/create table if not exists vyndi_vaos_write_qualifications/i);
   assert.match(sql,/create or replace function qualify_vaos_commercial_write_canary/i);

@@ -142,12 +142,13 @@ test("write-purpose signed context requires approval identity without commission
     method: "POST",
     path: "/api/vaos/bridge",
     purpose: "write-execute",
-    actionType: "INVENTORY.RESERVE_MATERIAL",
-    employeeId: "inventory",
+    actionType: "PEOPLE.CHANGE_EMPLOYEE_MASTER",
+    employeeId: "people",
     intentId: "intent-write-v2-1",
     executionJobId: "job-write-v2-1",
     approvalId: "APP-WRITE-1",
     missionId: "mission-write-v2-1",
+    operationalWriteProfile: "PEOPLE_DRAFT_MASTER_V1",
     input: {},
   };
 
@@ -220,3 +221,43 @@ test("write-qualification signed context requires approval and the exact qualifi
     { ok: false, error: "write_qualification_profile_invalid" },
   );
 });
+
+test("write-execute signed context is pinned to the Stage-4 People profile", () => {
+  const payload: Record<string, unknown> = {
+    protocolVersion: "vaos-vyndi-bridge.v2",
+    serviceIdentity: "vaos",
+    audience: "vyndi-os",
+    method: "POST",
+    path: "/api/vaos/bridge",
+    purpose: "write-execute",
+    actionType: "PEOPLE.CHANGE_EMPLOYEE_MASTER",
+    employeeId: "people",
+    intentId: "intent-stage4-1",
+    executionJobId: "job-stage4-1",
+    approvalId: "approval-stage4-1",
+    missionId: "operational-write:intent-stage4-1",
+    operationalWriteProfile: "PEOPLE_DRAFT_MASTER_V1",
+    input: {},
+  };
+
+  assert.deepEqual(
+    validateVaosBridgeSignedContext({
+      payload,
+      requestMethod: "POST",
+      requestPath: "/api/vaos/bridge",
+      expectedPurpose: "write-execute",
+    }),
+    { ok: true },
+  );
+
+  assert.deepEqual(
+    validateVaosBridgeSignedContext({
+      payload: { ...payload, operationalWriteProfile: "OTHER" },
+      requestMethod: "POST",
+      requestPath: "/api/vaos/bridge",
+      expectedPurpose: "write-execute",
+    }),
+    { ok: false, error: "operational_write_profile_invalid" },
+  );
+});
+

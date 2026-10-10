@@ -75,6 +75,12 @@ export function validateVaosBridgeSignedContext(input: {
   ) {
     return { ok: false as const, error: "write_qualification_profile_invalid" };
   }
+  if (
+    input.expectedPurpose === "write-execute"
+    && payload.operationalWriteProfile !== "PEOPLE_DRAFT_MASTER_V1"
+  ) {
+    return { ok: false as const, error: "operational_write_profile_invalid" };
+  }
   return { ok: true as const };
 }
 
