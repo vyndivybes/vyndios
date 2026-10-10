@@ -66,6 +66,20 @@ test("Stage-4 People master write is draft-only, revision-guarded, idempotent an
   assert.equal(replay.rows[0].result.replay,true);
   assert.equal(replay.rows[0].result.finalRevision,2);
 
+
+  const changedBodyReplay=[...args];
+  changedBodyReplay[16]='TAMPERED_REPLAY_VALUE';
+  await assert.rejects(
+    db.query(
+      `select execute_vaos_people_master_draft_change(
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17
+      )`,
+      changedBodyReplay,
+    ),
+    /OPERATIONAL_WRITE_IDEMPOTENCY_CONFLICT/,
+    'same execution identity with different body must never be accepted as replay',
+  );
+
   await assert.rejects(
     db.query(
       `select execute_vaos_people_master_draft_change(
