@@ -16,6 +16,7 @@ import {
 import { lakh } from "@/lib/format";
 import {
   CONFIGURATION_CATEGORIES,
+  FRAME_SIZES,
   defaultConfiguration,
   modelFamily,
   optionsFor,
@@ -200,7 +201,7 @@ function Commercial() {
       modelTier: variant.tier,
       variantId: variant.id,
       variantName: variant.name,
-      configuration: defaultConfiguration(variant.id),
+      configuration: defaultConfiguration(variant.id, (orderEdits[id] ?? orders.find((order) => order.id === id))?.configuration?.frameSize),
     });
   }
 
@@ -263,7 +264,8 @@ function Commercial() {
       <Panel title="Create bicycle demand / order" kicker="Persist Commercial truth first · then synchronize Production">
         <div className="grid gap-3 rounded-xl border border-border bg-surface p-4 md:grid-cols-5">
           <Field label="Month"><input type="number" min="1" max="36" value={draft.month} onChange={(event) => setDraft({ ...draft, month: Number(event.target.value) })} className="control mt-1" /></Field>
-          <Field label="Model & variant"><select value={draft.variantId} onChange={(event) => { const variantId = event.target.value; setDraft({ ...draft, variantId, configuration: defaultConfiguration(variantId) }); }} className="control mt-1">{MODELS.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}</select></Field>
+          <Field label="Model & variant"><select value={draft.variantId} onChange={(event) => { const variantId = event.target.value; setDraft({ ...draft, variantId, configuration: defaultConfiguration(variantId, draft.configuration.frameSize) }); }} className="control mt-1">{MODELS.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}</select></Field>
+          <Field label="Frame size"><select value={draft.configuration.frameSize ?? ""} onChange={(event) => setDraft({ ...draft, configuration: { ...draft.configuration, frameSize: event.target.value as ProductConfiguration["frameSize"] } })} className="control mt-1"><option value="">Unspecified</option>{FRAME_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}</select></Field>
           <Field label="Units"><input type="number" min="1" value={draft.units} onChange={(event) => setDraft({ ...draft, units: Number(event.target.value) })} className="control mt-1" /></Field>
           <Field label="Channel"><select value={draft.channel} onChange={(event) => setDraft({ ...draft, channel: event.target.value as SalesChannel })} className="control mt-1">{channelOptions.map((channel) => <option key={channel}>{channel}</option>)}</select></Field>
           <Field label="Status"><select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as SalesOrderStatus })} className="control mt-1">{statusOptions.map((status) => <option key={status}>{status}</option>)}</select></Field>
@@ -273,6 +275,7 @@ function Commercial() {
         </div>
         <div className="mt-3 rounded-xl border border-green/30 bg-green/5 p-4">
           <p className="text-xs font-semibold text-green">Automatic build selection</p>
+          <p className="mt-1 text-xs leading-5 text-muted">Frame size stays within the selected model/variant configuration and shared ledgers. A size selection does not release geometry, tooling or a design revision; Engineering must qualify the intended build before production.</p>
           <p className="mt-1 text-xs leading-5 text-muted">{currentVariant.name} has {CONFIGURATION_CATEGORIES.length} standard component categories preselected. Confirmed demand carries these selections into the released BOM/job-card workflow only after the order persistence receipt succeeds.</p>
         </div>
         <details className="mt-3 rounded-xl border border-border bg-bg-elevated/30 p-4">
@@ -316,7 +319,7 @@ function Commercial() {
                       <td className="px-3 py-3 font-semibold text-fg">{order.variantName ?? order.variantId ?? order.product}</td>
                       <td className="px-3 py-3"><span className="text-[10px] font-bold uppercase text-accent">{order.status}</span></td>
                       <td className="px-3 py-3 text-muted">{order.modelTier ? modelFamily(order.modelTier) : "—"}</td>
-                      <td className="px-3 py-3 text-muted">{Object.keys(order.configuration ?? {}).length} selections</td>
+                      <td className="px-3 py-3 text-muted">Size {order.configuration?.frameSize || "unspecified"} · {CONFIGURATION_CATEGORIES.filter(({ key }) => order.configuration?.[key]).length} components</td>
                       <td className="px-3 py-3 font-semibold text-fg">{lakh(order.units * order.aspLakh)}</td>
                       <td className="px-3 py-3 text-muted">{order.channel}</td>
                       <td className="px-3 py-3">
@@ -325,6 +328,7 @@ function Commercial() {
                           <div className="mt-3 w-full space-y-3">
                             <fieldset disabled={busy || !canWrite} className="space-y-3 disabled:opacity-60">
                               <Field label="Model & variant"><select value={edit.variantId ?? editVariant.id} onChange={(event) => editOrderVariant(order.id, event.target.value)} className="control mt-1">{MODELS.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}</select></Field>
+                              <Field label="Frame size"><select value={edit.configuration?.frameSize ?? ""} onChange={(event) => editOrderConfiguration(order.id, "frameSize", event.target.value)} className="control mt-1"><option value="">Unspecified</option>{FRAME_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}</select></Field>
                               <div className="grid gap-2 sm:grid-cols-2">
                                 <Field label="Month"><input type="number" min="1" max="36" value={edit.month} onChange={(event) => editOrder(order.id, { month: Number(event.target.value) })} className="control mt-1" /></Field>
                                 <Field label="Units"><input type="number" min="1" value={edit.units} onChange={(event) => editOrder(order.id, { units: Number(event.target.value) })} className="control mt-1" /></Field>
