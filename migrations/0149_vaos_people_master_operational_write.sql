@@ -116,7 +116,18 @@ begin
        or v_existing.approval_id is distinct from p_approval_id
        or v_existing.idempotency_key is distinct from p_idempotency_key
        or v_existing.target_id is distinct from p_target_id
-       or v_existing.operational_profile is distinct from p_operational_profile then
+       or v_existing.operational_profile is distinct from p_operational_profile
+       or v_existing.requested_by_hash is distinct from p_requested_by_hash
+       or v_existing.approved_by_hash is distinct from p_approved_by_hash
+       or v_existing.initial_revision is distinct from p_expected_revision
+       or v_existing.after_state->>'displayName' is distinct from p_display_name
+       or v_existing.after_state->>'functionName' is distinct from p_function_name
+       or v_existing.after_state->>'roleTitle' is distinct from p_role_title
+       or v_existing.after_state->>'engagementType' is distinct from p_engagement_type
+       or v_existing.after_state->>'startMonth' is distinct from p_start_month::text
+       or v_existing.after_state->>'endMonth' is distinct from p_end_month::text
+       or v_existing.after_state->>'sourceReference' is distinct from p_source_reference
+       or v_existing.after_state->>'notes' is distinct from coalesce(p_notes,'') then
       raise exception 'OPERATIONAL_WRITE_IDEMPOTENCY_CONFLICT';
     end if;
     return jsonb_build_object(
