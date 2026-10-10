@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   hasExactReleaseLineage,
+  hasExactSourceLineage,
   isReleaseGovernanceReady,
   isReleaseMathAndCashReady,
 } from "./vibpe-optimizer-release-policy.ts";
@@ -36,4 +37,27 @@ test("exact release lineage fails when provenance is missing", () => {
   assert.equal(hasExactReleaseLineage({ deployedSourceSha: null, ibpeSourceSha: "abcdef1", packetSourceSha: "abcdef1", packetId: "ADV", runParentPacketId: "ADV" }), false);
   assert.equal(hasExactReleaseLineage({ deployedSourceSha: "abcdef1", ibpeSourceSha: null, packetSourceSha: "abcdef1", packetId: "ADV", runParentPacketId: "ADV" }), false);
   assert.equal(hasExactReleaseLineage({ deployedSourceSha: "abcdef1", ibpeSourceSha: "abcdef1", packetSourceSha: null, packetId: "ADV", runParentPacketId: "ADV" }), false);
+});
+
+
+test("SOURCE-LINEAGE is independently evidenced before any optimizer run exists", () => {
+  const sourceSha = "ecec11329c194977d4d2068507fa39df131fecd4";
+  const packetOnly = {
+    deployedSourceSha: sourceSha,
+    ibpeSourceSha: sourceSha,
+    packetSourceSha: sourceSha,
+    packetId: "ADV-CURRENT",
+    runParentPacketId: null,
+  };
+  assert.equal(hasExactSourceLineage(packetOnly), true);
+  assert.equal(hasExactReleaseLineage(packetOnly), false);
+});
+
+test("SOURCE-LINEAGE fails closed on absent or mismatched packet/IBPE provenance", () => {
+  const sha = "ecec11329c194977d4d2068507fa39df131fecd4";
+  const valid = { deployedSourceSha: sha, ibpeSourceSha: sha, packetSourceSha: sha, packetId: "ADV-CURRENT", runParentPacketId: null };
+  assert.equal(hasExactSourceLineage({ ...valid, ibpeSourceSha: "1234567" }), false);
+  assert.equal(hasExactSourceLineage({ ...valid, packetSourceSha: null }), false);
+  assert.equal(hasExactSourceLineage({ ...valid, packetId: null }), false);
+  assert.equal(hasExactSourceLineage({ ...valid, deployedSourceSha: "" }), false);
 });
