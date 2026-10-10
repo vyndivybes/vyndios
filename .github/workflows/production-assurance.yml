@@ -52,6 +52,8 @@ jobs:
           node --test scripts/live-finance-posting.test.mjs
           npm run test:mes:golden
           npm run test:h5:integrations
+          npm run test:vaos-bridge:read
+          npm run test:r3:c
           npm run test:h2:recovery:expanded
 
       - name: Wait for exact Cloudflare deployment and schema readiness
