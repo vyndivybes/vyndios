@@ -4,6 +4,7 @@ import { getSql, type Sql } from "./db.ts";
 import { readOptimizerProductionReadiness, type OptimizerProductionReadiness } from "./optimizer-production-readiness.ts";
 import {
   hasExactReleaseLineage,
+  hasExactSourceLineage,
   isReleaseGovernanceReady,
   isReleaseMathAndCashReady,
 } from "./vibpe-optimizer-release-policy.ts";
@@ -141,14 +142,16 @@ export async function readVibpeOptimizerReleaseClosure(sql: Sql): Promise<VibpeO
       && cashStatusEligible
       && isReleaseMathAndCashReady(run.optimization_status, run.cash_guardrail_status),
   );
-  const accepted = Boolean(run?.accepted && mathAndCashReady);
-  const exactLineage = hasExactReleaseLineage({
+  const lineageInput = {
     deployedSourceSha,
     ibpeSourceSha: ibpe?.source_sha,
     packetSourceSha: packet?.source_sha,
     packetId: packet?.id,
     runParentPacketId: run?.parent_advanced_packet_id,
-  });
+  };
+  const sourceLineage = Boolean(packet && ibpe && hasExactSourceLineage(lineageInput));
+  const exactRunLineage = hasExactReleaseLineage(lineageInput);
+  const accepted = Boolean(run?.accepted && mathAndCashReady && exactRunLineage);
   const actorAttributed = Boolean(run?.created_by?.trim() && run?.created_role?.trim());
   const auditAttributed = Boolean(audit?.actor_user_id?.trim() && audit?.actor_role?.trim());
 
@@ -172,8 +175,8 @@ export async function readVibpeOptimizerReleaseClosure(sql: Sql): Promise<VibpeO
     {
       id: "SOURCE-LINEAGE",
       label: "Exact deployed source lineage",
-      pass: exactLineage,
-      evidence: exactLineage
+      pass: sourceLineage,
+      evidence: sourceLineage
         ? `deployed=${deployedSourceSha} · IBPE=${ibpe?.source_sha} · packet=${packet?.source_sha}`
         : `Source lineage mismatch or missing evidence: deployed=${deployedSourceSha || "missing"} · IBPE=${ibpe?.source_sha ?? "missing"} · packet=${packet?.source_sha ?? "missing"}.`,
     },
