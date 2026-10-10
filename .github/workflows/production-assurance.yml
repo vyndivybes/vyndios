@@ -107,14 +107,14 @@ jobs:
       - name: Operator UX viewport qualification
         run: npm run test:ux:production
 
-      - name: Preserve assurance evidence
+      # This repository is public. Never upload authenticated browser screenshots,
+      # request/response captures, or business records as publicly retrievable artifacts.
+      - name: Preserve non-sensitive exact-SHA evidence only
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: production-assurance-${{ github.run_id }}
-          path: |
-            artifacts/
-            .grok/evidence/
-          retention-days: 30
+          name: production-health-${{ github.run_id }}
+          path: .grok/evidence/production-assurance-exact-sha.json
+          retention-days: 7
           if-no-files-found: warn
 
