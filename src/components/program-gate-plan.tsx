@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { Kpi, Panel } from "@/components/kpi";
+import { ScheduleRevisionEditor } from "@/components/schedule-revision-editor";
 import {
   createProgramDependency,
   createProgramTask,
@@ -159,6 +160,7 @@ export function ProgramGatePlan({ role, state }: { role: CommandRole | null; sta
   }
 
   return <div className="space-y-5">
+    <ScheduleRevisionEditor role={role}/>
     <Panel title="Program & Gate Planning" kicker="Governed work packages · dependencies · critical path · evidence gates">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <Kpi label="Program tasks" value={String(state.tasks.length)} hint="Persisted governed tasks"/>

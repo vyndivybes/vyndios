@@ -1,0 +1,25 @@
+name: Schedule Revision Qualification
+on:
+  pull_request:
+    paths:
+      - 'src/lib/schedule-revision-*.mjs'
+      - 'src/lib/schedule-revision-authority.ts'
+      - 'src/components/schedule-revision-editor.tsx'
+      - 'src/components/program-gate-plan.tsx'
+      - 'scripts/schedule-revision-*.test.mjs'
+      - 'migrations/0190_vyndi_schedule_revision_workflow.sql'
+      - '.github/workflows/schedule-revision-qualification.yml'
+  push:
+    branches:
+      - 'feat/governed-schedule-revisions-*'
+jobs:
+  schedule-revision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run focused revision-policy and authority tests
+        run: node --test scripts/schedule-revision-policy.test.mjs scripts/schedule-revision-authority.test.mjs
