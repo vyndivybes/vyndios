@@ -1,6 +1,8 @@
 name: Production Assurance
 
 on:
+  push:
+    branches: [main]
   schedule:
     - cron: '17 1 * * 0'
   workflow_dispatch:
@@ -14,8 +16,8 @@ concurrency:
 
 jobs:
   assurance:
-    runs-on: [self-hosted, Linux, X64, vyndi-linux]
-    timeout-minutes: 35
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
     env:
       VYNDI_TEST_BASE_URL: https://vyndios.vayushastr.workers.dev
       VYNDI_TEST_EMAIL: ${{ secrets.VYNDI_TEST_EMAIL }}
@@ -38,6 +40,13 @@ jobs:
 
       - name: Install
         run: npm ci
+
+      - name: Deployment readiness contract regression
+        run: node --test scripts/production-deployment-readiness.test.mjs
+
+      - name: Wait for exact Cloudflare deployment and schema readiness
+        timeout-minutes: 10
+        run: node scripts/production-deployment-readiness.mjs
 
       - name: Verify assurance configuration
         shell: bash
