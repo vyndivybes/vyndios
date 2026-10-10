@@ -1,6 +1,8 @@
 name: Production Assurance
 
 on:
+  push:
+    branches: [main]
   schedule:
     - cron: '17 1 * * 0'
   workflow_dispatch:
@@ -14,8 +16,8 @@ concurrency:
 
 jobs:
   assurance:
-    runs-on: [self-hosted, Linux, X64, vyndi-linux]
-    timeout-minutes: 35
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
     env:
       VYNDI_TEST_BASE_URL: https://vyndios.vayushastr.workers.dev
       VYNDI_TEST_EMAIL: ${{ secrets.VYNDI_TEST_EMAIL }}
@@ -38,6 +40,25 @@ jobs:
 
       - name: Install
         run: npm ci
+
+      - name: Deployment readiness contract regression
+        run: node --test scripts/production-deployment-readiness.test.mjs
+
+      - name: Seven-domain governed transaction contract tests
+        run: |
+          set -euo pipefail
+          node --experimental-strip-types --test src/lib/crm-domain.test.ts
+          node --test scripts/schedule-revision-policy.test.mjs scripts/schedule-revision-authority.test.mjs
+          node --test scripts/live-finance-posting.test.mjs
+          npm run test:mes:golden
+          npm run test:h5:integrations
+          npm run test:vaos-bridge:read
+          npm run test:r3:c
+          npm run test:h2:recovery:expanded
+
+      - name: Wait for exact Cloudflare deployment and schema readiness
+        timeout-minutes: 10
+        run: node scripts/production-deployment-readiness.mjs
 
       - name: Verify assurance configuration
         shell: bash
@@ -88,14 +109,14 @@ jobs:
       - name: Operator UX viewport qualification
         run: npm run test:ux:production
 
-      - name: Preserve assurance evidence
+      # This repository is public. Never upload authenticated browser screenshots,
+      # request/response captures, or business records as publicly retrievable artifacts.
+      - name: Preserve non-sensitive exact-SHA evidence only
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: production-assurance-${{ github.run_id }}
-          path: |
-            artifacts/
-            .grok/evidence/
-          retention-days: 30
+          name: production-health-${{ github.run_id }}
+          path: .grok/evidence/production-assurance-exact-sha.json
+          retention-days: 7
           if-no-files-found: warn
 
