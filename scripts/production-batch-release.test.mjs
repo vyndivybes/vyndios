@@ -53,7 +53,7 @@ test("approval-heavy operational screens do not use forced-width horizontal regi
 test("Commercial defaults components and Production exposes one batch approval", async () => {
   const sales = await text("src/routes/command/sales.tsx");
   const production = await text("src/routes/command/production.tsx");
-  assert.match(sales, /defaultConfiguration\(variantId\)/);
+  assert.match(sales, /defaultConfiguration\(variantId, draft\.configuration\.frameSize\)/);
   assert.match(sales, /Optional component customization · defaults already selected/);
   assert.match(production, /Approve bike \/ batch/);
   assert.match(production, /approveProductionBatch/);

@@ -18,7 +18,7 @@ function Product() {
       <header className="border-b border-border pb-6">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">Product · canonical authority</p>
         <h1 className="mt-1 font-display text-4xl text-accent">Product</h1>
-        <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">Longitude, Latitude and Altitude are rendered directly from the canonical Product family/variant authority. This page no longer carries a competing static product master.</p>
+        <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">Longitude, Latitude and Altitude are rendered directly from the canonical Product family/variant authority. Frame size is a build configuration attribute under these models and variants, recorded in existing orders and production records rather than a separate size ledger. Design changes use controlled engineering revisions; released builds retain their approved revision.</p>
         <div className="mt-3 flex gap-3 text-sm font-semibold"><Link to="/command/engineering" className="text-accent">Engineering baseline →</Link><Link to="/command/bom-control" className="text-accent">BOM control →</Link></div>
       </header>
       <div className="grid gap-3 sm:grid-cols-3"><Kpi label="Families" value={String(families.size)} hint="Canonical VYNDI families"/><Kpi label="Variants" value={String(catalog.length)} hint="Current catalogue"/><Kpi label="Released + active" value={String(released)} hint="Eligible controlled variants" tone={released ? "ok" : "warn"}/></div>

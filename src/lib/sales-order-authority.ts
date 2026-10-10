@@ -5,7 +5,7 @@ import { getSql } from "@/lib/db";
 import { getBusinessWriteReadiness, requireBusinessActor } from "@/lib/business-actor";
 import type { SalesOrder } from "@/lib/finance/sales-engine";
 import { MODELS } from "@/lib/data/models";
-import { validateConfiguration } from "@/lib/product-configuration";
+import { validateConfiguration, validateFrameSize, type ProductConfiguration } from "@/lib/product-configuration";
 
 const statusSchema = z.enum(["lead", "confirmed", "delivered", "cancelled"]);
 const channelSchema = z.enum(["direct", "dealer", "online"]);
@@ -26,6 +26,11 @@ const orderSchema = z.object({
   configuration: z.record(z.string(), z.string()).optional(),
   changeReason: z.string().trim().max(500).optional(),
 }).superRefine((order, context) => {
+  try {
+    validateFrameSize(order.configuration ?? {});
+  } catch (error) {
+    context.addIssue({ code: "custom", path: ["configuration", "frameSize"], message: error instanceof Error ? error.message : "Invalid frame size." });
+  }
   if (order.status === "confirmed" || order.status === "delivered") {
     if (!order.modelTier) context.addIssue({ code: "custom", path: ["modelTier"], message: "Committed demand requires a model tier." });
     if (!order.variantId) context.addIssue({ code: "custom", path: ["variantId"], message: "Committed demand requires an exact VYNDI variant." });
@@ -90,7 +95,7 @@ export const saveSalesOrder = createServerFn({ method: "POST" })
       if (data.modelTier !== variant.tier) throw new Error("Sales order model tier does not match the selected variant.");
       const expectedProduct = variant.tier === "core" ? "aluminium" : variant.tier === "apex" ? "premiumCarbon" : "carbon";
       if (data.product !== expectedProduct) throw new Error("Sales order product line does not match the selected VYNDI variant.");
-      if (data.configuration) validateConfiguration(data.variantId, data.configuration);
+      if (data.configuration) validateConfiguration(data.variantId, data.configuration as ProductConfiguration);
     }
 
     const [current] = await sql.query<{

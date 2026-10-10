@@ -2,7 +2,18 @@ import { SEED_INVENTORY, type InventoryCategory, type InventoryItem } from "./da
 import { MODELS, type Model } from "./data/models.ts";
 
 export type ProductTier = Model["tier"];
-export type ProductConfiguration = Partial<Record<InventoryCategory, string>>;
+// Size describes the configured build; it never creates another product or ledger.
+export const FRAME_SIZES = ["XS", "S", "M", "L", "XL"] as const;
+export type FrameSize = (typeof FRAME_SIZES)[number];
+export type ProductConfiguration = Partial<Record<InventoryCategory, string>> & { frameSize?: FrameSize | "" };
+
+export function validateFrameSize(configuration: { frameSize?: unknown }) {
+  const size = configuration.frameSize;
+  // Historical orders and unqualified planning demand retain an explicit unknown size.
+  if (size === undefined || size === "") return;
+  if (!FRAME_SIZES.some((allowed) => allowed === size))
+    throw new Error("Frame size must be XS, S, M, L or XL.");
+}
 
 export const CONFIGURATION_CATEGORIES: {
   key: InventoryCategory;
@@ -89,13 +100,15 @@ export function optionsFor(tier: ProductTier, category: InventoryCategory) {
   return SEED_INVENTORY.filter((item) => item.category === category && isEligible(item, tier));
 }
 
-export function defaultConfiguration(variantId: string): ProductConfiguration {
+export function defaultConfiguration(variantId: string, frameSize?: FrameSize | ""): ProductConfiguration {
   const model = MODELS.find((entry) => entry.id === variantId);
   if (!model) throw new Error("Unknown product variant.");
-  return { ...DEFAULTS[model.tier], groupset: VARIANT_GROUPSET[variantId] };
+  validateFrameSize({ frameSize });
+  return { ...DEFAULTS[model.tier], groupset: VARIANT_GROUPSET[variantId], ...(frameSize ? { frameSize } : {}) };
 }
 
 export function validateConfiguration(variantId: string, configuration: ProductConfiguration) {
+  validateFrameSize(configuration);
   const model = MODELS.find((entry) => entry.id === variantId);
   if (!model) throw new Error("Unknown product variant.");
   return CONFIGURATION_CATEGORIES.map(({ key, label, quantityPerBike }) => {

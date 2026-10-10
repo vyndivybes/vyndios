@@ -201,7 +201,7 @@ function MasterPlan() {
         <div className="rounded-xl border border-border bg-surface/40 p-4">
           <p className="text-[10px] uppercase tracking-wider text-subtle">Approved company plan</p>
           <p className="mt-2 text-lg font-semibold text-fg">{plan.approved ? `R${plan.approved.revision}` : "Not approved yet"}</p>
-          <p className="mt-2 text-xs leading-5 text-muted">Only this revision drives official planning. Working scenarios and drafts never silently replace it.</p>
+          <p className="mt-2 text-xs leading-5 text-muted">Only this revision drives official planning. Working scenarios and drafts never silently replace it. An anticipated design change belongs in an engineering change request and the working plan until approved; it must not overwrite the released baseline on existing builds.</p>
         </div>
         <div className="rounded-xl border border-border bg-surface/40 p-4">
           <p className="text-[10px] uppercase tracking-wider text-subtle">Pending approval</p>

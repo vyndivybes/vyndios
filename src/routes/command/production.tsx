@@ -135,6 +135,7 @@ function printRequisitionRecord({
     <section class="meta">
       <div><span class="label">Job card</span><span class="value">${escapePrintHtml(card.id)}</span></div>
       <div><span class="label">Commercial order</span><span class="value">${escapePrintHtml(`${card.sales_order_id} R${card.sales_order_revision ?? "—"}`)}</span></div>
+      <div><span class="label">Frame size</span><span class="value">${escapePrintHtml((card.configuration as { frameSize?: string } | null)?.frameSize || "Unspecified")}</span></div>
       <div><span class="label">Batch</span><span class="value">${escapePrintHtml(card.batch_code ?? "—")}</span></div>
       <div><span class="label">BOM revision</span><span class="value">${escapePrintHtml(card.bom_revision ?? "—")}</span></div>
       <div><span class="label">Bicycle / variant</span><span class="value">${escapePrintHtml(card.product_label ?? card.variant_id ?? "—")}</span></div>
@@ -347,6 +348,7 @@ function ProductionWorkspace() {
                       <Metric label="Bicycle / variant" value={card.product_label ?? card.variant_id ?? "—"} />
                       <Metric label="Order" value={`${card.sales_order_id} R${card.sales_order_revision}`} />
                       <Metric label="Quantity" value={`${Number(card.units)} bike(s)`} />
+                      <Metric label="Frame size" value={String((card.configuration as { frameSize?: string } | null)?.frameSize || "Unspecified")} />
                       <Metric label="BOM" value={card.bom_revision ?? "—"} />
                       <Metric label="Material state" value={shortageCount ? `${shortageCount} shortage line(s)` : "Ready"} />
                     </div>
