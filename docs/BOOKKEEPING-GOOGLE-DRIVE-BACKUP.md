@@ -18,7 +18,7 @@ The following folder was created and verified through the user's Google Drive co
 
 ## How the implemented workflow operates
 
-- `.github/workflows/google-drive-books-backup.yml`: scheduled daily at 20:45 UTC (02:15 IST next day). It is OFF unless GitHub variable `VYNDI_GOOGLE_BACKUP_COMMISSIONED=true`. Manually dispatched runs are also disabled until that variable is true.
+- `.github/workflows/google-drive-books-backup.yml`: scheduled daily at 20:45 UTC (02:15 IST next day). Recurring runs are OFF unless GitHub variable `VYNDI_GOOGLE_BACKUP_COMMISSIONED=true`; a manually dispatched run is permitted for controlled first-use qualification while the recurring schedule stays OFF.
 - `pg_dump --format=custom --no-owner --no-acl` reads the Neon production database through a **read-only** backup role. The PostgreSQL stream is directly encrypted with an **age X25519 public recipient**, without writing the unencrypted archive to the GitHub runner's disk.
 - `rclone copyto --immutable` uploads ONLY ciphertext into the selected Google Drive folder. A second `rclone cat` readback independently checks the ciphertext SHA-256 and the workflow records **non-secret metadata only** in the GitHub Actions step summary.
 - The workflow never uses `rclone sync`, `delete`, or `purge`. It cannot silently delete older archives. Each backup has a unique run/attempt filename. Check available Drive storage: full Drive stops backups rather than silently deleting historic books.
@@ -41,7 +41,7 @@ The following folder was created and verified through the user's Google Drive co
 7. GitHub **finance-restore-review** environment **secrets**:
    - `VYNDI_GDRIVE_CLIENT_ID`, `VYNDI_GDRIVE_CLIENT_SECRET`, `VYNDI_GDRIVE_OAUTH_TOKEN` (same Drive account, independently protected).
    - `VYNDI_BOOKS_BACKUP_AGE_IDENTITY` = the age private identity, held only in the protected manual restore environment. Keep a separate secure offline copy.
-8. Once the credentials are present, set `VYNDI_GOOGLE_BACKUP_COMMISSIONED=true` and manually dispatch one backup. Inspect the result and matching ciphertext file in the designated Drive folder. **Then run the manual restore workflow** using the `daily/YYYY-MM-DD/books-....dump.age` key and ciphertext SHA-256 recorded in the completed backup step summary. Verify output checks and accounting-table completeness. Confirm the next scheduled backup also passes.
+8. Once the credentials are present, leave `VYNDI_GOOGLE_BACKUP_COMMISSIONED=false` and manually dispatch one backup. Inspect the result and matching ciphertext file in the designated Drive folder. **Then run the manual restore workflow** using the `daily/YYYY-MM-DD/books-....dump.age` key and ciphertext SHA-256 recorded in the completed backup step summary. Verify output checks and accounting-table completeness. Only after the first upload and independently witnessed restore pass, set `VYNDI_GOOGLE_BACKUP_COMMISSIONED=true` to activate the recurring daily schedule and verify its first scheduled run.
 9. Keep independent backup failure notifications and audit the available Google Drive storage. Review any company data-retention, India-location and access-control requirements with the CA. Do not enable period hard-close merely because Drive backup succeeded.
 
 ### Scope and limits
