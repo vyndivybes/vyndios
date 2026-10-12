@@ -73,7 +73,7 @@ test('Stage 9 cross-repo VAOS signed ingress reaches real VYNDI canonical SQL on
  t.after(async()=>server.close());
  assert.match(server.url,/^http:\/\/127\.0\.0\.1:\d+$/);
  const p=payload();
- assert.equal(vaosBridge.createVyndiWriteBridgeAdapter().prepare(p).executionEnabled,false); // production adapter stays closed
+ assert.equal(vaosBridge.createVyndiWriteBridgeAdapter().prepare({...p,approvalRef:p.approvalId}).executionEnabled,false); // production adapter stays closed
  await assert.rejects(()=>vaosBridge.createVyndiWriteBridgeAdapter().execute(
   vaosBridge.prepareVyndiBridgeEnvelope({...p,approvalRef:p.approvalId})),
   e=>e.code==='VYNDI_WRITE_BRIDGE_NOT_COMMISSIONED');
