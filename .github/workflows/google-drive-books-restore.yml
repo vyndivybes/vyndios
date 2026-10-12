@@ -1,0 +1,96 @@
+name: VYNDI Supplemental Google Drive Restore Drill
+on:
+  workflow_dispatch:
+    inputs:
+      backup_object:
+        description: Encrypted daily/.../books-...dump.age object key from successful backup
+        required: true
+        type: string
+      encrypted_sha256:
+        description: SHA-256 of encrypted file recorded in the successful backup run
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  isolated-restore:
+    environment: finance-restore-review
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_PASSWORD: temporary-restore-review-only
+          POSTGRES_DB: restored_books
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d restored_books"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      RCLONE_CONFIG_GDRIVE_TYPE: drive
+      RCLONE_CONFIG_GDRIVE_SCOPE: drive
+      RCLONE_CONFIG_GDRIVE_ROOT_FOLDER_ID: ${{ vars.VYNDI_GOOGLE_BACKUP_FOLDER_ID }}
+      RCLONE_CONFIG_GDRIVE_CLIENT_ID: ${{ secrets.VYNDI_GDRIVE_CLIENT_ID }}
+      RCLONE_CONFIG_GDRIVE_CLIENT_SECRET: ${{ secrets.VYNDI_GDRIVE_CLIENT_SECRET }}
+      RCLONE_CONFIG_GDRIVE_TOKEN: ${{ secrets.VYNDI_GDRIVE_OAUTH_TOKEN }}
+      VYNDI_BOOKS_BACKUP_AGE_IDENTITY: ${{ secrets.VYNDI_BOOKS_BACKUP_AGE_IDENTITY }}
+      BACKUP_OBJECT: ${{ inputs.backup_object }}
+      EXPECTED_SHA256: ${{ inputs.encrypted_sha256 }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate input and protected restoration credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$BACKUP_OBJECT" =~ ^daily/[0-9]{4}-[0-9]{2}-[0-9]{2}/books-[0-9]+-[0-9]+\.dump\.age$ ]]
+          [[ "$EXPECTED_SHA256" =~ ^[a-fA-F0-9]{64}$ ]]
+          test -n "$RCLONE_CONFIG_GDRIVE_ROOT_FOLDER_ID"
+          test -n "$RCLONE_CONFIG_GDRIVE_TOKEN"
+          test -n "$RCLONE_CONFIG_GDRIVE_CLIENT_ID"
+          test -n "$RCLONE_CONFIG_GDRIVE_CLIENT_SECRET"
+          [[ "$VYNDI_BOOKS_BACKUP_AGE_IDENTITY" =~ ^AGE-SECRET-KEY- ]]
+      - name: Install age and rclone on ephemeral GitHub runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq age rclone
+      - name: Download encrypted archive and independently verify ciphertext checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -m 0700 "$RUNNER_TEMP/vyndios-gdrive-restore"
+          rclone copyto "gdrive:$BACKUP_OBJECT" "$RUNNER_TEMP/vyndios-gdrive-restore/books.dump.age" --retries 2
+          got="$(sha256sum "$RUNNER_TEMP/vyndios-gdrive-restore/books.dump.age" | cut -d' ' -f1)"
+          test "$got" = "$EXPECTED_SHA256"
+      - name: Decrypt in memory and restore only to disposable PostgreSQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          key="$RUNNER_TEMP/vyndios-gdrive-restore/age-identity.txt"
+          printf '%s\n' "$VYNDI_BOOKS_BACKUP_AGE_IDENTITY" > "$key"
+          age -d -i "$key" "$RUNNER_TEMP/vyndios-gdrive-restore/books.dump.age" | \
+            docker run --rm -i --network host postgres:18-alpine \
+              sh -ec 'exec pg_restore --exit-on-error --no-owner --no-acl --dbname=postgresql://postgres:temporary-restore-review-only@127.0.0.1:5432/restored_books'
+          docker run --rm --network host postgres:18-alpine \
+            sh -ec 'psql --no-psqlrc --set ON_ERROR_STOP=on -At --dbname=postgresql://postgres:temporary-restore-review-only@127.0.0.1:5432/restored_books -c "select count(*) from epr_finance_journals;" && psql --no-psqlrc --set ON_ERROR_STOP=on -At --dbname=postgresql://postgres:temporary-restore-review-only@127.0.0.1:5432/restored_books -c "select count(*) from vyndi_books_edit_audit;"'
+          {
+            echo "## Independent encrypted Google Drive restore drill"
+            echo "Result: restoration and journal/audit-table readback passed"
+            echo "Backup key: $BACKUP_OBJECT"
+            echo "Encrypted SHA-256 verified: $EXPECTED_SHA256"
+            echo "Restored target: disposable PostgreSQL 18 only"
+            echo "This is NOT evidence of India-resident backup storage."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Remove encrypted object and transient decryption identity from runner
+        if: always()
+        shell: bash
+        run: |
+          rm -f "$RUNNER_TEMP/vyndios-gdrive-restore/books.dump.age" "$RUNNER_TEMP/vyndios-gdrive-restore/age-identity.txt"
+          rmdir "$RUNNER_TEMP/vyndios-gdrive-restore" 2>/dev/null || true
