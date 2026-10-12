@@ -3,6 +3,7 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - 'src/lib/analytics-supply-authority.ts'
       - 'src/lib/analytics-studio.ts'
       - 'src/lib/analytics-studio.test.ts'
       - 'src/routes/command/analytics-studio.tsx'
