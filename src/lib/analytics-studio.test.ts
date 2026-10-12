@@ -58,3 +58,17 @@ test('management actuals preserve explicit missing fields without inventing othe
  assert.equal(rows[0].metrics.revenue,2.5);
  assert.equal('opex' in rows[0].metrics,false);
 });
+
+
+test('independent full-supply sources become selectable only on qualified readback',()=>{
+ const source={coverage:{purchaseOrders:'PASS',salesInvoices:'HOLD',inventoryBalances:'PASS'},records:{
+  purchaseOrders:[{id:'PO-9',sku:'RESIN',status:'issued',quantity:8,unit_price_inr:1500}],
+  salesInvoices:[{id:'INV-1',status:'issued',amount_lakh:2}],
+  inventoryBalances:[{sku:'RESIN',unit:'kg',quantity_balance:11}],
+ }};
+ const rows=buildAnalyticsRows({lineage:[],report:{},actuals:{},supply:source});
+ assert.equal(rows.filter(r=>r.dataset==='purchaseOrders').length,1);
+ assert.equal(rows.filter(r=>r.dataset==='salesInvoices').length,0);
+ assert.equal(rows.find(r=>r.dataset==='inventoryBalances')?.metrics.quantity_balance,11);
+ assert.equal(rows.find(r=>r.dataset==='purchaseOrders')?.metrics.unit_price_inr,1500);
+});
