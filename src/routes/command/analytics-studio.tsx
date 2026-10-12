@@ -7,16 +7,18 @@ import {getAllErpSuiteReports} from '@/lib/erp-suite-reports';
 import {getOperatingPlanState} from '@/lib/operating-plan-authority';
 import {listMonthlyActuals} from '@/lib/actuals-authority';
 import {getAnalyticsSupplySnapshot} from '@/lib/analytics-supply-authority';
+import {getGroupPortfolio} from '@/lib/group-consolidation-authority';
+import {GroupPortfolio} from '@/components/command/group-portfolio';
 import {buildModelWithInputs,type ScenarioId} from '@/lib/finance/model';
 import {buildAnalyticsRows,filterAnalyticsRows,aggregateAnalyticsRows,paretoAnalyticsRows,buildKanbanLanes,getNumericMetrics,DATASETS,DIMENSIONS,type AnalyticsDatum} from '@/lib/analytics-studio';
 import {buildFounderReading,interpretAnalyticsSelection,describeAnalyticsMetric} from '@/lib/analytics-explainability';
 
 export const Route=createFileRoute('/command/analytics-studio')({
   loader:async()=>{
-    const [lineage,report,plan,actuals,supply]=await Promise.all([
-      getOperatingLineage(),getAllErpSuiteReports(),getOperatingPlanState(),listMonthlyActuals(),getAnalyticsSupplySnapshot(),
+    const [lineage,report,plan,actuals,supply,groupState]=await Promise.all([
+      getOperatingLineage(),getAllErpSuiteReports(),getOperatingPlanState(),listMonthlyActuals(),getAnalyticsSupplySnapshot(),getGroupPortfolio(),
     ]);
-    return {lineage,report,approvedPlan:plan.approved,actuals,supply};
+    return {lineage,report,approvedPlan:plan.approved,actuals,supply,groupState};
   },
   component:AnalyticsStudio,
 });
@@ -94,7 +96,7 @@ function csv(rows:AnalyticsDatum[],metric:string){
  const a=document.createElement('a');a.href=url;a.download='vyndi-analytics-sourced.csv';a.click();URL.revokeObjectURL(url);
 }
 function AnalyticsStudio(){
- const {lineage,report,approvedPlan,actuals,supply}=Route.useLoaderData();
+ const {lineage,report,approvedPlan,actuals,supply,groupState}=Route.useLoaderData();
  const router=useRouter();
  const [scope,setScope]=useState<'vyndi'|'group'>('vyndi');
  const [dataset,setDataset]=useState('flow');
@@ -177,9 +179,10 @@ function AnalyticsStudio(){
        <button type="button" onClick={()=>setScope('group')} aria-pressed={scope==='group'} className={'rounded-lg border px-3 py-2 text-xs font-semibold '+(scope==='group'?'border-accent bg-accent/15 text-accent':'border-border text-muted')}>Vāyū Shastr Group</button>
        <span className="rounded-lg border border-border px-3 py-2 text-xs text-muted">Sources: VYNDI canonical data · Plan: {approvedPlan?'Approved R'+approvedPlan.revision:'No approved baseline'}</span>
      </div>
-     {incompleteGroup&&<div role="status" className="mt-4 rounded-xl border border-warn/40 bg-warn/10 p-3 text-sm text-fg">Group consolidation is PARTIAL. Only VYNDI OS is currently a qualified source in this board; other Vāyū Shastr group entities are not yet connected. These figures must not be represented as consolidated group totals.</div>}
+     {incompleteGroup&&<div role="status" className="mt-4 rounded-xl border border-warn/40 bg-warn/10 p-3 text-sm text-fg">Group consolidation is PARTIAL. Only VYNDI OS source families can currently be inspected. Records must receive separately approved division attribution before they contribute to management-unit charts. Group finance, elimination and external division coverage remain on HOLD.</div>}
    </section>
 
+   {scope==='group'?<GroupPortfolio snapshot={groupState}/>:<div className="contents">
    <section aria-label="Founder dashboard reading guide" className={card+' p-5 sm:p-6'}>
      <div className="flex flex-wrap items-center gap-2">
        <BookOpen size={19} className="text-accent"/>
@@ -373,5 +376,6 @@ function AnalyticsStudio(){
    </section>
    <div className="flex items-start gap-2 rounded-xl border border-border bg-surface/40 p-4 text-xs leading-5 text-muted"><CheckCircle2 size={17} className="shrink-0 text-green"/>
    <span>Read-only analysis. Source systems retain sole business authority. Kanban stages are summaries derived from persisted linked records, not manual workflow state. Forecast sensitivity is advisory; no new purchase order, production release, ledger posting or approval is generated.</span></div>
+ </div>}
  </div>;
 }

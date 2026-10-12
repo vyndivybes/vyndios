@@ -4,6 +4,11 @@ on:
     branches: [main]
     paths:
       - 'src/lib/analytics-supply-authority.ts'
+      - 'src/lib/group-consolidation.ts'
+      - 'src/lib/group-consolidation.test.ts'
+      - 'src/lib/group-consolidation-authority.ts'
+      - 'src/components/command/group-portfolio.tsx'
+      - 'migrations/0192_group_management_attribution.sql'
       - 'src/lib/analytics-crm-hr.ts'
       - 'src/lib/analytics-crm-hr.test.ts'
       - 'src/lib/analytics-explainability.ts'
@@ -28,7 +33,7 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Focused evidence/aggregation tests
-        run: node --experimental-strip-types --test src/lib/analytics-studio.test.ts src/lib/analytics-explainability.test.ts src/lib/analytics-crm-hr.test.ts
+        run: node --experimental-strip-types --test src/lib/analytics-studio.test.ts src/lib/analytics-explainability.test.ts src/lib/analytics-crm-hr.test.ts src/lib/group-consolidation.test.ts
       - name: Generate route tree and bundle VYNDI app
         run: npm run build:dev
       - name: Typecheck generated enterprise analytics route
