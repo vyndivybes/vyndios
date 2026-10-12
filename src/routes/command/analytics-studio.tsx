@@ -6,15 +6,16 @@ import {getOperatingLineage} from '@/lib/operating-lineage';
 import {getAllErpSuiteReports} from '@/lib/erp-suite-reports';
 import {getOperatingPlanState} from '@/lib/operating-plan-authority';
 import {listMonthlyActuals} from '@/lib/actuals-authority';
+import {getAnalyticsSupplySnapshot} from '@/lib/analytics-supply-authority';
 import {buildModelWithInputs,type ScenarioId} from '@/lib/finance/model';
 import {buildAnalyticsRows,filterAnalyticsRows,aggregateAnalyticsRows,paretoAnalyticsRows,buildKanbanLanes,getNumericMetrics,DATASETS,DIMENSIONS,type AnalyticsDatum} from '@/lib/analytics-studio';
 
 export const Route=createFileRoute('/command/analytics-studio')({
   loader:async()=>{
-    const [lineage,report,plan,actuals]=await Promise.all([
-      getOperatingLineage(),getAllErpSuiteReports(),getOperatingPlanState(),listMonthlyActuals(),
+    const [lineage,report,plan,actuals,supply]=await Promise.all([
+      getOperatingLineage(),getAllErpSuiteReports(),getOperatingPlanState(),listMonthlyActuals(),getAnalyticsSupplySnapshot(),
     ]);
-    return {lineage,report,approvedPlan:plan.approved,actuals};
+    return {lineage,report,approvedPlan:plan.approved,actuals,supply};
   },
   component:AnalyticsStudio,
 });
@@ -92,7 +93,7 @@ function csv(rows:AnalyticsDatum[],metric:string){
  const a=document.createElement('a');a.href=url;a.download='vyndi-analytics-sourced.csv';a.click();URL.revokeObjectURL(url);
 }
 function AnalyticsStudio(){
- const {lineage,report,approvedPlan,actuals}=Route.useLoaderData();
+ const {lineage,report,approvedPlan,actuals,supply}=Route.useLoaderData();
  const router=useRouter();
  const [scope,setScope]=useState<'vyndi'|'group'>('vyndi');
  const [dataset,setDataset]=useState('flow');
@@ -103,7 +104,7 @@ function AnalyticsStudio(){
  const [scenario,setScenario]=useState<ScenarioId>('base');
  const [demandSensitivity,setDemandSensitivity]=useState(100);
  const [costSensitivity,setCostSensitivity]=useState(0);
- const rows=useMemo(()=>buildAnalyticsRows({lineage,report,actuals}),[lineage,report,actuals]);
+ const rows=useMemo(()=>buildAnalyticsRows({lineage,report,actuals,supply}),[lineage,report,actuals,supply]);
  const allDatasetRows=useMemo(()=>filterAnalyticsRows(rows,{dataset}),[rows,dataset]);
  const variants=useMemo(()=>[...new Set(allDatasetRows.map(r=>r.variant).filter(Boolean))].sort(),[allDatasetRows]);
  const statuses=useMemo(()=>[...new Set(allDatasetRows.map(r=>r.stage).filter(Boolean))].sort(),[allDatasetRows]);
@@ -125,6 +126,12 @@ function AnalyticsStudio(){
    ordersLinked:lineage.reduce((v,r)=>v+Number(r.purchaseOrderCount||0),0),
    invoices:lineage.reduce((v,r)=>v+Number(r.invoiceCount||0),0),grn:lineage.reduce((v,r)=>v+Number(r.goodsReceiptCount||0),0)}),[lineage]);
  const incompleteGroup=scope==='group';
+ const datasetCoverage=(supply.coverage as Record<string,string>)[dataset];
+ const qualifiedSource=datasetCoverage!=='HOLD';
+ const totalDemand=supply.coverage.demand==='PASS'?supply.records.demand.length:null;
+ const totalJobCards=supply.coverage.jobCards==='PASS'?supply.records.jobCards.length:null;
+ const totalPOs=supply.coverage.purchaseOrders==='PASS'?supply.records.purchaseOrders.length:null;
+ const totalSalesInvoices=supply.coverage.salesInvoices==='PASS'?supply.records.salesInvoices.length:null;
  const details=DATASETS.find(x=>x.id===dataset);
  const dataCount=allDatasetRows.length;
  const totalSelected=filtered.filter(r=>Object.hasOwn(r.metrics,currentMetric)).reduce((n,r)=>n+r.metrics[currentMetric],0);
@@ -151,10 +158,10 @@ function AnalyticsStudio(){
    </section>
 
    <section aria-label="Key operating indicators" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-     <Stat label="Committed demand" value={number(kpi.units)+' units'} hint={number(kpi.orders)+' sourced orders'}/>
-     <Stat label="Production job cards" value={number(kpi.jobCards)} hint="Current order-linked job cards"/>
+     <Stat label="Committed demand" value={number(kpi.units)+' units'} hint={(totalDemand===null?number(kpi.orders)+' committed linked orders':number(totalDemand)+' total sales orders · '+number(kpi.orders)+' committed linked')}/>
+     <Stat label="Production job cards" value={number(totalJobCards??kpi.jobCards)} hint={totalJobCards===null?'Order-linked job cards only':'All persisted job cards'}/>
      <Stat label="Material shortage lines" value={number(kpi.shortage)} hint="Across committed job requirements"/>
-     <Stat label="Supply chain execution" value={number(kpi.ordersLinked)+' POs'} hint={kpi.grn+' receipts · '+kpi.invoices+' issued invoices'}/>
+     <Stat label="Supply chain execution" value={number(totalPOs??kpi.ordersLinked)+' POs'} hint={(totalPOs===null?'Linked only · ':'All orders · ')+kpi.grn+' linked receipts · '+(totalSalesInvoices===null?kpi.invoices+' linked invoices':totalSalesInvoices+' sales invoices')}/>
    </section>
 
    <section className={card+' p-4 sm:p-5'} aria-label="Analytics variable selectors">
@@ -176,7 +183,7 @@ function AnalyticsStudio(){
           {Array.from({length:36},(_,i)=><option key={i} value={i+1}>M{i+1}</option>)}</select></Filter>
        <div className="flex items-end"><button type="button" onClick={()=>{setVariant('');setStatus('');setFrom(1);setTo(36);}} className="w-full rounded-xl border border-border px-4 py-2 text-sm text-muted hover:text-fg">Reset filters</button></div>
      </div>
-     <p className="mt-3 text-xs text-subtle">Source: {details?.source}. Month filters apply to dated records; undated records remain visible and explicitly marked as unassigned.</p>
+     <p className="mt-3 text-xs text-subtle">Source: {details?.source}. Readback: {datasetCoverage||'Existing ERP report'}. Month filters apply to dated records; undated records remain visible and explicitly marked as unassigned.</p>
    </section>
 
    <section className={card+' p-4 sm:p-5'}>
@@ -187,7 +194,7 @@ function AnalyticsStudio(){
         {VISUALS.map(v=><button key={v.id} type="button" aria-pressed={visual===v.id} onClick={()=>setVisual(v.id)} className={'rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition '+(visual===v.id?'border-accent bg-accent/15 text-accent':'border-border bg-bg text-muted hover:text-fg')}>{v.label}</button>)}
       </div>
     </div>
-    <ChartSurface rows={filtered} metric={currentMetric} dimension={dimension} visual={showKanban?'kanban':visual}/>
+    {!qualifiedSource?<Empty text="Canonical source read is on HOLD; no numerical conclusion can be drawn for this dataset."/>:<ChartSurface rows={filtered} metric={currentMetric} dimension={dimension} visual={showKanban?'kanban':visual}/>} 
     {visual==='pareto'&&<p className="mt-2 text-xs text-muted">Cumulative share is calculated from nonnegative category totals. The 80% reference identifies the most influential contributors.</p>}
    </section>
 
