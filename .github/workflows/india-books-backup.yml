@@ -1,0 +1,120 @@
+name: VYNDI India Books Daily Backup
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 20 * * *'
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: vyndi-books-india-backup
+  cancel-in-progress: false
+jobs:
+  backup:
+    # A non-commissioned scheduler must never access live finance data.
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.VYNDI_INDIA_BACKUP_COMMISSIONED == 'true' }}
+    environment: finance-backup
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: ${{ secrets.VYNDI_BOOKS_BACKUP_READ_URL }}
+      BACKUP_BUCKET: ${{ vars.VYNDI_INDIA_BACKUP_BUCKET }}
+      AWS_REGION: ${{ vars.VYNDI_INDIA_BACKUP_AWS_REGION }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check configured backup credentials without printing secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$DATABASE_URL"
+          test -n "$BACKUP_BUCKET"
+          test -n "$AWS_REGION"
+          case "$AWS_REGION" in
+            ap-south-1|ap-south-2) ;;
+            *) echo "::error::India-resident AWS region must be Mumbai or Hyderabad"; exit 1 ;;
+          esac
+          test -n "${{ vars.VYNDI_INDIA_BACKUP_IAM_ROLE }}"
+      - name: Acquire restricted AWS role (OIDC, not static keys)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.VYNDI_INDIA_BACKUP_IAM_ROLE }}
+          aws-region: ${{ vars.VYNDI_INDIA_BACKUP_AWS_REGION }}
+          role-session-name: vyndi-books-backup-${{ github.run_id }}
+      - name: Verify India bucket residency and immutable retention before any export
+        id: location
+        shell: bash
+        run: |
+          set -euo pipefail
+          location="$(aws s3api get-bucket-location --bucket "$BACKUP_BUCKET" --query 'LocationConstraint' --output text)"
+          test "$location" = "$AWS_REGION"
+          versioning="$(aws s3api get-bucket-versioning --bucket "$BACKUP_BUCKET" --query Status --output text)"
+          test "$versioning" = "Enabled"
+          object_lock="$(aws s3api get-object-lock-configuration --bucket "$BACKUP_BUCKET" --query 'ObjectLockConfiguration.ObjectLockEnabled' --output text)"
+          test "$object_lock" = "Enabled"
+          retention="$(aws s3api get-object-lock-configuration --bucket "$BACKUP_BUCKET" --query 'ObjectLockConfiguration.Rule.DefaultRetention.Mode' --output text)"
+          case "$retention" in COMPLIANCE|GOVERNANCE) ;; *) echo "::error::S3 default retention is missing"; exit 1 ;; esac
+          echo "versioning=$versioning" >> "$GITHUB_OUTPUT"
+          echo "object_lock=$object_lock" >> "$GITHUB_OUTPUT"
+          echo "retention=$retention" >> "$GITHUB_OUTPUT"
+          echo "location=$location" >> "$GITHUB_OUTPUT"
+      - name: Export consistent read-only PostgreSQL database archive
+        id: export
+        shell: bash
+        run: |
+          set -euo pipefail
+          backup_dir="$RUNNER_TEMP/vyndios-books-backup"
+          install -d -m 0700 "$backup_dir"
+          # The isolated PostgreSQL 18 client matches the Neon server major version.
+          docker run --rm --network host \
+            --user "$(id -u):$(id -g)" \
+            -e DATABASE_URL \
+            -v "$backup_dir:/work" \
+            postgres:18-alpine \
+            sh -ec 'umask 077; pg_dump --dbname="$DATABASE_URL" --format=custom --no-owner --no-acl --file=/work/books.dump'
+          test -s "$backup_dir/books.dump"
+          sha="$(sha256sum "$backup_dir/books.dump" | cut -d' ' -f1)"
+          key="vyndios-books/daily/$(TZ=Asia/Kolkata date +%F)/books-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.dump"
+          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+          echo "key=$key" >> "$GITHUB_OUTPUT"
+      - name: Upload immutable version to India bucket and independently read metadata
+        env:
+          LOCAL_SHA256: ${{ steps.export.outputs.sha256 }}
+          BACKUP_KEY: ${{ steps.export.outputs.key }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws s3 cp "$RUNNER_TEMP/vyndios-books-backup/books.dump" "s3://$BACKUP_BUCKET/$BACKUP_KEY" \
+            --sse AES256 --metadata "sha256=$LOCAL_SHA256"
+          remote_sha="$(aws s3api head-object --bucket "$BACKUP_BUCKET" --key "$BACKUP_KEY" --query 'Metadata.sha256' --output text)"
+          version_id="$(aws s3api head-object --bucket "$BACKUP_BUCKET" --key "$BACKUP_KEY" --query VersionId --output text)"
+          encryption="$(aws s3api head-object --bucket "$BACKUP_BUCKET" --key "$BACKUP_KEY" --query ServerSideEncryption --output text)"
+          object_size="$(aws s3api head-object --bucket "$BACKUP_BUCKET" --key "$BACKUP_KEY" --query ContentLength --output text)"
+          export REMOTE_SHA="$remote_sha" VERSION_ID="$version_id" ENCRYPTION="$encryption" OBJECT_SIZE="$object_size"
+          export VERSIONING="${{ steps.location.outputs.versioning }}" OBJECT_LOCK="${{ steps.location.outputs.object_lock }}"
+          export RETENTION_MODE="${{ steps.location.outputs.retention }}" LOCAL_REGION="${{ steps.location.outputs.location }}"
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from "node:fs";
+          const e=process.env;
+          writeFileSync(e.RUNNER_TEMP+"/vyndios-books-backup-proof.json",JSON.stringify({
+            region:e.LOCAL_REGION, versioning:e.VERSIONING, objectLock:e.OBJECT_LOCK,
+            retentionMode:e.RETENTION_MODE, size:Number(e.OBJECT_SIZE),
+            sha256:e.LOCAL_SHA256,remoteSha256:e.REMOTE_SHA,versionId:e.VERSION_ID,
+            encrypted:e.ENCRYPTION, backupKey:e.BACKUP_KEY,
+            baselineSha:e.GITHUB_SHA,verifiedAt:new Date().toISOString(),
+            scope:"PostgreSQL archive; separately verify external voucher and document storage"
+          },null,2));
+          NODE
+          node scripts/india-books-backup-proof.mjs verify "$RUNNER_TEMP/vyndios-books-backup-proof.json"
+      - name: Preserve non-sensitive verification record only
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: india-books-backup-proof-${{ github.run_id }}
+          path: ${{ runner.temp }}/vyndios-books-backup-proof.json
+          retention-days: 30
+      - name: Remove plaintext dump from transient runner
+        if: always()
+        shell: bash
+        run: |
+          rm -f "$RUNNER_TEMP/vyndios-books-backup/books.dump"
+          rmdir "$RUNNER_TEMP/vyndios-books-backup" 2>/dev/null || true
