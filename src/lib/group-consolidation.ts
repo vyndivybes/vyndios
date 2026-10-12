@@ -28,7 +28,7 @@ const metricKeys:Record<GroupSourceKind,keyof Pick<UnitSummary,'orders'|'jobCard
  sales_invoice:'salesInvoices',supplier_invoice:'supplierInvoices',
  crm_customer:'crmCustomers',people_record:'peopleRecords',
 };
-const fresh=({id,name}:typeof GROUP_UNITS[number]):UnitSummary=>({
+const fresh=({id,name}:{id:GroupUnitId;name:string}):UnitSummary=>({
  id,name,orders:0,units:0,jobCards:0,purchaseOrders:0,salesInvoices:0,supplierInvoices:0,
  crmCustomers:0,peopleRecords:0,sourceCounts:Object.fromEntries(GROUP_SOURCE_KINDS.map(kind=>[kind,0])) as UnitSummary['sourceCounts'],
 });
@@ -43,7 +43,7 @@ export function calculateGroupCoverage(coverage:GroupSourceCoverage,buckets:read
  return {complete:holds.length===0,holds};
 }
 export function aggregateDivisionSources(buckets:readonly GroupSourceBucket[],coverage:GroupSourceCoverage){
- const divisions=GROUP_UNITS.map(fresh),unattributed=fresh({id:'corporate',name:'Unattributed',type:'management_unit'});
+ const divisions=GROUP_UNITS.map(fresh),unattributed=fresh({id:'corporate',name:'Unattributed'});
  const seen=new Set<string>();
  for(const b of buckets){
   if(!GROUP_SOURCE_KINDS.includes(b.sourceKind))throw Error('GROUP_SOURCE_KIND_INVALID');
