@@ -102,6 +102,30 @@ function AccountingWorkbench() {
         <p className="max-w-sm text-xs leading-5 text-muted">Use Finance → Accounting & Statements for formal statements; this workbench remains the journal, reconciliation and accounting-control surface.</p>
       </header>
 
+      <Panel title="Bookkeeping go-live · Day-1 technical integrity" kicker="Starting daily books is independent of a completed accounting month">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${data.day1TechnicalHealth.state === "TECHNICAL_CONTROLS_PASS" ? "border-green text-green" : "border-danger text-danger"}`}>
+            {data.day1TechnicalHealth.state === "TECHNICAL_CONTROLS_PASS" ? "Technical integrity checks passed" : "Technical integrity requires action"}
+          </span>
+          <span className="text-xs text-muted">
+            {data.day1TechnicalHealth.passed.length} checks passed · {data.day1TechnicalHealth.failed.length} checks failed
+          </span>
+        </div>
+        {data.day1TechnicalHealth.failed.length ? <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-danger">
+          {data.day1TechnicalHealth.failed.map((finding) => <li key={finding}>{finding}</li>)}
+        </ul> : null}
+        <p className="mt-3 text-xs leading-5 text-muted">
+          These checks validate posted-journal integrity, source lineage, posting exceptions, active edit-audit triggers,
+          and database journal protections. They do not require a prior bank reconciliation, physical stocktake, closed month,
+          or CA evidence pack. This technical pass alone does not authorize production bookkeeping.
+        </p>
+        <p className="mt-2 text-xs leading-5 text-muted">
+          Full Day-1 acceptance additionally requires independently verified evidence of India-resident daily books and
+          audit-trail backups, a successful restore drill, authenticated transaction journeys, approved setup and
+          deployed-SHA parity. Statutory CA sign-off is a separate later process.
+        </p>
+      </Panel>
+
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <Kpi label="Posted journals" value={String(summary.posted_journals ?? 0)} hint="Source-linked double entry" />
         <Kpi label="Trial balance" value={tbDifference === 0 ? "Balanced" : money(Math.abs(tbDifference))} hint="Debit minus credit" tone={tbDifference === 0 ? "ok" : "danger"} />

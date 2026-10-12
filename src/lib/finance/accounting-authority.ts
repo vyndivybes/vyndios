@@ -4,6 +4,7 @@ import { requireBusinessActor } from "@/lib/business-actor";
 import { getCommandRole } from "@/lib/command-access";
 import { getSql, type SqlRow } from "@/lib/db";
 import { canPerform } from "@/lib/page-access";
+import { DAY1_TECHNICAL_QUERY, assessDay1TechnicalHealth } from "@/lib/finance/bookkeeping-day1-operational";
 import { getRouteMeta } from "@/lib/page-metadata";
 import {
   buildFinancialStatements,
@@ -56,7 +57,8 @@ async function requireEdit() {
 export const getAccountingWorkbench = createServerFn({ method: "GET" }).handler(async () => {
   await requireView();
   const sql = await getSql();
-  const [summary, trialBalance, generalLedger, journals, jobCosts, conversionCosts, openJobs, sourceCostLines, toolingProfiles, toolingRecovery, toolingRuns, gst, bank, assets, payroll, exceptions] = await Promise.all([
+  const [day1Rows, summary, trialBalance, generalLedger, journals, jobCosts, conversionCosts, openJobs, sourceCostLines, toolingProfiles, toolingRecovery, toolingRuns, gst, bank, assets, payroll, exceptions] = await Promise.all([
+    sql.query<SqlRow>(DAY1_TECHNICAL_QUERY),
     sql.query<SqlRow>(`select * from epr_finance_control_summary`),
     sql.query<SqlRow>(`select * from epr_finance_trial_balance order by account_code`),
     sql.query<SqlRow>(`select * from epr_finance_general_ledger limit 500`),
@@ -138,6 +140,7 @@ export const getAccountingWorkbench = createServerFn({ method: "GET" }).handler(
           case severity when 'critical' then 1 when 'high' then 2 when 'medium' then 3 else 4 end,created_at desc`),
   ]);
   return {
+    day1TechnicalHealth: assessDay1TechnicalHealth(day1Rows[0]),
     summary: summary[0] ?? {},
     trialBalance,
     generalLedger,
