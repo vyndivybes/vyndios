@@ -39,6 +39,7 @@ export const ADMIN_HOME = "/command/users";
 export const COMMAND_SHORTCUTS: readonly WorkspaceLink[] = [
   { to: "/command/decision-inbox", label: "Action Inbox" },
   { to: "/command/control-tower", label: "Control Tower" },
+  { to: "/command/analytics-studio", label: "Analytics Studio" },
   { to: "/command/intelligence", label: "Product Intelligence" },
   { to: "/command/ibpe-operating-workspace", label: "VIBPE Workspace" },
   { to: "/command/ibpe-operating-workspace/authority", label: "VIBPE Planning Authority" },
@@ -120,6 +121,7 @@ export const WORKSPACE_NAVIGATION: Record<CanonicalWorkspaceId, readonly Workspa
         { to: COMMAND_HOME, label: "Command Centre" },
         { to: "/command/decision-inbox", label: "Action Inbox" },
         { to: "/command/control-tower", label: "Control Tower" },
+  { to: "/command/analytics-studio", label: "Analytics Studio" },
       ],
     },
     {
