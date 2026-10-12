@@ -32,6 +32,10 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$BACKUP_READ_URL"
+          case "$BACKUP_READ_URL" in
+            *sslmode=require*|*sslmode=verify-full*) ;;
+            *) echo "::error::Neon backup connection must explicitly require TLS"; exit 1 ;;
+          esac
           test -n "$RCLONE_CONFIG_GDRIVE_ROOT_FOLDER_ID"
           test -n "$RCLONE_CONFIG_GDRIVE_CLIENT_ID"
           test -n "$RCLONE_CONFIG_GDRIVE_CLIENT_SECRET"
