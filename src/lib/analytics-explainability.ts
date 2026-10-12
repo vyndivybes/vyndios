@@ -141,7 +141,7 @@ export function buildFounderReading(input:{
  supplyCaution:holds.length
   ?'HOLD sources: '+holds.join(', ')+'. Missing source records cannot be treated as zero.'
   :'Connected read-only source coverage is verified for the listed full-order datasets; this is not a statutory audit.',
- shortageExplanation:'There are '+input.shortageLines+' recorded material shortage lines across '+input.linkedOrders+' linked orders. A zero does not prove no material shortages exist elsewhere.',
+ shortageExplanation:'There are '+input.shortageLines+' recorded material shortage lines across '+input.linkedOrders+' linked orders. Zero recorded lines do not establish that all products and stores have sufficient material.',
  forecastCaution:'Forecast sliders represent illustrative scenarios and planning estimates, not posted actuals, accepted orders or approved new budgets.',
  currentMeaning:'Currently showing '+input.linkedOrders+' linked committed orders, '+input.committedUnits+' units and '+input.jobCards+' linked job cards. This is not necessarily every order or job card in the database.',
  };
