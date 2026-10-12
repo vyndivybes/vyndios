@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {GROUP_UNITS,calculateGroupCoverage,consolidateGroupEvents,validateTransferPair,aggregateDivisionSources} from './group-consolidation.ts';
+import {GROUP_UNITS,calculateGroupCoverage,consolidateGroupEvents,validateTransferPair,aggregateDivisionSources,type TransferPair,type ConsolidationEvent} from './group-consolidation.ts';
 
 test('the six group units are management divisions and not separate legal companies',()=>{
  assert.deepEqual(GROUP_UNITS.map(x=>x.id),['corporate','carbon','aluminium','software','vybes','merchandise']);
@@ -31,7 +31,7 @@ test('duplicate division+source buckets cannot inflate reported metrics',()=>{
  ],{job_card:'PASS'}),/GROUP_DUPLICATE_SOURCE_BUCKET/);
 });
 test('internal transfer eliminations demand independently evidenced matched external identifiers',()=>{
- const base={transferId:'X1',period:'2026-10',currency:'INR',basis:'approved',
+ const base:TransferPair={transferId:'X1',period:'2026-10',currency:'INR',basis:'approved',
   debit:{divisionId:'carbon',amount:20000,sourceRef:'JC-SERVICE-1'},
   credit:{divisionId:'software',amount:20000,sourceRef:'INV-SERVICE-1'}};
  assert.equal(validateTransferPair(base).eligible,true);
@@ -40,9 +40,9 @@ test('internal transfer eliminations demand independently evidenced matched exte
  assert.equal(validateTransferPair({...base,basis:'draft'}).eligible,false);
 });
 test('consolidation excludes only independently matched and approved internal pairs',()=>{
- const external=[{id:'external-sale',amount:40000,divisionId:'software',class:'external' as const}];
- const internal=[{id:'internal-charge',amount:20000,divisionId:'software',class:'internal' as const,transferId:'X1'}];
- const pair={transferId:'X1',period:'2026-10',currency:'INR',basis:'approved',
+ const external:ConsolidationEvent[]=[{id:'external-sale',amount:40000,divisionId:'software',class:'external' as const}];
+ const internal:ConsolidationEvent[]=[{id:'internal-charge',amount:20000,divisionId:'software',class:'internal' as const,transferId:'X1'}];
+ const pair:TransferPair={transferId:'X1',period:'2026-10',currency:'INR',basis:'approved',
   debit:{divisionId:'carbon',amount:20000,sourceRef:'BILL-1'},
   credit:{divisionId:'software',amount:20000,sourceRef:'BILL-2'}};
  const a=consolidateGroupEvents([...external,...internal],[pair]);
