@@ -136,7 +136,7 @@ export function buildFounderReading(input:{
  const holds=Object.entries(input.sourceCoverage).filter(([,status])=>status!=='PASS').map(([source])=>source);
  return {
  groupCaution:input.scope==='group'
-  ?'This is NOT a consolidated group balance. Only VYNDI OS is currently an authorized business source; other divisions have not been reconciled.'
+  ?'This is not consolidated group reporting. Only VYNDI OS is currently an authorized business source; other divisions have not been reconciled.'
   :'This is a VYNDI OS operating view, not a statutory group consolidation.',
  supplyCaution:holds.length
   ?'HOLD sources: '+holds.join(', ')+'. Missing source records cannot be treated as zero.'
