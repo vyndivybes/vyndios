@@ -6,15 +6,19 @@
 
 The prepared India-only S3 workflow remains separate and OFF. This Drive automation does not create chargeable AWS infrastructure.
 
-## Existing destination
+## OAuth-limited backup destination: first-time setup
 
-The following folder was created and verified through the user's Google Drive connection:
+The earlier folder named `VYNDI OS - Encrypted Backups (Supplementary)`, created by the ChatGPT Drive connection, remains in Drive but **must not** be used as the target for the `drive.file` OAuth connector: rclone cannot reliably access a folder created by a different OAuth application with `drive.file` scope.
 
-- Display name: `VYNDI OS - Encrypted Backups (Supplementary)`
-- Google Drive folder ID: `1hjC8cK8qYMwBzY0j4r-PIur-rQKbqtvb`
-- [Open folder](https://drive.google.com/drive/folders/1hjC8cK8qYMwBzY0j4r-PIur-rQKbqtvb)
+Use a newly created **rclone-owned** folder, made after authorizing the **same desktop OAuth client** that will be used by GitHub Actions:
 
-**Authorize with the Google account that actually owns or has editor access to this exact folder.** A ChatGPT Google Drive connection cannot authorize a separate GitHub Actions runtime.
+1. In Google OAuth Data Access, configure only `https://www.googleapis.com/auth/drive.file` for this backup integration. This is a *non-sensitive* per-file permission; the full `https://www.googleapis.com/auth/drive` restricted permission is not needed.
+2. Using `rclone config` on a trusted PC, select Google Drive, supply your own Desktop Client ID and secret, and select scope **`drive.file` (option 3)**. Authenticate the Google account that will own the backup folder. Avoid authorizing the old full-drive scope; if one already exists, delete that local rclone remote and issue a new token limited to `drive.file`.
+3. Run `rclone mkdir gdrive:VYNDI-OS-Backup-Encrypted`. Because this folder is created by this OAuth application, `drive.file` permits rclone to access it. Verify with `rclone lsf gdrive: -d`.
+4. Run `rclone link gdrive:VYNDI-OS-Backup-Encrypted` to obtain the folder link/ID. Set **`VYNDI_GOOGLE_BACKUP_FOLDER_ID` to this newly returned ID**, not the old ChatGPT-created folder ID. Test `rclone lsf gdrive:` after temporarily setting `root_folder_id` to that ID.
+5. Do not paste OAuth tokens, Client Secret, or private encryption key into chat or issues. Configure them only in the protected GitHub Actions environments. Complete the recovery drill before scheduling production backups.
+
+The original empty ChatGPT-created Google Drive folder may remain unused; this avoids requesting unnecessary account-wide Google Drive access merely to reuse an existing folder.
 
 ## How the implemented workflow operates
 
@@ -27,11 +31,11 @@ The following folder was created and verified through the user's Google Drive co
 ### Required one-time setup (no new paid platform required)
 
 1. **Create an OAuth client in Google Cloud (Drive API)** for a local desktop application. This is a separate Google API credential, not a paid AWS service. Follow the current [rclone Google Drive setup guide](https://rclone.org/drive/#making-your-own-client-id). Rclone's shared client ID is being retired in 2026, so **use your own client ID and client secret**. Complete Google's consent configuration for your own account with the Drive API enabled. For uninterrupted refresh tokens avoid leaving an external OAuth app in 7-day Testing mode; ensure the app's publishing status and Google's verification requirements are appropriate to a private single-user application.
-2. **Perform a one-time interactive authorization** using `rclone config` on a trusted machine, with the exact OAuth client ID/secret from step 1. Use `drive` as the permission scope, and authorize the **Google account with this Drive folder**. When finished, find `token = { ... }` inside the local `rclone.conf`. Never post any access token, refresh token, OAuth client secret or the configuration file in a chat, issue, pull request, or screenshot.
+2. **Perform a one-time interactive authorization** using `rclone config` on a trusted machine, with the exact OAuth client ID/secret from step 1. Use `drive.file` as the permission scope, and authorize the Google account in which you created the new rclone-managed folder. When finished, find `token = { ... }` inside the local `rclone.conf`. Never post any access token, refresh token, OAuth client secret or the configuration file in a chat, issue, pull request, or screenshot.
 3. **Generate an age identity locally** with `age-keygen -o vyndi-age-identity.txt`. Keep a secure **offline copy** of the private identity. Copy only the output **public recipient** starting with `age1` into the GitHub repository variable below. Loss of the private key makes your encrypted backups unrecoverable.
-4. GitHub repository → **Settings → Environments**: configure `finance-backup` and the separately protected `finance-restore-review` environments, with reviewer protection where supported. Restrict trusted write access to the repository and changes to workflows. An OAuth token with the `drive` scope can access much more than one folder: the root-folder setting limits *this workflow's paths*, not the token's underlying Google permissions.
+4. GitHub repository → **Settings → Environments**: configure `finance-backup` and the separately protected `finance-restore-review` environments, with reviewer protection where supported. Restrict trusted write access to the repository and changes to workflows. The `drive.file` token can access files and folders created by this OAuth application (or explicitly shared with it); the folder ID additionally constrains this workflow's intended destination.
 5. GitHub repository **variables**:
-   - `VYNDI_GOOGLE_BACKUP_FOLDER_ID` = `1hjC8cK8qYMwBzY0j4r-PIur-rQKbqtvb`
+   - `VYNDI_GOOGLE_BACKUP_FOLDER_ID` = **ID of the new folder created using this OAuth client and rclone**.
    - `VYNDI_GOOGLE_BACKUP_AGE_RECIPIENT` = your public `age1...` recipient
    - `VYNDI_GOOGLE_BACKUP_COMMISSIONED` = leave unset or `false` until first qualification
 6. GitHub **finance-backup** environment **secrets**:
