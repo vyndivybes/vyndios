@@ -4,6 +4,8 @@ on:
     branches: [main]
     paths:
       - 'src/lib/analytics-supply-authority.ts'
+      - 'src/lib/analytics-crm-hr.ts'
+      - 'src/lib/analytics-crm-hr.test.ts'
       - 'src/lib/analytics-explainability.ts'
       - 'src/lib/analytics-explainability.test.ts'
       - 'src/lib/analytics-studio.ts'
@@ -26,7 +28,7 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Focused evidence/aggregation tests
-        run: node --experimental-strip-types --test src/lib/analytics-studio.test.ts src/lib/analytics-explainability.test.ts
+        run: node --experimental-strip-types --test src/lib/analytics-studio.test.ts src/lib/analytics-explainability.test.ts src/lib/analytics-crm-hr.test.ts
       - name: Generate route tree and bundle VYNDI app
         run: npm run build:dev
       - name: Typecheck generated enterprise analytics route
