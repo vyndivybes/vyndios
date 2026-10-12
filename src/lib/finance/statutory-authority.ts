@@ -48,9 +48,9 @@ async function periodBlockers(periodValue: string) {
        (select count(*) from epr_finance_gst_ledger
           where period=$1 and direction='input' and status='active' and gst_inr>0 and eligible_itc is null)::int as unverified_input_itc,
        (select count(*) from vyndi_supplier_invoices
-          where to_char(invoice_on,'YYYY-MM')=$1 and status<>'void' and gst_inr>0 and itc_control_status='pending')::int as pending_supplier_itc,
+          where to_char(invoice_on,'YYYY-MM')=$1 and status<>'void' and gst_inr>0 and coalesce(itc_control_status,'pending')='pending')::int as pending_supplier_itc,
        (select count(*) from vyndi_invoices
-          where status='issued' and to_char(issued_at,'YYYY-MM')=$1 and tax_profile_status<>'complete')::int as invoice_tax,
+          where status='issued' and to_char(issued_at,'YYYY-MM')=$1 and tax_profile_status is distinct from 'complete')::int as invoice_tax,
        (select count(*) from vyndi_invoices
           where status='issued' and to_char(issued_at,'YYYY-MM')=$1 and e_invoice_required=true and trim(coalesce(irn,''))='')::int as irn,
        (select count(*) from epr_finance_payroll_controls
@@ -70,7 +70,28 @@ async function periodBlockers(periodValue: string) {
           where period=$1 and status in ('draft','submitted','approved'))::int as open_stocktakes`,
     [periodValue],
   );
-  const values = row ?? {};
+  // SQL query shape and completeness are financial authority: never turn missing evidence into zero blockers.
+  if (!row || typeof row !== "object") {
+    throw new Error("Finance period evidence unavailable; hard-close assessment failed closed.");
+  }
+  const countColumns = [
+    "unmatched_bank", "gst_evidence", "unverified_input_itc", "pending_supplier_itc",
+    "invoice_tax", "irn", "payroll", "posting", "assets",
+    "approved_bank_reconciliations", "posted_stocktakes", "open_stocktakes",
+  ];
+  for (const column of countColumns) {
+    const value = row[column];
+    const parsed = Number(value);
+    if (value === null || value === undefined || value === "" || !Number.isSafeInteger(parsed) || parsed < 0) {
+      throw new Error(`Finance period evidence incomplete or invalid: ${column}.`);
+    }
+  }
+  const rawTbDifference = row.tb_difference;
+  if (rawTbDifference === null || rawTbDifference === undefined || rawTbDifference === "" ||
+      !Number.isFinite(Number(rawTbDifference)) || Number(rawTbDifference) < 0) {
+    throw new Error("Finance period evidence incomplete or invalid: tb_difference.");
+  }
+  const values = row;
   const blockers = {
     unmatchedBank: Number(values.unmatched_bank ?? 0),
     gstEvidence: Number(values.gst_evidence ?? 0),
@@ -183,7 +204,7 @@ export const approveBankReconciliation = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const actor = await requireApprove();
     const sql = await getSql();
-    const rows = await sql.query<SqlRow>(`update epr_finance_bank_reconciliation_sessions set approved_by=$2,approved_at=now(),evidence_reference=$3 where id=$1 and status='reconciled' and prepared_by is distinct from $2 and approved_by is null returning id`,[data.id,actor.userId,data.evidenceReference]);
+    const rows = await sql.query<SqlRow>(`update epr_finance_bank_reconciliation_sessions set approved_by=$2,approved_at=now(),evidence_reference=$3 where id=$1 and status='reconciled' and prepared_by is not null and prepared_by <> $2 and approved_by is null returning id`,[data.id,actor.userId,data.evidenceReference]);
     if (!rows[0]) throw new Error("Bank reconciliation not found, already approved, or self-approval prohibited.");
     return { ok:true,id:data.id };
   });
@@ -232,7 +253,7 @@ export const approveCaEvidencePack = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const actor = await requireApprove();
     const sql = await getSql();
-    const rows = await sql.query<SqlRow>(`update epr_finance_ca_evidence_packs set status='approved',approved_by=$2,approved_at=now(),evidence_reference=$3 where id=$1 and status='review_ready' and blocker_count=0 and generated_by is distinct from $2 and approved_by is null returning id`,[data.id,actor.userId,data.evidenceReference]);
+    const rows = await sql.query<SqlRow>(`update epr_finance_ca_evidence_packs set status='approved',approved_by=$2,approved_at=now(),evidence_reference=$3 where id=$1 and status='review_ready' and blocker_count=0 and generated_by is not null and generated_by <> $2 and approved_by is null returning id`,[data.id,actor.userId,data.evidenceReference]);
     if (!rows[0]) throw new Error("CA pack must be blocker-free, review-ready, unapproved and approved by an independent checker.");
     return { ok:true,id:data.id };
   });
