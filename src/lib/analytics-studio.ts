@@ -9,7 +9,7 @@ export type AnalyticsInput={
   lineage?:readonly object[];
   report?:any;
   actuals?:object;
-  supply?:{records?:Record<string,any>;coverage?:Record<string,string>};
+  supply?:object;
 };
 const text=(x:unknown)=>typeof x==='string'?x.trim():x==null?'':String(x);
 const num=(x:unknown)=>x!==null&&x!==undefined&&x!==''&&Number.isFinite(Number(x))?Number(x):null;
@@ -70,6 +70,7 @@ function reportRows(output:AnalyticsDatum[],dataset:string,input:unknown,source:
 }
 export function buildAnalyticsRows({lineage=[],report={},actuals={},supply={}}:AnalyticsInput):AnalyticsDatum[]{
  const output:AnalyticsDatum[]=[];
+ const external=supply as {records?:Record<string,any>;coverage?:Record<string,string>};
  for(const sourceRow of lineage){
   if(!sourceRow||typeof sourceRow!=='object'||Array.isArray(sourceRow))continue;
   const raw=sourceRow as Record<string,unknown>;
@@ -86,7 +87,7 @@ export function buildAnalyticsRows({lineage=[],report={},actuals={},supply={}}:A
     month:month(raw.planMonth),source:'VYNDI committed order → job-card lineage',metrics:fields});
  }
  for(const kind of ['demand','jobCards','purchaseOrders','salesInvoices','supplierInvoices','inventoryBalances']){
-   if(supply?.coverage?.[kind]==='PASS')reportRows(output,kind,supply?.records?.[kind], 'VYNDI:'+kind);
+   if(external?.coverage?.[kind]==='PASS')reportRows(output,kind,external?.records?.[kind], 'VYNDI:'+kind);
  }
  reportRows(output,'materials',report?.inventory?.procurementNetRequirement,'vyndi_report_procurement_net_requirement');
  reportRows(output,'inventory',report?.inventory?.mslHealth,'vyndi_report_msl_health');
