@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { getSql } from "@/lib/db";
+import { getSql, type SqlRow } from "@/lib/db";
+import { QUALITY_REGISTER_QUERY } from "@/lib/quality-register-query";
 import { requireBusinessActor } from "@/lib/business-actor";
 import type { CommandPermission } from "@/lib/page-access";
 
@@ -104,19 +105,21 @@ export const listQualityAuthority = createServerFn({ method: "GET" }).handler(as
   await assertSameSiteRequest();
   await requirePermission("view");
   const sql = await getSql();
-  const [inspections, ncrs, capas, releases, eprOpen] = await Promise.all([
-    sql`select * from vyndi_quality_inspections order by recorded_at desc limit 500`,
-    sql`select * from vyndi_quality_ncrs order by updated_at desc limit 500`,
-    sql`select * from vyndi_quality_capas order by updated_at desc limit 500`,
-    sql`select * from vyndi_quality_releases where superseded_at is null order by decided_at desc limit 500`,
-    sql<{ count: number }>`select count(*)::int as count from epr_ncr_capa where status not in ('closed','rejected')`,
-  ]);
+  const [registers] = await sql.query<{
+    inspections: SqlRow[];
+    ncrs: SqlRow[];
+    capas: SqlRow[];
+    releases: SqlRow[];
+    epr_open: number;
+  }>(QUALITY_REGISTER_QUERY);
+  if (!registers) throw new Error("Quality register evidence unavailable");
+  const { inspections, ncrs, capas, releases } = registers;
   return {
     inspections: Array.isArray(inspections) ? [...inspections] : [],
     ncrs: Array.isArray(ncrs) ? [...ncrs] : [],
     capas: Array.isArray(capas) ? [...capas] : [],
     releases: Array.isArray(releases) ? [...releases] : [],
-    eprOpenNcrCapa: Number((eprOpen as Array<{ count: number }>)[0]?.count ?? 0),
+    eprOpenNcrCapa: Number(registers.epr_open),
   };
 });
 
