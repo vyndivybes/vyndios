@@ -4,7 +4,14 @@ import {getSql} from '@/lib/db';
 import {canPerform} from '@/lib/page-access';
 import {getRouteMeta} from '@/lib/page-metadata';
 
-type RecordRow=Record<string,unknown>;
+type RecordRow=Record<string,string|number|boolean|null>;
+const scalar=(value:unknown):string|number|boolean|null=>{
+ if(value===null||value===undefined)return null;
+ if(typeof value==='string'||typeof value==='boolean')return value;
+ if(typeof value==='number')return Number.isFinite(value)?value:null;
+ if(value instanceof Date)return value.toISOString();
+ return null;
+};
 const SOURCES={
   demand:{table:'vyndi_sales_orders',sort:'plan_month,id',keys:['id','status','plan_month','variant_name','units']},
   jobCards:{table:'epr_production_job_cards',sort:'id',keys:['id','status','sales_order_id']},
@@ -28,9 +35,9 @@ export const getAnalyticsSupplySnapshot=createServerFn({method:'GET'}).handler(a
  const entries=await Promise.all(Object.entries(SOURCES).map(async([key,source])=>{
    try{
      // Whitelisted static table names and sort expressions only; no user SQL.
-     const rows=await sql.query<RecordRow>('select * from '+source.table+' order by '+source.sort+' limit '+(MAX+1));
+     const rows=await sql.query<Record<string,unknown>>('select * from '+source.table+' order by '+source.sort+' limit '+(MAX+1));
      if(rows.length>MAX)return [key,'HOLD',[]] as const;
-     const projected=rows.map(row=>Object.fromEntries(source.keys.filter(k=>Object.hasOwn(row,k)).map(k=>[k,row[k]])));
+     const projected=rows.map(row=>Object.fromEntries(source.keys.filter(k=>Object.hasOwn(row,k)).map(k=>[k,scalar(row[k])])) as RecordRow);
      return [key,'PASS',projected] as const;
    }catch{return [key,'HOLD',[]] as const;}
  }));
