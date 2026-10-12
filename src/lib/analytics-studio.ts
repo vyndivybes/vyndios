@@ -1,3 +1,4 @@
+import {describeAnalyticsMetric} from './analytics-explainability.ts';
 /** Pure projections of existing, authorized VYNDI OS report/lineage reads.
  * No queries, writes, artificial metrics, automatic business actions or cross-company consolidation.
  */
@@ -121,18 +122,20 @@ function dimensionOf(row:AnalyticsDatum,key:string){
 export function aggregateAnalyticsRows(rows:AnalyticsDatum[],dimension:string,metric:string){
  if(!DIMENSIONS.includes(dimension))throw new Error('ANALYTICS_DIMENSION_INVALID');
  const map=new Map<string,{name:string,value:number,records:number}>();
+ const mode=describeAnalyticsMetric(metric,rows[0]?.dataset??'').aggregation;
  for(const row of rows){
   if(!Object.hasOwn(row.metrics,metric))continue;
   const v=row.metrics[metric];if(!Number.isFinite(v))continue;
   const name=dimensionOf(row,dimension),current=map.get(name)||{name,value:0,records:0};
   current.value+=v;current.records++;map.set(name,current);
  }
- const out=[...map.values()];
+ const out=[...map.values()].map(x=>mode==='average'?{...x,value:x.value/x.records}:x);
  if(dimension==='month')out.sort((a,b)=>Number(a.name.slice(1))-Number(b.name.slice(1)));
  else out.sort((a,b)=>b.value-a.value||a.name.localeCompare(b.name));
  return out;
 }
 export function paretoAnalyticsRows(rows:AnalyticsDatum[],dimension:string,metric:string){
+ if(describeAnalyticsMetric(metric,rows[0]?.dataset??'').aggregation==='average')return [];
  const ranks=aggregateAnalyticsRows(rows,dimension,metric).filter(r=>r.value>=0)
    .sort((a,b)=>b.value-a.value||a.name.localeCompare(b.name));
  const total=ranks.reduce((n,r)=>n+r.value,0);let cumulative=0;
