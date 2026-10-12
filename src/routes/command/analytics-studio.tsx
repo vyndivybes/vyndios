@@ -85,7 +85,6 @@ function ChartSurface({rows,metric,dimension,visual}:{rows:AnalyticsDatum[];metr
       <XAxis dataKey="name" tickFormatter={chartAxis} angle={-20} textAnchor="end" height={65} tick={{fontSize:11}}/><YAxis tick={{fontSize:11}}/>
       <Tooltip/><Bar dataKey="value" name={readable} radius={[5,5,0,0]}>{plotted.map((p,i)=><Cell key={p.name} fill={COLOR[i%COLOR.length]}/>)}</Bar></BarChart>}
   </ResponsiveContainer>
- </div>}
  </div>;
 }
 function csv(rows:AnalyticsDatum[],metric:string){
@@ -377,5 +376,6 @@ function AnalyticsStudio(){
    </section>
    <div className="flex items-start gap-2 rounded-xl border border-border bg-surface/40 p-4 text-xs leading-5 text-muted"><CheckCircle2 size={17} className="shrink-0 text-green"/>
    <span>Read-only analysis. Source systems retain sole business authority. Kanban stages are summaries derived from persisted linked records, not manual workflow state. Forecast sensitivity is advisory; no new purchase order, production release, ledger posting or approval is generated.</span></div>
+ </div>}
  </div>;
 }
