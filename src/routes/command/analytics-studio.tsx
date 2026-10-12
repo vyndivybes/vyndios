@@ -102,6 +102,7 @@ function AnalyticsStudio(){
  const [from,setFrom]=useState(1),[to,setTo]=useState(36);
  const [dimension,setDimension]=useState('stage'),[metric,setMetric]=useState('units'),[visual,setVisual]=useState<Visual>('bar');
  const [scenario,setScenario]=useState<ScenarioId>('base');
+ const [financeView,setFinanceView]=useState<'revenue'|'spend'|'cash'>('revenue');
  const [demandSensitivity,setDemandSensitivity]=useState(100);
  const [costSensitivity,setCostSensitivity]=useState(0);
  const rows=useMemo(()=>buildAnalyticsRows({lineage,report,actuals,supply}),[lineage,report,actuals,supply]);
@@ -111,12 +112,14 @@ function AnalyticsStudio(){
  const filtered=useMemo(()=>filterAnalyticsRows(rows,{dataset,variant,status,from,to}),[rows,dataset,variant,status,from,to]);
  const metrics=useMemo(()=>getNumericMetrics(allDatasetRows),[allDatasetRows]);
  const currentMetric=metrics.includes(metric)?metric:(metrics.includes(DATASETS.find(d=>d.id===dataset)?.defaultMetric||'')?DATASETS.find(d=>d.id===dataset)!.defaultMetric:metrics[0]||'recordCount');
- const actualsByMonth=actuals as Record<number,{revenue?:number|null;cogs?:number|null;opex?:number|null}>;
+ const actualsByMonth=actuals as Record<number,{revenue?:number|null;cogs?:number|null;opex?:number|null;closingCash?:number|null}>;
  const projections=useMemo(()=>approvedPlan?buildModelWithInputs(scenario,approvedPlan.drawStandby,approvedPlan.finance):[],[approvedPlan,scenario]);
  const comparison=useMemo(()=>projections.filter(row=>row.m>=from&&row.m<=to).map(row=>{
    const actual=actualsByMonth[row.m];
    return {month:'M'+row.m,plannedRevenue:row.revenue,actualRevenue:actual?.revenue??null,
      whatIfRevenue:row.revenue*demandSensitivity/100,
+     actualOperatingSpend:actual?.cogs!==null&&actual?.cogs!==undefined&&actual?.opex!==null&&actual?.opex!==undefined?actual.cogs+actual.opex:null,
+     actualClosingCash:actual?.closingCash??null,
      plannedOperatingSpend:row.cogs+row.opex,
      sensitivityOperatingSpend:(row.cogs*demandSensitivity/100+row.opex)*(1+costSensitivity/100),
      plannedClosingCash:row.closing};
@@ -220,12 +223,24 @@ function AnalyticsStudio(){
        <div className="mt-4 grid gap-3 sm:grid-cols-3"><Stat label="Scenario revenue" value={currency(comparison.reduce((n,r)=>n+r.plannedRevenue,0))} hint={scenario+' plan · selected months'}/>
           <Stat label="Modeled operating spend" value={currency(comparison.reduce((n,r)=>n+r.plannedOperatingSpend,0))} hint="COGS + Opex · not posted actual"/>
           <Stat label="Illustrative adjusted revenue" value={currency(comparison.reduce((n,r)=>n+r.whatIfRevenue,0))} hint="Demand sensitivity, not an approved forecast"/></div>
-       <div className="mt-4 h-[330px] w-full"><ResponsiveContainer width="100%" height="100%">
+       <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Financial metric view">
+       {([{id:'revenue',label:'Revenue vs actual'},{id:'spend',label:'Budget vs actual spend'},{id:'cash',label:'Cash trajectory'}] as const).map(v=><button type="button" key={v.id} aria-pressed={financeView===v.id} onClick={()=>setFinanceView(v.id)} className={'rounded-lg border px-3 py-2 text-xs font-semibold '+(financeView===v.id?'border-accent bg-accent/15 text-accent':'border-border text-muted')}>{v.label}</button>)}
+     </div>
+     <div className="mt-4 h-[330px] w-full"><ResponsiveContainer width="100%" height="100%">
         <LineChart data={comparison} margin={{top:10,right:15,left:2,bottom:5}}>
           <CartesianGrid strokeDasharray="3 5" opacity={.15}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tick={{fontSize:10}}/><Tooltip formatter={(v)=>v===null?'Unavailable':currency(Number(v))}/>
-          <Legend/><Line type="monotone" dataKey="plannedRevenue" name="Approved plan model ₹L" stroke={COLOR[0]} strokeWidth={2} dot={false}/>
-          <Line type="monotone" dataKey="actualRevenue" name="Authoritative actual ₹L" stroke={COLOR[1]} strokeWidth={3} connectNulls={false}/>
-          <Line type="monotone" dataKey="whatIfRevenue" name="Illustrative what-if ₹L" stroke={COLOR[2]} strokeDasharray="5 4" dot={false}/>
+          <Legend/>{financeView==='revenue'?<>
+            <Line type="monotone" dataKey="plannedRevenue" name="Approved plan revenue ₹L" stroke={COLOR[0]} strokeWidth={2} dot={false}/>
+            <Line type="monotone" dataKey="actualRevenue" name="Recorded actual revenue ₹L" stroke={COLOR[1]} strokeWidth={3} connectNulls={false}/>
+            <Line type="monotone" dataKey="whatIfRevenue" name="Illustrative demand what-if ₹L" stroke={COLOR[2]} strokeDasharray="5 4" dot={false}/>
+          </>:financeView==='spend'?<>
+            <Line type="monotone" dataKey="plannedOperatingSpend" name="Plan COGS + Opex ₹L" stroke={COLOR[0]} strokeWidth={2} dot={false}/>
+            <Line type="monotone" dataKey="actualOperatingSpend" name="Recorded actual COGS + Opex ₹L" stroke={COLOR[1]} strokeWidth={3} connectNulls={false}/>
+            <Line type="monotone" dataKey="sensitivityOperatingSpend" name="Illustrative cost what-if ₹L" stroke={COLOR[2]} strokeDasharray="5 4" dot={false}/>
+          </>:<>
+            <Line type="monotone" dataKey="plannedClosingCash" name="Scenario modeled cash ₹L" stroke={COLOR[0]} strokeWidth={2} dot={false}/>
+            <Line type="monotone" dataKey="actualClosingCash" name="Recorded closing cash ₹L" stroke={COLOR[1]} strokeWidth={3} connectNulls={false}/>
+          </>}
         </LineChart></ResponsiveContainer></div>
        <p className="mt-2 text-xs text-muted">Approved operating plan revision {approvedPlan.revision}. Financial actuals appear only for recorded months. Demand slider scales modeled revenue only; cost slider changes the illustrative spend calculation, not canonical cash or engineering BOM.</p>
      </>:<Empty text="Forecast unavailable: an approved Integrated Operating Plan has not been established. No simulated revenue or budget is shown as actual."/>}
