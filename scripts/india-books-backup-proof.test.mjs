@@ -39,7 +39,7 @@ test("workflow is guarded, uses India location and does not export live data to 
   assert.match(yml,/schedule:/);
   assert.match(yml,/configure-aws-credentials/);
   assert.match(yml,/aws s3api get-bucket-location/);
-  assert.match(yml,/get-bucket-object-lock-configuration/);
+  assert.match(yml,/get-object-lock-configuration/);
   assert.match(yml,/pg_dump/);
   assert.match(yml,/--no-owner/);
   assert.match(yml,/--no-acl/);
