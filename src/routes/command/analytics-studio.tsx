@@ -1,6 +1,6 @@
-import {createFileRoute,Link} from '@tanstack/react-router';
+import {createFileRoute,Link,useRouter} from '@tanstack/react-router';
 import {useMemo,useState} from 'react';
-import {Activity,BarChart3,Boxes,CheckCircle2,Download,ExternalLink,Layers3,LayoutDashboard,RefreshCw,TrendingUp,AlertTriangle} from 'lucide-react';
+import {Activity,BarChart3,CheckCircle2,Download,ExternalLink,Layers3,RefreshCw,TrendingUp} from 'lucide-react';
 import {Area,AreaChart,Bar,BarChart,CartesianGrid,Cell,ComposedChart,Legend,Line,LineChart,Pie,PieChart,ResponsiveContainer,Scatter,ScatterChart,Tooltip,XAxis,YAxis,ReferenceLine} from 'recharts';
 import {getOperatingLineage} from '@/lib/operating-lineage';
 import {getAllErpSuiteReports} from '@/lib/erp-suite-reports';
@@ -93,6 +93,7 @@ function csv(rows:AnalyticsDatum[],metric:string){
 }
 function AnalyticsStudio(){
  const {lineage,report,approvedPlan,actuals}=Route.useLoaderData();
+ const router=useRouter();
  const [scope,setScope]=useState<'vyndi'|'group'>('vyndi');
  const [dataset,setDataset]=useState('flow');
  const [variant,setVariant]=useState('');
@@ -137,7 +138,7 @@ function AnalyticsStudio(){
          <p className="mt-2 text-sm leading-6 text-muted">Live read-only source reports · selectable metrics · Kanban · Pareto · scenarios · interactive charts · audit-aware planning.</p>
        </div>
        <div className="flex flex-wrap gap-2">
-         <button type="button" onClick={()=>{void Route.router?.invalidate?.()}} className="inline-flex items-center gap-2 rounded-xl border border-border bg-bg px-3 py-2 text-xs text-fg"><RefreshCw size={15}/> Refresh</button>
+         <button type="button" onClick={()=>{void router.invalidate()}} className="inline-flex items-center gap-2 rounded-xl border border-border bg-bg px-3 py-2 text-xs text-fg"><RefreshCw size={15}/> Refresh</button>
          <button type="button" onClick={()=>csv(filtered,currentMetric)} className="inline-flex items-center gap-2 rounded-xl bg-accent px-3 py-2 text-xs font-bold text-accent-fg"><Download size={15}/> Export CSV</button>
        </div>
      </div>
