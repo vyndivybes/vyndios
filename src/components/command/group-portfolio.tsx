@@ -28,7 +28,7 @@ export function GroupPortfolio({snapshot}:{snapshot:Snapshot}){
  const [measure,setMeasure]=useState<Measure>('orders');
  const [mode,setMode]=useState<'bar'|'pie'|'pareto'>('bar');
  const [governance,setGovernance]=useState(false);
- const key=sources[measure],sourceReady=snapshot.coverage[key]==='PASS';
+ const key=sources[measure],sourceReady=snapshot.sourceCoverage[key]==='PASS';
  const selected=unit?snapshot.divisions.find(x=>x.id===unit):null;
  const measured=snapshot.divisions.map(x=>({name:x.name,value:x[measure],id:x.id})); 
  const sorted=[...measured].sort((a,b)=>b.value-a.value);
@@ -44,10 +44,10 @@ export function GroupPortfolio({snapshot}:{snapshot:Snapshot}){
      <p className="mt-2 text-xs leading-5 text-muted">Business divisions are not separate incorporated companies. No revenue, cash, expenditure or profit is claimed at group level without source-ledger coverage and approved internal-transfer eliminations.</p>
      <div className="mt-4 grid gap-3 sm:grid-cols-3">
        <div className="rounded-xl border border-border bg-bg/60 p-4"><p className="text-xs uppercase tracking-wide text-muted">Division count</p><strong className="mt-2 block text-2xl text-fg">6</strong><p className="text-xs text-muted">Management units, not legal entities</p></div>
-       <div className="rounded-xl border border-border bg-bg/60 p-4"><p className="text-xs uppercase tracking-wide text-muted">Source coverage</p><strong className="mt-2 block text-2xl text-fg">{Object.values(snapshot.coverage).filter(x=>x==='PASS').length} / {GROUP_SOURCE_KINDS.length}</strong><p className="text-xs text-muted">VYNDI ERP source families readable</p></div>
+       <div className="rounded-xl border border-border bg-bg/60 p-4"><p className="text-xs uppercase tracking-wide text-muted">Source coverage</p><strong className="mt-2 block text-2xl text-fg">{Object.values(snapshot.sourceCoverage).filter(x=>x==='PASS').length} / {GROUP_SOURCE_KINDS.length}</strong><p className="text-xs text-muted">VYNDI ERP source families readable</p></div>
        <div className="rounded-xl border border-border bg-bg/60 p-4"><p className="text-xs uppercase tracking-wide text-muted">Group financial totals</p><strong className="mt-2 block text-2xl text-fg">HOLD</strong><p className="text-xs text-muted">Requires journal attribution and internal eliminations</p></div>
      </div>
-     {snapshot.coverage.sales_order==='PASS'&&<p className="mt-4 rounded-lg border border-border bg-bg/60 px-4 py-3 text-xs text-fg">Sales orders: <strong>{format(snapshot.totalAttributed.orders)} attributed</strong> · <strong>{format(snapshot.unattributed.orders)} unattributed</strong>. The latter are not silently counted under Carbon or any other division.</p>}
+     {snapshot.sourceCoverage.sales_order==='PASS'&&<p className="mt-4 rounded-lg border border-border bg-bg/60 px-4 py-3 text-xs text-fg">Sales orders: <strong>{format(snapshot.totalAttributed.orders)} attributed</strong> · <strong>{format(snapshot.unattributed.orders)} unattributed</strong>. The latter are not silently counted under Carbon or any other division.</p>}
      {!snapshot.divisionAttributionComplete&&<div role="status" className="mt-3 flex gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs leading-5 text-fg"><ShieldAlert className="shrink-0" size={17}/> Division attribution remains incomplete. Unassigned or unavailable records cannot be used to certify full group consolidation.</div>}
    </div>
 
@@ -91,7 +91,7 @@ export function GroupPortfolio({snapshot}:{snapshot:Snapshot}){
      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{Object.entries(measures).map(([metric,label])=>{
        const kind=sources[metric as Measure];
        return <div key={metric} className="rounded-lg border border-border bg-bg/60 p-3">
-         <p className="text-xs text-muted">{label}</p><strong className="mt-1 block text-xl text-fg">{snapshot.coverage[kind]==='PASS'?format(selected[metric as Measure]):'HOLD'}</strong>
+         <p className="text-xs text-muted">{label}</p><strong className="mt-1 block text-xl text-fg">{snapshot.sourceCoverage[kind]==='PASS'?format(selected[metric as Measure]):'HOLD'}</strong>
        </div>;
      })}</div>
      <div className="mt-4 flex flex-wrap gap-4 text-xs"><Link to="/command/sales" className="text-accent">CRM / sales <ExternalLink size={12} className="inline"/></Link>
