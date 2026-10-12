@@ -19,6 +19,8 @@ test("only private, encrypted database bytes are uploaded, not saved as artifact
   const y = backup();
   assert.match(y, /postgres:18-alpine/);
   assert.match(y, /pg_dump/);
+  assert.match(y, /sslmode=require/);
+  assert.match(y, /sslmode=verify-full/);
   assert.match(y, /--no-owner/);
   assert.match(y, /--no-acl/);
   assert.match(y, /age -r/);
