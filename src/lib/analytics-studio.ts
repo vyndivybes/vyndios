@@ -6,9 +6,9 @@ export type AnalyticsDatum={
   status:string;month:number|null;source:string;metrics:Record<string,number>;
 };
 export type AnalyticsInput={
-  lineage?:Array<Record<string,unknown>>;
-  report?:Record<string,any>;
-  actuals?:Record<string|number,Record<string,unknown>>;
+  lineage?:readonly object[];
+  report?:any;
+  actuals?:object;
 };
 const text=(x:unknown)=>typeof x==='string'?x.trim():x==null?'':String(x);
 const num=(x:unknown)=>x!==null&&x!==undefined&&x!==''&&Number.isFinite(Number(x))?Number(x):null;
@@ -63,8 +63,9 @@ function reportRows(output:AnalyticsDatum[],dataset:string,input:unknown,source:
 }
 export function buildAnalyticsRows({lineage=[],report={},actuals={}}:AnalyticsInput):AnalyticsDatum[]{
  const output:AnalyticsDatum[]=[];
- for(const raw of lineage){
-  if(!raw||typeof raw!=='object'||Array.isArray(raw))continue;
+ for(const sourceRow of lineage){
+  if(!sourceRow||typeof sourceRow!=='object'||Array.isArray(sourceRow))continue;
+  const raw=sourceRow as Record<string,unknown>;
   const id=text(raw.salesOrderId);if(!id)continue;
   const metricKeys=['units','shortageLines','shortageUnits','purchaseOrderCount','goodsReceiptCount','acceptedReceiptUnits','travellerCount','qualityInspectionCount','qualityReleaseCount','openNcrCount','openCapaCount','shipmentCount','invoiceCount','collectionCount','collectionAmountLakh'];
   const fields=numeric(raw,metricKeys);
