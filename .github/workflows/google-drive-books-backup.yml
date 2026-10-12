@@ -10,8 +10,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   backup:
-    # Default OFF. Do not run until OAuth, age public key and read-only Neon URL are independently commissioned.
-    if: ${{ vars.VYNDI_GOOGLE_BACKUP_COMMISSIONED == 'true' }}
+    # Scheduled runs default OFF; manual dispatch permits controlled first-use qualification.
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.VYNDI_GOOGLE_BACKUP_COMMISSIONED == 'true' }}
     environment: finance-backup
     runs-on: ubuntu-latest
     timeout-minutes: 40
