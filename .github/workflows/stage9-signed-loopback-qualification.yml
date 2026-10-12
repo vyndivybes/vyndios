@@ -1,0 +1,43 @@
+name: Stage 9 Signed VAOS-to-VYNDI Loopback Qualification
+on:
+  pull_request:
+    paths:
+      - "scripts/stage9-signed-loopback-sandbox.mjs"
+      - "scripts/vaos-stage9-signed-loopback.test.mjs"
+      - ".github/workflows/stage9-signed-loopback-qualification.yml"
+  push:
+    branches: [qual/stage9-signed-loopback-p2p-20261013]
+    paths:
+      - "scripts/stage9-signed-loopback-sandbox.mjs"
+      - "scripts/vaos-stage9-signed-loopback.test.mjs"
+      - ".github/workflows/stage9-signed-loopback-qualification.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  signed-loopback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: VYNDI OS canonical code
+        uses: actions/checkout@v4
+      - name: Pinned VAOS sender contract
+        uses: actions/checkout@v4
+        with:
+          repository: vyndivybes/vaos
+          ref: f8fa8ec2bcfb64e876d503d7a3a5a4d7c4353e2c
+          path: vaos-reference
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: No production connection strings
+        shell: bash
+        run: |
+          test -z "${DATABASE_URL:-}" && test -z "${NEON_DATABASE_URL:-}" && test -z "${HYPERDRIVE_URL:-}"
+          echo "Only ephemeral PGlite and loopback are permitted."
+      - name: Install existing pinned dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Signed VAOS → canonical VYNDI P2P, ephemeral loopback only
+        run: node --experimental-strip-types --test scripts/vaos-stage9-signed-loopback.test.mjs
