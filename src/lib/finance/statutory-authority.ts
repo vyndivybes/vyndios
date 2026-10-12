@@ -183,7 +183,7 @@ export const approveBankReconciliation = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const actor = await requireApprove();
     const sql = await getSql();
-    const rows = await sql.query<SqlRow>(`update epr_finance_bank_reconciliation_sessions set approved_by=$2,approved_at=now(),evidence_reference=$3 where id=$1 and status='reconciled' and prepared_by is distinct from $2 and approved_by is null returning id`,[data.id,actor.userId,data.evidenceReference]);
+    const rows = await sql.query<SqlRow>(`update epr_finance_bank_reconciliation_sessions set approved_by=$2,approved_at=now(),evidence_reference=$3 where id=$1 and status='reconciled' and prepared_by is not null and prepared_by <> $2 and approved_by is null returning id`,[data.id,actor.userId,data.evidenceReference]);
     if (!rows[0]) throw new Error("Bank reconciliation not found, already approved, or self-approval prohibited.");
     return { ok:true,id:data.id };
   });
@@ -232,7 +232,7 @@ export const approveCaEvidencePack = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const actor = await requireApprove();
     const sql = await getSql();
-    const rows = await sql.query<SqlRow>(`update epr_finance_ca_evidence_packs set status='approved',approved_by=$2,approved_at=now(),evidence_reference=$3 where id=$1 and status='review_ready' and blocker_count=0 and generated_by is distinct from $2 and approved_by is null returning id`,[data.id,actor.userId,data.evidenceReference]);
+    const rows = await sql.query<SqlRow>(`update epr_finance_ca_evidence_packs set status='approved',approved_by=$2,approved_at=now(),evidence_reference=$3 where id=$1 and status='review_ready' and blocker_count=0 and generated_by is not null and generated_by <> $2 and approved_by is null returning id`,[data.id,actor.userId,data.evidenceReference]);
     if (!rows[0]) throw new Error("CA pack must be blocker-free, review-ready, unapproved and approved by an independent checker.");
     return { ok:true,id:data.id };
   });
