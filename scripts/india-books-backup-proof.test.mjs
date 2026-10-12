@@ -47,3 +47,15 @@ test("workflow is guarded, uses India location and does not export live data to 
   assert.doesNotMatch(yml,/path:\s*.*\.dump/i);
   assert.doesNotMatch(yml,/echo .*DATABASE_URL/);
 });
+
+test("restoration uses isolated PostgreSQL and requires real archive checksum",()=>{
+  const yml=readFileSync(new URL("../.github/workflows/india-books-restore-drill.yml",import.meta.url),"utf8");
+  assert.match(yml,/workflow_dispatch/);
+  assert.match(yml,/VYNDI_INDIA_RESTORE_IAM_ROLE/);
+  assert.match(yml,/postgres:18-alpine/);
+  assert.match(yml,/pg_restore --exit-on-error/);
+  assert.match(yml,/sha256sum/);
+  assert.match(yml,/vyndi_books_edit_audit/);
+  assert.doesNotMatch(yml,/path:\s*.*\.dump/i);
+  assert.doesNotMatch(yml,/DROP DATABASE/i);
+});
