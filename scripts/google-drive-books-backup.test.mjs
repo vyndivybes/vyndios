@@ -8,6 +8,7 @@ const restore = () => readFileSync(new URL("../.github/workflows/google-drive-bo
 test("supplementary Google Drive backup is disabled by default and never mislabels India compliance", () => {
   const y = backup();
   assert.match(y, /VYNDI_GOOGLE_BACKUP_COMMISSIONED/);
+  assert.match(y, /github\.event_name == 'workflow_dispatch' \|\| vars\.VYNDI_GOOGLE_BACKUP_COMMISSIONED == 'true'/);
   assert.match(y, /workflow_dispatch/);
   assert.match(y, /schedule:/);
   assert.match(y, /SUPPLEMENTARY_ONLY_NOT_INDIA_RESIDENT/);
