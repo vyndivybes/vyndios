@@ -1,6 +1,6 @@
 import {createFileRoute,Link,useRouter} from '@tanstack/react-router';
 import {useMemo,useState} from 'react';
-import {Activity,BarChart3,CheckCircle2,Download,ExternalLink,Layers3,RefreshCw,TrendingUp} from 'lucide-react';
+import {Activity,BarChart3,BookOpen,CheckCircle2,Download,ExternalLink,Layers3,RefreshCw,TrendingUp} from 'lucide-react';
 import {Area,AreaChart,Bar,BarChart,CartesianGrid,Cell,ComposedChart,Legend,Line,LineChart,Pie,PieChart,ResponsiveContainer,Scatter,ScatterChart,Tooltip,XAxis,YAxis,ReferenceLine} from 'recharts';
 import {getOperatingLineage} from '@/lib/operating-lineage';
 import {getAllErpSuiteReports} from '@/lib/erp-suite-reports';
@@ -9,6 +9,7 @@ import {listMonthlyActuals} from '@/lib/actuals-authority';
 import {getAnalyticsSupplySnapshot} from '@/lib/analytics-supply-authority';
 import {buildModelWithInputs,type ScenarioId} from '@/lib/finance/model';
 import {buildAnalyticsRows,filterAnalyticsRows,aggregateAnalyticsRows,paretoAnalyticsRows,buildKanbanLanes,getNumericMetrics,DATASETS,DIMENSIONS,type AnalyticsDatum} from '@/lib/analytics-studio';
+import {buildFounderReading,interpretAnalyticsSelection,describeAnalyticsMetric} from '@/lib/analytics-explainability';
 
 export const Route=createFileRoute('/command/analytics-studio')({
   loader:async()=>{
@@ -137,7 +138,16 @@ function AnalyticsStudio(){
  const totalSalesInvoices=supply.coverage.salesInvoices==='PASS'?supply.records.salesInvoices.length:null;
  const details=DATASETS.find(x=>x.id===dataset);
  const dataCount=allDatasetRows.length;
- const totalSelected=filtered.filter(r=>Object.hasOwn(r.metrics,currentMetric)).reduce((n,r)=>n+r.metrics[currentMetric],0);
+ const selectedValues=filtered.filter(r=>Object.hasOwn(r.metrics,currentMetric)).map(r=>r.metrics[currentMetric]);
+ const metricInfo=describeAnalyticsMetric(currentMetric,dataset);
+ const totalSelected=selectedValues.length?(selectedValues.reduce((n,r)=>n+r,0)/(metricInfo.aggregation==='average'?selectedValues.length:1)):null;
+ const interpretation=interpretAnalyticsSelection({dataset,metric:currentMetric,dimension,visual,rowsCount:filtered.length,sourceState:datasetCoverage});
+ const founderReading=buildFounderReading({
+   scope,linkedOrders:kpi.orders,committedUnits:kpi.units,shortageLines:kpi.shortage,jobCards:kpi.jobCards,
+   sourceCoverage:supply.coverage,
+ });
+ const qualifiedFeeds=Object.values(supply.coverage).filter(status=>status==='PASS').length;
+ const totalFeeds=Object.keys(supply.coverage).length;
  const showKanban=visual==='kanban';
  return <div className="min-w-0 space-y-5 pb-12">
    <section className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-surface via-surface to-accent/10 p-5 shadow-md sm:p-7">
@@ -158,6 +168,33 @@ function AnalyticsStudio(){
        <span className="rounded-lg border border-border px-3 py-2 text-xs text-muted">Sources: VYNDI canonical data · Plan: {approvedPlan?'Approved R'+approvedPlan.revision:'No approved baseline'}</span>
      </div>
      {incompleteGroup&&<div role="status" className="mt-4 rounded-xl border border-warn/40 bg-warn/10 p-3 text-sm text-fg">Group consolidation is PARTIAL. Only VYNDI OS is currently a qualified source in this board; other Vāyū Shastr group entities are not yet connected. These figures must not be represented as consolidated group totals.</div>}
+   </section>
+
+   <section aria-label="Founder dashboard reading guide" className={card+' p-5 sm:p-6'}>
+     <div className="flex flex-wrap items-center gap-2">
+       <BookOpen size={19} className="text-accent"/>
+       <h2 className="text-xl font-semibold text-fg">Start here · What am I looking at?</h2>
+       <span className="rounded-full border border-border px-2.5 py-1 text-[11px] text-muted">Founder interpretation</span>
+     </div>
+     <p className="mt-3 text-sm leading-6 text-fg">This is a <strong>management reading of VYNDI OS records</strong>, not a list of instructions or a financial audit. It answers: <strong>What was ordered? What is held up? What is in stock? What is planned versus recorded?</strong></p>
+     <div className="mt-4 grid gap-3 md:grid-cols-3">
+       <div className="rounded-xl border border-border bg-bg/70 p-4">
+         <p className="text-xs font-semibold uppercase tracking-wide text-muted">01 · What exists in the records?</p>
+         <p className="mt-2 text-sm text-fg">{founderReading.currentMeaning}</p>
+         <p className="mt-2 text-xs text-muted">Order-linked figures are not automatically totals for every department.</p>
+       </div>
+       <div className="rounded-xl border border-border bg-bg/70 p-4">
+         <p className="text-xs font-semibold uppercase tracking-wide text-muted">02 · Where are the material problems?</p>
+         <p className="mt-2 text-sm text-fg">{founderReading.shortageExplanation}</p>
+         <p className="mt-2 text-xs text-muted">Use Material requirements and Inventory / MSL for detailed sourcing.</p>
+       </div>
+       <div className="rounded-xl border border-border bg-bg/70 p-4">
+         <p className="text-xs font-semibold uppercase tracking-wide text-muted">03 · Can I rely on the figures?</p>
+         <p className="mt-2 text-sm text-fg">{qualifiedFeeds} of {totalFeeds} direct source reads passed their latest request check.</p>
+         <p className="mt-2 text-xs text-muted">{founderReading.supplyCaution}</p>
+       </div>
+     </div>
+     <p className="mt-4 rounded-xl border border-border bg-bg/60 px-4 py-3 text-xs leading-5 text-muted"><strong className="text-fg">How to explore:</strong> Select a business dataset → choose what to measure → choose how to group it → switch chart type → examine the records below. <strong className="text-fg">M1–M36 mean months in the business plan, not calendar month names.</strong> {founderReading.groupCaution}</p>
    </section>
 
    <section aria-label="Key operating indicators" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -189,16 +226,37 @@ function AnalyticsStudio(){
      <p className="mt-3 text-xs text-subtle">Source: {details?.source}. Readback: {datasetCoverage||'Existing ERP report'}. Month filters apply to dated records; undated records remain visible and explicitly marked as unassigned.</p>
    </section>
 
+   <section className={card+' p-4 sm:p-5'} aria-label="Explain selected analytics">
+     <div className="flex items-center gap-2"><BookOpen size={17} className="text-accent"/><h2 className="text-lg font-semibold text-fg">What this selection means</h2></div>
+     <div className="mt-3 grid gap-4 lg:grid-cols-2">
+       <div>
+         <p className="text-xs font-semibold uppercase tracking-wide text-green">{interpretation.title}</p>
+         <p className="mt-1 text-sm leading-6 text-fg">{interpretation.what}</p>
+         <p className="mt-2 text-xs leading-5 text-muted"><strong className="text-fg">Look for:</strong> {interpretation.lookFor}</p>
+         <p className="mt-2 text-xs leading-5 text-muted"><strong className="text-fg">Possible next action:</strong> {interpretation.decision}</p>
+       </div>
+       <div className="rounded-xl border border-border bg-bg/60 p-4">
+         <p className="text-xs font-semibold text-fg">{metricInfo.label} · {metricInfo.unit} · {metricInfo.aggregation==='average'?'average per source row':'sum of source rows'}</p>
+         <p className="mt-2 text-xs leading-5 text-muted">{metricInfo.description}</p>
+         <p className="mt-2 text-xs leading-5 text-muted"><strong className="text-fg">How to read the chart:</strong> {interpretation.chartExplanation}</p>
+       </div>
+     </div>
+     <p role="status" className="mt-4 rounded-lg border border-border bg-bg/60 px-3 py-2 text-xs leading-5 text-muted"><strong className="text-fg">Read carefully:</strong> {interpretation.caution}</p>
+   </section>
+
    <section className={card+' p-4 sm:p-5'}>
     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-      <div><p className="text-[10px] uppercase tracking-[.16em] text-green">Interactive statistical board</p><h2 className="mt-1 text-lg font-semibold text-fg">{pretty(currentMetric)} by {pretty(dimension)}</h2>
-        <p className="text-xs text-muted">Sourced records: {number(filtered.length)} · Selected metric total: {number(totalSelected)} · No estimated data in actual observations.</p></div>
+      <div><p className="text-[10px] uppercase tracking-[.16em] text-green">Interactive statistical board</p><h2 className="mt-1 text-lg font-semibold text-fg">{metricInfo.label} by {pretty(dimension)}</h2>
+        <p className="text-xs text-muted">Source records: {number(filtered.length)} · {metricInfo.aggregation==='average'?'Average':'Total'} of selected {metricInfo.unit}: {totalSelected===null?'Not recorded':number(totalSelected)} · Recorded observations only.</p></div>
       <div className="flex flex-wrap gap-1.5" role="group" aria-label="Visualization">
         {VISUALS.map(v=><button key={v.id} type="button" aria-pressed={visual===v.id} onClick={()=>setVisual(v.id)} className={'rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition '+(visual===v.id?'border-accent bg-accent/15 text-accent':'border-border bg-bg text-muted hover:text-fg')}>{v.label}</button>)}
       </div>
     </div>
-    {!qualifiedSource?<Empty text="Canonical source read is on HOLD; no numerical conclusion can be drawn for this dataset."/>:<ChartSurface rows={filtered} metric={currentMetric} dimension={dimension} visual={showKanban?'kanban':visual}/>} 
-    {visual==='pareto'&&<p className="mt-2 text-xs text-muted">Cumulative share is calculated from nonnegative category totals. The 80% reference identifies the most influential contributors.</p>}
+    {!qualifiedSource?<Empty text="Source on HOLD: this is not proof of zero activity."/>:
+     metricInfo.aggregation==='average'&&(visual==='pie'||visual==='pareto')?
+      <Empty text="This measure is a price, balance or rate. Its values cannot be summed into pie shares or a Pareto chart. Choose Bar, Line or a count/quantity measure."/>:
+      <ChartSurface rows={filtered} metric={currentMetric} dimension={dimension} visual={showKanban?'kanban':visual}/>}
+    {visual==='pareto'&&metricInfo.aggregation==='sum'&&<p className="mt-2 text-xs text-muted">Cumulative share is calculated from nonnegative category totals. The 80% reference identifies the most influential contributors.</p>}
    </section>
 
    <div className="grid gap-4 xl:grid-cols-2">
@@ -243,6 +301,7 @@ function AnalyticsStudio(){
           </>}
         </LineChart></ResponsiveContainer></div>
        <p className="mt-2 text-xs text-muted">Approved operating plan revision {approvedPlan.revision}. Financial actuals appear only for recorded months. Demand slider scales modeled revenue only; cost slider changes the illustrative spend calculation, not canonical cash or engineering BOM.</p>
+       <p className="mt-2 rounded-lg border border-border bg-bg/50 p-3 text-xs text-muted"><strong className="text-fg">What does this mean?</strong> Orange represents the scenario from the operating plan, green is a recorded actual where available, and blue is a sensitivity illustration. {founderReading.forecastCaution} Financial values are in ₹ lakh.</p>
      </>:<Empty text="Forecast unavailable: an approved Integrated Operating Plan has not been established. No simulated revenue or budget is shown as actual."/>}
    </section>
 
