@@ -70,7 +70,7 @@ export const getGroupPortfolio=createServerFn({method:'GET'}).handler(async()=>{
  const buckets=batches.flatMap(x=>x.buckets);
  const result=aggregateDivisionSources(buckets,coverage);
  // No cash, revenue or group-wide cost numbers are inferred from source counts.
- return {asOf:new Date().toISOString(),units:GROUP_UNITS,coverage,...result,
+ return {asOf:new Date().toISOString(),units:GROUP_UNITS,sourceCoverage:coverage,...result,
   accountingConsolidationQualified:false,forecastByDivisionQualified:false,
   divisionAttributionComplete:result.coverage.complete,
   legalConsolidationQualified:false};
