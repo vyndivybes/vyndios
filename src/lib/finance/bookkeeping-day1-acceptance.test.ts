@@ -27,7 +27,7 @@ test("an unqualified control cannot be overridden by other passed controls", () 
     .filter(p=>p.gate!=="NON_DISABLEABLE_TRANSACTION_AUDIT_TRAIL");
   const result=evaluateBookkeepingDay1(sha,proofs);
   assert.equal(result.state,"NOT_YET_QUALIFIED");
-  assert.ok(result.outstanding.some(x=>x.id==="NON_DISABLEABLE_TRANSACTION_AUDIT_TRAIL"));
+  assert.ok(result.outstanding.some(x=>x==="NON_DISABLEABLE_TRANSACTION_AUDIT_TRAIL"));
 });
 
 test("India backup verification is a distinct pre-use requirement", () => {
