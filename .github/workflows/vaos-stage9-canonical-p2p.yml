@@ -1,0 +1,33 @@
+name: VAOS Stage 9 Canonical VYNDI P2P Sandbox
+on:
+  push:
+    branches:
+      - qual/stage9-canonical-p2p-pglite-20261012
+    paths:
+      - "scripts/vaos-stage9-canonical-p2p.test.mjs"
+      - ".github/workflows/vaos-stage9-canonical-p2p.yml"
+  pull_request:
+    paths:
+      - "scripts/vaos-stage9-canonical-p2p.test.mjs"
+      - ".github/workflows/vaos-stage9-canonical-p2p.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  canonical-p2p:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install pinned dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Actual VYNDI canonical PostgreSQL functions, ephemeral PGlite only
+        run: node --test scripts/vaos-stage9-canonical-p2p.test.mjs
+      - name: Production database and payment isolation
+        run: |
+          test -z "${DATABASE_URL:-}" && test -z "${NEON_DATABASE_URL:-}" && test -z "${HYPERDRIVE_URL:-}"
+          echo "STAGE9_CANONICAL_PGLITE_ONLY_NO_REMOTE_DB_PASS"
