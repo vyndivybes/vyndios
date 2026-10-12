@@ -1,0 +1,99 @@
+name: VYNDI Supplemental Google Drive Encrypted Backup
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '45 20 * * *'
+permissions:
+  contents: read
+concurrency:
+  group: vyndi-supplementary-gdrive-books-backup
+  cancel-in-progress: false
+jobs:
+  backup:
+    # Scheduled runs default OFF; manual dispatch permits controlled first-use qualification.
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.VYNDI_GOOGLE_BACKUP_COMMISSIONED == 'true' }}
+    environment: finance-backup
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      BACKUP_READ_URL: ${{ secrets.VYNDI_BOOKS_BACKUP_READ_URL }}
+      VYNDI_GOOGLE_BACKUP_AGE_RECIPIENT: ${{ vars.VYNDI_GOOGLE_BACKUP_AGE_RECIPIENT }}
+      RCLONE_CONFIG_GDRIVE_TYPE: drive
+      RCLONE_CONFIG_GDRIVE_SCOPE: drive
+      RCLONE_CONFIG_GDRIVE_ROOT_FOLDER_ID: ${{ vars.VYNDI_GOOGLE_BACKUP_FOLDER_ID }}
+      RCLONE_CONFIG_GDRIVE_CLIENT_ID: ${{ secrets.VYNDI_GDRIVE_CLIENT_ID }}
+      RCLONE_CONFIG_GDRIVE_CLIENT_SECRET: ${{ secrets.VYNDI_GDRIVE_CLIENT_SECRET }}
+      RCLONE_CONFIG_GDRIVE_TOKEN: ${{ secrets.VYNDI_GDRIVE_OAUTH_TOKEN }}
+      BACKUP_KIND: SUPPLEMENTARY_ONLY_NOT_INDIA_RESIDENT
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preflight without disclosing credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$BACKUP_READ_URL"
+          case "$BACKUP_READ_URL" in
+            *sslmode=require*|*sslmode=verify-full*) ;;
+            *) echo "::error::Neon backup connection must explicitly require TLS"; exit 1 ;;
+          esac
+          test -n "$RCLONE_CONFIG_GDRIVE_ROOT_FOLDER_ID"
+          test -n "$RCLONE_CONFIG_GDRIVE_CLIENT_ID"
+          test -n "$RCLONE_CONFIG_GDRIVE_CLIENT_SECRET"
+          test -n "$RCLONE_CONFIG_GDRIVE_TOKEN"
+          [[ "$VYNDI_GOOGLE_BACKUP_AGE_RECIPIENT" =~ ^age1[a-z0-9]+$ ]]
+          node -e 'const t=JSON.parse(process.env.RCLONE_CONFIG_GDRIVE_TOKEN||"{}"); if(!t.refresh_token)process.exit(1)'
+      - name: Install age and rclone on ephemeral GitHub runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq age rclone
+          age --version
+          rclone version | head -1
+      - name: Check target Google Drive folder access
+        shell: bash
+        run: |
+          set -euo pipefail
+          rclone lsf gdrive: --max-depth 1 > /dev/null
+      - name: Stream-read PostgreSQL custom archive directly into age encryption (no plaintext backup file)
+        id: export
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          backup_dir="$RUNNER_TEMP/vyndios-gdrive-backup"
+          mkdir -m 0700 "$backup_dir"
+          encrypted_file="$backup_dir/books.dump.age"
+          docker run --rm --network host -e BACKUP_READ_URL postgres:18-alpine \
+            sh -ec 'exec pg_dump --dbname="$BACKUP_READ_URL" --format=custom --no-owner --no-acl' \
+            | age -r "$VYNDI_GOOGLE_BACKUP_AGE_RECIPIENT" -o "$encrypted_file"
+          test -s "$encrypted_file"
+          echo "file=$encrypted_file" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(sha256sum "$encrypted_file" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "object=daily/$(TZ=Asia/Kolkata date +%F)/books-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.dump.age" >> "$GITHUB_OUTPUT"
+      - name: Upload encrypted archive only and verify independent encrypted readback
+        env:
+          ENCRYPTED_FILE: ${{ steps.export.outputs.file }}
+          LOCAL_SHA256: ${{ steps.export.outputs.sha256 }}
+          REMOTE_OBJECT: ${{ steps.export.outputs.object }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rclone copyto "$ENCRYPTED_FILE" "gdrive:$REMOTE_OBJECT" --immutable --retries 2
+          remote_sha="$(rclone cat "gdrive:$REMOTE_OBJECT" | sha256sum | cut -d' ' -f1)"
+          test "$remote_sha" = "$LOCAL_SHA256"
+          {
+            echo "## VYNDI encrypted supplemental Drive backup"
+            echo "State: encrypted object uploaded and independently read back"
+            echo "Kind: $BACKUP_KIND (not an India-resident statutory backup)"
+            echo "UTC date: $(date -u +%F)"
+            echo "Backup key: $REMOTE_OBJECT"
+            echo "Encrypted SHA-256: $LOCAL_SHA256"
+            echo "Scope: PostgreSQL books, edit-audit and database-stored vouchers; external files require separate coverage"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Erase transient encrypted archive
+        if: always()
+        shell: bash
+        run: |
+          rm -f "$RUNNER_TEMP/vyndios-gdrive-backup/books.dump.age"
+          rmdir "$RUNNER_TEMP/vyndios-gdrive-backup" 2>/dev/null || true
