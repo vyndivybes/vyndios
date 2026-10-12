@@ -53,3 +53,12 @@ test("existing India-only workflow is not repurposed or bypassed", () => {
   assert.match(india, /VYNDI_INDIA_BACKUP_COMMISSIONED/);
   assert.match(india, /ap-south-1\|ap-south-2/);
 });
+
+test("Google OAuth permission is limited to rclone-created files in both workflows", () => {
+  const b=backup(), r=restore();
+  for(const [label,y] of [["backup",b],["restore",r]]) {
+    assert.match(y, /RCLONE_CONFIG_GDRIVE_SCOPE: drive\.file/, label);
+    assert.doesNotMatch(y, /RCLONE_CONFIG_GDRIVE_SCOPE: drive\s*$/m, label);
+    assert.match(y, /RCLONE_CONFIG_GDRIVE_ROOT_FOLDER_ID:.*VYNDI_GOOGLE_BACKUP_FOLDER_ID/, label);
+  }
+});
