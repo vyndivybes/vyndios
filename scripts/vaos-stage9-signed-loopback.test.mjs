@@ -111,7 +111,7 @@ test('Stage 9 cross-repo VAOS signed ingress reaches real VYNDI canonical SQL on
  const selfApproval=await signedRequest(server.url,keys.privateKey,payload({idempotencyKey:'STAGE9-SECOND-PO',requestedBy:'same',approvedBy:'same'}),{nonce:'nonce-stage9-sod-0007'});
  assert.equal(selfApproval.status,422);
  const wrongPurpose=await signedRequest(server.url,keys.privateKey,payload({purpose:'read-observe',idempotencyKey:'STAGE9-THIRD-PO'}),{nonce:'nonce-stage9-purpose-0008'});
- assert.equal(wrongPurpose.status,403);
+ assert.equal(wrongPurpose.status,401,'invalid signed context is an authentication failure, not an authorized action');
  const after=await db.query("select count(*)::int as n from vyndi_purchase_orders where id like 'STAGE9-SIGNED-PO-%'");
  assert.equal(Number(after.rows[0].n),2);
  const audit=await db.query("select count(*)::int as n from vyndi_audit_events where entity_id like 'STAGE9-SIGNED-%'");
