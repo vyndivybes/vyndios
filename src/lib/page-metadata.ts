@@ -77,6 +77,7 @@ export const routeRegistry: Record<string, RouteMeta> = {
     { navHidden: true },
   ),
   "/command": meta("/command", "Board", "observe", "command", "board", "keep", "Command"),
+  "/command/analytics-studio": meta("/command/analytics-studio", "Analytics Studio", "observe", "command", "founder", "keep", "Command"),
   "/command/control-tower": meta(
     "/command/control-tower",
     "Command Tower",
