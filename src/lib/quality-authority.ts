@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { getSql } from "@/lib/db";
+import { getSql, type SqlRow } from "@/lib/db";
 import { QUALITY_REGISTER_QUERY } from "@/lib/quality-register-query";
 import { requireBusinessActor } from "@/lib/business-actor";
 import type { CommandPermission } from "@/lib/page-access";
@@ -106,10 +106,10 @@ export const listQualityAuthority = createServerFn({ method: "GET" }).handler(as
   await requirePermission("view");
   const sql = await getSql();
   const [registers] = await sql.query<{
-    inspections: Record<string, unknown>[];
-    ncrs: Record<string, unknown>[];
-    capas: Record<string, unknown>[];
-    releases: Record<string, unknown>[];
+    inspections: SqlRow[];
+    ncrs: SqlRow[];
+    capas: SqlRow[];
+    releases: SqlRow[];
     epr_open: number;
   }>(QUALITY_REGISTER_QUERY);
   if (!registers) throw new Error("Quality register evidence unavailable");
