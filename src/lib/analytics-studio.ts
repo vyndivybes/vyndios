@@ -9,6 +9,7 @@ export type AnalyticsInput={
   lineage?:readonly object[];
   report?:any;
   actuals?:object;
+  supply?:{records?:Record<string,any>;coverage?:Record<string,string>};
 };
 const text=(x:unknown)=>typeof x==='string'?x.trim():x==null?'':String(x);
 const num=(x:unknown)=>x!==null&&x!==undefined&&x!==''&&Number.isFinite(Number(x))?Number(x):null;
@@ -23,6 +24,12 @@ const numeric=(src:Record<string,unknown>, allowed?:readonly string[])=>{
  return out;
 };
 export const DATASETS=Object.freeze([
+ {id:'demand',label:'All demand orders',source:'VYNDI sales orders authority',defaultMetric:'units'},
+ {id:'jobCards',label:'All job cards',source:'Canonical production job cards',defaultMetric:'recordCount'},
+ {id:'purchaseOrders',label:'All purchase orders',source:'VYNDI purchase order status',defaultMetric:'recordCount'},
+ {id:'salesInvoices',label:'Issued / pending sales invoices',source:'VYNDI sales invoice authority',defaultMetric:'recordCount'},
+ {id:'supplierInvoices',label:'Supplier invoices',source:'VYNDI supplier invoice authority',defaultMetric:'recordCount'},
+ {id:'inventoryBalances',label:'Inventory quantities',source:'Canonical VYNDI inventory balance',defaultMetric:'recordCount'},
  {id:'flow',label:'Demand → cash',source:'Signed order/job-card lineage',defaultMetric:'units'},
  {id:'materials',label:'Material requirements',source:'Procurement net requirement view',defaultMetric:'recordCount'},
  {id:'inventory',label:'Inventory / MSL',source:'Minimum stock level health view',defaultMetric:'recordCount'},
@@ -61,7 +68,7 @@ function reportRows(output:AnalyticsDatum[],dataset:string,input:unknown,source:
   });
  }
 }
-export function buildAnalyticsRows({lineage=[],report={},actuals={}}:AnalyticsInput):AnalyticsDatum[]{
+export function buildAnalyticsRows({lineage=[],report={},actuals={},supply={}}:AnalyticsInput):AnalyticsDatum[]{
  const output:AnalyticsDatum[]=[];
  for(const sourceRow of lineage){
   if(!sourceRow||typeof sourceRow!=='object'||Array.isArray(sourceRow))continue;
@@ -77,6 +84,9 @@ export function buildAnalyticsRows({lineage=[],report={},actuals={}}:AnalyticsIn
   output.push({id,dataset:'flow',category:text(raw.variantName||raw.variantId)||'Unspecified variant',
     variant:text(raw.variantName||raw.variantId),stage:stage(raw),status:text(raw.orderStatus)||'Unknown',
     month:month(raw.planMonth),source:'VYNDI committed order → job-card lineage',metrics:fields});
+ }
+ for(const kind of ['demand','jobCards','purchaseOrders','salesInvoices','supplierInvoices','inventoryBalances']){
+   if(supply?.coverage?.[kind]==='PASS')reportRows(output,kind,supply?.records?.[kind], 'VYNDI:'+kind);
  }
  reportRows(output,'materials',report?.inventory?.procurementNetRequirement,'vyndi_report_procurement_net_requirement');
  reportRows(output,'inventory',report?.inventory?.mslHealth,'vyndi_report_msl_health');
