@@ -3,6 +3,7 @@ import {getCommandRole} from '@/lib/command-access';
 import {getSql} from '@/lib/db';
 import {canPerform} from '@/lib/page-access';
 import {getRouteMeta} from '@/lib/page-metadata';
+import {GROUP_AGGREGATE_QUERIES,validateAggregateRows} from './analytics-crm-hr';
 
 type RecordRow=Record<string,string|number|boolean|null>;
 const scalar=(value:unknown):string|number|boolean|null=>{
@@ -20,7 +21,7 @@ const SOURCES={
   supplierInvoices:{table:'vyndi_supplier_invoices',sort:'id',keys:['id','status','purchase_order_id','invoice_number','amount_ex_gst_inr','gst_inr','quantity_invoiced']},
   inventoryBalances:{table:'vyndi_inventory_balance',sort:'sku',keys:['sku','unit','quantity_balance']},
 } as const;
-export type AnalyticsSource=keyof typeof SOURCES;
+export type AnalyticsSource=(keyof typeof SOURCES)|(keyof typeof GROUP_AGGREGATE_QUERIES);
 export type AnalyticsSupplySnapshot={generatedAt:string;coverage:Record<AnalyticsSource,'PASS'|'HOLD'>;records:Record<AnalyticsSource,RecordRow[]>};
 const MAX=1000;
 /** Isolated, read-only, permission checked projections. Never return * columns.
@@ -41,9 +42,21 @@ export const getAnalyticsSupplySnapshot=createServerFn({method:'GET'}).handler(a
      return [key,'PASS',projected] as const;
    }catch{return [key,'HOLD',[]] as const;}
  }));
+ // Aggregate the CRM/HR data inside Postgres. Never load contacts, names, salary
+ // amounts or employee records into the analytics transport or CSV export.
+ const leadership=await Promise.all(Object.entries(GROUP_AGGREGATE_QUERIES).map(async([key,spec])=>{
+   try{
+     const rows=await sql.query<Record<string,unknown>>(spec.query);
+     const validated=validateAggregateRows(rows);
+     return [key,'PASS',validated] as const;
+   }catch{
+     return [key,'HOLD',[]] as const;
+   }
+ }));
+ const all=[...entries,...leadership];
  return {
    generatedAt:new Date().toISOString(),
-   coverage:Object.fromEntries(entries.map(([k,status])=>[k,status])) as AnalyticsSupplySnapshot['coverage'],
-   records:Object.fromEntries(entries.map(([k,,rows])=>[k,rows])) as AnalyticsSupplySnapshot['records'],
+   coverage:Object.fromEntries(all.map(([k,status])=>[k,status])) as AnalyticsSupplySnapshot['coverage'],
+   records:Object.fromEntries(all.map(([k,,rows])=>[k,rows])) as AnalyticsSupplySnapshot['records'],
  };
 });

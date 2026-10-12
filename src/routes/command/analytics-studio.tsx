@@ -146,6 +146,16 @@ function AnalyticsStudio(){
    scope,linkedOrders:kpi.orders,committedUnits:kpi.units,shortageLines:kpi.shortage,jobCards:kpi.jobCards,
    sourceCoverage:supply.coverage,
  });
+ const sumApproved=(kind:keyof typeof supply.coverage,accept:(item:Record<string,string|number|boolean|null>)=>boolean)=>{
+   if(supply.coverage[kind]!=='PASS')return null;
+   return supply.records[kind].reduce((sum,row)=>sum+(accept(row)?Number(row.record_count||0):0),0);
+ };
+ const crmProspects=sumApproved('crmCustomers',row=>row.status==='prospect');
+ const crmFollowupsOverdue=sumApproved('crmFollowups',row=>row.status==='overdue');
+ const hrApproved=sumApproved('hrWorkforce',row=>row.status==='approved'&&row.category!=='planned_role');
+ const hrPlanned=sumApproved('hrWorkforce',row=>row.category==='planned_role');
+ const hrPayrollHolds=sumApproved('hrPayrollReadiness',row=>row.status==='hold');
+ const openDataset=(kind:string)=>{setDataset(kind);setVariant('');setStatus('');setMetric('recordCount');setDimension('status');setVisual('bar');};
  const qualifiedFeeds=Object.values(supply.coverage).filter(status=>status==='PASS').length;
  const totalFeeds=Object.keys(supply.coverage).length;
  const showKanban=visual==='kanban';
@@ -202,6 +212,41 @@ function AnalyticsStudio(){
      <Stat label="Production job cards" value={number(totalJobCards??kpi.jobCards)} hint={totalJobCards===null?'Order-linked job cards only':'All persisted job cards'}/>
      <Stat label="Material shortage lines" value={number(kpi.shortage)} hint="Across committed job requirements"/>
      <Stat label="Supply chain execution" value={number(totalPOs??kpi.ordersLinked)+' POs'} hint={(totalPOs===null?'Linked only · ':'All orders · ')+kpi.grn+' linked receipts · '+(totalSalesInvoices===null?kpi.invoices+' linked invoices':totalSalesInvoices+' sales invoices')}/>
+   </section>
+
+   <section className={card+' p-4 sm:p-5'} aria-label="CRM and HR consolidated intelligence">
+     <div className="flex flex-wrap items-start justify-between gap-3">
+       <div><h2 className="text-lg font-semibold text-fg">CRM &amp; Human Resources Intelligence</h2>
+         <p className="mt-1 text-sm leading-5 text-muted">Customer relationships and workforce readiness alongside material, finance and production — one governed read-only management view.</p></div>
+       <span className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted">Privacy-safe aggregate observations</span>
+     </div>
+     <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+       <button type="button" onClick={()=>openDataset('crmCustomers')} className="rounded-xl border border-border bg-bg/70 p-4 text-left hover:border-accent">
+         <span className="block text-xs font-semibold uppercase tracking-wide text-muted">CRM · Prospects</span>
+         <strong className="mt-2 block text-2xl text-fg">{crmProspects===null?'HOLD':number(crmProspects)}</strong>
+         <span className="mt-1 block text-xs text-subtle">Registered prospect customer records — not committed sales</span>
+       </button>
+       <button type="button" onClick={()=>openDataset('crmFollowups')} className="rounded-xl border border-border bg-bg/70 p-4 text-left hover:border-accent">
+         <span className="block text-xs font-semibold uppercase tracking-wide text-muted">CRM · Overdue Follow-ups</span>
+         <strong className="mt-2 block text-2xl text-fg">{crmFollowupsOverdue===null?'HOLD':number(crmFollowupsOverdue)}</strong>
+         <span className="mt-1 block text-xs text-subtle">Activities with recorded due dates in the past</span>
+       </button>
+       <button type="button" onClick={()=>openDataset('hrWorkforce')} className="rounded-xl border border-border bg-bg/70 p-4 text-left hover:border-accent">
+         <span className="block text-xs font-semibold uppercase tracking-wide text-muted">HR · Approved People Records</span>
+         <strong className="mt-2 block text-2xl text-fg">{hrApproved===null?'HOLD':number(hrApproved)}</strong>
+         <span className="mt-1 block text-xs text-subtle">{hrPlanned===null?'Unverified planned roles':number(hrPlanned)+' planned-role records'} · record approvals are not verified live headcount</span>
+       </button>
+       <button type="button" onClick={()=>openDataset('hrPayrollReadiness')} className="rounded-xl border border-border bg-bg/70 p-4 text-left hover:border-accent">
+         <span className="block text-xs font-semibold uppercase tracking-wide text-muted">HR · Payroll Readiness Holds</span>
+         <strong className="mt-2 block text-2xl text-fg">{hrPayrollHolds===null?'HOLD':number(hrPayrollHolds)}</strong>
+         <span className="mt-1 block text-xs text-subtle">Person-periods on hold — not missing salary or payment amounts</span>
+       </button>
+     </div>
+     <div className="mt-4 flex flex-wrap gap-4 text-xs font-semibold">
+       <Link to="/command/sales" className="inline-flex items-center gap-1 text-accent">Open CRM workspace <ExternalLink size={13}/></Link>
+       <Link to="/command/people-office" className="inline-flex items-center gap-1 text-accent">Open HR / People Office <ExternalLink size={13}/></Link>
+     </div>
+     <p className="mt-3 rounded-lg border border-border bg-bg/60 p-3 text-xs leading-5 text-muted">CRM indicators count records, not conversion value or confirmed revenue. HR indicators are aggregated: names, contact information, attendance histories and individual salary information are not transferred to this board. This is still a VYNDI OS management view; separate division attribution and statutory group consolidation remain pending.</p>
    </section>
 
    <section className={card+' p-4 sm:p-5'} aria-label="Analytics variable selectors">

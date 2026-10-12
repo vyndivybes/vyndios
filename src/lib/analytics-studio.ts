@@ -25,6 +25,11 @@ const numeric=(src:Record<string,unknown>, allowed?:readonly string[])=>{
  return out;
 };
 export const DATASETS=Object.freeze([
+ {id:'crmCustomers',label:'CRM customer segments',source:'CRM aggregated customer lifecycle and segments',defaultMetric:'recordCount'},
+ {id:'crmFollowups',label:'CRM follow-ups / activities',source:'CRM aggregated activity queue and overdue follow-ups',defaultMetric:'recordCount'},
+ {id:'hrWorkforce',label:'HR workforce status',source:'Governed People Office aggregate engagement and approval status',defaultMetric:'recordCount'},
+ {id:'hrAttendance',label:'HR attendance observations',source:'Aggregated latest attendance observations by status, all recorded dates',defaultMetric:'recordCount'},
+ {id:'hrPayrollReadiness',label:'HR payroll readiness',source:'Aggregated payroll readiness by period and status; no personnel pay data',defaultMetric:'recordCount'},
  {id:'demand',label:'All demand orders',source:'VYNDI sales orders authority',defaultMetric:'units'},
  {id:'jobCards',label:'All job cards',source:'Canonical production job cards',defaultMetric:'recordCount'},
  {id:'purchaseOrders',label:'All purchase orders',source:'VYNDI purchase order status',defaultMetric:'recordCount'},
@@ -59,7 +64,12 @@ function reportRows(output:AnalyticsDatum[],dataset:string,input:unknown,source:
   if(!row||typeof row!=='object'||Array.isArray(row))continue;
   const value=row as Record<string,unknown>;
   const m=numeric(value);
-  const category=text(value.sku||value.item_name||value.ledger_id||value.purchase_order_id||value.job_card_id||value.sales_order_id||value.invoice_id||value.supplier_id||value.variant_name)||dataset;
+  if(['crmCustomers','crmFollowups','hrWorkforce','hrAttendance','hrPayrollReadiness'].includes(dataset)){
+   const sourceCount=num(value.record_count);
+   if(sourceCount===null||!Number.isSafeInteger(sourceCount)||sourceCount<0)continue;
+   m.recordCount=sourceCount;
+  }
+  const category=text(value.category||value.sku||value.item_name||value.ledger_id||value.purchase_order_id||value.job_card_id||value.sales_order_id||value.invoice_id||value.supplier_id||value.variant_name)||dataset;
   output.push({
    id:dataset+':'+index, dataset,category,variant:text(value.variant_name||value.variant||''),
    stage:text(value.gate_status||value.health||value.exception_class||value.aging_bucket||value.status||'Recorded'),
@@ -87,7 +97,8 @@ export function buildAnalyticsRows({lineage=[],report={},actuals={},supply={}}:A
     variant:text(raw.variantName||raw.variantId),stage:stage(raw),status:text(raw.orderStatus)||'Unknown',
     month:month(raw.planMonth),source:'VYNDI committed order → job-card lineage',metrics:fields});
  }
- for(const kind of ['demand','jobCards','purchaseOrders','salesInvoices','supplierInvoices','inventoryBalances']){
+ for(const kind of ['demand','jobCards','purchaseOrders','salesInvoices','supplierInvoices','inventoryBalances',
+  'crmCustomers','crmFollowups','hrWorkforce','hrAttendance','hrPayrollReadiness']){
    if(external?.coverage?.[kind]==='PASS')reportRows(output,kind,external?.records?.[kind], 'VYNDI:'+kind);
  }
  reportRows(output,'materials',report?.inventory?.procurementNetRequirement,'vyndi_report_procurement_net_requirement');
