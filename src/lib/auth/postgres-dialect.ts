@@ -17,6 +17,25 @@ import { AsyncLocalStorage } from "node:async_hooks";
 
 type PostgresClient = Pick<Client, "connect" | "end" | "query">;
 type PostgresClientFactory = () => PostgresClient;
+
+/**
+ * Retrying is allowed ONLY for a failed connection attempt, never for
+ * credential checks, authorization decisions, queries or transactions.
+ * The replacement client has no prior session identity or request state.
+ */
+function retriableConnectFailure(error: unknown): boolean {
+  const cause = error && typeof error === "object" && "cause" in error
+    ? (error as { cause?: unknown }).cause
+    : null;
+  for (const candidate of [error, cause]) {
+    if (!candidate || typeof candidate !== "object") continue;
+    const code = "code" in candidate ? String(candidate.code) : "";
+    if (["ETIMEDOUT", "ECONNRESET", "EPIPE", "ECONNREFUSED", "EAI_AGAIN"].includes(code)) return true;
+    const message = "message" in candidate ? String(candidate.message) : "";
+    if (/timeout exceeded when trying to connect|connect(?:ion)? timed out|socket hang up|connection terminated unexpectedly/i.test(message)) return true;
+  }
+  return false;
+}
 type RequestState = { client?: PostgresClient };
 const requestState = new AsyncLocalStorage<RequestState>();
 
@@ -29,7 +48,11 @@ const requestState = new AsyncLocalStorage<RequestState>();
  */
 export function requestSafePostgresDialect(
   connectionString: string,
-  createClient: PostgresClientFactory = () => new Client({ connectionString }),
+  createClient: PostgresClientFactory = () => new Client({
+    connectionString,
+    connectionTimeoutMillis: 3_500,
+    query_timeout: 10_000,
+  }),
 ): Dialect & { runInRequest<T>(work: () => Promise<T>): Promise<T> } {
   const dialect: Dialect = {
     createAdapter: () => new PostgresAdapter(),
@@ -60,15 +83,18 @@ class RequestSafePostgresDriver implements Driver {
   async acquireConnection(): Promise<DatabaseConnection> {
     const state = requestState.getStore();
     if (state?.client) return new RequestSafePostgresConnection(state.client, false);
-    const client = this.createClient();
-    try {
-      await client.connect();
-      if (state) state.client = client;
-      return new RequestSafePostgresConnection(client, !state);
-    } catch (error) {
-      await client.end().catch(() => undefined);
-      throw error;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const client = this.createClient();
+      try {
+        await client.connect();
+        if (state) state.client = client;
+        return new RequestSafePostgresConnection(client, !state);
+      } catch (error) {
+        await client.end().catch(() => undefined);
+        if (attempt === 1 || !retriableConnectFailure(error)) throw error;
+      }
     }
+    throw new Error("PostgreSQL transport unavailable");
   }
 
   async releaseConnection(connection: DatabaseConnection): Promise<void> {
