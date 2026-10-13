@@ -12,9 +12,9 @@ test("deployed PostgreSQL uses short-lived Clients instead of a retained request
   assert.doesNotMatch(block, /new Pool\(/);
   assert.match(block, /createRequestPostgresLimiter\(/);
   assert.match(block, /new Client\(\{/);
-  assert.match(block, /await client\.connect\(\)/);
-  assert.match(block, /await client\.query\(text, params\)/);
-  assert.match(block, /await client\.end\(\)/);
+  assert.match(block, /await timeStage\("db.connect", \(\) => client\.connect\(\)\)/);
+  assert.match(block, /await timeStage\("db.query", \(\) => client\.query\(text, params\)\)/);
+  assert.match(block, /finally\s*\{\s*await timeStage\("db.close", \(\) => client\.end\(\)\)/);
 });
 
 test("deployed SQL facade retains request-level concurrency bounding", async () => {

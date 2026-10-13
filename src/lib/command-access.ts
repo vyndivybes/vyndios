@@ -30,7 +30,10 @@ export const getCommandAuthorization = createServerFn({ method: "GET" })
 
 export const getCommandRole = createServerFn({ method: "GET" })
   .middleware([optionalAuthMiddleware])
-  .handler(async ({ context }) => (await resolveCommandAuthorization(context)).role);
+  .handler(async ({ context }) => {
+    const { timeStage } = await import("./request-timing.server");
+    return timeStage("command.beforeLoad", async () => (await resolveCommandAuthorization(context)).role);
+  });
 
 export const getCommandIdentity = createServerFn({ method: "GET" })
   .middleware([optionalAuthMiddleware])

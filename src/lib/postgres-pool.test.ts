@@ -17,8 +17,8 @@ test("deployed PostgreSQL keeps request sharing without retaining a pg.Pool", as
   assert.match(databaseSource, /requestSqlCache\.set\(request, pending\)/);
   assert.match(databaseSource, /createRequestPostgresLimiter\(\)/);
   assert.match(databaseSource, /new Client\(\{/);
-  assert.match(databaseSource, /await client\.connect\(\)/);
-  assert.match(databaseSource, /await client\.end\(\)/);
+  assert.match(databaseSource, /await timeStage\("db.connect", \(\) => client\.connect\(\)\)/);
+  assert.match(databaseSource, /await timeStage\("db.close", \(\) => client\.end\(\)\)/);
   assert.doesNotMatch(databaseSource, /new Pool\(/);
   assert.doesNotMatch(databaseSource, /__vyndiLocalPostgresPool__/);
   assert.match(authSource, /requestSafePostgresDialect\(postgresTransport\.connectionString\)/);
@@ -34,8 +34,8 @@ test("loopback detection remains available for local transport diagnostics", asy
   const databaseSource = await readFile(new URL("./db.server.ts", import.meta.url), "utf8");
   assert.match(databaseSource, /new Client\(\{/);
   assert.match(databaseSource, /connectionString: transport\.connectionString/);
-  assert.match(databaseSource, /await client\.connect\(\)/);
-  assert.match(databaseSource, /await client\.end\(\)/);
+  assert.match(databaseSource, /await timeStage\("db.connect", \(\) => client\.connect\(\)\)/);
+  assert.match(databaseSource, /await timeStage\("db.close", \(\) => client\.end\(\)\)/);
   assert.doesNotMatch(databaseSource, /__vyndiLocalPostgresPool__/);
 });
 
