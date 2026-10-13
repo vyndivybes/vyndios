@@ -195,7 +195,21 @@ function LineageRecord({ row }: { row: Awaited<ReturnType<typeof getOperatingLin
   );
 }
 
+// The first HTML response must be independent of governed Inventory and
+// downstream Operations datasets. Never call a canonical reader during SSR.
 function Operations() {
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => { setHydrated(true); }, []);
+  if (!hydrated) return (
+    <section data-route-readiness="loading" className="space-y-3">
+      <h1 className="font-display text-4xl">Operations</h1>
+      <p className="text-sm text-muted">Loading governed Operations availability…</p>
+    </section>
+  );
+  return <OperationsReady />;
+}
+
+function OperationsReady() {
   Route.useLoaderData();
   const [warnings, setWarnings] = useState<Awaited<ReturnType<typeof getInventoryMslWarnings>>>([]);
   const [warningsLoaded, setWarningsLoaded] = useState(false);
@@ -274,6 +288,13 @@ function Operations() {
 
   return (
     <div className="space-y-6">
+      {!warningsLoaded ? (
+        <span data-route-readiness="loading" className="sr-only">Canonical inventory warnings loading</span>
+      ) : warningsError ? (
+        <span data-route-readiness="error" role="alert">Inventory warnings unavailable: {warningsError}</span>
+      ) : (
+        <span data-route-readiness="ready" className="sr-only">Canonical inventory warnings available</span>
+      )}
       <header className="border-b border-border pb-6">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">
           Operations · demand to quality execution · canonical authority
