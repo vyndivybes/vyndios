@@ -31,18 +31,34 @@ const actualGrid =
 const forecastGrid =
   "grid-cols-[minmax(0,.55fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,.8fr)_minmax(0,2fr)]";
 
+// Authenticated operator UI is populated after hydration so 36-month
+// modelling and the transaction-backed read do not consume Worker SSR CPU.
 function Actuals() {
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => { setHydrated(true); }, []);
+  if (!hydrated) return (
+    <section data-route-readiness="loading" className="space-y-3">
+      <h1 className="font-display text-4xl">Actuals &amp; rolling forecast</h1>
+      <p className="text-sm text-muted">Loading canonical monthly actuals…</p>
+    </section>
+  );
+  return <ActualsClient />;
+}
+
+function ActualsClient() {
   const scenario = useVeloxis((s) => s.scenario);
   const drawStandby = useVeloxis((s) => s.drawStandby);
   const finance = useVeloxis((s) => s.finance);
   const [actuals, setActuals] = useState<ActualsMap>({});
   const [status, setStatus] = useState("Loading central actuals…");
+  const [loadPhase, setLoadPhase] = useState<"loading" | "ready" | "error">("loading");
   const [busy, setBusy] = useState<number | null>(null);
 
   async function reload() {
     const rows = await listMonthlyActuals();
     setActuals(rows);
     setStatus("Central actuals reconciled to transaction ledger");
+    setLoadPhase("ready");
   }
 
   useEffect(() => {
@@ -52,9 +68,14 @@ function Actuals() {
         if (active) {
           setActuals(rows);
           setStatus("Central actuals reconciled to transaction ledger");
+          setLoadPhase("ready");
         }
       })
-      .catch((e) => active && setStatus(e instanceof Error ? e.message : "Unable to load actuals"));
+      .catch((e) => {
+        if (!active) return;
+        setStatus(e instanceof Error ? e.message : "Unable to load actuals");
+        setLoadPhase("error");
+      });
     return () => {
       active = false;
     };
@@ -148,6 +169,9 @@ function Actuals() {
 
   return (
     <div className="min-w-0 space-y-6">
+      {loadPhase === "ready" ? <span data-route-readiness="ready" className="sr-only">Canonical actuals loaded</span>
+        : loadPhase === "error" ? <span data-route-readiness="error" role="alert">Canonical actuals unavailable</span>
+        : <span data-route-readiness="loading" className="sr-only">Canonical actuals loading</span>}
       <header>
         <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Finance · central actual books</p>
         <h1 className="font-display text-4xl">Actuals & rolling forecast</h1>
