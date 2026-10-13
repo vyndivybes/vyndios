@@ -1,4 +1,5 @@
 import { getSql } from "@/lib/db";
+import { timeStage } from "./request-timing.server";
 import { getRequest } from "@tanstack/react-start/server";
 import { createRequestMemoizer } from "@/lib/request-memo.server";
 import type { CommandRole } from "@/lib/page-access";
@@ -36,11 +37,11 @@ export async function getAssignedCommandRole(
   };
 
   const request = getRequest();
-  if (!request) return resolveRole();
+  if (!request) return timeStage("role.resolve", resolveRole);
 
   return roleRequestMemo(
     request,
     `${userId}|${normalizedEmail ?? ""}`,
-    resolveRole,
+    () => timeStage("role.resolve", resolveRole),
   );
 }

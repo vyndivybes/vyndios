@@ -1,3 +1,4 @@
+import { timeStage } from "./request-timing.server";
 import { getRequest } from "@tanstack/react-start/server";
 import { pendingMigrations } from "../../scripts/migration-plan.mjs";
 import { expectedRuntimeMigrationNames, planRuntimeSchemaMigrations } from "./runtime-schema-migrations";
@@ -75,6 +76,10 @@ export function safeRuntimeSchemaMigrationFailure(error:unknown){
 }
 
 async function ensureHyperdriveSchemaReady(transport: PostgresTransport):Promise<void>{
+  return timeStage("schema.ready", () => checkHyperdriveSchemaReady(transport));
+}
+
+async function checkHyperdriveSchemaReady(transport: PostgresTransport):Promise<void>{
   if(transport.source!=="hyperdrive") return;
   globalRef.__hyperdriveMigrationReady__ ??= (async()=>{
     const { Client }=await import("pg");
@@ -84,7 +89,7 @@ async function ensureHyperdriveSchemaReady(transport: PostgresTransport):Promise
     });
     let inTransaction=false;
     try{
-      await client.connect();
+      await timeStage("db.connect", () => client.connect());
     }catch(error){
       throw new RuntimeSchemaMigrationError({
         stage:"connect",
@@ -96,7 +101,7 @@ async function ensureHyperdriveSchemaReady(transport: PostgresTransport):Promise
     try{
       await client.query("BEGIN");
       inTransaction=true;
-      await client.query("select pg_advisory_xact_lock($1,$2)",[1982,1505]);
+      await timeStage("db.query", () => client.query("select pg_advisory_xact_lock($1,$2)",[1982,1505]));
 
       let appliedRows:{rows:Array<{name:string}>};
       try{
@@ -157,7 +162,7 @@ async function ensureHyperdriveSchemaReady(transport: PostgresTransport):Promise
       }
       throw error;
     }finally{
-      await client.end().catch(()=>undefined);
+      await timeStage("db.close", () => client.end()).catch(()=>undefined);
     }
   })().catch((error)=>{
     globalRef.__hyperdriveMigrationReady__=undefined;
@@ -256,7 +261,7 @@ export async function withSqlTransactionServer<T>(
 
   let inTransaction = false;
   try {
-    await client.connect();
+    await timeStage("db.connect", () => client.connect());
     await client.query("BEGIN");
     inTransaction = true;
 
@@ -272,7 +277,7 @@ export async function withSqlTransactionServer<T>(
     await client.query("SET LOCAL idle_in_transaction_session_timeout = '30s'");
 
     const sql = toSql(async <R>(text: string, params: unknown[]) => {
-      const result = await client.query(text, params);
+      const result = await timeStage("db.query", () => client.query(text, params));
       return result.rows as R[];
     });
 
@@ -300,7 +305,7 @@ export async function withSqlTransactionServer<T>(
     }
     throw error;
   } finally {
-    await client.end().catch(() => undefined);
+    await timeStage("db.close", () => client.end()).catch(() => undefined);
   }
 }
 
@@ -318,11 +323,11 @@ async function createPostgresSql(transport: PostgresTransport): Promise<Sql> {
         connectionTimeoutMillis: 10_000,
       });
       try {
-        await client.connect();
-        const res = await client.query(text, params);
+        await timeStage("db.connect", () => client.connect());
+        const res = await timeStage("db.query", () => client.query(text, params));
         return res.rows as T[];
       } finally {
-        await client.end().catch(() => undefined);
+        await timeStage("db.close", () => client.end()).catch(() => undefined);
       }
     }),
   );

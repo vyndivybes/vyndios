@@ -1,4 +1,5 @@
 import { getRequest } from "@tanstack/react-start/server";
+import { timeStage } from "../request-timing.server";
 import { createRequestMemoizer } from "../request-memo.server";
 import { gateIdentityEnabled } from "./gate-identity.server";
 import { auth, authConfigured, logSessionLookupFailure } from "./server";
@@ -70,7 +71,7 @@ export async function getSessionUser(
   }
   const cacheKey = bearerToken ? "bearer" : "cookie";
   return sessionRequestMemo(request, cacheKey, async () => {
-    const session = await auth.api.getSession({ headers }).catch((error) => {
+    const session = await timeStage("session.verify", () => auth.api.getSession({ headers })).catch((error) => {
       logSessionLookupFailure(request, error);
       throw error;
     });

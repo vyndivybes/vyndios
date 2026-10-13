@@ -43,12 +43,13 @@ export const optionalAuthMiddleware = createMiddleware({ type: "function" })
   .server(async ({ next, context }) => {
     const { assertSameSiteRequest } = await import("./isolation.server");
     const { getSessionUser } = await import("./verify.server");
+    const { timeStage } = await import("../request-timing.server");
     assertSameSiteRequest();
     const user = await getSessionUser(context?.bearerToken);
-    return next({
+    return timeStage("route.loader", () => next({
       context: {
         userId: user?.id,
         userEmail: user?.email ?? null,
       },
-    });
+    }));
   });

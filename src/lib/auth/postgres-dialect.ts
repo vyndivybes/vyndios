@@ -14,6 +14,7 @@ import {
 } from "kysely";
 import { Client } from "pg";
 import { AsyncLocalStorage } from "node:async_hooks";
+import { timeStage } from "../request-timing.server.ts";
 
 type PostgresClient = Pick<Client, "connect" | "end" | "query">;
 type PostgresClientFactory = () => PostgresClient;
@@ -86,7 +87,7 @@ class RequestSafePostgresDriver implements Driver {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const client = this.createClient();
       try {
-        await client.connect();
+        await timeStage("auth.connect", () => client.connect());
         if (state) state.client = client;
         return new RequestSafePostgresConnection(client, !state);
       } catch (error) {
@@ -132,7 +133,7 @@ class RequestSafePostgresConnection implements DatabaseConnection {
   }
 
   async executeQuery<O>(compiledQuery: CompiledQuery): Promise<QueryResult<O>> {
-    const result = await this.client.query(compiledQuery.sql, [...compiledQuery.parameters]);
+    const result = await timeStage("auth.query", () => this.client.query(compiledQuery.sql, [...compiledQuery.parameters]));
     return {
       ...(typeof result.rowCount === "number" ? { numAffectedRows: BigInt(result.rowCount) } : {}),
       rows: result.rows as O[],
@@ -153,6 +154,6 @@ class RequestSafePostgresConnection implements DatabaseConnection {
   }
 
   async close(): Promise<void> {
-    if (this.closeOnRelease) await this.client.end();
+    if (this.closeOnRelease) await timeStage("auth.close", () => this.client.end());
   }
 }
