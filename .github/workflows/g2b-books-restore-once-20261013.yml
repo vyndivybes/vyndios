@@ -80,9 +80,9 @@ jobs:
           key="$RUNNER_TEMP/g2b-books-restore/age-identity.txt"
           printf '%s\n' "$VYNDI_BOOKS_BACKUP_AGE_IDENTITY" > "$key"
           age -d -i "$key" "$RUNNER_TEMP/g2b-books-restore/books.dump.age" |
-            docker run --rm -i --network host postgres:18-alpine
+            docker run --rm -i --network host postgres:18-alpine \
               sh -ec 'exec pg_restore --exit-on-error --no-owner --no-acl --dbname=postgresql://postgres:temporary-isolated-restore-only@127.0.0.1:5432/restored_books'
-          docker run --rm --network host postgres:18-alpine
+          docker run --rm --network host postgres:18-alpine \
             sh -ec 'psql --no-psqlrc --set ON_ERROR_STOP=on --dbname=postgresql://postgres:temporary-isolated-restore-only@127.0.0.1:5432/restored_books -Atc "select count(*) from epr_finance_journals;" >/dev/null &&
               psql --no-psqlrc --set ON_ERROR_STOP=on --dbname=postgresql://postgres:temporary-isolated-restore-only@127.0.0.1:5432/restored_books -Atc "select count(*) from vyndi_books_edit_audit;" >/dev/null'
           {
