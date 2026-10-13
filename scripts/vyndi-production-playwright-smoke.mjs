@@ -46,6 +46,16 @@ const protectedRoutes = [
   "/command/financial-cockpit",
 ];
 
+const departmentAuditRoutes = new Set([
+  "/command/accounting", "/command/procurement",
+  "/command/purchase-execution", "/command/inventory",
+  "/command/inventory-ledgers/components", "/command/quality",
+]);
+const departmentalAuditOnly = process.env.VYNDI_TEST_DEPARTMENT_AUDIT === "1";
+const selectedRoutes = departmentalAuditOnly
+  ? protectedRoutes.filter(route => departmentAuditRoutes.has(route))
+  : protectedRoutes;
+
 const routeEvidence = new Map([
   ["/command", /Command Centre|Command/i],
   ["/command/ibpe-operating-workspace", /IBPE|VIBPE|planning/i],
@@ -71,7 +81,7 @@ const routeEvidence = new Map([
 await mkdir(evidenceRoot, { recursive: true });
 
 const evidence = {
-  test: "VYNDI production Playwright smoke",
+  test: departmentalAuditOnly ? "DEPARTMENT_AUDIT" : "VYNDI production Playwright smoke",
   mode: "read-only-browser",
   baseUrl,
   expectedSha: expectedSha || null,
@@ -200,7 +210,7 @@ try {
   }
   assert.deepEqual(loginErrors, [], `Login emitted browser errors: ${loginErrors.join(" | ")}`);
 
-  for (const route of protectedRoutes) {
+  for (const route of selectedRoutes) {
     const page = await context.newPage();
     const pageErrors = [];
     const routeNetworkEvidence = [];
@@ -263,11 +273,6 @@ try {
     // Departmental auditor smoke: preserve full-width access to controls and
     // all source-backed sections. These are presentation checks, NOT database
     // reconciliation or independent departmental qualification certificates.
-    const departmentAuditRoutes = new Set([
-      "/command/accounting", "/command/procurement",
-      "/command/purchase-execution", "/command/inventory",
-      "/command/inventory-ledgers/components", "/command/quality",
-    ]);
     if (departmentAuditRoutes.has(route)) {
       const viewports = [];
       for (const width of [390, 768, 1440]) {
@@ -309,7 +314,7 @@ try {
 
   evidence.result = "PASS";
   evidence.completedAt = new Date().toISOString();
-  console.log(`[vyndi-playwright] PASS · ${protectedRoutes.length} protected routes · ${baseUrl}`);
+  console.log(`[vyndi-playwright] PASS · ${selectedRoutes.length} protected routes · ${baseUrl}`);
   console.log(`[vyndi-playwright] evidence: ${evidenceRoot}`);
 } catch (error) {
   evidence.result = "FAIL";

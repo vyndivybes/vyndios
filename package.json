@@ -90,7 +90,8 @@
     "test:assurance:closure": "node --test scripts/enterprise-assurance-closure.test.mjs",
     "test:vaos-write-authority": "node --test scripts/vaos-operational-write-authority.test.mjs",
     "test:vaos-bridge:read": "node --experimental-strip-types --test src/lib/vaos-bridge-auth.test.ts && node --test scripts/vaos-read-bridge-contract.test.mjs && node --experimental-strip-types --test scripts/vaos-schedule-export.test.mjs scripts/vaos-schedule-bridge-gate.test.mjs",
-    "test:department:readonly": "node --test scripts/department-readonly-audit.test.mjs"
+    "test:department:readonly": "node --test scripts/department-readonly-audit.test.mjs",
+    "test:browser:departments": "node scripts/vyndi-department-playwright-smoke.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
