@@ -3,9 +3,9 @@ import { createStartHandler, defaultStreamHandler, defineHandlerCallback } from 
 import { timeStage, traceRequest } from "./lib/request-timing.server";
 
 const fetch = createStartHandler(defineHandlerCallback((ctx) =>
-  timeStage("ssr", () => defaultStreamHandler(ctx)),
+  timeStage("ssr", async () => defaultStreamHandler(ctx)),
 ));
 
 export default createServerEntry({
-  fetch: (request, options) => traceRequest(request, () => fetch(request, options)),
+  fetch: (request, options) => traceRequest(request, async () => fetch(request, options)),
 });
