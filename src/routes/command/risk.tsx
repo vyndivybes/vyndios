@@ -1,5 +1,5 @@
-import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { Fragment, useMemo, useState } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Kpi, Panel } from "@/components/kpi";
 import {
   createRiskRegisterItem,
@@ -41,17 +41,18 @@ const domains = [
   "operational","evidence",
 ] as const;
 
-export const Route = createFileRoute("/command/risk")({
-  loader: async () => {
-    const [risks, derived, history] = await Promise.all([
-      listCanonicalRiskAuthority(),
-      listDerivedEngineeringRiskSignals(),
-      listRiskHistory(),
-    ]);
-    return { risks, derived, history };
-  },
-  component: Risk,
-});
+export const Route = createFileRoute("/command/risk")({ component: Risk });
+
+type RiskData = { risks: Row[]; derived: Row[]; history: Row[] };
+
+async function readCanonicalRisk(): Promise<RiskData> {
+  const [risks, derived, history] = await Promise.all([
+    listCanonicalRiskAuthority(),
+    listDerivedEngineeringRiskSignals(),
+    listRiskHistory(),
+  ]);
+  return { risks: risks as Row[], derived: derived as Row[], history: history as Row[] };
+}
 
 const emptyRisk: NewRiskForm = {
   id: "",
@@ -79,9 +80,41 @@ function optionalNumber(value: string, divisor = 1) {
 }
 
 function Risk() {
-  const loaded = Route.useLoaderData() as { risks: Row[]; derived: Row[]; history: Row[] };
+  const [state, setState] = useState<{
+    status: "loading" | "ready" | "error";
+    loaded?: RiskData;
+    error?: string;
+  }>({ status: "loading" });
+  useEffect(() => {
+    let active = true;
+    void readCanonicalRisk()
+      .then((loaded) => { if (active) setState({ status: "ready", loaded }); })
+      .catch((error) => {
+        if (active) setState({ status: "error", error: error instanceof Error ? error.message : "Risk authority unavailable" });
+      });
+    return () => { active = false; };
+  }, []);
+  async function reloadRisk() {
+    const loaded = await readCanonicalRisk();
+    setState({ status: "ready", loaded });
+  }
+  if (state.status === "loading") return (
+    <section data-route-readiness="loading" className="space-y-3">
+      <h1 className="font-display text-4xl">Risk Register</h1>
+      <p className="text-sm text-muted">Loading canonical risk, VEDM evidence and audit history…</p>
+    </section>
+  );
+  if (state.status === "error") return (
+    <section data-route-readiness="error" role="alert" className="space-y-3">
+      <h1 className="font-display text-4xl">Risk Register</h1>
+      <p className="text-sm text-warn">Canonical Risk unavailable: {state.error}</p>
+    </section>
+  );
+  return <section data-route-readiness="ready"><RiskReady loaded={state.loaded!} onReload={reloadRisk} /></section>;
+}
+
+function RiskReady({ loaded, onReload }: { loaded: RiskData; onReload: () => Promise<void> }) {
   const risks = loaded.risks;
-  const router = useRouter();
   const [editingId, setEditingId] = useState("");
   const [form, setForm] = useState<RiskForm | null>(null);
   const [newRisk, setNewRisk] = useState<NewRiskForm>(emptyRisk);
@@ -120,7 +153,7 @@ function Risk() {
       setEditingId("");
       setForm(null);
       setMessage(`${id} updated through canonical Risk authority; audit evidence was appended.`);
-      await router.invalidate();
+      await onReload();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Risk register update failed.");
     } finally {
@@ -155,7 +188,7 @@ function Risk() {
       setNewRisk(emptyRisk);
       setShowCreate(false);
       setMessage("Governed risk created and appended to the audit trail.");
-      await router.invalidate();
+      await onReload();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Risk creation failed.");
     } finally {
