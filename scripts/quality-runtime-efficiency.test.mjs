@@ -6,13 +6,16 @@ const route = await readFile(new URL("../src/routes/command/quality.tsx", import
 const deck = await readFile(new URL("../src/components/quality-assurance-deck.tsx", import.meta.url), "utf8").catch(() => "");
 const smoke = await readFile(new URL("./vyndi-production-playwright-smoke.mjs", import.meta.url), "utf8");
 
-test("Quality cold-entry loader keeps only canonical Quality authority", () => {
+test("Quality cold-entry SSR has no canonical query; authorized read happens after hydration", () => {
   const start = route.indexOf('createFileRoute("/command/quality")');
   const end = route.indexOf("component: Quality", start);
   assert.ok(start >= 0 && end > start);
   const loader = route.slice(start, end);
-  assert.match(loader, /listQualityAuthority\(\)/);
-  assert.doesNotMatch(loader, /listIsoQualityCompliance\(\)|getManufacturingQualityIntelligence\(\)/);
+  assert.doesNotMatch(loader, /listQualityAuthority\(\)|listIsoQualityCompliance\(\)|getManufacturingQualityIntelligence\(\)/);
+  assert.match(route, /useEffect\(/);
+  assert.match(route, /listQualityAuthority\(\)/);
+  assert.match(route, /data-route-readiness="error"/);
+  assert.match(route, /data-route-readiness="ready"/);
 });
 
 test("ISO compliance and Manufacturing Quality intelligence remain governed on-demand", () => {
