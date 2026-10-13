@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Archive,
   CheckCircle2,
@@ -134,7 +134,7 @@ type InventoryReadback = { items: MasterInventoryItemRecord[]; role: ReturnType<
 
 function MasterInventory() {
   const { role } = Route.useLoaderData();
-  const loadedAt = useRouterState({ select: (state) => state.loadedAt });
+  const loadedAt = Route.useMatch({ select: (match) => match.updatedAt });
   const [state, setState] = useState<
     { status: "loading" } | { status: "error"; error: string } | { status: "ready"; items: MasterInventoryItemRecord[] }
   >({ status: "loading" });
