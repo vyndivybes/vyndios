@@ -91,11 +91,16 @@ async function executeRead(
 
   if (actionType === "PROCUREMENT.OBSERVE_SHORTAGE") {
     const rows = await sql.query<{ record: unknown }>(
-      `select to_jsonb(l) as record
-         from epr_production_job_card_lines l
-        where l.shortage_quantity > 0
-        order by l.shortage_quantity desc,l.created_at desc
-        limit $1`,
+      `select to_jsonb(s) as record from (
+         select sales_order_id,product_label,variant_id,units,due_month,sku,category,item,
+                required_quantity,physical_quantity as available_quantity,reserved_quantity,
+                shortage_quantity,available_to_promise,unit,bom_revision,sales_order_revision
+           from vyndi_live_job_card_requirements
+          where job_card_status in ('released','in_progress')
+            and sku is not null and shortage_quantity > 0
+          order by due_month,shortage_quantity desc,sku,job_card_line_id
+          limit $1
+       ) s`,
       [limit],
     );
     return { records: rows.map((row) => row.record) };
