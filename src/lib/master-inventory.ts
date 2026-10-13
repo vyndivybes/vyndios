@@ -2,8 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getCommandRole } from "@/lib/command-access";
 import { requireBusinessActor } from "@/lib/business-actor";
-import { SEED_INVENTORY } from "@/lib/data/inventory";
-import { getSql, type Sql } from "@/lib/db";
+import { getSql } from "@/lib/db";
 import { getRouteMeta } from "@/lib/page-metadata";
 import { canPerform } from "@/lib/page-access";
 
@@ -105,45 +104,12 @@ async function requireInventoryWrite() {
   return actor;
 }
 
-const globalRef = globalThis as typeof globalThis & { __masterInventorySeedPromise__?: Promise<void> };
-
-/** Catalogue rows are master data only. Rate/MSL/category may be seeded; quantity never is. */
-async function ensureComponentCatalogue(sql: Sql) {
-  const seed = SEED_INVENTORY.map((item) => ({
-    id: `component-${item.id}`,
-    sku: item.sku.toLocaleUpperCase(),
-    name: `${item.brand} · ${item.model}`,
-    category: item.category,
-    unit: "ea",
-    minimum_stock_level: Math.max(0, item.reorderLevel),
-    planned_monthly_use: 0,
-  }));
-  await sql.query(
-    `with seed as (
-       select * from json_to_recordset($1::json) as x(
-         id text,sku text,name text,category text,unit text,minimum_stock_level numeric,planned_monthly_use numeric
-       )
-     )
-     insert into master_inventory_items
-       (id,ledger_id,sku,name,category,unit,minimum_stock_level,planned_monthly_use,created_by,updated_by)
-     select id,'components',upper(sku),name,category,unit,minimum_stock_level,planned_monthly_use,'catalogue-seed','catalogue-seed'
-       from seed
-     on conflict (sku) do nothing`,
-    [JSON.stringify(seed)],
-  );
-}
-async function ensureSeeds(sql: Sql) {
-  globalRef.__masterInventorySeedPromise__ ??= ensureComponentCatalogue(sql).catch((error) => {
-    globalRef.__masterInventorySeedPromise__ = undefined;
-    throw error;
-  });
-  await globalRef.__masterInventorySeedPromise__;
-}
+// The master catalogue is populated by migration 0061. Inventory GETs must
+// never seed or otherwise mutate business records during a read-only audit.
 
 export const getMasterInventoryItems = createServerFn({ method: "GET" }).handler(async () => {
   await requireInventoryView();
   const sql = await getSql();
-  await ensureSeeds(sql);
   return sql.query<MasterInventoryItemRecord>(`
     with fifo as (
       select sku,vyndi_canonical_unit(unit) as unit,count(*)::int as lot_count,
@@ -172,7 +138,6 @@ export const getMasterInventoryItems = createServerFn({ method: "GET" }).handler
 export const getMasterInventoryData = createServerFn({ method: "GET" }).handler(async () => {
   await requireInventoryView();
   const sql = await getSql();
-  await ensureSeeds(sql);
   const [items, lots] = await Promise.all([
     sql.query<MasterInventoryItemRecord>(`
       with fifo as (

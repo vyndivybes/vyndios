@@ -38,6 +38,10 @@ const protectedRoutes = [
   "/command/inventory",
   "/command/operations",
   "/command/quality",
+  "/command/accounting",
+  "/command/procurement",
+  "/command/purchase-execution",
+  "/command/inventory-ledgers/components",
   "/command/actuals",
   "/command/financial-cockpit",
 ];
@@ -56,6 +60,12 @@ const routeEvidence = new Map([
   ["/command/cash", /Cash|Working Capital/i],
   ["/command/engineering", /Engineering/i],
   ["/command/risk", /Risk Register|VYNDI Risk Engine/i],
+  ["/command/inventory", /Master Inventory|Full-view stock health register/i],
+  ["/command/inventory-ledgers/components", /Item balance register/i],
+  ["/command/accounting", /Accounting Workbench/i],
+  ["/command/procurement", /Procurement|MSL replenishment queue/i],
+  ["/command/purchase-execution", /Purchase Execution/i],
+  ["/command/quality", /Quality & Product Compliance/i],
 ]);
 
 await mkdir(evidenceRoot, { recursive: true });
@@ -247,6 +257,35 @@ try {
       await page.getByRole("button", { name: /Add demand \/ order|Sign in to create order/i }).first().waitFor({
         state: "visible",
         timeout: 20_000,
+      });
+    }
+
+    // Departmental auditor smoke: preserve full-width access to controls and
+    // all source-backed sections. These are presentation checks, NOT database
+    // reconciliation or independent departmental qualification certificates.
+    const departmentAuditRoutes = new Set([
+      "/command/accounting", "/command/procurement",
+      "/command/purchase-execution", "/command/inventory",
+      "/command/inventory-ledgers/components", "/command/quality",
+    ]);
+    if (departmentAuditRoutes.has(route)) {
+      const viewports = [];
+      for (const width of [390, 768, 1440]) {
+        await page.setViewportSize({ width, height: 900 });
+        const metrics = await page.evaluate(() => ({
+          viewportWidth: window.innerWidth,
+          documentWidth: document.documentElement.scrollWidth,
+        }));
+        assert.ok(metrics.documentWidth <= metrics.viewportWidth + 2,
+          route + " has document-level overflow at " + width + "px: "
+          + metrics.documentWidth + "px");
+        viewports.push({ width, documentWidth: metrics.documentWidth });
+      }
+      evidence.departmentAudits ??= [];
+      evidence.departmentAudits.push({
+        route, viewports, browserScope: "authenticated-readonly",
+        sourceReconciliation: "NOT_PERFORMED_BY_BROWSER_SMOKE",
+        independentQualification: "NOT_CLAIMED",
       });
     }
 
