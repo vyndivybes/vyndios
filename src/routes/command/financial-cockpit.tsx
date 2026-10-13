@@ -1,18 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Kpi, Panel } from "@/components/kpi";
 import { FinanceVisual } from "@/components/finance-visual";
 import { buildModelWithInputs, totals, type ScenarioId } from "@/lib/finance/model";
 import { accountingTotals, buildAccountingModel } from "@/lib/finance/accounting";
 import { getOperatingPlanState, type OperatingPlanSnapshot } from "@/lib/operating-plan-authority";
 
-export const Route = createFileRoute("/command/financial-cockpit")({
-  loader: async () => {
-    const state = await getOperatingPlanState();
-    return state.approved ?? null;
-  },
-  component: FinancialCockpit,
-});
+export const Route = createFileRoute("/command/financial-cockpit")({ component: FinancialCockpit });
 
 const money = (n: number, digits = 1) => `₹${n.toFixed(digits)}L`;
 const scenarios: { id: ScenarioId; label: string }[] = [
@@ -22,11 +16,37 @@ const scenarios: { id: ScenarioId; label: string }[] = [
 ];
 
 function FinancialCockpit() {
-  const approvedPlan = Route.useLoaderData() as OperatingPlanSnapshot | null;
-  if (!approvedPlan) {
-    return <FinancialCockpitBlocked />;
-  }
-  return <FinancialCockpitReady approvedPlan={approvedPlan} />;
+  const [state, setState] = useState<{
+    status: "loading" | "ready" | "error";
+    approvedPlan: OperatingPlanSnapshot | null;
+    error?: string;
+  }>({ status: "loading", approvedPlan: null });
+  useEffect(() => {
+    let active = true;
+    void getOperatingPlanState()
+      .then((result) => {
+        if (active) setState({ status: "ready", approvedPlan: result.approved ?? null });
+      })
+      .catch((error) => {
+        if (active) setState({ status: "error", approvedPlan: null, error: error instanceof Error ? error.message : "Finance evidence unavailable" });
+      });
+    return () => { active = false; };
+  }, []);
+  if (state.status === "loading") return (
+    <section data-route-readiness="loading" className="space-y-3">
+      <h1 className="font-display text-4xl">Consolidated Finance</h1>
+      <p className="text-sm text-muted">Loading approved operating-plan evidence…</p>
+    </section>
+  );
+  if (state.status === "error") return (
+    <section data-route-readiness="error" role="alert" className="space-y-3">
+      <h1 className="font-display text-4xl">Consolidated Finance</h1>
+      <p className="text-sm text-warn">Canonical finance evidence unavailable: {state.error}</p>
+    </section>
+  );
+  return <section data-route-readiness="ready">
+    {state.approvedPlan ? <FinancialCockpitReady approvedPlan={state.approvedPlan} /> : <FinancialCockpitBlocked />}
+  </section>;
 }
 
 function FinancialCockpitBlocked() {
