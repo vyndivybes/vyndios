@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { Kpi, Panel } from "@/components/kpi";
 import { QualityAssuranceDeck } from "@/components/quality-assurance-deck";
 import { listQualityAuthority } from "@/lib/quality-authority";
@@ -13,13 +14,41 @@ const num = (row: Row, ...keys: string[]) => {
   return 0;
 };
 
-export const Route = createFileRoute("/command/quality")({
-  loader: async () => {
-    const quality = await listQualityAuthority();
-    return { quality };
-  },
-  component: Quality,
-});
+export const Route = createFileRoute("/command/quality")({ component: Quality });
+
+type CanonicalQuality = Awaited<ReturnType<typeof listQualityAuthority>>;
+
+// Canonical governed read is client-triggered: the 10-ms Free Worker CPU budget
+// must not render the large Quality register during the HTML SSR request.
+function Quality() {
+  const [state, setState] = useState<{
+    status: "loading" | "ready" | "error";
+    quality?: CanonicalQuality;
+    error?: string;
+  }>({ status: "loading" });
+  useEffect(() => {
+    let active = true;
+    void listQualityAuthority()
+      .then((quality) => { if (active) setState({ status: "ready", quality }); })
+      .catch((error) => {
+        if (active) setState({ status: "error", error: error instanceof Error ? error.message : "Canonical Quality unavailable" });
+      });
+    return () => { active = false; };
+  }, []);
+  if (state.status === "loading") return (
+    <section data-route-readiness="loading" className="space-y-3">
+      <h1 className="font-display text-4xl">Quality &amp; Product Compliance</h1>
+      <p className="text-sm text-muted">Loading canonical inspection, NCR, CAPA and release registers…</p>
+    </section>
+  );
+  if (state.status === "error") return (
+    <section data-route-readiness="error" role="alert" className="space-y-3">
+      <h1 className="font-display text-4xl">Quality &amp; Product Compliance</h1>
+      <p className="text-sm text-warn">Canonical Quality unavailable: {state.error}</p>
+    </section>
+  );
+  return <section data-route-readiness="ready"><QualityReady quality={state.quality!} /></section>;
+}
 
 function StatusPill({ value }: { value: string }) {
   const positive = ["current", "pass", "approved", "ready_for_dual_approval", "released", "active"].includes(value);
@@ -31,8 +60,7 @@ function StatusPill({ value }: { value: string }) {
   );
 }
 
-function Quality() {
-  const { quality } = Route.useLoaderData();
+function QualityReady({ quality }: { quality: CanonicalQuality }) {
   const inspections = quality.inspections as Row[];
   const ncrs = quality.ncrs as Row[];
   const capas = quality.capas as Row[];

@@ -20,6 +20,13 @@ if (parsedBase.protocol !== "https:" && !["localhost", "127.0.0.1"].includes(par
   throw new Error(`Refusing browser smoke against non-HTTPS target: ${baseUrl}`);
 }
 
+const cpuBoundClientRoutes = new Set([
+  "/command/actuals",
+  "/command/financial-cockpit",
+  "/command/quality",
+  "/command/ibpe-operating-workspace/assurance",
+]);
+
 const protectedRoutes = [
   "/command",
   "/command/ibpe-operating-workspace",
@@ -231,6 +238,11 @@ try {
         serverTiming: headers["server-timing"] || null,
         responseBody,
       });
+    }
+    assert.ok(response?.ok(), `${route} returned HTTP ${response?.status() ?? "none"}`);
+    if (cpuBoundClientRoutes.has(route)) {
+      // SSR placeholders are never accepted as real departmental audit proof.
+      await page.locator('[data-route-readiness="ready"]').waitFor({ state: "attached", timeout: 30_000 });
     }
     await page.locator("body").waitFor({ state: "visible", timeout: 30_000 });
     await page.waitForFunction(() => (document.body?.innerText || "").trim().length > 40, undefined, {

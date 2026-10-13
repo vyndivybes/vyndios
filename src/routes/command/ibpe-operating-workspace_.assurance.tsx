@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Kpi, Panel } from "@/components/kpi";
 import {
@@ -34,12 +34,42 @@ const toneFor = (value: string) => {
 };
 
 export const Route = createFileRoute("/command/ibpe-operating-workspace_/assurance")({
-  loader: () => getVibpeAssurancePageData(),
   component: VibpeAssurancePage,
 });
 
+type AssuranceData = Awaited<ReturnType<typeof getVibpeAssurancePageData>>;
+
 function VibpeAssurancePage() {
-  const data = Route.useLoaderData();
+  const [state, setState] = useState<{
+    status: "loading" | "ready" | "error";
+    data?: AssuranceData;
+    error?: string;
+  }>({ status: "loading" });
+  useEffect(() => {
+    let active = true;
+    void getVibpeAssurancePageData()
+      .then((data) => { if (active) setState({ status: "ready", data }); })
+      .catch((error) => {
+        if (active) setState({ status: "error", error: error instanceof Error ? error.message : "Assurance evidence unavailable" });
+      });
+    return () => { active = false; };
+  }, []);
+  if (state.status === "loading") return (
+    <section data-route-readiness="loading" className="space-y-3">
+      <h1 className="font-display text-4xl">VIBPE Assurance</h1>
+      <p className="text-sm text-muted">Loading governed assurance evidence…</p>
+    </section>
+  );
+  if (state.status === "error") return (
+    <section data-route-readiness="error" role="alert" className="space-y-3">
+      <h1 className="font-display text-4xl">VIBPE Assurance</h1>
+      <p className="text-sm text-warn">Canonical assurance unavailable: {state.error}</p>
+    </section>
+  );
+  return <section data-route-readiness="ready"><VibpeAssuranceReady data={state.data!} /></section>;
+}
+
+function VibpeAssuranceReady({ data }: { data: AssuranceData }) {
   const [snapshotState, setSnapshotState] = useState("No assurance snapshot captured in this session.");
   const [fullExceptions, setFullExceptions] = useState<VibpeAssuranceException[] | null>(null);
   const [exceptionLoadState, setExceptionLoadState] = useState("");
