@@ -20,6 +20,13 @@ const evidenceRoot = resolve(
 if (!email) throw new Error("VYNDI_TEST_EMAIL is required.");
 if (!password) throw new Error("VYNDI_TEST_PASSWORD is required.");
 
+const cpuBoundClientRoutes = new Set([
+  "/command/actuals",
+  "/command/financial-cockpit",
+  "/command/quality",
+  "/command/ibpe-operating-workspace/assurance",
+]);
+
 const protectedRoutes = [
   "/command",
   "/command/sales",
@@ -140,6 +147,11 @@ try {
           timeout: route.includes("assurance") ? 90_000 : 60_000,
         });
         status = response?.status() ?? null;
+        assert.ok(response?.ok(), `${route} returned HTTP ${status ?? "none"}`);
+        if (cpuBoundClientRoutes.has(route)) {
+          // The HTML shell alone is not qualification; await canonical readback.
+          await page.locator('[data-route-readiness="ready"]').waitFor({ state: "attached", timeout: 30_000 });
+        }
         await page.locator("body").waitFor({ state: "visible", timeout: 30_000 });
         await page.waitForFunction(() => (document.body?.innerText || "").trim().length > 40, undefined, { timeout: 30_000 });
         const body = (await page.locator("body").innerText()).trim();
