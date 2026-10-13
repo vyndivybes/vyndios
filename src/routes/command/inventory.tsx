@@ -158,7 +158,7 @@ function MasterInventory() {
   if (state.status !== "ready") return (
     <section data-route-readiness={state.status} role={state.status === "error" ? "alert" : "status"} className="space-y-3">
       <h1 className="font-display text-4xl">Master Inventory</h1>
-      <p className="text-sm text-muted">{state.status === "error" ? state.error : "Loading canonical stock, ledger and demand coverage…"}</p>
+      <p className="text-sm text-muted">{state.status === "error" ? state.error : "Loading canonical stock, ledger and demand coverageâ€¦"}</p>
     </section>
   );
   return <section data-route-readiness="ready"><MasterInventoryReady data={{ items: state.items, role }} onReload={refreshItems} /></section>;
