@@ -1,0 +1,100 @@
+# Single-use Books archive disaster-recovery exercise.
+# Never runs on a schedule; protected finance-restore-review environment.
+name: G2b Supplemental Books Independent Restore 2026-10-13
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/g2b-books-restore-once-20261013.yml'
+permissions:
+  contents: read
+concurrency:
+  group: g2b-20261013-isolated-books-restore
+  cancel-in-progress: false
+jobs:
+  restore:
+    environment: finance-restore-review
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_PASSWORD: temporary-isolated-restore-only
+          POSTGRES_DB: restored_books
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d restored_books"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      BACKUP_OBJECT: daily/2026-10-13/books-38335906337-1.dump.age
+      EXPECTED_SHA256: 8e2c44755b295285ac8ce6d2008f021548c135e508d71125534621f0453cfd17
+      RCLONE_CONFIG_GDRIVE_TYPE: drive
+      RCLONE_CONFIG_GDRIVE_SCOPE: drive.file
+      RCLONE_CONFIG_GDRIVE_ROOT_FOLDER_ID: ${{ vars.VYNDI_GOOGLE_BACKUP_FOLDER_ID }}
+      RCLONE_CONFIG_GDRIVE_CLIENT_ID: ${{ secrets.VYNDI_GDRIVE_CLIENT_ID }}
+      RCLONE_CONFIG_GDRIVE_CLIENT_SECRET: ${{ secrets.VYNDI_GDRIVE_CLIENT_SECRET }}
+      RCLONE_CONFIG_GDRIVE_TOKEN: ${{ secrets.VYNDI_GDRIVE_OAUTH_TOKEN }}
+      VYNDI_BOOKS_BACKUP_AGE_IDENTITY: ${{ secrets.VYNDI_BOOKS_BACKUP_AGE_IDENTITY }}
+    steps:
+      - name: Checkout reviewed release
+        uses: actions/checkout@v4
+      - name: Validate original independently read-back checksum and restricted credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$BACKUP_OBJECT" == "daily/2026-10-13/books-38335906337-1.dump.age" ]]
+          [[ "$EXPECTED_SHA256" =~ ^[a-f0-9]{64}$ ]]
+          test -n "$RCLONE_CONFIG_GDRIVE_ROOT_FOLDER_ID"
+          test -n "$RCLONE_CONFIG_GDRIVE_TOKEN"
+          test -n "$RCLONE_CONFIG_GDRIVE_CLIENT_ID"
+          test -n "$RCLONE_CONFIG_GDRIVE_CLIENT_SECRET"
+          [[ "$VYNDI_BOOKS_BACKUP_AGE_IDENTITY" == AGE-SECRET-KEY-* ]] || {
+            echo "::error::G2B_HOLD: age decryption identity missing in protected finance-restore-review environment"; exit 1;
+          }
+      - name: Install restore clients in isolated ephemeral environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq age rclone
+      - name: Retrieve encrypted archive and match original backup ciphertext
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          install -d -m 0700 "$RUNNER_TEMP/g2b-books-restore"
+          rclone copyto "gdrive:$BACKUP_OBJECT" "$RUNNER_TEMP/g2b-books-restore/books.dump.age" --retries 2
+          got="$(sha256sum "$RUNNER_TEMP/g2b-books-restore/books.dump.age" | cut -d' ' -f1)"
+          if [ "$got" != "$EXPECTED_SHA256" ]; then
+            echo "::error::G2B_HOLD: archived ciphertext digest mismatch"; exit 1;
+          fi
+      - name: Decrypt in stream and restore to disposable PostgreSQL only
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          key="$RUNNER_TEMP/g2b-books-restore/age-identity.txt"
+          printf '%s\n' "$VYNDI_BOOKS_BACKUP_AGE_IDENTITY" > "$key"
+          age -d -i "$key" "$RUNNER_TEMP/g2b-books-restore/books.dump.age" |
+            docker run --rm -i --network host postgres:18-alpine
+              sh -ec 'exec pg_restore --exit-on-error --no-owner --no-acl --dbname=postgresql://postgres:temporary-isolated-restore-only@127.0.0.1:5432/restored_books'
+          docker run --rm --network host postgres:18-alpine
+            sh -ec 'psql --no-psqlrc --set ON_ERROR_STOP=on --dbname=postgresql://postgres:temporary-isolated-restore-only@127.0.0.1:5432/restored_books -Atc "select count(*) from epr_finance_journals;" >/dev/null &&
+              psql --no-psqlrc --set ON_ERROR_STOP=on --dbname=postgresql://postgres:temporary-isolated-restore-only@127.0.0.1:5432/restored_books -Atc "select count(*) from vyndi_books_edit_audit;" >/dev/null'
+          {
+            echo "## G2b disposable Books restore"
+            echo "Result: ciphertext SHA matched prior backup; decryption and isolated PostgreSQL 18 restore passed"
+            echo "Source: $BACKUP_OBJECT"
+            echo "Scope: books database only, NOT complete VAOS/VYNDI or India-resident recovery qualification"
+            echo "External vouchers, independent RPO/RTO and production restoration: NOT VERIFIED"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Remove encrypted object and ephemeral decryption identity
+        if: always()
+        shell: bash
+        run: |
+          rm -f "$RUNNER_TEMP/g2b-books-restore/books.dump.age" "$RUNNER_TEMP/g2b-books-restore/age-identity.txt"
+          rmdir "$RUNNER_TEMP/g2b-books-restore" 2>/dev/null || true
