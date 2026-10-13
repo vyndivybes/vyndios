@@ -62,3 +62,17 @@ test("quality empty states are factual, and a production HOLD is not silently re
   assert.match(quality, /No serialized Quality release recorded/);
   assert.match(quality, /Product release remains an explicit approval action/);
 });
+
+test("departmental browser audit has a dedicated route scope and preserves full-route acceptance", () => {
+  const smoke = read("scripts/vyndi-production-playwright-smoke.mjs");
+  const wrapper = read("scripts/vyndi-department-playwright-smoke.mjs");
+  const ci = read(".github/workflows/production-assurance.yml");
+  const pkg = JSON.parse(read("package.json"));
+  assert.match(smoke, /VYNDI_TEST_DEPARTMENT_AUDIT/);
+  assert.match(smoke, /const selectedRoutes = departmentalAuditOnly/);
+  assert.match(smoke, /for \(const route of selectedRoutes\)/);
+  assert.match(smoke, /departmentalAuditOnly \? "DEPARTMENT_AUDIT"/);
+  assert.match(wrapper, /VYNDI_TEST_DEPARTMENT_AUDIT = "1"/);
+  assert.match(pkg.scripts["test:browser:departments"], /vyndi-department-playwright-smoke/);
+  assert.match(ci, /name: Independent four-department browser acceptance[\s\S]*run: npm run test:browser:departments[\s\S]*name: Authenticated protected-route smoke/);
+});
