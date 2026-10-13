@@ -21,6 +21,7 @@ if (!email) throw new Error("VYNDI_TEST_EMAIL is required.");
 if (!password) throw new Error("VYNDI_TEST_PASSWORD is required.");
 
 const cpuBoundClientRoutes = new Set([
+  "/command/operations",
   "/command/risk",
   "/command/actuals",
   "/command/financial-cockpit",
