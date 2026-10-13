@@ -1,4 +1,5 @@
 import { timeStage } from "./request-timing.server";
+import { createRequestReadinessGate } from "./request-readiness";
 import { getRequest } from "@tanstack/react-start/server";
 import { pendingMigrations } from "../../scripts/migration-plan.mjs";
 import { expectedRuntimeMigrationNames, planRuntimeSchemaMigrations } from "./runtime-schema-migrations";
@@ -12,7 +13,6 @@ import type { Sql, SqlRow, SqlTransactionOptions } from "./db.ts";
 const globalRef = globalThis as typeof globalThis & {
   __pgliteInstance__?: Promise<import("@electric-sql/pglite").PGlite>;
   __pgliteMigrateChain__?: Promise<void>;
-  __hyperdriveMigrationReady__?: Promise<void>;
 };
 
 /**
@@ -27,6 +27,7 @@ const globalRef = globalThis as typeof globalThis & {
  * request/query context that created it.
  */
 const requestSqlCache = new WeakMap<Request, Promise<Sql>>();
+const schemaReadinessGate = createRequestReadinessGate();
 
 const OID_INT8 = 20;
 const OID_DATE = 1082;
@@ -81,94 +82,49 @@ async function ensureHyperdriveSchemaReady(transport: PostgresTransport):Promise
 
 async function checkHyperdriveSchemaReady(transport: PostgresTransport):Promise<void>{
   if(transport.source!=="hyperdrive") return;
-  globalRef.__hyperdriveMigrationReady__ ??= (async()=>{
+  // A canceled Worker request can leave its I/O promise unsettled. Never make
+  // another request await it. Only completed validation is cached globally.
+  await schemaReadinessGate(getRequest(), async () => {
     const { Client }=await import("pg");
     const client=new Client({
       connectionString:transport.connectionString,
-      connectionTimeoutMillis:10_000,
+      connectionTimeoutMillis:3_500,
+      query_timeout:10_000,
     });
-    let inTransaction=false;
     try{
-      await timeStage("db.connect", () => client.connect());
-    }catch(error){
-      throw new RuntimeSchemaMigrationError({
-        stage:"connect",
-        sqlState:sqlStateOf(error),
-        cause:error,
-      });
-    }
-
-    try{
-      await client.query("BEGIN");
-      inTransaction=true;
-      await timeStage("db.query", () => client.query("select pg_advisory_xact_lock($1,$2)",[1982,1505]));
-
+      try{
+        await timeStage("db.connect", () => client.connect());
+      }catch(error){
+        throw new RuntimeSchemaMigrationError({stage:"connect",sqlState:sqlStateOf(error),cause:error});
+      }
       let appliedRows:{rows:Array<{name:string}>};
       try{
-        appliedRows=await client.query<{name:string}>("select name from _migrations");
+        appliedRows=await timeStage("db.query", () => client.query<{name:string}>("select name from _migrations"));
       }catch(error){
-        throw new RuntimeSchemaMigrationError({
-          stage:"bootstrap",
-          migrationName:null,
-          sqlState:sqlStateOf(error),
-          cause:error,
-        });
+        throw new RuntimeSchemaMigrationError({stage:"bootstrap",sqlState:sqlStateOf(error),cause:error});
       }
-
       const plan=planRuntimeSchemaMigrations({
         transportSource:"hyperdrive",
         migrations:bundledMigrations,
         applied:appliedRows.rows.map((row)=>row.name),
       });
-
       if(plan.blocked.length){
-        const first=plan.blocked[0];
         throw new RuntimeSchemaMigrationError({
-          stage:"apply",
-          migrationName:first?.name??null,
-          sqlState:"DESTRUCTIVE_MIGRATION_BLOCKED",
-          cause:new Error(
-            "Runtime schema parity found a destructive pending migration; owner migration is required.",
-          ),
+          stage:"apply",migrationName:plan.blocked[0]?.name??null,sqlState:"DESTRUCTIVE_MIGRATION_BLOCKED",
+          cause:new Error("Runtime schema parity found a destructive pending migration; owner migration is required."),
         });
       }
-
       if(plan.pending.length){
         throw new RuntimeSchemaMigrationError({
-          stage:"apply",
-          migrationName:plan.pending[0]?.name??null,
-          sqlState:"SCHEMA_LAG",
-          cause:new Error(
-            "Runtime schema parity is lagging by "+
-            plan.pending.length+
-            " migration(s); apply migrations with the database owner before serving traffic.",
-          ),
+          stage:"apply",migrationName:plan.pending[0]?.name??null,sqlState:"SCHEMA_LAG",
+          cause:new Error("Runtime schema parity is lagging by "+plan.pending.length+
+            " migration(s); apply migrations with the database owner before serving traffic."),
         });
       }
-
-      await client.query("COMMIT");
-      inTransaction=false;
-    }catch(error){
-      if(inTransaction){
-        try{
-          await client.query("ROLLBACK");
-        }catch(rollbackError){
-          throw new RuntimeSchemaMigrationError({
-            stage:"unlock",
-            sqlState:sqlStateOf(rollbackError),
-            cause:error,
-          });
-        }
-      }
-      throw error;
     }finally{
       await timeStage("db.close", () => client.end()).catch(()=>undefined);
     }
-  })().catch((error)=>{
-    globalRef.__hyperdriveMigrationReady__=undefined;
-    throw error;
   });
-  await globalRef.__hyperdriveMigrationReady__;
 }
 
 export async function readRuntimeSchemaMigrationStatus(sql:Sql){
