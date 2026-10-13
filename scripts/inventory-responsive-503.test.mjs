@@ -8,6 +8,11 @@ test("inventory route does not perform a redundant role lookup after parent Comm
   assert.doesNotMatch(source, /Promise\.all\(\[getMasterInventoryItems\(\),\s*getCommandRole\(\)\]\)/);
   assert.match(source, /loader:\s*async \(\{ context \}\)/);
   assert.match(source, /const items = await getMasterInventoryItems\(\)/);
+  const loader = source.slice(source.indexOf("loader:"), source.indexOf("component:"));
+  assert.doesNotMatch(loader, /getMasterInventoryItems/);
+  assert.match(source, /useEffect/);
+  assert.match(source, /data-route-readiness="ready"/);
+  assert.match(source, /await onReload\(\)/);
   assert.match(source, /role:\s*context\.commandRole/);
 });
 

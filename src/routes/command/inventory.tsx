@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
 import {
   Archive,
   CheckCircle2,
@@ -8,7 +8,7 @@ import {
   Search,
   TriangleAlert,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Kpi } from "@/components/kpi";
 import {
   MASTER_INVENTORY_LEDGER_PAGES,
@@ -29,8 +29,7 @@ import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/command/inventory")({
   loader: async ({ context }) => {
-    const items = await getMasterInventoryItems();
-    return { items, role: context.commandRole };
+    return { role: context.commandRole };
   },
   component: MasterInventory,
 });
@@ -131,9 +130,41 @@ function ledgerLabel(id: MasterInventoryLedgerId) {
   return MASTER_INVENTORY_LEDGER_PAGES.find((ledger) => ledger.id === id)?.label ?? id;
 }
 
+type InventoryReadback = { items: MasterInventoryItemRecord[]; role: ReturnType<typeof Route.useLoaderData>["role"] };
+
 function MasterInventory() {
-  const data = Route.useLoaderData();
-  const router = useRouter();
+  const { role } = Route.useLoaderData();
+  const loadedAt = useRouterState({ select: (state) => state.loadedAt });
+  const [state, setState] = useState<
+    { status: "loading" } | { status: "error"; error: string } | { status: "ready"; items: MasterInventoryItemRecord[] }
+  >({ status: "loading" });
+  useEffect(() => {
+    let active = true;
+    setState({ status: "loading" });
+    void getMasterInventoryItems()
+      .then((items) => { if (active) setState({ status: "ready", items }); })
+      .catch((error) => { if (active) setState({ status: "error", error: error instanceof Error ? error.message : "Canonical Inventory unavailable" }); });
+    return () => { active = false; };
+  }, [loadedAt]);
+  async function refreshItems() {
+    try {
+      const items = await getMasterInventoryItems();
+      setState({ status: "ready", items });
+    } catch (error) {
+      setState({ status: "error", error: error instanceof Error ? error.message : "Canonical Inventory unavailable" });
+      throw error;
+    }
+  }
+  if (state.status !== "ready") return (
+    <section data-route-readiness={state.status} role={state.status === "error" ? "alert" : "status"} className="space-y-3">
+      <h1 className="font-display text-4xl">Master Inventory</h1>
+      <p className="text-sm text-muted">{state.status === "error" ? state.error : "Loading canonical stock, ledger and demand coverage…"}</p>
+    </section>
+  );
+  return <section data-route-readiness="ready"><MasterInventoryReady data={{ items: state.items, role }} onReload={refreshItems} /></section>;
+}
+
+function MasterInventoryReady({ data, onReload }: { data: InventoryReadback; onReload: () => Promise<void> }) {
   const items = useMemo(() => data.items.map(viewItem), [data.items]);
   const [entryOpen, setEntryOpen] = useState(false);
   const [draft, setDraft] = useState(blankEntry);
@@ -201,7 +232,7 @@ function MasterInventory() {
       });
       setDraft({ ...blankEntry, ledgerId: draft.ledgerId, receivedOn: today() });
       setMessage("Saved. The item and receipt are now in the selected ledger.");
-      await router.invalidate();
+      await onReload();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Inventory entry could not be saved.");
     } finally {

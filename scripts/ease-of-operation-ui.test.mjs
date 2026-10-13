@@ -190,5 +190,7 @@ test("Master Inventory initial GET does not reconstruct FIFO lot audit history",
   assert.ok(loaderStart >= 0 && loaderEnd > loaderStart);
   const loader = inventorySource.slice(loaderStart, loaderEnd);
   assert.doesNotMatch(loader, /getMasterInventoryData\(\)/);
-  assert.match(loader, /getMasterInventoryItems\(\)/);
+  assert.doesNotMatch(loader, /getMasterInventoryItems\(\)/);
+  assert.match(inventorySource, /void getMasterInventoryItems\(\)/);
+  assert.match(inventorySource, /data-route-readiness="ready"/);
 });

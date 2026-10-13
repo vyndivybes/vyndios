@@ -112,6 +112,9 @@ try {
 
       const startedAt = Date.now();
       await spaNavigate(page, route);
+      if (["/command/inventory", "/command/operations", "/command/risk", "/command/quality", "/command/financial-cockpit"].includes(route)) {
+        await page.locator('[data-route-readiness="ready"]').waitFor({ state: "attached", timeout: 30_000 });
+      }
       await page.locator("body").waitFor({ state: "visible", timeout: 30_000 });
       await page.waitForTimeout(120);
 

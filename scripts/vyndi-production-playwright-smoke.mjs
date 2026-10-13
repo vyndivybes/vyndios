@@ -21,6 +21,7 @@ if (parsedBase.protocol !== "https:" && !["localhost", "127.0.0.1"].includes(par
 }
 
 const cpuBoundClientRoutes = new Set([
+  "/command/inventory",
   "/command/operations",
   "/command/risk",
   "/command/actuals",
