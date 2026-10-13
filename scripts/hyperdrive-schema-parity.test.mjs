@@ -26,6 +26,18 @@ test("Hyperdrive database requests never execute schema DDL before returning SQL
   assert.match(block,/createPostgresSql\(transport\)/);
 });
 
+test("schema readiness never shares pending request I/O or locks the read-only migration check",()=>{
+  const start=dbServer.indexOf("async function checkHyperdriveSchemaReady");
+  const end=dbServer.indexOf("export async function readRuntimeSchemaMigrationStatus",start);
+  const gate=dbServer.slice(start,end);
+  assert.match(gate,/schemaReadinessGate\(getRequest\(\), async/);
+  assert.doesNotMatch(dbServer,/__hyperdriveMigrationReady__/);
+  assert.doesNotMatch(gate,/pg_advisory|client\.query\("BEGIN"|client\.query\("COMMIT"/);
+  assert.match(gate,/connectionTimeoutMillis:3_500/);
+  assert.match(gate,/query_timeout:10_000/);
+  assert.match(gate,/select name from _migrations/);
+});
+
 test("runtime migration policy blocks destructive SQL and only permits Hyperdrive",()=>{
   assert.match(helper,/transportSource!=="hyperdrive"/);
   assert.match(helper,/DROP TABLE/);

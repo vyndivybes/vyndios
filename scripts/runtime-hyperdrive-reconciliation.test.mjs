@@ -10,7 +10,9 @@ test("Hyperdrive is a least-privilege schema parity gate, never a runtime DDL wr
   const gate=source.slice(start,end);
 
   assert.match(gate,/planRuntimeSchemaMigrations/);
-  assert.match(gate,/pg_advisory_xact_lock/);
+  assert.doesNotMatch(gate,/pg_advisory_xact_lock/);
+  assert.match(gate,/schemaReadinessGate\(getRequest\(\), async/);
+  assert.match(gate,/query_timeout:10_000/);
   assert.match(gate,/SCHEMA_LAG/);
   assert.match(gate,/plan\.pending/);
   assert.doesNotMatch(gate,/create table if not exists _migrations/i);
