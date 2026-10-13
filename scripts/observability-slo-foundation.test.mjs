@@ -52,3 +52,34 @@ test("H1 SLO runner measures exact-SHA protected-route evidence without writes",
   assert.match(freeze, /ee47744b89b9f9aa16da0c110fc0cdfa8471c426/);
   assert.match(freeze, /Broad business-feature expansion pauses/);
 });
+
+test("SLO failures surface route-by-route diagnostics without disclosing browser data", async () => {
+  const { summarizePublicFailureDiagnostics } = await import("./slo-failure-diagnostics.mjs");
+  const routes = [
+    { route: "/command", ok: true, status: 200, durationMs: 50 },
+    { route: "/command/sales", ok: false, status: 503, durationMs: 500, error: "secret=DO_NOT_EXPOSE", pageErrors: ["DO_NOT_EXPOSE"] },
+    { route: "/command/sales", ok: false, status: null, durationMs: 60000, error: "page.goto: Timeout 60000ms exceeded https://private" },
+    { route: "/command/inventory", ok: false, status: 200, durationMs: 150, error: "lost authenticated access: session DO_NOT_EXPOSE" },
+    { route: "/command/quality", ok: false, status: 200, durationMs: 250, pageErrors: ["token DO_NOT_EXPOSE"], error: "browser emitted errors" },
+  ];
+  const result = summarizePublicFailureDiagnostics(routes);
+  assert.equal(result.failures, 4);
+  assert.equal(result.routeFailures.length, 3);
+  assert.deepEqual(result.routeFailures.find(r => r.route === "/command/sales").reasons, {
+    HTTP_5XX: 1, NAVIGATION_TIMEOUT: 1,
+  });
+  assert.deepEqual(result.routeFailures.find(r => r.route === "/command/inventory").reasons, { AUTH_REDIRECT: 1 });
+  assert.deepEqual(result.routeFailures.find(r => r.route === "/command/quality").reasons, { BROWSER_EXCEPTION: 1 });
+  assert.doesNotMatch(JSON.stringify(result), /DO_NOT_EXPOSE|private|secret|token/);
+});
+
+test("SLO must emit safe failure breakdown before fail-closed assertion and retain latency gates", async () => {
+  const runner = await read("scripts/vyndi-observability-slo.mjs");
+  assert.match(runner, /summarizePublicFailureDiagnostics/);
+  const diagnosticPos = runner.indexOf('event: "vyndi.slo.failure-diagnostics"');
+  const failedAssertionPos = runner.indexOf("assert.equal(aggregate.failures, 0");
+  assert.ok(diagnosticPos > 0 && diagnosticPos < failedAssertionPos, "Safe diagnostics must appear before failure throws");
+  assert.match(runner, /aggregate\.p95Ms/);
+  assert.match(runner, /aggregate\.p99Ms/);
+  assert.match(runner, /report\.summary = \{ aggregate, byRoute \}/);
+});
