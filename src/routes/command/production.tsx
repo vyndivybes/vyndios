@@ -349,8 +349,8 @@ function ProductionWorkspace() {
                     return pending ? (
                       <div className="mt-3 space-y-2 rounded-lg border border-warn/40 p-3">
                         <p className="text-xs font-semibold text-warn">Controlled change awaiting authorization</p>
-                        <p className="text-xs text-muted">Approved R{order.job_card_revision} → requested R{pending.target_sales_revision}. {pending.reason}</p>
-                        {pending.ecn_id ? <p className="text-xs text-muted">Released ECN {pending.ecn_id}</p> : null}
+                        <p className="text-xs text-muted">Approved R{order.job_card_revision} → requested R{String(pending.target_sales_revision)}. {String(pending.reason)}</p>
+                        {pending.ecn_id ? <p className="text-xs text-muted">Released ECN {String(pending.ecn_id)}</p> : null}
                         <Button className="w-full" disabled={busyAction!==null} onClick={()=>void approveControlledChange(String(pending.id))}>{busyAction==="change-apply:"+pending.id?"Applying…":"Approve and release successor"}</Button>
                       </div>
                     ):(
@@ -362,7 +362,7 @@ function ProductionWorkspace() {
                         <label className="block text-xs text-muted">Released ECN (mandatory for configuration/BOM change)
                           <select className="control mt-1 w-full" value={changeEcns[String(order.id)]??""} onChange={e=>setChangeEcns(current=>({...current,[String(order.id)]:e.target.value}))}>
                             <option value="">Operational-only change (no ECN)</option>
-                            {notices.map((notice:any)=><option key={notice.id} value={notice.id}>{notice.notice_number} · {notice.target_bom_revision??"No BOM change"}</option>)}
+                            {notices.map((notice:any)=><option key={notice.id} value={notice.id}>{String(notice.notice_number)} · {String(notice.target_bom_revision??"No BOM change")}</option>)}
                           </select>
                         </label>
                         <Link to="/command/engineering" className="block text-xs text-accent">Engineering ECR / ECO / ECN →</Link>
