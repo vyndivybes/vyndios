@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { authMiddleware } from "@/lib/auth/middleware";
+import type { ProductConfiguration } from "@/lib/product-configuration";
 import { requireBusinessActor } from "@/lib/business-actor";
 import { withSqlTransaction, type Sql } from "@/lib/db";
 import { evaluateEngineeringChangeEffectivity, type EngineeringEffectivityRule } from "@/lib/engineering-change-control-model";
@@ -18,7 +19,7 @@ type SalesOrder = {
   id:string;revision:number|string;plan_month:number|string;product_id:"aluminium"|"carbon"|"premiumCarbon";
   units:number|string;status:"lead"|"confirmed"|"delivered"|"cancelled";
   model_tier:"core"|"pro"|"apex"|null;variant_id:string|null;variant_name:string|null;
-  configuration:Record<string,string>;
+  configuration:ProductConfiguration;
 };
 type JobCard = {
   id:string;sales_order_id:string;sales_order_revision:number|string;status:string;
