@@ -4,6 +4,7 @@ import { getSql } from "@/lib/db";
 import { getCommandRole } from "@/lib/command-access";
 import { canPerform, type CommandPermission } from "@/lib/page-access";
 import { CURRENT_VEDM_AUTHORITY } from "@/lib/engineering-current-authority";
+import {classifyEngineeringBaselines, type BaselineSourceRow} from "@/lib/engineering-baseline-reconciliation";
 import { compileVedmAuthorityGraph, createVedmR3aSeed } from "@/lib/vedm-authority-graph";
 
 const familySchema = z.enum(["longitude", "latitude", "altitude"]);
@@ -49,7 +50,7 @@ export const listEngineeringAuthority = createServerFn({ method: "GET" }).handle
   await assertSameSiteRequest();
   await requirePermission("view");
   const sql = await getSql();
-  const [baselines, changes, evidenceReceipts, workflows, releaseDecisions, threadSnapshots] = await Promise.all([
+  const [baselines, changes, evidenceReceipts, workflows, releaseDecisions, threadSnapshots, bomReleases, manifests] = await Promise.all([
     sql`
       select b.*, f.display_name as family_name, v.display_name as variant_name
       from vyndi_engineering_baselines b
@@ -94,11 +95,19 @@ export const listEngineeringAuthority = createServerFn({ method: "GET" }).handle
       order by created_at desc
       limit 25
     `,
+    sql`select id,bom_revision from vyndi_bom_revision_releases order by released_at desc`,
+    sql`select baseline_id,bom_release_id,finalized from vyndi_engineering_configuration_manifests order by created_at desc`,
   ]);
   const vedmGraph = compileVedmAuthorityGraph(
     createVedmR3aSeed(),
     new Date().toISOString().slice(0, 10),
   );
+  const statuses=classifyEngineeringBaselines({
+    baselines:baselines as BaselineSourceRow[],
+    bomReleases:bomReleases as {id:string;bom_revision:string}[],
+    manifests:manifests as {baseline_id:string;bom_release_id:string|null;finalized:boolean}[],
+  });
+  const dispositions=new Map(statuses.map(item=>[item.id,item]));
   return {
     vedmAuthority: CURRENT_VEDM_AUTHORITY,
     vedmAuthorityGraph: {
@@ -115,7 +124,13 @@ export const listEngineeringAuthority = createServerFn({ method: "GET" }).handle
       issues: vedmGraph.issues,
       mutationAuthority: "HUMAN_APPROVAL_REQUIRED",
     },
-    baselines: Array.isArray(baselines) ? [...baselines] : [],
+    baselines: Array.isArray(baselines)
+      ? baselines.map(row=>({...row,
+         release_disposition:dispositions.get(String(row.id))?.releaseDisposition??"UNKNOWN",
+         record_origin:dispositions.get(String(row.id))?.recordOrigin??"NOT_INDEPENDENTLY_VERIFIED",
+         bom_link_qualified:dispositions.get(String(row.id))?.bomLinkQualified??false,
+         production_release_qualified:false}))
+      : [],
     changes: Array.isArray(changes) ? [...changes] : [],
     evidenceReceipts: Array.isArray(evidenceReceipts) ? [...evidenceReceipts] : [],
     r3Governance: {
