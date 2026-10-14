@@ -329,7 +329,7 @@ function Commercial() {
                       <td data-label="Value" className="px-3 py-2 font-semibold text-fg tabular-nums">{lakh(order.units * order.aspLakh)}</td>
                       <td data-label="Channel" className="px-3 py-2 text-muted">{order.channel}</td>
                       <td data-label="Control" className="px-3 py-2">
-                        <button type="button" className="rounded-md border border-border px-3 py-2 text-xs font-semibold text-accent hover:border-accent focus-visible:outline" aria-expanded={editingOrderId === order.id} aria-controls={`order-editor-${order.id}`} onClick={() => setEditingOrderId((current) => current === order.id ? null : order.id)}>
+                        <button type="button" className="rounded-md border border-border px-3 py-2 text-xs font-semibold text-accent hover:border-accent focus-visible:outline" aria-label={editingOrderId === order.id ? "Close order revision" : "Revise order / configuration"} aria-expanded={editingOrderId === order.id} aria-controls={`order-editor-${order.id}`} onClick={() => setEditingOrderId((current) => current === order.id ? null : order.id)}>
                           {editingOrderId === order.id ? "Close revision" : "Revise order"}
                         </button>
                       </td>
