@@ -19,7 +19,7 @@ export function EngineeringChangeControlPanel({state}:{state:EngineeringChangeCo
     targetBomVenture:"" as ""|"carbon"|"aluminium",targetBomModelId:"",targetBomRevision:"",
     implementationPlan:"",verificationPlan:"",sourceReference:"UI:ENGINEERING:ECO",
   });
-  const [ecrForm,setEcrForm]=useState({baselineId:"",title:"",reason:""});
+  const [ecrForm,setEcrForm]=useState({baselineId:"",title:"",reason:"",targetBomRevision:""});
   const chosenBaseline=state.releasedBaselines.find((x)=>x.id===ecrForm.baselineId);
   const [effectForm,setEffectForm]=useState<Record<string,{type:"variant"|"date"|"serial"|"sales_order"|"job_card";valueFrom:string;valueTo:string;effectiveFrom:string;effectiveTo:string;sourceReference:string}>>({});
 
@@ -60,6 +60,9 @@ export function EngineeringChangeControlPanel({state}:{state:EngineeringChangeCo
         <label className="text-xs text-muted">Change title
           <input className="control mt-1" value={ecrForm.title} onChange={(e)=>setEcrForm({...ecrForm,title:e.target.value})} placeholder="Commercial order configuration revision"/>
         </label>
+        <label className="text-xs text-muted md:col-span-2">Target BOM revision (only if BOM must change)
+          <input className="control mt-1" value={ecrForm.targetBomRevision} onChange={(e)=>setEcrForm({...ecrForm,targetBomRevision:e.target.value})} placeholder="Leave empty when released BOM is unchanged"/>
+        </label>
         <label className="text-xs text-muted md:col-span-2">Reason and impact
           <textarea className="control mt-1 min-h-20" value={ecrForm.reason} onChange={(e)=>setEcrForm({...ecrForm,reason:e.target.value})} placeholder="Reason for change, affected order, BOM and disposition plan"/>
         </label>
@@ -68,7 +71,7 @@ export function EngineeringChangeControlPanel({state}:{state:EngineeringChangeCo
         onClick={()=>void act("ecr-create",()=>createEngineeringChange({data:{
           id:"ECR-"+crypto.randomUUID(),familyCode:chosenBaseline!.familyCode as "longitude"|"latitude"|"altitude",
           variantId:chosenBaseline!.variantId,fromBaselineId:chosenBaseline!.id,targetRevisionCode:chosenBaseline!.revisionCode,
-          targetBomRevision:null,title:ecrForm.title.trim(),reason:ecrForm.reason.trim(),
+          targetBomRevision:ecrForm.targetBomRevision.trim()||null,title:ecrForm.title.trim(),reason:ecrForm.reason.trim(),
           bomCostDeltaInr:0,weightDeltaG:0,productionImpactPct:0,inventoryImpactLakh:0,affectedSkus:[],
           sourceReference:"UI:ENGINEERING:PRODUCTION-CHANGE",
         }}),"ECR created; submit it and approve below.")} className="mt-3 rounded bg-accent px-4 py-2 text-xs font-semibold text-bg disabled:opacity-40">Create ECR</button>
