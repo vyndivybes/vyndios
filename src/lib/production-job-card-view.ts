@@ -12,20 +12,20 @@ export const getProductionJobCardView = createServerFn({ method: "GET" })
     context.userId ? { userId: context.userId, email: context.userEmail } : undefined,
   );
   const sql = await getSql();
-  const [orders, cards, lines, travellers] = await Promise.all([
+  const [orders, cards, lines, travellers, changes, notices] = await Promise.all([
     sql`
       select o.id,o.revision,o.plan_month,o.units,o.variant_id,o.variant_name,o.status,
              c.id as job_card_id,c.status as job_card_status,c.sales_order_revision as job_card_revision,
              c.batch_code,c.approved_at::text as job_card_approved_at
         from vyndi_sales_orders o
-        left join epr_production_job_cards c on c.sales_order_id=o.id
+        left join epr_production_job_cards c on c.sales_order_id=o.id and c.current_for_order=true
        where o.status='confirmed'
        order by o.plan_month,o.id
     `,
     sql`
       select c.id,c.sales_order_id,c.sales_order_revision,c.product_id,c.product_label,c.units,c.bom_tier,c.due_month,c.status,
              c.production_owner,c.created_by,c.model_tier,c.variant_id,c.configuration,c.bom_revision,c.released_mapping_set,
-             c.batch_code,c.approved_by,c.approved_at::text as approved_at,
+             c.batch_code,c.approved_by,c.approved_at::text as approved_at,c.current_for_order,c.supersedes_job_card_id,c.production_change_id,
              coalesce(p.po_draft_count,0)::int as po_draft_count,
              c.created_at::text as created_at,c.updated_at::text as updated_at
         from epr_production_job_cards c
@@ -63,6 +63,8 @@ export const getProductionJobCardView = createServerFn({ method: "GET" })
         left join epr_production_job_cards c on c.id=t.job_card_id
        order by t.created_at desc,t.serial_number asc limit 500
     `,
+    sql`select id,sales_order_id,source_job_card_id,target_sales_revision,reason,ecn_id,status,created_by,approved_by,successor_job_card_id,created_at::text as created_at,applied_at::text as applied_at from vyndi_production_change_requests order by created_at desc limit 500`,
+    sql`select id,notice_number,target_bom_revision from vyndi_engineering_change_notices order by released_at desc limit 100`,
   ]);
 
   // These columns are scalar database identifiers/labels. Normalize them at the
@@ -88,5 +90,5 @@ export const getProductionJobCardView = createServerFn({ method: "GET" })
     updated_at: String(row.updated_at ?? ""),
   }));
 
-  return { orders, cards, lines, travellers: normalizedTravellers };
+  return { orders, cards, lines, travellers: normalizedTravellers, changes, notices };
 });
