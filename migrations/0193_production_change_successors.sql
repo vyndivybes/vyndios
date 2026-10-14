@@ -77,7 +77,8 @@ begin
   select c.current_for_order into v_current
     from epr_travellers t
     join epr_production_job_cards c on c.id=t.job_card_id
-    where t.id=v_traveller;
+    where t.id=v_traveller
+    for share of c;
   if v_current=false then
     raise exception 'Superseded production Job Card cannot accept new traveller, quality or dispatch evidence.';
   end if;
