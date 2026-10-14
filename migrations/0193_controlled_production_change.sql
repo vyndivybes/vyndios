@@ -68,3 +68,66 @@ for each row execute function vyndi_guard_superseded_reservation_issue();
 
 comment on table vyndi_production_changes is
   'Approved commercial-order revision linked to immutable ECR/ECO/ECN authority and an archived predecessor Job Card. Application is one serializable transaction, not a silent in-place rewrite.';
+
+
+-- A superseded predecessor remains queryable but cannot acquire new EPR
+-- evidence, traverse new production gates, or be silently resumed.
+create or replace function vyndi_guard_superseded_traveller_mutation()
+returns trigger language plpgsql as $$
+declare v_job_card text;
+begin
+  v_job_card:=case when tg_op='DELETE' then old.job_card_id else new.job_card_id end;
+  if v_job_card is not null and exists(
+    select 1 from epr_production_job_cards c where c.id=v_job_card and c.superseded_at is not null
+  ) then
+    raise exception 'Historical traveller on superseded Job Card % is immutable.',v_job_card;
+  end if;
+  if tg_op='DELETE' then return old; end if;
+  return new;
+end;
+$$;
+drop trigger if exists trg_vyndi_superseded_traveller_immutability on epr_travellers;
+create trigger trg_vyndi_superseded_traveller_immutability
+before insert or update or delete on epr_travellers
+for each row execute function vyndi_guard_superseded_traveller_mutation();
+
+create or replace function vyndi_guard_superseded_epr_evidence()
+returns trigger language plpgsql as $$
+declare v_traveller text;
+begin
+  v_traveller:=case when tg_op='DELETE' then old.traveller_id else new.traveller_id end;
+  if exists(
+    select 1 from epr_travellers t
+    join epr_production_job_cards c on c.id=t.job_card_id
+    where t.id=v_traveller and c.superseded_at is not null
+  ) then
+    raise exception 'Historical EPR evidence for superseded traveller % is immutable.',v_traveller;
+  end if;
+  if tg_op='DELETE' then return old; end if;
+  return new;
+end;
+$$;
+drop trigger if exists trg_vyndi_superseded_epr_gates on epr_gate_events;
+create trigger trg_vyndi_superseded_epr_gates
+before insert or update or delete on epr_gate_events
+for each row execute function vyndi_guard_superseded_epr_evidence();
+drop trigger if exists trg_vyndi_superseded_epr_records on epr_evidence;
+create trigger trg_vyndi_superseded_epr_records
+before insert or update or delete on epr_evidence
+for each row execute function vyndi_guard_superseded_epr_evidence();
+
+create or replace function vyndi_guard_superseded_supplier_order()
+returns trigger language plpgsql as $$
+begin
+  if new.status<>'cancelled' and new.job_card_id is not null and exists(
+    select 1 from epr_production_job_cards c where c.id=new.job_card_id and c.superseded_at is not null
+  ) then
+    raise exception 'Cannot create or reopen a purchase order on a superseded Job Card.';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists trg_vyndi_superseded_supplier_order on vyndi_purchase_orders;
+create trigger trg_vyndi_superseded_supplier_order
+before insert or update of status,job_card_id on vyndi_purchase_orders
+for each row execute function vyndi_guard_superseded_supplier_order();
