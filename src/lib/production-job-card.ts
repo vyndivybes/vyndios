@@ -13,7 +13,7 @@ function ventureForTier(tier: ProductTier) {
   return tier === "core" ? "aluminium" : "carbon";
 }
 
-function stageFor(category: string | null, bomLineKey: string) {
+export function stageFor(category: string | null, bomLineKey: string) {
   const value = (category ?? bomLineKey).toLowerCase();
   if (value.includes("frame") || value.includes("fork") || value.includes("raw"))
     return { no: 1, code: "RM", name: "Raw material & frame set", type: "raw_material" as const };
@@ -29,7 +29,7 @@ async function requireProductionView() {
   if (!role || !canPerform(role, "view")) throw new Error("Production job-card permission denied.");
 }
 
-type OrderRow = {
+export type OrderRow = {
   id: string;
   revision: number | string;
   plan_month: number | string;
@@ -70,7 +70,7 @@ async function releasedRows(
   );
 }
 
-async function activeReleasedMappings(
+export async function activeReleasedMappings(
   sql: Awaited<ReturnType<typeof getSql>>,
   order: OrderRow,
 ): Promise<{ bomRevision: string; rows: MappingRow[]; authority: "variant" | "family-standard" }> {
@@ -143,7 +143,7 @@ export const syncProductionJobCard = createServerFn({ method: "POST" })
     if (!order) throw new Error("Sales order not found in the central order authority.");
 
     const [existing] = await sql.query<{ id: string; status: string; sales_order_revision: number | string; bom_revision:string|null; approved_at:string|null }>(
-      `select id,status,sales_order_revision,bom_revision,approved_at::text as approved_at from epr_production_job_cards where sales_order_id=$1 limit 1`,
+      `select id,status,sales_order_revision,bom_revision,approved_at::text as approved_at from epr_production_job_cards where sales_order_id=$1 and current_for_order=true limit 1`,
       [order.id],
     );
 
