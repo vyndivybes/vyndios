@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getSql } from "@/lib/db";
+import {classifyEngineeringBaselines, type BaselineSourceRow} from "@/lib/engineering-baseline-reconciliation";
 import {normalizeVaosScheduleExport,validateScheduleProjectInput} from "@/lib/vaos-schedule-export";
 import {
   sha256Hex,
@@ -156,19 +157,34 @@ async function executeRead(
   }
 
   if (actionType === "ENGINEERING.OBSERVE_CONFIGURATION") {
-    const [changeOrders, baselines] = await Promise.all([
+    const [changeOrders, baselines, bomReleases, manifests] = await Promise.all([
       sql.query<{ record: unknown }>(
         "select to_jsonb(e) as record from vyndi_engineering_change_orders e order by e.updated_at desc limit $1",
         [limit],
       ),
-      sql.query<{ record: unknown }>(
+      sql.query<{ record: BaselineSourceRow }>(
         "select to_jsonb(b) as record from vyndi_engineering_baselines b order by b.updated_at desc limit $1",
         [limit],
       ),
+      sql.query<{ id:string;bom_revision:string }>(
+        "select id,bom_revision from vyndi_bom_revision_releases order by released_at desc limit $1",[limit]
+      ),
+      sql.query<{ baseline_id:string;bom_release_id:string|null;finalized:boolean }>(
+        "select baseline_id,bom_release_id,finalized from vyndi_engineering_configuration_manifests order by created_at desc limit $1",[limit]
+      ),
     ]);
+    const dispositions=classifyEngineeringBaselines({
+      baselines:baselines.map(row=>row.record),bomReleases,manifests
+    });
     return {
       changeOrders: changeOrders.map((row) => row.record),
-      baselines: baselines.map((row) => row.record),
+      baselines: baselines.map((row,index) => ({
+        ...row.record,
+        release_disposition:dispositions[index].releaseDisposition,
+        record_origin:dispositions[index].recordOrigin,
+        bom_link_qualified:dispositions[index].bomLinkQualified,
+        production_release_qualified:false,
+      })),
     };
   }
 
