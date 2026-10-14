@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { Kpi, Panel } from "@/components/kpi";
+import { createEngineeringChange, transitionEngineeringChange } from "@/lib/engineering-authority";
 import {
   addEngineeringEffectivityRule,
   createEngineeringChangeOrder,
@@ -18,6 +19,8 @@ export function EngineeringChangeControlPanel({state}:{state:EngineeringChangeCo
     targetBomVenture:"" as ""|"carbon"|"aluminium",targetBomModelId:"",targetBomRevision:"",
     implementationPlan:"",verificationPlan:"",sourceReference:"UI:ENGINEERING:ECO",
   });
+  const [ecrForm,setEcrForm]=useState({baselineId:"",title:"",reason:""});
+  const chosenBaseline=state.releasedBaselines.find((x)=>x.id===ecrForm.baselineId);
   const [effectForm,setEffectForm]=useState<Record<string,{type:"variant"|"date"|"serial"|"sales_order"|"job_card";valueFrom:string;valueTo:string;effectiveFrom:string;effectiveTo:string;sourceReference:string}>>({});
 
   const selectedEcr=useMemo(()=>state.approvedEcrs.find((row)=>row.id===ecoForm.ecrId)??null,[state.approvedEcrs,ecoForm.ecrId]);
@@ -43,6 +46,39 @@ export function EngineeringChangeControlPanel({state}:{state:EngineeringChangeCo
       </div>
       <p className="mt-3 text-[10px] leading-4 text-subtle">This extends the existing Engineering baseline/ECR authority. ECO/ECN never releases a baseline or BOM by itself: those authorities must already be released before ECN issue.</p>
       {message?<div role="status" className="mt-3 rounded border border-border bg-surface px-3 py-2 text-xs text-muted">{message}</div>:null}
+    </Panel>
+
+    <Panel title="Engineering Change Request" kicker="Create → submit → approve · then open ECO/ECN">
+      <p className="text-xs leading-5 text-muted">For a stale approved Production Job Card, record the requested change against its released Engineering baseline. Use the exact Commercial Order or original Job Card ID as ECO effectivity before ECN release. Unchanged geometry/BOM can retain the released baseline; a new BOM must be separately released in BOM Control.</p>
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <label className="text-xs text-muted">Affected released baseline
+          <select className="control mt-1" value={ecrForm.baselineId} onChange={(e)=>setEcrForm({...ecrForm,baselineId:e.target.value})}>
+            <option value="">Select baseline</option>
+            {state.releasedBaselines.map((row)=><option key={row.id} value={row.id}>{row.familyCode} · {row.variantId??"family"} · {row.revisionCode} · {row.bomRevision??"no BOM"}</option>)}
+          </select>
+        </label>
+        <label className="text-xs text-muted">Change title
+          <input className="control mt-1" value={ecrForm.title} onChange={(e)=>setEcrForm({...ecrForm,title:e.target.value})} placeholder="Commercial order configuration revision"/>
+        </label>
+        <label className="text-xs text-muted md:col-span-2">Reason and impact
+          <textarea className="control mt-1 min-h-20" value={ecrForm.reason} onChange={(e)=>setEcrForm({...ecrForm,reason:e.target.value})} placeholder="Reason for change, affected order, BOM and disposition plan"/>
+        </label>
+      </div>
+      <button type="button" disabled={!!busy||!chosenBaseline||!ecrForm.title.trim()||ecrForm.reason.trim().length<5}
+        onClick={()=>void act("ecr-create",()=>createEngineeringChange({data:{
+          id:"ECR-"+crypto.randomUUID(),familyCode:chosenBaseline!.familyCode as "longitude"|"latitude"|"altitude",
+          variantId:chosenBaseline!.variantId,fromBaselineId:chosenBaseline!.id,targetRevisionCode:chosenBaseline!.revisionCode,
+          targetBomRevision:null,title:ecrForm.title.trim(),reason:ecrForm.reason.trim(),
+          bomCostDeltaInr:0,weightDeltaG:0,productionImpactPct:0,inventoryImpactLakh:0,affectedSkus:[],
+          sourceReference:"UI:ENGINEERING:PRODUCTION-CHANGE",
+        }}),"ECR created; submit it and approve below.")} className="mt-3 rounded bg-accent px-4 py-2 text-xs font-semibold text-bg disabled:opacity-40">Create ECR</button>
+      {state.allEcrs.length>0?<div className="mt-4 space-y-2">
+        {state.allEcrs.map((ecr)=><div key={ecr.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border p-3 text-xs">
+          <div><p className="font-mono text-accent">{ecr.id}</p><p className="text-fg">{ecr.title}</p><p className="text-muted">{ecr.familyCode} · {ecr.targetRevisionCode} · {ecr.status}</p></div>
+          {ecr.status==="open"?<button type="button" disabled={!!busy} className="rounded border border-border px-3 py-2 text-accent" onClick={()=>void act("ecr-submit:"+ecr.id,()=>transitionEngineeringChange({data:{id:ecr.id,toStatus:"pending_approval",sourceReference:"UI:PRODUCTION-CHANGE:ECR"}}),"ECR submitted.")}>Submit ECR</button>:null}
+          {ecr.status==="pending_approval"?<button type="button" disabled={!!busy} className="rounded border border-border px-3 py-2 text-green" onClick={()=>void act("ecr-approve:"+ecr.id,()=>transitionEngineeringChange({data:{id:ecr.id,toStatus:"approved",sourceReference:"UI:PRODUCTION-CHANGE:ECR"}}),"ECR approved; create ECO below.")}>Approve ECR</button>:null}
+        </div>)}
+      </div>:null}
     </Panel>
 
     <Panel title="Create Engineering Change Order" kicker="Approved ECR → controlled implementation plan">
