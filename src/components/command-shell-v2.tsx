@@ -478,7 +478,7 @@ export function CommandShell({ initialRole }: { initialRole: CommandRole }) {
             <WorkspaceTabs role={role} routes={FINANCE_TABS} label="Finance workspace" />
             <WorkspaceTabs role={role} routes={GOVERNANCE_TABS} label="Governance and Assurance workspace" />
             <WorkspaceTabs role={role} routes={ADMIN_TABS} label="Administration workspace" />
-            <fieldset disabled={viewer} className="m-0 min-w-0 border-0 p-0">
+            <fieldset disabled={viewer} className="vyndi-command-tables m-0 min-w-0 border-0 p-0">
               <Outlet />
             </fieldset>
             <GuidedWorkPanel role={role} />
