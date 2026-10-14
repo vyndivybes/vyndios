@@ -128,6 +128,90 @@ async function activeReleasedMappings(
   return { bomRevision, rows: selected, authority: "variant" };
 }
 
+type ExistingProductionCard = { id:string; status:string; sales_order_revision:number|string; bom_revision:string|null; approved_at:string|null };
+type ReleasedProductionBom = Awaited<ReturnType<typeof activeReleasedMappings>>;
+
+/** Reuse the same authoritative BOM and reservation projection inside the
+ * atomic controlled-supersession transaction. Never rewrite an approved card. */
+async function writeSynchronizedProductionJobCard(
+  sql: Awaited<ReturnType<typeof getSql>>,
+  order: OrderRow,
+  existing: ExistingProductionCard | undefined,
+  actor: {userId:string;role:string},
+  released: ReleasedProductionBom,
+) {
+  const {bomRevision,rows:mappings,authority}=released;
+  const jobId = existing?.id ?? `JBC-${crypto.randomUUID()}`;
+  if (existing) {
+    await sql.query(`select release_epr_job_card_reservations($1,$2,$3)`, [jobId, actor.userId, actor.role]);
+    await sql.query(`delete from epr_production_job_card_lines where job_card_id=$1`, [jobId]);
+    await sql.query(
+      `update epr_production_job_cards set
+         product_id=$2,product_label=$3,units=$4,bom_tier=$5,due_month=$6,status='released',
+         model_tier=$5,variant_id=$7,configuration=$8::jsonb,sales_order_revision=$9,bom_revision=$10,
+         released_mapping_set=$11::jsonb,updated_by=$12,updated_at=now()
+       where id=$1`,
+      [jobId, order.product_id, order.variant_name ?? order.variant_id, Number(order.units), order.model_tier, Number(order.plan_month), order.variant_id, JSON.stringify(order.configuration ?? {}), Number(order.revision), bomRevision, JSON.stringify(mappings.map((m) => m.id)), actor.userId],
+    );
+  } else {
+    await sql.query(
+      `insert into epr_production_job_cards
+        (id,sales_order_id,product_id,product_label,units,bom_tier,due_month,status,production_owner,created_by,
+         model_tier,variant_id,configuration,sales_order_revision,bom_revision,released_mapping_set,updated_by)
+       values ($1,$2,$3,$4,$5,$6,$7,'released','operations',$8,$6,$9,$10::jsonb,$11,$12,$13::jsonb,$8)`,
+      [jobId, order.id, order.product_id, order.variant_name ?? order.variant_id, Number(order.units), order.model_tier, Number(order.plan_month), actor.userId, order.variant_id, JSON.stringify(order.configuration ?? {}), Number(order.revision), bomRevision, JSON.stringify(mappings.map((m) => m.id))],
+    );
+  }
+   for (const [index, mapping] of mappings.entries()) {
+    const stage = stageFor(mapping.configuration_category, mapping.bom_line_key);
+    const lineId = `${jobId}-${index + 1}`;
+    const quantity = Number(order.units) * Number(mapping.quantity);
+    await sql.query(
+      `insert into epr_production_job_card_lines
+        (id,job_card_id,stage_no,stage_code,stage_name,line_type,item,quantity,unit,source_bom_line,sku,category,
+         available_quantity,shortage_quantity,issue_status,bom_mapping_id,requirement_revision)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,0,$8,'pending',$13,$14)`,
+      [lineId, jobId, stage.no, stage.code, stage.name, stage.type, mapping.bom_line_key, quantity, mapping.unit, mapping.bom_line_key, mapping.sku, mapping.configuration_category, mapping.id, Number(order.revision)],
+    );
+    await sql.query(`select * from reserve_epr_inventory_for_job_line($1,$2,$3,$4,$5)`, [
+      `RES-${crypto.randomUUID()}`, jobId, lineId, actor.userId, actor.role,
+    ]);
+  }
+   const operations = [
+    { no: 4, code: "FA", name: "Final assembly", item: "Final assembly" },
+    { no: 5, code: "QC", name: "QC, release & packaging", item: "QC, release & packaging" },
+  ];
+  for (const [index, step] of operations.entries()) {
+    await sql.query(
+      `insert into epr_production_job_card_lines
+        (id,job_card_id,stage_no,stage_code,stage_name,line_type,item,quantity,unit,source_bom_line,issue_status,requirement_revision)
+       values ($1,$2,$3,$4,$5,'operation',$6,$7,'operation',$6,'pending',$8)`,
+      [`${jobId}-OP-${index + 1}`, jobId, step.no, step.code, step.name, step.item, Number(order.units), Number(order.revision)],
+    );
+  }
+   await sql.query(
+    `insert into vyndi_audit_events
+      (id,entity_type,entity_id,entity_revision,action,actor_user_id,actor_role,source_reference,payload_json)
+     values ($1,'production_job_card',$2,$3,$4,$5,$6,$7,$8::jsonb)`,
+    [`AUD-JC-${crypto.randomUUID()}`, jobId, Number(order.revision), existing ? "synchronized_to_sales_revision" : "released_from_sales_order", actor.userId, actor.role, order.id,
+     JSON.stringify({ variantId: order.variant_id, bomRevision, bomAuthority: authority, mappingIds: mappings.map((m) => m.id), units: Number(order.units), dueMonth: Number(order.plan_month) })],
+  );
+   return { id: jobId, created: !existing, synchronized: true, state: "released" as const, salesOrderRevision: Number(order.revision), bomRevision, bomAuthority: authority };
+}
+
+export async function resolveProductionBom(sql: Awaited<ReturnType<typeof getSql>>, order: OrderRow) {
+  return activeReleasedMappings(sql, order);
+}
+
+export async function createControlledSuccessorJobCard(
+  sql: Awaited<ReturnType<typeof getSql>>,
+  order: OrderRow,
+  actor: {userId:string;role:string},
+) {
+  const released = await activeReleasedMappings(sql,order);
+  return writeSynchronizedProductionJobCard(sql,order,undefined,actor,released);
+}
+
 /** Synchronize Production from the current central Sales-order revision. */
 export const syncProductionJobCard = createServerFn({ method: "POST" })
   .validator(syncSchema)
@@ -143,7 +227,7 @@ export const syncProductionJobCard = createServerFn({ method: "POST" })
     if (!order) throw new Error("Sales order not found in the central order authority.");
 
     const [existing] = await sql.query<{ id: string; status: string; sales_order_revision: number | string; bom_revision:string|null; approved_at:string|null }>(
-      `select id,status,sales_order_revision,bom_revision,approved_at::text as approved_at from epr_production_job_cards where sales_order_id=$1 limit 1`,
+      `select id,status,sales_order_revision,bom_revision,approved_at::text as approved_at from epr_production_job_cards where sales_order_id=$1 and superseded_at is null limit 1`,
       [order.id],
     );
 
@@ -184,66 +268,7 @@ export const syncProductionJobCard = createServerFn({ method: "POST" })
       throw new Error("This job card is already in progress. Put it on controlled hold and process a production change before revising the order.");
     }
 
-    const jobId = existing?.id ?? `JBC-${crypto.randomUUID()}`;
-    if (existing) {
-      await sql.query(`select release_epr_job_card_reservations($1,$2,$3)`, [jobId, actor.userId, actor.role]);
-      await sql.query(`delete from epr_production_job_card_lines where job_card_id=$1`, [jobId]);
-      await sql.query(
-        `update epr_production_job_cards set
-           product_id=$2,product_label=$3,units=$4,bom_tier=$5,due_month=$6,status='released',
-           model_tier=$5,variant_id=$7,configuration=$8::jsonb,sales_order_revision=$9,bom_revision=$10,
-           released_mapping_set=$11::jsonb,updated_by=$12,updated_at=now()
-         where id=$1`,
-        [jobId, order.product_id, order.variant_name ?? order.variant_id, Number(order.units), order.model_tier, Number(order.plan_month), order.variant_id, JSON.stringify(order.configuration ?? {}), Number(order.revision), bomRevision, JSON.stringify(mappings.map((m) => m.id)), actor.userId],
-      );
-    } else {
-      await sql.query(
-        `insert into epr_production_job_cards
-          (id,sales_order_id,product_id,product_label,units,bom_tier,due_month,status,production_owner,created_by,
-           model_tier,variant_id,configuration,sales_order_revision,bom_revision,released_mapping_set,updated_by)
-         values ($1,$2,$3,$4,$5,$6,$7,'released','operations',$8,$6,$9,$10::jsonb,$11,$12,$13::jsonb,$8)`,
-        [jobId, order.id, order.product_id, order.variant_name ?? order.variant_id, Number(order.units), order.model_tier, Number(order.plan_month), actor.userId, order.variant_id, JSON.stringify(order.configuration ?? {}), Number(order.revision), bomRevision, JSON.stringify(mappings.map((m) => m.id))],
-      );
-    }
-
-    for (const [index, mapping] of mappings.entries()) {
-      const stage = stageFor(mapping.configuration_category, mapping.bom_line_key);
-      const lineId = `${jobId}-${index + 1}`;
-      const quantity = Number(order.units) * Number(mapping.quantity);
-      await sql.query(
-        `insert into epr_production_job_card_lines
-          (id,job_card_id,stage_no,stage_code,stage_name,line_type,item,quantity,unit,source_bom_line,sku,category,
-           available_quantity,shortage_quantity,issue_status,bom_mapping_id,requirement_revision)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,0,$8,'pending',$13,$14)`,
-        [lineId, jobId, stage.no, stage.code, stage.name, stage.type, mapping.bom_line_key, quantity, mapping.unit, mapping.bom_line_key, mapping.sku, mapping.configuration_category, mapping.id, Number(order.revision)],
-      );
-      await sql.query(`select * from reserve_epr_inventory_for_job_line($1,$2,$3,$4,$5)`, [
-        `RES-${crypto.randomUUID()}`, jobId, lineId, actor.userId, actor.role,
-      ]);
-    }
-
-    const operations = [
-      { no: 4, code: "FA", name: "Final assembly", item: "Final assembly" },
-      { no: 5, code: "QC", name: "QC, release & packaging", item: "QC, release & packaging" },
-    ];
-    for (const [index, step] of operations.entries()) {
-      await sql.query(
-        `insert into epr_production_job_card_lines
-          (id,job_card_id,stage_no,stage_code,stage_name,line_type,item,quantity,unit,source_bom_line,issue_status,requirement_revision)
-         values ($1,$2,$3,$4,$5,'operation',$6,$7,'operation',$6,'pending',$8)`,
-        [`${jobId}-OP-${index + 1}`, jobId, step.no, step.code, step.name, step.item, Number(order.units), Number(order.revision)],
-      );
-    }
-
-    await sql.query(
-      `insert into vyndi_audit_events
-        (id,entity_type,entity_id,entity_revision,action,actor_user_id,actor_role,source_reference,payload_json)
-       values ($1,'production_job_card',$2,$3,$4,$5,$6,$7,$8::jsonb)`,
-      [`AUD-JC-${crypto.randomUUID()}`, jobId, Number(order.revision), existing ? "synchronized_to_sales_revision" : "released_from_sales_order", actor.userId, actor.role, order.id,
-       JSON.stringify({ variantId: order.variant_id, bomRevision, bomAuthority: authority, mappingIds: mappings.map((m) => m.id), units: Number(order.units), dueMonth: Number(order.plan_month) })],
-    );
-
-    return { id: jobId, created: !existing, synchronized: true, state: "released" as const, salesOrderRevision: Number(order.revision), bomRevision, bomAuthority: authority };
+    return writeSynchronizedProductionJobCard(sql,order,existing,actor,{bomRevision,rows:mappings,authority});
   });
 
 export const refreshProductionReservations = createServerFn({ method: "POST" })
@@ -283,7 +308,7 @@ export const getProductionJobCards = createServerFn({ method: "GET" }).handler(a
     select id,sales_order_id,sales_order_revision,product_id,product_label,units,bom_tier,due_month,status,
            production_owner,created_by,model_tier,variant_id,configuration,bom_revision,released_mapping_set,
            batch_code,approved_by,approved_at::text as approved_at,created_at::text as created_at,updated_at::text as updated_at
-      from epr_production_job_cards order by due_month asc,created_at desc limit 500`;
+      from epr_production_job_cards where superseded_at is null order by due_month asc,created_at desc limit 500`;
   const lines = await sql`
     select job_card_line_id as id,job_card_id,sku,category,item,required_quantity as quantity,unit,
            physical_quantity as available_quantity,shortage_quantity,issue_status,bom_mapping_id,
