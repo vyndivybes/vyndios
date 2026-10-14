@@ -29,6 +29,10 @@ function baselineView(row: Row): Row {
     drawing_ref: text(row, "drawing_ref", "drawingRef"),
     bom_revision: text(row, "bom_revision", "bomRevision"),
     status: text(row, "status"),
+    release_disposition:text(row,"release_disposition"),
+    record_origin:text(row,"record_origin"),
+    bom_link_qualified:row.bom_link_qualified===true,
+    production_release_qualified:row.production_release_qualified===true,
   };
 }
 
@@ -77,6 +81,9 @@ function BaselineRecord({ row }: { row: Row }) {
   const drawing = text(row, "drawing_ref", "drawingRef");
   const bom = text(row, "bom_revision", "bomRevision") || "—";
   const status = text(row, "status");
+  const disposition=text(row,"release_disposition");
+  const unqualified=status==="released"&&row.production_release_qualified!==true;
+  const releaseDisplay=unqualified?"Prelaunch · not production approved":status;
 
   return (
     <article className="rounded-lg border border-border/80 bg-bg/45 p-3 transition-colors hover:bg-surface/45">
@@ -95,7 +102,10 @@ function BaselineRecord({ row }: { row: Row }) {
           <p className="break-all">{drawing || "—"}</p>
           <p className="mt-1 break-all">BOM {bom}</p>
         </div>
-        <p className="min-w-0 break-words text-[10px] font-semibold uppercase text-green">{status}</p>
+        <div className="min-w-0 break-words text-[10px] font-semibold uppercase">
+          <p className={unqualified?"text-amber-600":"text-green"}>{releaseDisplay}</p>
+          {unqualified?<p className="mt-1 normal-case text-muted">Stored: released · {disposition.replaceAll("_"," ").toLowerCase()}</p>:null}
+        </div>
       </div>
 
       <div className="space-y-3 lg:hidden">
@@ -104,7 +114,7 @@ function BaselineRecord({ row }: { row: Row }) {
             <p className="break-words text-sm font-semibold text-fg">{family}</p>
             <p className="mt-1 break-words text-[10px] text-muted">{variant}</p>
           </div>
-          <span className="shrink-0 text-[10px] font-semibold uppercase text-green">{status}</span>
+          <span className={"max-w-[55%] shrink-0 text-right text-[10px] font-semibold uppercase "+(unqualified?"text-amber-600":"text-green")}>{releaseDisplay}</span>
         </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs sm:grid-cols-3">
           <div className="min-w-0">
@@ -180,7 +190,9 @@ function Engineering() {
   const baselines = data.baselines as Row[];
   const changes = data.changes as Row[];
   const evidenceReceipts = data.evidenceReceipts as Row[];
-  const released = baselines.filter((row) => text(row, "status") === "released").length;
+  const released = baselines.filter((row) => row.production_release_qualified === true).length;
+  const legacyUnqualified=baselines.filter(row=>
+    text(row,"status")==="released"&&row.production_release_qualified!==true).length;
   const openChanges = changes.filter(
     (row) => !["implemented", "rejected"].includes(text(row, "status")),
   ).length;
@@ -193,8 +205,8 @@ function Engineering() {
         </p>
         <h1 className="mt-1 font-display text-4xl text-accent">Engineering</h1>
         <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">
-          Released baselines and engineering changes are loaded from the governed Engineering authority.
-          Legacy in-page revision arrays are no longer a competing source of truth.
+          Engineering baselines and changes are loaded from the governed records.
+          The legacy system-migration release labels do not constitute approved production configurations.
         </p>
         <div className="mt-3 flex flex-wrap gap-3 text-sm font-semibold">
           <Link to="/command/product" className="text-accent">Product register →</Link>
@@ -233,12 +245,19 @@ function Engineering() {
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi label="Baselines" value={String(baselines.length)} hint="Canonical records" />
-        <Kpi label="Released" value={String(released)} hint="G04 release evidence" tone={released ? "ok" : "warn"} />
+        <Kpi label="Production-authorized" value={String(released)} hint="Only verified release authority" tone={released ? "ok" : "warn"} />
+        <Kpi label="Prelaunch / unverified" value={String(legacyUnqualified)} hint="Historical labels retained; BOM approval not invented" tone={legacyUnqualified ? "warn" : "ok"} />
         <Kpi label="ECRs" value={String(changes.length)} hint="Controlled change requests" />
         <Kpi label="Open change" value={String(openChanges)} hint="Requires lifecycle action" tone={openChanges ? "warn" : "ok"} />
         <Kpi label="Workbench evidence" value={String(evidenceReceipts.length)} hint="Append-only receipts" tone={evidenceReceipts.length ? "ok" : "warn"} />
       </div>
 
+      {legacyUnqualified>0?<p className="rounded-lg border border-amber-600/40 bg-surface p-4 text-sm leading-6 text-fg">
+        {legacyUnqualified} migrated engineering baseline(s) still have historical “released” database labels but
+        lack approved production configuration evidence. They are preserved for traceability and cannot be used
+        as released BOM/production authority. Continue preparing a new controlled candidate revision;
+        no automatic release or BOM linkage has been created.
+      </p>:null}
       <Panel title="Engineering Baseline Register" kicker="Geometry · material · tooling · drawing · BOM">
         <div className="space-y-2" data-full-view-table="engineering-baseline-register">
           <div className="hidden grid-cols-[minmax(0,1.25fr)_minmax(0,.65fr)_minmax(0,1.45fr)_minmax(0,1fr)_minmax(0,1.25fr)_minmax(0,.75fr)] gap-3 rounded-lg border border-border bg-surface/55 px-3 py-2 text-[9px] font-bold uppercase tracking-[0.12em] text-subtle lg:grid">
