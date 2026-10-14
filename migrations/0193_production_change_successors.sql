@@ -64,3 +64,42 @@ for each row execute function vyndi_production_successor_guard();
 
 comment on table vyndi_production_change_requests is
   'Audited request and approval evidence linking immutable approved Job Card revisions to controlled successors; application gates verify no physical execution or downstream commitment before release.';
+
+-- Prevent any new physical execution, release evidence or serial allocation
+-- from being recorded against a superseded (noncurrent) approved Job Card.
+create or replace function vyndi_block_superseded_traveller_activity()
+returns trigger language plpgsql as $$
+declare
+  v_traveller text;
+  v_current boolean;
+begin
+  v_traveller:=new.traveller_id;
+  select c.current_for_order into v_current
+    from epr_travellers t
+    join epr_production_job_cards c on c.id=t.job_card_id
+    where t.id=v_traveller;
+  if v_current=false then
+    raise exception 'Superseded production Job Card cannot accept new traveller, quality or dispatch evidence.';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists vyndi_gate_supersession_guard on epr_gate_events;
+create trigger vyndi_gate_supersession_guard
+before insert or update on epr_gate_events
+for each row execute function vyndi_block_superseded_traveller_activity();
+
+drop trigger if exists vyndi_evidence_supersession_guard on epr_evidence;
+create trigger vyndi_evidence_supersession_guard
+before insert or update on epr_evidence
+for each row execute function vyndi_block_superseded_traveller_activity();
+
+drop trigger if exists vyndi_quality_supersession_guard on vyndi_quality_releases;
+create trigger vyndi_quality_supersession_guard
+before insert on vyndi_quality_releases
+for each row execute function vyndi_block_superseded_traveller_activity();
+
+drop trigger if exists vyndi_shipment_supersession_guard on vyndi_shipment_serial_allocations;
+create trigger vyndi_shipment_supersession_guard
+before insert on vyndi_shipment_serial_allocations
+for each row execute function vyndi_block_superseded_traveller_activity();
