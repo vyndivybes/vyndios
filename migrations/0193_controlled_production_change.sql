@@ -131,3 +131,49 @@ drop trigger if exists trg_vyndi_superseded_supplier_order on vyndi_purchase_ord
 create trigger trg_vyndi_superseded_supplier_order
 before insert or update of status,job_card_id on vyndi_purchase_orders
 for each row execute function vyndi_guard_superseded_supplier_order();
+
+
+-- Operational reports select the one current successor; historic predecessor
+-- remains available through the lineage and audit views.
+create or replace view vyndi_report_production_release_gate as
+select
+  c.id as job_card_id,
+  c.sales_order_id,
+  c.status,
+  c.bom_revision,
+  o.status as order_status,
+  o.units as order_units,
+  o.plan_month,
+  case
+    when c.status = 'planned' then 'AWAITING_RELEASE'
+    when c.status = 'released' then 'RELEASED'
+    when c.status = 'complete' then 'COMPLETE'
+    else upper(c.status)
+  end as gate_status
+from epr_production_job_cards c
+left join vyndi_sales_orders o on o.id = c.sales_order_id
+where c.superseded_at is null;
+
+
+create or replace view vyndi_report_order_book_sync as
+select
+  o.id as sales_order_id,
+  o.revision as order_revision,
+  o.status as order_status,
+  o.plan_month,
+  o.product_id,
+  o.units as order_units,
+  o.asp_lakh,
+  c.id as job_card_id,
+  c.sales_order_revision as job_order_revision,
+  c.status as job_status,
+  case
+    when c.id is null and o.status in ('confirmed', 'delivered') then 'MISSING_JOB_CARD'
+    when c.id is not null and c.sales_order_revision is distinct from o.revision then 'STALE_JOB_CARD'
+    when o.status = 'cancelled' and c.status <> 'cancelled' then 'CANCELLED_ORDER_ACTIVE_JOB'
+    else 'SYNCED'
+  end as sync_status
+from vyndi_sales_orders o
+left join epr_production_job_cards c on c.sales_order_id = o.id and c.superseded_at is null;
+
+
