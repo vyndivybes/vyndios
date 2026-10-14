@@ -1,0 +1,63 @@
+name: VYNDI OS Controlled Cloudflare Release
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/lib/engineering-baseline-reconciliation.ts'
+      - 'src/lib/engineering-baseline-reconciliation.test.ts'
+      - 'src/lib/engineering-authority.ts'
+      - 'src/lib/engineering-change-control-authority.ts'
+      - 'src/routes/api/vaos/bridge.ts'
+      - 'src/routes/command/engineering.tsx'
+      - 'package.json'
+      - '.github/workflows/vyndios-controlled-release.yml'
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact reviewed main commit to release
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: vyndios-controlled-worker-deploy
+  cancel-in-progress: false
+jobs:
+  deploy-reviewed-main:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_ACCOUNT_ID: e20ce7032f6475caaf1197b09d3fe164
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      EXPECTED_SHA: ${{ inputs.expected_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Require exact source and existing Cloudflare credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[a-f0-9]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          if [[ -z "${CLOUDFLARE_API_TOKEN:-}" ]]; then
+            echo "::error::CLOUDFLARE_API_TOKEN repository secret is missing. No deployment attempted."
+            exit 1
+          fi
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify build and existing migration contracts without applying schema changes
+        run: npm run build:bundle
+      - name: Recheck main before Cloudflare release
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$EXPECTED_SHA"
+      - name: Deploy exact reviewed source with source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.136.3 deploy --config wrangler.jsonc --var "VYNDI_SOURCE_SHA:$EXPECTED_SHA"
