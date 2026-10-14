@@ -357,7 +357,8 @@ test("G7: Command leads with today's operational control and demotes program gov
 
 test("G8: high-volume touched lists are compact and progressively disclosed", () => {
   assert.match(commercial, /compact register · expand only to revise/);
-  assert.match(commercial, /<table className="w-full table-auto text-left text-xs">/);
+  assert.match(commercial, /<table className="vyndi-register-table w-full text-left text-sm"/);
+  assert.match(commercial, /data-editor-row/);
   assert.match(commercial, /Revise order \/ configuration/);
   assert.match(operations, /compact register/);
   assert.match(peopleOffice, /expand/);
