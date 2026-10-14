@@ -74,20 +74,23 @@ export const requestProductionChange=createServerFn({method:"POST"})
   });
 
 async function assertNoExecution(sql:Sql,old:JobCard) {
-  const lines=await sql.query<{id:string}>(
-    "select id from epr_production_job_card_lines where job_card_id=$1 and issue_status in ('issued','complete') limit 1",
+  const lines=await sql.query<{id:string;issue_status:string}>(
+    "select id,issue_status from epr_production_job_card_lines where job_card_id=$1 for update",
     [old.id],
   );
-  if(lines.length) throw new Error("Material has been issued or consumed; put the build through Engineering/Quality disposition before a successor release.");
-  const reservations=await sql.query<{id:string}>(
-    "select id from epr_inventory_reservations where job_card_id=$1 and status='consumed' limit 1",[old.id],
+  if(lines.some(row=>["issued","complete"].includes(row.issue_status)))
+    throw new Error("Material has been issued or consumed; put the build through Engineering/Quality disposition before a successor release.");
+  const reservations=await sql.query<{id:string;status:string}>(
+    "select id,status from epr_inventory_reservations where job_card_id=$1 for update",[old.id],
   );
-  if(reservations.length) throw new Error("Consumed inventory reservations prohibit automatic production supersession.");
-  const travellers=await sql.query<{id:string}>(
-    "select id from epr_travellers where job_card_id=$1 and status not in ('draft','released','rejected') limit 1",
+  if(reservations.some(row=>row.status==="consumed"))
+    throw new Error("Consumed inventory reservations prohibit automatic production supersession.");
+  const travellers=await sql.query<{id:string;status:string}>(
+    "select id,status from epr_travellers where job_card_id=$1 for update",
     [old.id],
   );
-  if(travellers.length) throw new Error("A traveller is in build or already completed; Production/Quality must disposition the existing serial first.");
+  if(travellers.some(row=>!["draft","released","rejected"].includes(row.status)))
+    throw new Error("A traveller is in build or already completed; Production/Quality must disposition the existing serial first.");
   const productionEvidence=await sql.query<{id:string}>(
     "select ev.id from epr_evidence ev join epr_travellers tr on tr.id=ev.traveller_id where tr.job_card_id=$1 and ev.gate_id<>'EPR-04' limit 1",
     [old.id],
@@ -98,14 +101,19 @@ async function assertNoExecution(sql:Sql,old:JobCard) {
     [old.id],
   );
   if(gateProgress.length) throw new Error("Traveller has progressed through Production/Quality gates; disposition is required.");
-  const purchaseCommitments=await sql.query<{id:string}>(
-    "select id from vyndi_purchase_orders where job_card_id=$1 and status not in ('draft','cancelled') limit 1",[old.id],
+  const purchaseCommitments=await sql.query<{id:string;status:string}>(
+    "select id,status from vyndi_purchase_orders where job_card_id=$1 for update",[old.id],
   );
-  if(purchaseCommitments.length) throw new Error("Issued or approved supplier commitments exist on the earlier Job Card; reconcile Purchasing before supersession.");
+  if(purchaseCommitments.some(row=>!["draft","cancelled"].includes(row.status)))
+    throw new Error("Issued, received or approved supplier commitments exist on the earlier Job Card; reconcile Purchasing before supersession.");
   const allocations=await sql.query<{id:string}>(
     "select id from vyndi_shipment_serial_allocations where job_card_id=$1 limit 1",[old.id],
   );
   if(allocations.length) throw new Error("The earlier Job Card has serial shipment allocations; shipment/disposition must be handled before change.");
+  const qualityReleases=await sql.query<{id:string}>(
+    "select id from vyndi_quality_releases where job_card_id=$1 limit 1",[old.id],
+  );
+  if(qualityReleases.length) throw new Error("Quality release evidence exists; controlled Quality disposition is required.");
 }
 
 async function verifyEngineeringNotice(
@@ -197,6 +205,11 @@ export const approveAndApplyProductionChange=createServerFn({method:"POST"})
       await sql.query(
         "update vyndi_production_change_requests set status='applied',approved_by=$2,successor_job_card_id=$3,applied_at=now(),updated_at=now() where id=$1",
         [request.id,actor.userId,nextId],
+      );
+      await sql.query(
+        "insert into vyndi_audit_events(id,entity_type,entity_id,entity_revision,action,actor_user_id,actor_role,source_reference,payload_json) values($1,'production_job_card',$2,$3,'CONTROLLED_PREDECESSOR_SUPERSEDED',$4,$5,$6,$7::jsonb)",
+        ["AUD-PCR-"+crypto.randomUUID(),card!.id,Number(card!.sales_order_revision),actor.userId,actor.role,request.id,
+          JSON.stringify({successorJobCardId:nextId,targetSalesRevision:Number(order!.revision),reason:request.reason})],
       );
       await sql.query(
         "insert into vyndi_audit_events(id,entity_type,entity_id,entity_revision,action,actor_user_id,actor_role,source_reference,payload_json) values($1,'production_job_card',$2,$3,'CONTROLLED_PRODUCTION_SUCCESSOR_RELEASED',$4,$5,$6,$7::jsonb)",
