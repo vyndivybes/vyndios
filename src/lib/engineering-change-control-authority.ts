@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getSql, type Sql } from "@/lib/db";
+import {classifyEngineeringBaselines} from "@/lib/engineering-baseline-reconciliation";
 import { getCommandRole } from "@/lib/command-access";
 import { canPerform, type CommandPermission } from "@/lib/page-access";
 import { compareEngineeringBaselines, type EngineeringBaselineSnapshot, type EngineeringBomLine, type EngineeringEffectivityRule } from "@/lib/engineering-change-control-model";
@@ -16,6 +17,7 @@ type EcrRow={
 type BaselineRow={
   id:string;family_code:string;variant_id:string|null;revision_code:string;geometry_ref:string;material_spec:string;
   layup_ref:string|null;alloy_spec:string|null;tooling_ref:string|null;drawing_ref:string;bom_revision:string|null;status:string;
+  source_ref:string;created_by:string;approved_by:string|null;
 };
 type EcoRow={
   id:string;ecr_id:string;from_baseline_id:string|null;target_baseline_id:string;change_class:string;
@@ -102,14 +104,17 @@ async function bomLinesFor(sql:Sql,modelId:string|null,bomRevision:string|null){
 }
 
 export async function buildEngineeringChangeControlFromSql(sql:Sql){
-  const [ecrs,baselines,ecos,effectivityRows,ecns,bomReleases]=await Promise.all([
+  const [ecrs,baselines,ecos,effectivityRows,ecns,bomReleases,manifests]=await Promise.all([
     sql.query<EcrRow>("select id,family_code,variant_id,from_baseline_id,target_revision_code,target_bom_revision,title,reason,affected_skus,status,source_ref from vyndi_engineering_change_requests order by updated_at desc,id"),
-    sql.query<BaselineRow>("select id,family_code,variant_id,revision_code,geometry_ref,material_spec,layup_ref,alloy_spec,tooling_ref,drawing_ref,bom_revision,status from vyndi_engineering_baselines order by family_code,updated_at desc,id"),
+    sql.query<BaselineRow>("select id,family_code,variant_id,revision_code,geometry_ref,material_spec,layup_ref,alloy_spec,tooling_ref,drawing_ref,bom_revision,status,source_ref,created_by,approved_by from vyndi_engineering_baselines order by family_code,updated_at desc,id"),
     sql.query<EcoRow>("select id,ecr_id,from_baseline_id,target_baseline_id,change_class,target_bom_venture,target_bom_model_id,target_bom_revision,implementation_plan,verification_plan,status,record_revision,source_ref,created_by,submitted_by,approved_by,released_by,released_at::text,created_at::text,updated_at::text from vyndi_engineering_change_orders order by updated_at desc,id"),
     sql.query<EffectivityRow>("select id,eco_id,effectivity_type,value_from,value_to,effective_from::text,effective_to::text,source_ref,created_by,created_at::text from vyndi_engineering_change_effectivity order by eco_id,effectivity_type,created_at,id"),
     sql.query<EcnRow>("select id,notice_number,eco_id,ecr_id,from_baseline_id,target_baseline_id,target_bom_venture,target_bom_model_id,target_bom_revision,change_class,effectivity_json,implementation_plan,verification_plan,source_ref,released_by,released_at::text from vyndi_engineering_change_notices order by released_at desc,id"),
-    sql.query<BomReleaseRow>("select venture,model_id,bom_revision,previous_bom_revision,released_at::text from vyndi_bom_revision_releases order by released_at desc,venture,model_id,bom_revision"),
+    sql.query<(BomReleaseRow & {id:string})>("select id,venture,model_id,bom_revision,previous_bom_revision,released_at::text from vyndi_bom_revision_releases order by released_at desc,venture,model_id,bom_revision"),
+    sql.query<{baseline_id:string;bom_release_id:string|null;finalized:boolean}>("select baseline_id,bom_release_id,finalized from vyndi_engineering_configuration_manifests order by created_at desc"),
   ]);
+  const baselineDispositions=classifyEngineeringBaselines({baselines,bomReleases,manifests});
+  const qualifiedIds=new Set(baselineDispositions.filter(x=>x.bomLinkQualified).map(x=>x.id));
   const ecrById=new Map(ecrs.map((row)=>[row.id,row]));
   const baselineById=new Map(baselines.map((row)=>[row.id,row]));
   const rulesByEco=new Map<string,EffectivityRow[]>();
@@ -161,11 +166,14 @@ export async function buildEngineeringChangeControlFromSql(sql:Sql){
       id:row.id,title:row.title,familyCode:row.family_code,variantId:row.variant_id,fromBaselineId:row.from_baseline_id,
       targetRevisionCode:row.target_revision_code,targetBomRevision:row.target_bom_revision,affectedSkus:jsonList(row.affected_skus),sourceReference:row.source_ref,
     })),
-    releasedBaselines:baselines.filter((row)=>row.status==="released").map((row)=>({id:row.id,familyCode:row.family_code,variantId:row.variant_id,revisionCode:row.revision_code,bomRevision:row.bom_revision})),
+    releasedBaselines:baselines.filter((row)=>row.status==="released"&&qualifiedIds.has(row.id))
+      .map((row)=>({id:row.id,familyCode:row.family_code,variantId:row.variant_id,revisionCode:row.revision_code,bomRevision:row.bom_revision})),
+    unqualifiedReleaseLabels:baselineDispositions.filter(x=>x.storedStatus==="released"&&!x.bomLinkQualified),
     releasedBomScopes:bomReleases.map((row)=>({venture:row.venture,modelId:row.model_id,bomRevision:row.bom_revision,previousBomRevision:row.previous_bom_revision,releasedAt:row.released_at})),
     changeOrders,
     notices:ecns.map((row)=>({id:row.id,noticeNumber:row.notice_number,ecoId:row.eco_id,ecrId:row.ecr_id,targetBaselineId:row.target_baseline_id,targetBomRevision:row.target_bom_revision,changeClass:row.change_class,releasedAt:row.released_at,sourceReference:row.source_ref})),
     summary:{
+      unqualifiedReleaseLabelCount:baselineDispositions.filter(x=>x.storedStatus==="released"&&!x.bomLinkQualified).length,
       ecoCount:ecos.length,openEcoCount:ecos.filter((row)=>!["released","rejected"].includes(row.status)).length,
       releasedEcnCount:ecns.length,effectivityRuleCount:effectivityRows.length,
       impactedJobCardCount:new Set(changeOrders.flatMap((row)=>row.whereUsed.jobCards.map((item)=>item.job_card_id))).size,
