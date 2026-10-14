@@ -151,6 +151,12 @@ export async function buildEngineeringChangeControlFromSql(sql:Sql){
   }
 
   return {
+    allEcrs:ecrs.map((row)=>({
+      id:row.id,title:row.title,reason:row.reason,status:row.status,
+      familyCode:row.family_code,variantId:row.variant_id,fromBaselineId:row.from_baseline_id,
+      targetRevisionCode:row.target_revision_code,targetBomRevision:row.target_bom_revision,
+      sourceReference:row.source_ref,
+    })),
     approvedEcrs:ecrs.filter((row)=>row.status==="approved").map((row)=>({
       id:row.id,title:row.title,familyCode:row.family_code,variantId:row.variant_id,fromBaselineId:row.from_baseline_id,
       targetRevisionCode:row.target_revision_code,targetBomRevision:row.target_bom_revision,affectedSkus:jsonList(row.affected_skus),sourceReference:row.source_ref,
