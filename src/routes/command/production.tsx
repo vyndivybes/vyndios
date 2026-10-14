@@ -9,6 +9,7 @@ import { lakh } from "@/lib/format";
 import { getProductionJobCardView } from "@/lib/production-job-card-view";
 import { issueProductionReservation, syncProductionJobCard } from "@/lib/production-job-card";
 import { approveProductionBatch } from "@/lib/production-release-authority";
+import { requestProductionChange, approveProductionChange, applyProductionChange, rejectProductionChange } from "@/lib/production-change-authority";
 import { useVeloxis } from "@/lib/store";
 import { VYNDI_PRINT_BRAND_CSS, vyndiPrintBrandMarkup } from "@/lib/print-brand";
 
@@ -171,12 +172,14 @@ function printRequisitionRecord({
 }
 
 function ProductionWorkspace() {
-  const { orders, cards, lines, travellers } = Route.useLoaderData();
+  const { orders, cards, lines, travellers, changes, ecnOptions, archivedCards } = Route.useLoaderData();
   const router = useRouter();
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [busyLine, setBusyLine] = useState<string | null>(null);
   const [selectedTraveller, setSelectedTraveller] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
+  const [changeReasons, setChangeReasons] = useState<Record<string,string>>({});
+  const [selectedEcn, setSelectedEcn] = useState<Record<string,string>>({});
 
   const scenario = useVeloxis((state) => state.scenario) as ScenarioId;
   const drawStandby = useVeloxis((state) => state.drawStandby);
@@ -218,18 +221,37 @@ function ProductionWorkspace() {
     }
   }
 
+  const normalReconciliation = ordersNeedingJobCard.filter((order: any) => !order.job_card_approved_at);
+
   async function reconcileAll() {
-    if (!ordersNeedingJobCard.length) return;
+    if (!normalReconciliation.length) {
+      setMessage("Approved stale builds require a controlled production change; use Request Production Change on the affected order.");
+      return;
+    }
     setBusyAction("sync:all");
     setMessage("");
     try {
-      for (const order of ordersNeedingJobCard) {
+      for (const order of normalReconciliation) {
         await syncProductionJobCard({ data: { salesOrderId: String(order.id) } });
       }
-      setMessage(`${ordersNeedingJobCard.length} confirmed Commercial order(s) reconciled to current Production job-card revisions.`);
+      setMessage(`${normalReconciliation.length} eligible Commercial order(s) reconciled. Approved stale cards require separate controlled change.`);
       await router.invalidate();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Confirmed-order reconciliation failed.");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function productionChangeAction(key:string, action:()=>Promise<unknown>, success:string) {
+    setBusyAction(key);
+    setMessage("");
+    try {
+      await action();
+      setMessage(success);
+      await router.invalidate();
+    } catch(error) {
+      setMessage(error instanceof Error ? error.message : "Controlled production change failed.");
     } finally {
       setBusyAction(null);
     }
@@ -310,7 +332,7 @@ function ProductionWorkspace() {
           <div className="mt-4 space-y-3">
             <div className="flex flex-col gap-3 rounded-lg border border-warn/40 bg-warn/5 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div><p className="text-sm font-semibold text-warn">{ordersNeedingJobCard.length} confirmed order(s) are not on the current Production revision.</p><p className="mt-1 text-xs text-muted">Reconciliation validates the controlled BOM before creating or refreshing the job card. It does not approve the bike/batch.</p></div>
-              <Button disabled={busyAction !== null} onClick={() => void reconcileAll()}>{busyAction === "sync:all" ? "Reconciling…" : "Reconcile all"}</Button>
+              <Button disabled={busyAction !== null || normalReconciliation.length === 0} onClick={() => void reconcileAll()}>{normalReconciliation.length === 0 ? "Controlled change required" : busyAction === "sync:all" ? "Reconciling…" : "Reconcile all"}</Button>
             </div>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {ordersNeedingJobCard.map((order: any) => (
@@ -318,7 +340,54 @@ function ProductionWorkspace() {
                   <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold text-fg">{order.variant_name ?? order.variant_id ?? order.id}</p><p className="mt-1 font-mono text-[10px] text-subtle">{order.id}</p></div><span className="text-[10px] font-bold uppercase text-warn">{order.job_card_id ? "STALE" : "MISSING"}</span></div>
                   <p className="mt-3 text-xs text-muted">Order R{order.revision} · {order.units} unit(s) · M{order.plan_month}</p>
                   <p className="mt-1 text-[10px] text-subtle">Job card: {order.job_card_id ? `${order.job_card_id} R${order.job_card_revision ?? "—"}` : "not created"}</p>
-                  <Button className="mt-3 w-full" disabled={busyAction !== null} onClick={() => void synchronize(String(order.id))}>{busyAction === `sync:${order.id}` ? "Synchronizing…" : "Synchronize controlled build"}</Button>
+                  {order.job_card_approved_at ? (() => {
+                    const change = (changes as any[]).find((row) =>
+                      row.previous_job_card_id === order.job_card_id &&
+                      Number(row.requested_sales_revision) === Number(order.revision) &&
+                      row.status !== "rejected");
+                    return <div className="mt-3 space-y-3 rounded-lg border border-warn/40 bg-warn/5 p-3">
+                      <p className="text-xs font-semibold text-warn">Approved Job Card is frozen. Preserve R{order.job_card_revision}; do not run ordinary synchronization.</p>
+                      {!change ? <>
+                        <label className="block text-xs text-muted">Reason for R{order.revision} change
+                          <textarea className="control mt-1 min-h-20 text-sm" value={changeReasons[order.id] ?? ""} placeholder="Describe what changed and why the approved build must be superseded." onChange={(event) => setChangeReasons((v) => ({...v,[order.id]:event.target.value}))}/>
+                        </label>
+                        <Button className="w-full" disabled={busyAction !== null || (changeReasons[order.id] ?? "").trim().length < 5}
+                          onClick={() => void productionChangeAction("request:"+order.id,
+                            () => requestProductionChange({data:{salesOrderId:String(order.id),reason:(changeReasons[order.id] ?? "").trim()}}),
+                            "Production change recorded. Release a matching ECN in Engineering, then approve it here.")}>
+                          Request Production Change
+                        </Button>
+                      </> : <>
+                        <p className="text-xs text-fg">Change {change.id} · <strong className="text-accent">{change.status}</strong></p>
+                        {change.status === "requested" ? <>
+                          <Link to="/command/engineering" className="block text-xs font-semibold text-accent underline">Open Engineering → ECR / ECO / ECN</Link>
+                          <label className="block text-xs text-muted">Released Engineering Change Notice
+                            <select className="control mt-1 text-sm" value={selectedEcn[change.id] ?? ""} onChange={(event) => setSelectedEcn((v) => ({...v,[change.id]:event.target.value}))}>
+                              <option value="">Select applicable released ECN</option>
+                              {(ecnOptions as any[]).map((ecn) => <option key={ecn.id} value={ecn.id}>{ecn.notice_number} · {ecn.change_class}{ecn.target_bom_revision ? " · "+ecn.target_bom_revision : ""}</option>)}
+                            </select>
+                          </label>
+                          <Button className="w-full" disabled={busyAction !== null || !selectedEcn[change.id]}
+                            onClick={() => void productionChangeAction("approve:"+change.id,
+                              () => approveProductionChange({data:{changeId:String(change.id),ecnId:selectedEcn[change.id]}}),
+                              "Governed change approved; confirm Apply & re-release to create the R"+order.revision+" successor.")}>
+                            Approve controlled change
+                          </Button>
+                          <button type="button" disabled={busyAction !== null} className="text-xs text-muted underline" onClick={() => void productionChangeAction("reject:"+change.id,
+                            () => rejectProductionChange({data:{changeId:String(change.id)}}), "Change request rejected.")}>Reject request</button>
+                        </> : null}
+                        {change.status === "approved" ? <>
+                          <p className="text-xs leading-5 text-muted">ECN {change.notice_number ?? change.ecn_id} is approved. Application is atomic and preserves the predecessor approval, travellers and audit trail. It cancels only uncommitted draft POs.</p>
+                          <Button className="w-full" disabled={busyAction !== null}
+                            onClick={() => void productionChangeAction("apply:"+change.id,
+                              () => applyProductionChange({data:{changeId:String(change.id)}}),
+                              "Controlled successor created and synchronized with Commercial order R"+order.revision+". The new bike/batch still requires its own approval.")}>
+                            Apply & re-release controlled revision
+                          </Button>
+                        </> : null}
+                      </>}
+                    </div>;
+                  })() : <Button className="mt-3 w-full" disabled={busyAction !== null} onClick={() => void synchronize(String(order.id))}>{busyAction === `sync:${order.id}` ? "Synchronizing…" : "Synchronize controlled build"}</Button>}
                 </article>
               ))}
             </div>
@@ -327,6 +396,18 @@ function ProductionWorkspace() {
           <div className="mt-4 rounded-lg border border-green/30 bg-green/5 p-4"><p className="text-sm font-semibold text-green">All confirmed Commercial orders are synchronized to the current Production revision.</p><p className="mt-1 text-xs text-muted">If you expected more confirmed orders than the count above, the missing records are upstream in the Commercial persistence/environment, not hidden in Production.</p></div>
         )}
       </Panel>
+
+      {archivedCards.length > 0 ? <Panel title="Superseded approved Job Cards" kicker="Immutable predecessor approvals and serial genealogy retained">
+        <div className="grid gap-3 sm:grid-cols-2">
+          {archivedCards.map((card: any) => <article key={card.id} className="rounded-lg border border-border bg-surface/30 p-3 text-xs">
+            <p className="break-all font-mono text-accent">{card.id}</p>
+            <p className="mt-1 text-muted">Order {card.sales_order_id} R{card.sales_order_revision} · {card.status}</p>
+            <p className="mt-1 text-muted">Frozen BOM {card.bom_revision} · batch {card.batch_code ?? "—"}</p>
+            <p className="mt-1 text-muted">Approved by {card.approved_by ?? "—"} · {card.approved_at ?? "—"}</p>
+            <p className="mt-1 text-muted">Superseded {card.superseded_at}</p>
+          </article>)}
+        </div>
+      </Panel> : null}
 
       <Panel title="Bike / batch release" kicker="One approval creates the dependent production records">
         {cards.length === 0 ? (
