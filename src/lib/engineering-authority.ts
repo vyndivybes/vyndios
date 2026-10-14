@@ -51,7 +51,7 @@ export const listEngineeringAuthority = createServerFn({ method: "GET" }).handle
   await requirePermission("view");
   const sql = await getSql();
   const [baselines, changes, evidenceReceipts, workflows, releaseDecisions, threadSnapshots, bomReleases, manifests] = await Promise.all([
-    sql`
+    sql<BaselineSourceRow & Record<string, unknown>>`
       select b.*, f.display_name as family_name, v.display_name as variant_name
       from vyndi_engineering_baselines b
       join vyndi_product_families f on f.family_code=b.family_code
