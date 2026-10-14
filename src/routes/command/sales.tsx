@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Kpi, Panel } from "@/components/kpi";
 import { CrmWorkspace } from "@/components/commercial/crm-workspace";
 import { requireArrayResponse, requireRecordResponse } from "@/lib/commercial-response-contract";
@@ -54,6 +54,7 @@ function Commercial() {
   );
   const [orders, setOrders] = useState<SalesOrder[]>([]);
   const [orderEdits, setOrderEdits] = useState<Record<string, SalesOrder>>({});
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [actuals, setActuals] = useState<Record<number, { units?: number | null; revenue?: number | null }>>({});
   const [writeReadiness, setWriteReadiness] = useState<WriteReadiness | null>(null);
   const [busy, setBusy] = useState(false);
@@ -297,9 +298,10 @@ function Commercial() {
         {orders.length === 0 ? (
           <p className="text-sm text-muted">No centrally persisted orders yet. A successful creation will appear here immediately before Production synchronization is attempted.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full table-auto text-left text-xs">
-              <thead className="bg-bg-elevated text-[10px] uppercase tracking-wider text-subtle">
+          <div className="overflow-x-auto rounded-lg border border-border/70" data-testid="order-register-wrapper">
+            <table className="vyndi-register-table w-full text-left text-sm" aria-label="Commercial order register">
+              <colgroup><col style={{ width: "15%" }} /><col style={{ width: "20%" }} /><col style={{ width: "10%" }} /><col style={{ width: "12%" }} /><col style={{ width: "15%" }} /><col style={{ width: "9%" }} /><col style={{ width: "9%" }} /><col style={{ width: "10%" }} /></colgroup>
+              <thead className="bg-bg-elevated text-xs uppercase tracking-wide text-subtle">
                 <tr>
                   <th className="px-3 py-2">Order</th>
                   <th className="px-3 py-2">Model / variant</th>
@@ -317,18 +319,26 @@ function Commercial() {
                   const editVariant = MODELS.find((entry) => entry.id === edit.variantId) ?? initialVariant;
                   const changed = JSON.stringify(edit) !== JSON.stringify(order);
                   return (
-                    <tr key={order.id} className="border-t border-border align-top">
-                      <td className="px-3 py-3 font-mono text-[10px] text-subtle">{order.id}</td>
-                      <td className="px-3 py-3 font-semibold text-fg">{order.variantName ?? order.variantId ?? order.product}</td>
-                      <td className="px-3 py-3"><span className="text-[10px] font-bold uppercase text-accent">{order.status}</span></td>
-                      <td className="px-3 py-3 text-muted">{order.modelTier ? modelFamily(order.modelTier) : "—"}</td>
-                      <td className="px-3 py-3 text-muted">Size {order.configuration?.frameSize || "unspecified"} · {CONFIGURATION_CATEGORIES.filter(({ key }) => order.configuration?.[key]).length} components</td>
-                      <td className="px-3 py-3 font-semibold text-fg">{lakh(order.units * order.aspLakh)}</td>
-                      <td className="px-3 py-3 text-muted">{order.channel}</td>
-                      <td className="px-3 py-3">
-                        <details className="rounded-md border border-border bg-bg/40 p-2">
-                          <summary className="cursor-pointer whitespace-nowrap text-[11px] font-semibold text-accent">Revise order / configuration</summary>
-                          <div className="mt-3 w-full space-y-3">
+                    <Fragment key={order.id}>
+                    <tr data-record-row className="border-t border-border align-middle">
+                      <td data-label="Order" className="px-3 py-2 font-mono text-xs text-subtle" title={order.id}>{order.id.length > 18 ? `${order.id.slice(0, 11)}…${order.id.slice(-6)}` : order.id}</td>
+                      <td data-label="Model / variant" className="px-3 py-2 font-semibold text-fg">{order.variantName ?? order.variantId ?? order.product}</td>
+                      <td data-label="Status" className="px-3 py-2"><span className="text-xs font-bold uppercase text-accent">{order.status}</span></td>
+                      <td data-label="Family" className="px-3 py-2 text-muted">{order.modelTier ? modelFamily(order.modelTier) : "—"}</td>
+                      <td data-label="Config" className="px-3 py-2 text-muted">Size {order.configuration?.frameSize || "unspecified"} · {CONFIGURATION_CATEGORIES.filter(({ key }) => order.configuration?.[key]).length} components</td>
+                      <td data-label="Value" className="px-3 py-2 font-semibold text-fg tabular-nums">{lakh(order.units * order.aspLakh)}</td>
+                      <td data-label="Channel" className="px-3 py-2 text-muted">{order.channel}</td>
+                      <td data-label="Control" className="px-3 py-2">
+                        <button type="button" className="rounded-md border border-border px-3 py-2 text-xs font-semibold text-accent hover:border-accent focus-visible:outline" aria-expanded={editingOrderId === order.id} aria-controls={`order-editor-${order.id}`} onClick={() => setEditingOrderId((current) => current === order.id ? null : order.id)}>
+                          {editingOrderId === order.id ? "Close revision" : "Revise order"}
+                        </button>
+                      </td>
+                    </tr>
+                    {editingOrderId === order.id ? (
+                      <tr data-editor-row className="border-t border-border bg-bg-elevated/60">
+                        <td colSpan={8} className="p-4 sm:p-5">
+                          <div id={`order-editor-${order.id}`} className="mx-auto w-full max-w-4xl space-y-3">
+                            <h3 className="text-sm font-semibold text-fg">Revise order · {order.variantName ?? order.id}</h3>
                             <fieldset disabled={busy || !canWrite} className="space-y-3 disabled:opacity-60">
                               <Field label="Model & variant"><select value={edit.variantId ?? editVariant.id} onChange={(event) => editOrderVariant(order.id, event.target.value)} className="control mt-1">{MODELS.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}</select></Field>
                               <Field label="Frame size"><select value={edit.configuration?.frameSize ?? ""} onChange={(event) => editOrderConfiguration(order.id, "frameSize", event.target.value)} className="control mt-1"><option value="">Unspecified</option>{FRAME_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}</select></Field>
@@ -350,13 +360,15 @@ function Commercial() {
                             </fieldset>
                             <div className="flex flex-wrap items-center gap-2">
                               <button type="button" disabled={busy || !canWrite || !changed} onClick={() => void saveOrderRevision(order.id)} className="rounded-md bg-accent px-3 py-2 text-xs font-semibold text-bg disabled:opacity-40">Save & synchronize revision</button>
-                              {changed ? <span className="text-[10px] font-semibold text-warn">Unsaved revision</span> : <span className="text-[10px] text-subtle">Matches persisted order</span>}
+                              <button type="button" onClick={() => setEditingOrderId(null)} className="rounded-md border border-border px-3 py-2 text-xs text-fg">Close</button>
+                              {changed ? <span className="text-xs font-semibold text-warn">Unsaved revision</span> : <span className="text-xs text-subtle">Matches persisted order</span>}
                             </div>
-                            <p className="text-[10px] leading-4 text-subtle">Saving creates a Commercial revision first, then revalidates the released BOM and reconciles the Job Card. An already-approved build cannot be silently replaced; it requires a controlled production change.</p>
+                            <p className="text-xs leading-5 text-subtle">Saving creates a Commercial revision first, then revalidates the released BOM and reconciles the Job Card. An already-approved build cannot be silently replaced; it requires a controlled production change.</p>
                           </div>
-                        </details>
-                      </td>
-                    </tr>
+                        </td>
+                      </tr>
+                    ) : null}
+                    </Fragment>
                   );
                 })}
               </tbody>
