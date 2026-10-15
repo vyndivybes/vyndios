@@ -1,5 +1,5 @@
-import type {SqlRow} from "@/lib/db";
-import {buildFinancialStatements, type StatementJobCost, type StatementLedgerLine} from "@/lib/finance/financial-statements";
+import type {SqlRow} from "../db.ts";
+import {buildFinancialStatements, type StatementJobCost, type StatementLedgerLine} from "./financial-statements.ts";
 
 /** Read-only, complete-to-date ledger basis for the existing VYNDI finance statement engine.
  * Unlike generic bridge record samples this query must not silently truncate P&L actuals.
