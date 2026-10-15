@@ -29,7 +29,7 @@ test("BI counts use entire scoped source, not the page size",async()=>{
   return [{rec:{id:"A",status:"OPEN",updated_at:"2026-10-12T00:00:00Z"}}];
  }};
  const result=await readEnterpriseBi(fake as never,{employeeId:"production",from:"2026-10-01",to:"2026-10-15",limit:1});
- const first=result.departments[0] as {status:string;periodEventCount:number;flaggedStatusCount:number;detailPage:{hasMore:boolean};records:unknown[]};
+ const first=result.departments[0] as {status:string;periodEventCount:number;flaggedStatusCount:number;currentSourceCount:number;currentAttentionCount:number;detailPage:{hasMore:boolean};records:unknown[]};
  assert.equal(first.status,"OBSERVED");
  assert.equal(first.periodEventCount,157);
  assert.equal(first.flaggedStatusCount,113);
