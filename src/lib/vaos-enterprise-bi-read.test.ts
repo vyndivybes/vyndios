@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {validateBiScope,classifyBiSample,readEnterpriseBi,VYNDI_BI_DEPARTMENTS} from "./vaos-enterprise-bi-read";
+import {validateBiScope,classifyBiSample,readEnterpriseBi,VYNDI_BI_DEPARTMENTS} from "./vaos-enterprise-bi-read.ts";
 test("all 16 departmental ledgers are explicitly mapped",()=>{
  assert.equal(Object.keys(VYNDI_BI_DEPARTMENTS).length,16);
  assert.equal(new Set(Object.values(VYNDI_BI_DEPARTMENTS).map(x=>x.table)).size,16);
