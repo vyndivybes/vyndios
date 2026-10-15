@@ -64,7 +64,8 @@ export function classifyBiSample(value:Record<string,unknown>){
 }
 const dateSql=(r:string)=>{
  const fields=EVENT_FIELDS.map(k=>`nullif(${r}->>'${k}','')`).join(",");
- return `case when left(coalesce(${fields}),10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}
+ return `case when left(coalesce(${fields}),10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+ then left(coalesce(${fields}),10) else null end`;
 };
 async function readOne(sql:Sql,employeeId:Employee,from:string,to:string,offset:number,limit:number){
  const meta=VYNDI_BI_DEPARTMENTS[employeeId];
