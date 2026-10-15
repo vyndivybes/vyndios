@@ -78,3 +78,9 @@ test("missing authoritative schema is unavailable, never zero",async()=>{
  assert.equal(result.departments[0].status,"UNAVAILABLE");
  assert.equal("periodEventCount" in result.departments[0],false);
 });
+
+
+test("specialist source scope cannot escape its employee's governed sources",()=>{
+ assert.equal(validateBiScope({employeeId:'qa',sourceTable:'vyndi_quality_capas',from:'2026-10-01',to:'2026-10-15'}).sourceTable,'vyndi_quality_capas');
+ for(const employeeId of ['all','commercial'])assert.throws(()=>validateBiScope({employeeId,sourceTable:'vyndi_quality_capas',from:'2026-10-01',to:'2026-10-15'}),/BI_SOURCE/);
+});

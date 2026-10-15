@@ -71,6 +71,7 @@ const validDay=(v:string)=>/^\d{4}-\d{2}-\d{2}$/.test(v)&&Number.isFinite(Date.p
 export function validateBiScope(input: Record<string,unknown>) {
  const from=String(input.from??""),to=String(input.to??"");
  const employeeId=String(input.employeeId??"all");
+ const sourceTable=input.sourceTable==null?null:String(input.sourceTable);
  const offset=Number(input.offset??0),limit=Number(input.limit??50);
  if(!validDay(from)||!validDay(to)
    ||from>to|| Date.parse(to)-Date.parse(from)>366*86400000
@@ -80,7 +81,9 @@ export function validateBiScope(input: Record<string,unknown>) {
    ||(employeeId!=="all"&&!Object.hasOwn(VYNDI_BI_DEPARTMENTS,employeeId))) {
   throw new Error("INVALID_BI_SCOPE");
  }
- return {employeeId:employeeId as Employee|"all",from,to,offset,limit};
+ if(sourceTable&&(employeeId==='all'||![VYNDI_BI_DEPARTMENTS[employeeId as Employee].table,
+  ...VYNDI_BI_RELATED[employeeId as Employee]].includes(sourceTable)))throw new Error('INVALID_BI_SOURCE');
+ return {employeeId:employeeId as Employee|"all",sourceTable,from,to,offset,limit};
 }
 function eventDate(record:Record<string,unknown>):string|null {
  for(const key of EVENT_FIELDS) {
@@ -169,7 +172,9 @@ export async function readEnterpriseBi(sql:Sql,input:Record<string,unknown>){
   const meta=VYNDI_BI_DEPARTMENTS[employeeId];
   const sources=[];
   for(const table of [meta.table,...VYNDI_BI_RELATED[employeeId]]){
-   try{sources.push(await readOne(sql,employeeId,scope.from,scope.to,scope.offset,scope.employeeId==='all'?Math.min(scope.limit,5):scope.limit,table));}
+   try{sources.push(await readOne(sql,employeeId,scope.from,scope.to,
+    scope.sourceTable&&scope.sourceTable!==table?0:scope.offset,
+    scope.employeeId==='all'?Math.min(scope.limit,5):scope.limit,table));}
    catch{sources.push({status:'UNAVAILABLE' as const,sourceTable:table,reason:'Source query unavailable; counts unknown.'});}
   }
   const primary=sources[0];
