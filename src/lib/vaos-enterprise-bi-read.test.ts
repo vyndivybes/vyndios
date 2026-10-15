@@ -29,15 +29,29 @@ test("BI counts use entire scoped source, not the page size",async()=>{
   return [{rec:{id:"A",status:"OPEN",updated_at:"2026-10-12T00:00:00Z"}}];
  }};
  const result=await readEnterpriseBi(fake as never,{employeeId:"production",from:"2026-10-01",to:"2026-10-15",limit:1});
- const first=result.departments[0] as {status:string;periodEventCount:number;flaggedStatusCount:number;detailPage:{hasMore:boolean};records:unknown[]};
+ const first=result.departments[0] as {status:string;periodEventCount:number;flaggedStatusCount:number;currentSourceCount:number;currentAttentionCount:number;detailPage:{hasMore:boolean};records:unknown[]};
  assert.equal(first.status,"OBSERVED");
  assert.equal(first.periodEventCount,157);
  assert.equal(first.flaggedStatusCount,113);
  assert.equal(first.records.length,1);
  assert.equal(first.detailPage.hasMore,true);
- assert.equal(calls.length,2);
+ assert.equal(calls.length,3);
  assert.ok(calls.every(x=>x.query.includes("epr_production_job_cards")));
  assert.deepEqual(calls[0].params,["2026-10-01","2026-10-15"]);
+ assert.equal(first.currentSourceCount,157);
+ assert.equal(first.currentAttentionCount,113);
+});
+test("undated pending cases remain visible in current backlog when no period event occurred",async()=>{
+ const source={query:async(query:string)=>{
+  if(query.includes("group by 1")&&!query.includes(" where "))return [{status:"OPEN",quantity:"10"}];
+  return [];
+ }};
+ const r=await readEnterpriseBi(source as never,{employeeId:"risk",from:"2026-10-01",to:"2026-10-15"});
+ const x=r.departments[0] as {status:string;periodEventCount:number;currentSourceCount:number;currentAttentionCount:number};
+ assert.equal(x.status,"OBSERVED");
+ assert.equal(x.periodEventCount,0);
+ assert.equal(x.currentSourceCount,10);
+ assert.equal(x.currentAttentionCount,10);
 });
 test("missing authoritative schema is unavailable, never zero",async()=>{
  const fake={query:async()=>{throw new Error("missing source")}};

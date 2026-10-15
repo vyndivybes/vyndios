@@ -27,8 +27,9 @@ type Employee = keyof typeof VYNDI_BI_DEPARTMENTS;
 const SAFE_FIELDS=["id","status","state","outcome","stage","action","source_reference","record_origin","reference","sku",
 "revision","bom_revision","release_disposition","priority","closed_at","completed_at","updated_at","created_at",
 "recorded_at","posted_at","entry_date","due_date","due_at","occurred_at","event_at","effective_at"];
-const EVENT_FIELDS=["closed_at","completed_at","occurred_at","event_at","posted_at","recorded_at",
-"transaction_date","entry_date","effective_at","updated_at","created_at"];
+const EVENT_FIELDS=["closed_at","completed_at","decided_at","released_at","approved_at","issued_at",
+"occurred_at","event_at","posted_at","recorded_at","transaction_date","entry_date","order_date","opened_at",
+"effective_at","updated_at","created_at"];
 const scalar=(v:unknown)=>v==null||["string","number","boolean"].includes(typeof v);
 export function validateBiScope(input: Record<string,unknown>) {
  const from=String(input.from??""),to=String(input.to??"");
@@ -63,7 +64,7 @@ export function classifyBiSample(value:Record<string,unknown>){
 }
 const dateSql=(r:string)=>{
  const fields=EVENT_FIELDS.map(k=>`nullif(${r}->>'${k}','')`).join(",");
- return `case when left(coalesce(${fields}),10) ~ '^\\d{4}-\\d{2}-\\d{2}$'
+ return `case when left(coalesce(${fields}),10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
  then left(coalesce(${fields}),10) else null end`;
 };
 async function readOne(sql:Sql,employeeId:Employee,from:string,to:string,offset:number,limit:number){
@@ -78,16 +79,27 @@ async function readOne(sql:Sql,employeeId:Employee,from:string,to:string,offset:
          nullif(t.rec->>'outcome',''),nullif(t.rec->>'stage',''),'Unclassified'),64) as status,
      count(*)::text as quantity ${base} ${where}
      group by 1 order by count(*) desc,status`,[from,to]);
+ const current=await sql.query<{status:string;quantity:string}>(
+  `select left(coalesce(nullif(t.rec->>'status',''),nullif(t.rec->>'state',''),
+         nullif(t.rec->>'outcome',''),nullif(t.rec->>'stage',''),'Unclassified'),64) as status,
+     count(*)::text as quantity ${base}
+     group by 1 order by count(*) desc,status`,[]);
  const records=await sql.query<{rec:Record<string,unknown>}>(
   `select t.rec ${base} ${where}
      order by ${date} desc,coalesce(t.rec->>'id','') desc limit $3 offset $4`,
   [from,to,limit,offset]);
  const statusDistribution=summaries.map(r=>({status:r.status,count:Number(r.quantity)}));
+ const currentStatusDistribution=current.map(r=>({status:r.status,count:Number(r.quantity)}));
+ const currentSourceCount=currentStatusDistribution.reduce((sum,r)=>sum+r.count,0);
+ const currentAttentionCount=currentStatusDistribution.filter(r=>
+  /(?:^|[_ -])(open|draft|planned|pending|blocked|hold|failed|overdue|rejected|in.progress|awaiting)(?:$|[_ -])/i.test(r.status))
+  .reduce((sum,r)=>sum+r.count,0);
  const total=statusDistribution.reduce((sum,r)=>sum+r.count,0);
  const issues=statusDistribution.filter(r=>/fail|block|hold|reject|mismatch|overdue|open|shortage|nonconform/i.test(r.status))
   .reduce((sum,r)=>sum+r.count,0);
  return {employeeId,department:meta.label,sourceTable:meta.table,
   periodEventCount:total,flaggedStatusCount:issues,statusDistribution,
+  currentSourceCount,currentAttentionCount,currentStatusDistribution,
   records:records.map(r=>classifyBiSample(r.rec)),
   isCompleteAggregate:true,detailPage:{offset,limit,hasMore:offset+records.length<total},
   timestampMeaning:"FIRST_RECORDED_SOURCE_DATE_BY_AVAILABLE_FIELD",
@@ -110,6 +122,7 @@ export async function readEnterpriseBi(sql:Sql,input:Record<string,unknown>){
    "The reporting date reflects the first available recorded source-date field, not necessarily a verified finish date.",
    "Flagged statuses are review leads, not confirmed duplicate errors or independent audits.",
    "Records are business source evidence, not proof an AI agent personally completed that work.",
-   "Missing or undated business records cannot be interpreted as zero and are excluded from dated totals."
+   "Missing or undated business records cannot be interpreted as zero and are excluded from dated totals.",
+   "Current backlog flags are all-time latest recorded statuses, separate from period activity; a flagged state is not an audited discrepancy or proof of lateness."
   ]};
 }
