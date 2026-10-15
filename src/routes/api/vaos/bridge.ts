@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getSql } from "@/lib/db";
+import { readVaosFinancialStatements } from "@/lib/finance/vaos-financial-statements-export";
 import {classifyEngineeringBaselines, type BaselineSourceRow} from "@/lib/engineering-baseline-reconciliation";
 import {normalizeVaosScheduleExport,validateScheduleProjectInput} from "@/lib/vaos-schedule-export";
 import {
@@ -18,6 +19,7 @@ const READ_ACTIONS = new Set([
   "PRODUCTION.OBSERVE_WIP",
   "MAINTENANCE.OBSERVE_ASSET",
   "FINANCE.OBSERVE_LEDGER",
+  "FINANCE.OBSERVE_STATEMENTS",
   "PEOPLE.OBSERVE_WORKFORCE",
   "ENGINEERING.OBSERVE_CONFIGURATION",
   "PROJECT.OBSERVE_SCHEDULE",
@@ -30,6 +32,7 @@ const EXPECTED_EMPLOYEE: Record<string, string> = {
   "PRODUCTION.OBSERVE_WIP": "production",
   "MAINTENANCE.OBSERVE_ASSET": "maintenance",
   "FINANCE.OBSERVE_LEDGER": "finance",
+  "FINANCE.OBSERVE_STATEMENTS": "finance",
   "PEOPLE.OBSERVE_WORKFORCE": "people",
   "ENGINEERING.OBSERVE_CONFIGURATION": "engineering-configuration",
   "PROJECT.OBSERVE_SCHEDULE": "project",
@@ -42,6 +45,7 @@ const SOURCE_AUTHORITY: Record<string, string> = {
   "PRODUCTION.OBSERVE_WIP": "getProductionJobCards",
   "MAINTENANCE.OBSERVE_ASSET": "getAssetMaintenanceState",
   "FINANCE.OBSERVE_LEDGER": "getAccountingWorkbench",
+  "FINANCE.OBSERVE_STATEMENTS": "buildFinancialStatements",
   "PEOPLE.OBSERVE_WORKFORCE": "listPeopleOfficeAuthority",
   "ENGINEERING.OBSERVE_CONFIGURATION": "getEngineeringChangeControlState",
   "PROJECT.OBSERVE_SCHEDULE": "readGovernedProgramSchedule",
@@ -143,6 +147,10 @@ async function executeRead(
       ledger: ledger.map((row) => row.record),
       journals: journals.map((row) => row.record),
     };
+  }
+
+  if (actionType === "FINANCE.OBSERVE_STATEMENTS") {
+    return readVaosFinancialStatements(sql, input);
   }
 
   if (actionType === "PEOPLE.OBSERVE_WORKFORCE") {
