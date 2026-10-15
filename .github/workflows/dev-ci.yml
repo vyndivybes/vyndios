@@ -83,6 +83,9 @@ jobs:
       - name: VAOS signed read bridge
         run: npm run test:vaos-bridge:read
 
+      - name: Founder enterprise BI authority and period tests
+        run: node --experimental-strip-types --test src/lib/vaos-enterprise-bi-read.test.ts
+
       - name: Enterprise assurance control regression
         run: npm run test:assurance:closure
 
