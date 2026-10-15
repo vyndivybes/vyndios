@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 const read=(p)=>readFile(new URL(`../${p}`,import.meta.url),"utf8");
+const reader=await read("src/lib/forecast-learning-read.ts");
 const [migration,model,authority,panel,planning,planningDeck,intelligence,intelligenceDeck,vibpe,pkg]=await Promise.all([
   read("migrations/0113_vyndi_forecast_learning.sql"),
   read("src/lib/forecast-learning-model.ts"),
@@ -25,7 +26,8 @@ test("forecast vintages and period closes are immutable governed evidence",()=>{
 });
 
 test("learning authority forbids hindsight by selecting only vintages captured before target period start",()=>{
-  assert.match(authority,/captured_at.*period_start|period_start.*captured_at/s);
+  assert.match(reader,/captured_at.*period_start|period_start.*captured_at/s);
+  assert.match(authority,/buildForecastLearningFromSql/);
   assert.match(authority,/captureForecastVintage/);
   assert.match(authority,/closeLearningPeriod/);
   assert.match(authority,/captureForecastLearningSnapshot/);

@@ -5,7 +5,9 @@ import { requireBusinessActor } from "@/lib/business-actor";
 import { canAccessRoute } from "@/lib/page-access";
 import { buildModelWithInputs, type FinanceAssumptions, type ProductLineId } from "@/lib/finance/model";
 import { normalizeOperatingPlan, type OperatingPlan } from "@/lib/planning/operating-plan";
-import { buildForecastLearning, type ForecastLearningObservation } from "@/lib/forecast-learning-model";
+import type {buildForecastLearning} from "@/lib/forecast-learning-model";
+import { buildForecastLearningFromSql } from "@/lib/forecast-learning-read";
+export { buildForecastLearningFromSql } from "@/lib/forecast-learning-read";
 
 const PRODUCTS:ProductLineId[]=["aluminium","carbon","premiumCarbon"];
 const MINIMUM_CLOSED_PERIODS=3;
@@ -101,47 +103,6 @@ async function approvedPlan(sql:Sql){
   return rows[0];
 }
 
-export async function buildForecastLearningFromSql(sql:Sql){
-  const rows=await sql.query<Record<string,unknown>>(
-    `with latest_close as (
-       select distinct on (period_start)
-              id,period_start,plan_month,revision
-         from vyndi_learning_period_closes
-        order by period_start,revision desc
-     )
-     select cp.product_id,
-            c.period_start,
-            c.plan_month,
-            cp.actual_qty,
-            fv.vintage_id,
-            fv.plan_qty,
-            fv.forecast_qty,
-            c.id as close_id
-       from latest_close c
-       join vyndi_learning_period_close_products cp on cp.close_id=c.id
-       join lateral (
-         select vl.vintage_id,vl.plan_qty,vl.forecast_qty
-           from vyndi_forecast_vintage_lines vl
-           join vyndi_forecast_vintages v on v.id=vl.vintage_id
-          where vl.period_start=c.period_start
-            and vl.product_id=cp.product_id
-            and v.captured_at < c.period_start::timestamptz
-          order by v.captured_at desc,v.id desc
-          limit 1
-       ) fv on true
-      order by c.period_start,cp.product_id`
-  );
-  const observations:ForecastLearningObservation[]=rows.map((row)=>({
-    productId:clean(row.product_id),
-    planMonth:n(row.plan_month),
-    planQty:n(row.plan_qty),
-    forecastQty:n(row.forecast_qty),
-    actualQty:n(row.actual_qty),
-    vintageId:clean(row.vintage_id),
-    closeId:clean(row.close_id),
-  }));
-  return buildForecastLearning({observations,minimumClosedPeriods:MINIMUM_CLOSED_PERIODS});
-}
 
 async function readForecastLearningState(sql:Sql){
   const plan=await approvedPlan(sql).catch(()=>null);
