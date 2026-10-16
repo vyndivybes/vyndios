@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createVoucherJournal } from "../src/lib/finance/voucher-journals.ts";
-import { validateJournal } from "../src/lib/finance/general-ledger.ts";
+import { validateJournal, CORE_CHART_OF_ACCOUNTS } from "../src/lib/finance/general-ledger.ts";
 
 const base = { id: "V-1", entryDate: "2026-10-16", reference: "DOC-001", amountInr: 1250.50 };
 const scenarios = [
@@ -19,7 +19,7 @@ for (const [kind, debit, credit] of scenarios) {
     assert.equal(entry.sourceId, "DOC-001");
     assert.equal(entry.lines[0].debitInr, 1250.5);
     assert.equal(entry.lines[1].creditInr, 1250.5);
-    assert.equal(validateJournal(entry, [...(kind === "contra" ? [{ code: "1010", name: "Cash", type: "asset" }] : [])]).valid, false);
+    assert.equal(validateJournal(entry, [...CORE_CHART_OF_ACCOUNTS, { code: "1010", name: "Cash", type: "asset" }]).valid, true);
   });
 }
 test("positive payment cannot be posted with the same debit and credit account", () => {
