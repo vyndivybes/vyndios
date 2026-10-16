@@ -131,7 +131,7 @@ function authPopupPlugin(): Plugin {
   };
 }
 
-export default defineConfig(() => ({
+export default defineConfig(({ command }) => ({
     server: {
       host: "0.0.0.0",
       port: 8080,
@@ -165,7 +165,20 @@ export default defineConfig(() => ({
       exclude: ["@electric-sql/pglite"],
     },
     plugins: [
-      cloudflare({ viteEnvironment: { name: "ssr" } }),
+      cloudflare({
+        viteEnvironment: { name: "ssr" },
+        // Codespaces is an isolated, no-deployment UI preview. The production
+        // Wrangler config stays unchanged and continues to use Hyperdrive.
+        // With no local Hyperdrive binding, db.server.ts uses its PGLite fallback.
+        // Only remove this binding for the Vite dev server, never for builds.
+        config: (userConfig) => {
+          const embeddedPreview =
+            command === "serve" &&
+            (process.env.CODESPACES === "true" ||
+              process.env.VYNDI_EMBEDDED_DB_PREVIEW === "1");
+          if (embeddedPreview) delete userConfig.hyperdrive;
+        },
+      }),
       pgliteBootstrapPlugin(),
       authPopupPlugin(),
       appEnvPlugin(),
