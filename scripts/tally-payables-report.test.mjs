@@ -68,8 +68,10 @@ test("source mismatches, missing posting evidence and malformed reversals fail c
   assert.throws(() => buildPayablesAgingReport(noReversal, "2026-10-16"), /Missing allocation reversal/);
 });
 
-test("report authority validates date and denies unauthorized callers before opening database", async () => {
-  const source = await readFile(new URL("../src/lib/finance/payables-report-authority.ts", import.meta.url), "utf8");
+for (const domain of ["payables", "receivables"]) test(domain + " report authority validates date and denies unauthorized callers before opening database", async () => {
+  const handlerName = domain === "payables" ? "getPayablesAgingReport" : "getReceivablesAgingReport";
+  const loaderName = domain === "payables" ? "loadPayablesAgingReport" : "loadReceivablesAgingReport";
+  const source = await readFile(new URL(`../src/lib/finance/${domain}-report-authority.ts`, import.meta.url), "utf8");
   const code = ts.transpileModule(source.replace(/^import .*;\r?$/gm, ""), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
   let role = null; let opened = 0; let allowed = false;
   const createServerFn = ({ method }) => {
@@ -77,19 +79,19 @@ test("report authority validates date and denies unauthorized callers before ope
     return { validator: schema => ({ handler: handler => async input => handler({ data: schema.parse(input.data) }) }) };
   };
   const exports = {};
-  new Function("exports", "createServerFn", "z", "getCommandRole", "getSql", "canPerform", "getRouteMeta", "loadPayablesAgingReport", code)(
+  new Function("exports", "createServerFn", "z", "getCommandRole", "getSql", "canPerform", "getRouteMeta", loaderName, code)(
     exports, createServerFn, z, async () => role, async () => { opened++; return {}; },
-    (actualRole, permission, meta) => { assert.equal(actualRole, role); assert.equal(permission, "view"); assert.equal(meta.path, "/command/payables"); return allowed; },
+    (actualRole, permission, meta) => { assert.equal(actualRole, role); assert.equal(permission, "view"); assert.equal(meta.path, `/command/${domain}`); return allowed; },
     path => ({ path }), async (_sql, asOfDate) => ({ asOfDate }));
   for (const value of [null, "sales"]) {
     role = value;
-    await assert.rejects(() => exports.getPayablesAgingReport({ data: { asOfDate: "2026-10-16" } }), /permission denied/);
+    await assert.rejects(() => exports[handlerName]({ data: { asOfDate: "2026-10-16" } }), /permission denied/);
   }
   assert.equal(opened, 0);
   role = "finance"; allowed = true;
-  await assert.rejects(() => exports.getPayablesAgingReport({ data: { asOfDate: "2026-02-30" } }));
+  await assert.rejects(() => exports[handlerName]({ data: { asOfDate: "2026-02-30" } }));
   assert.equal(opened, 0);
-  assert.deepEqual(await exports.getPayablesAgingReport({ data: { asOfDate: "2026-10-16" } }), { asOfDate: "2026-10-16" });
+  assert.deepEqual(await exports[handlerName]({ data: { asOfDate: "2026-10-16" } }), { asOfDate: "2026-10-16" });
   assert.equal(opened, 1);
 });
 
@@ -144,4 +146,15 @@ test("database report reconstructs payment reversal, debit-note offset and recov
   const settled = await loadPayablesAgingReport(sql, "2026-09-07");
   assert.equal(settled.aging.totalOutstandingInr, 0);
   assert.equal(settled.reconciliation.reconciled, true);
+  await assert.rejects(() => db.query(`insert into epr_finance_journal_lines(journal_id,line_no,account_code,debit_inr,credit_inr,memo)
+    values('FIN-AP-AGING-INV',99,'1000',1,0,'Attempted late append')`), /immutable/i);
+  await assert.rejects(() => db.query(`insert into epr_finance_journals(id,entry_date,source_type,source_id,description,status)
+    values('UNBALANCED-HEADER','2026-10-17','test','UNBALANCED-HEADER','Invalid direct SQL','posted')`), /not balanced.*commit/i);
+  assert.equal((await db.query(`select count(*)::int as n from epr_finance_journals where id='UNBALANCED-HEADER'`)).rows[0].n,0);
+  await assert.rejects(() => db.exec(`begin;
+    insert into epr_finance_journals(id,entry_date,source_type,source_id,description,status) values('UNBALANCED-LINES','2026-10-17','test','UNBALANCED-LINES','Invalid direct SQL','posted');
+    insert into epr_finance_journal_lines(journal_id,line_no,account_code,debit_inr,credit_inr,memo) values
+      ('UNBALANCED-LINES',1,'1000',1,0,''),('UNBALANCED-LINES',2,'3000',0,0.99,'');
+    commit;`), /not balanced.*commit/i);
+  await db.exec('rollback');
 });

@@ -8,12 +8,14 @@ export function reconcileSubledger(input: {
   asOfDate: string;
   kind: "receivable" | "payable";
   totalOutstandingInr: number;
+  creditBalanceInr?: number;
   journals: readonly JournalEntry[];
 }) {
   const cutoff = calendarDay(input.asOfDate);
   if (input.kind !== "receivable" && input.kind !== "payable") throw new Error("Unsupported subledger kind.");
   const accountCode = input.kind === "receivable" ? "1100" : "2000";
-  const subledger = inrToPaise(input.totalOutstandingInr);
+  const creditBalance = inrToPaise(input.creditBalanceInr ?? 0);
+  const subledger = addPaise(inrToPaise(input.totalOutstandingInr), -creditBalance);
   const seen = new Set<string>();
   const journalIds: string[] = [];
   let balance = 0;
@@ -35,5 +37,5 @@ export function reconcileSubledger(input: {
   }
   const difference = addPaise(balance, -subledger);
   return { asOfDate: input.asOfDate, accountCode, journalIds, ledgerBalanceInr: balance / 100,
-    subledgerBalanceInr: subledger / 100, differenceInr: difference / 100, reconciled: difference === 0 };
+    subledgerBalanceInr: subledger / 100, creditBalanceInr: creditBalance / 100, differenceInr: difference / 100, reconciled: difference === 0 };
 }

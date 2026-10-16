@@ -2,6 +2,8 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { ArrowRight, Banknote, FileText, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { Kpi, Panel } from "@/components/kpi";
+import { PayablesAgingReportPanel } from "@/components/payables-aging-report";
+import { getReceivablesAgingReport } from "@/lib/finance/receivables-report-authority";
 import { issueInvoice, listShipmentRevenueLedger, postCollection } from "@/lib/shipment-authority";
 
 export const Route = createFileRoute("/command/receivables")({
@@ -9,9 +11,9 @@ export const Route = createFileRoute("/command/receivables")({
   component: Receivables,
 });
 const moneyLakh = (value: number) =>
-  new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(value * 100_000);
+  new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value * 100_000);
 const moneyInr = (value: number) =>
-  new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(value);
+  new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 
 type TaxMode = "" | "cgst_sgst" | "igst" | "zero_rated" | "exempt";
 
@@ -20,13 +22,14 @@ function Receivables() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [reportVersion, setReportVersion] = useState(0);
   const activeInvoices = data.invoices.filter((invoice) => invoice.status === "issued");
   const postedCollections = data.collections.filter((collection) => collection.status === "posted");
   const collectedByInvoice = new Map<string, number>();
   for (const collection of postedCollections)
     collectedByInvoice.set(collection.invoiceId, (collectedByInvoice.get(collection.invoiceId) ?? 0) + collection.amountLakh);
   const outstanding = activeInvoices.reduce(
-    (sum, invoice) => sum + Math.max(invoice.grossAmountLakh - (collectedByInvoice.get(invoice.id) ?? 0), 0),
+    (sum, invoice) => sum + invoice.balanceInr / 100000,
     0,
   );
   const uninvoiced = data.shipments.filter(
@@ -58,6 +61,7 @@ function Receivables() {
   const [collection, setCollection] = useState({ id: "", invoiceId: "", planMonth: 1, amountLakh: 0, sourceReference: "" });
 
   async function run(task: () => Promise<unknown>, success: string) {
+    setReportVersion(version => version + 1);
     setBusy(true);
     setMessage("");
     try {
@@ -183,12 +187,12 @@ function Receivables() {
                 onChange={(e) => {
                   const selectedId = e.target.value;
                   const row = activeInvoices.find((item) => item.id === selectedId);
-                  setCollection({ ...collection, invoiceId: selectedId, amountLakh: row ? Math.max(row.grossAmountLakh - (collectedByInvoice.get(selectedId) ?? 0), 0) : 0 });
+                  setCollection({ ...collection, invoiceId: selectedId, amountLakh: row ? row.balanceInr / 100000 : 0 });
                 }}
               >
                 <option value="">Select invoice</option>
-                {activeInvoices.filter((row) => row.grossAmountLakh - (collectedByInvoice.get(row.id) ?? 0) > 0).map((row) => (
-                  <option key={row.id} value={row.id}>{row.id} · open {moneyLakh(row.grossAmountLakh - (collectedByInvoice.get(row.id) ?? 0))}</option>
+                {activeInvoices.filter((row) => row.balanceInr > 0).map((row) => (
+                  <option key={row.id} value={row.id}>{row.id} · open {moneyInr(row.balanceInr)}</option>
                 ))}
               </select>
             </Field>
@@ -203,6 +207,9 @@ function Receivables() {
           </button>
         </Panel>
       </div>
+
+      <PayablesAgingReportPanel key={reportVersion} kind="receivable" disabled={busy}
+        loadReport={asOfDate => getReceivablesAgingReport({ data: { asOfDate } })} />
 
       <Panel title="Receivable register" kicker="Shipment → tax invoice → credit due date → gross collection">
         <div className="overflow-x-auto">
@@ -226,7 +233,7 @@ function Receivables() {
                     <td className="px-3 py-3 text-right tabular-nums">{moneyInr(row.gstInr)}</td>
                     <td className="px-3 py-3 text-right font-semibold tabular-nums">{moneyLakh(row.grossAmountLakh)}</td>
                     <td className="px-3 py-3 text-right tabular-nums text-ok">{moneyLakh(collected)}</td>
-                    <td className="px-3 py-3 text-right font-semibold tabular-nums">{moneyLakh(Math.max(row.grossAmountLakh - collected, 0))}</td>
+                    <td className="px-3 py-3 text-right font-semibold tabular-nums">{moneyInr(row.balanceInr)}{row.refundDueInr > 0 ? <span className="block text-xs text-warn">Credit / refund due {moneyInr(row.refundDueInr)}</span> : null}</td>
                     <td className="px-3 py-3 text-xs">
                       {row.creditProfileStatus === "controlled" ? <><span className="font-semibold text-fg">{row.creditTermsDays} days · due {row.dueOn}</span><span className="block text-muted">{row.creditTermsReference}</span></> : <span className="font-semibold text-warn">Legacy · terms not inferred</span>}
                     </td>

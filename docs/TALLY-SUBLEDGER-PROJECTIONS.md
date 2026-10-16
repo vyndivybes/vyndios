@@ -8,7 +8,7 @@ The canonical sources remain shipment-derived customer invoices and bank-evidenc
 
 `computeReceivableAging` accepts invoices and receipt allocations. `computePayableAging` accepts the same invoice shape and payment allocations. Each allocation ID must be unique in the supplied snapshot. A bank receipt split across bills requires distinct allocation IDs; these functions do not deduplicate bank transactions or authorize bill allocations.
 
-Callers of the pure calculation modules must select one entity, INR currency and authorized source records, and supply complete invoice/allocation history. Draft, rejected, cancelled and reversed source records must not be represented as active invoices/payments. The pure modules do not query or change database records or infer posting authority. The payable database adapter below reconstructs historical state from posted journals; receivable adapters and UI consumers are still required.
+Callers of the pure calculation modules must select one entity, INR currency and authorized source records, and supply complete invoice/allocation history. Draft, rejected, cancelled and reversed source records must not be represented as active invoices/payments. The pure modules do not query or change database records or infer posting authority. Both database adapters reconstruct historical state from posted journals and are called by on-demand panels in their existing workspaces.
 
 ## Calculation rules
 
@@ -44,4 +44,20 @@ All posted account-2000 entries, including opening and unmapped manual postings,
 
 Tests run the real migrations and supplier-payment/reversal/return functions in isolated PGlite, check prior-date and current-date balances, and verify no journals/audit events are created by report reads. Authorization tests execute the report handler with controlled identity/database boundaries and verify rejection occurs before database access.
 
-Receivable database adapters, accountant-reviewed reports, production scale, authenticated full-application browser journeys and live deployment remain unverified. No complete TallyPrime parity or live finance certification is claimed.
+## Receivable database report
+
+`getReceivablesAgingReport` requires the existing Receivables route view permission before database access. The adapter reads invoices, collections, credit notes, refunds and posted journals in one SQL snapshot. Journal entry dates own accounting cutoffs, including sources whose timestamps were converted in the database session's timezone. Current source status does not erase the history before a dated reversal.
+
+Customer credit balances are retained separately and deducted from outstanding bills for signed GL reconciliation. They are not clamped away. Credit notes and refunds are validated against their source amounts and linked invoices. The report retains a breakdown of gross invoice, collected, credited, refunded, outstanding and credit balances. Ageing classifies the derived open amount; it does not manufacture payment allocations.
+
+Legacy invoices without evidenced terms/due dates remain in total balances and GL comparison, but are listed as unaged. A diagnostic GL match can therefore coexist with explicitly incomplete ageing. No due date is inferred. There is no durable customer-master key on these invoice rows: the displayed source reference is the sales-order/spare-sale reference, not a fabricated party identity. Party-wide allocation/migration remains a separate requirement.
+
+The existing Receivables screen now obtains current open/refund amounts from the canonical sales-ledger view, so credit notes and refunds are not ignored in its KPI, register or collection selector. Receivables reads/writes check the route's authorization; voids and collection reversals additionally require approval permission. Migration `0195` enforces an independent finance/admin actor at the reversal/void database boundary and prevents voiding an invoice with active customer credit notes.
+
+## Posting integrity migrations
+
+- `0194` rejects fractional/negative/unsafe paise and even a one-paise imbalance in canonical SQL posting. Source retries must match existing date, description and normalized lines. A source lock serializes competing retries.
+- `0195` preserves the existing cash, journal reversal and audit paths while adding independent approval checks.
+- `0196` permits journal construction within the posting transaction, rejects later line inserts into posted journals, and defers exact balance/safe-paise checks until transaction commit. Existing posted UPDATE/DELETE immutability and hard-close triggers remain in force.
+
+These migrations were authored for controlled application, not applied to live books. Real PostgreSQL rehearsal, concurrent-client testing, accountant-reviewed reports, production scale, authenticated full-application browser journeys and live deployment remain unverified. Existing collection/cash storage in four-decimal lakh units cannot represent arbitrary paise and remains a separate release blocker. See the dated audit report for remaining work. No complete TallyPrime parity or live finance certification is claimed.

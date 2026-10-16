@@ -84,7 +84,7 @@ export function validateJournal(entry: Pick<JournalEntry, "lines">, chart: Ledge
     // This protects manually constructed journals before posting to the ledger.
     for (const [side, raw] of [["debit", line.debitInr], ["credit", line.creditInr]] as const) {
       if (raw === undefined) continue;
-      if (!Number.isFinite(raw) || raw < 0 || Math.abs(raw * 100 - Math.round(raw * 100)) > 1e-6) {
+      if (!Number.isFinite(raw) || raw < 0 || !Number.isSafeInteger(Math.round(raw * 100)) || Math.abs(raw * 100 - Math.round(raw * 100)) > 1e-6) {
         errors.push(`Account ${line.accountCode} has an invalid ${side} amount; amounts must be nonnegative finite INR values in paise.`);
       }
     }
@@ -95,7 +95,10 @@ export function validateJournal(entry: Pick<JournalEntry, "lines">, chart: Ledge
     }
   }
   const totals = journalTotals(entry);
-  if (Math.abs(totals.differenceInr) > 0.01) errors.push(`Journal is not balanced by ₹${Math.abs(totals.differenceInr).toFixed(2)}.`);
+  const debitPaise = entry.lines.reduce((sum, line) => sum + Math.round((line.debitInr ?? 0) * 100), 0);
+  const creditPaise = entry.lines.reduce((sum, line) => sum + Math.round((line.creditInr ?? 0) * 100), 0);
+  if (!Number.isSafeInteger(debitPaise) || !Number.isSafeInteger(creditPaise)) errors.push("Invalid total amount: unsafe integer paise.");
+  if (debitPaise !== creditPaise) errors.push(`Journal is not balanced by ₹${Math.abs(totals.differenceInr).toFixed(2)}.`);
   return { valid: errors.length === 0, errors, ...totals };
 }
 

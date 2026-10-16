@@ -1,4 +1,5 @@
 import type { JournalEntry } from "./general-ledger.ts";
+import { calendarDay } from "./receivables-aging.ts";
 
 /** Pure voucher-to-ledger projection. Posting and idempotency must be enforced by the DB-backed authority. */
 export type VoucherKind = "receipt" | "payment" | "contra" | "journal" | "sales" | "purchase" | "credit_note" | "debit_note";
@@ -13,16 +14,16 @@ export type VoucherInput = {
   memo?: string;
 };
 const kinds = new Set<VoucherKind>(["receipt","payment","contra","journal","sales","purchase","credit_note","debit_note"]);
-const currencyAmount = (n: number) => Number.isFinite(n) && n > 0 && Math.abs(n * 100 - Math.round(n * 100)) <= 1e-6;
+const currencyAmount = (n: number) => Number.isFinite(n) && n > 0 && Number.isSafeInteger(Math.round(n * 100)) && Math.abs(n * 100 - Math.round(n * 100)) <= 1e-6;
 export function createVoucherJournal(input: VoucherInput): JournalEntry {
   if (!kinds.has(input.kind)) throw new Error("Unsupported voucher kind.");
   if (!input.id?.trim()) throw new Error("Voucher ID is required.");
   if (!input.reference?.trim()) throw new Error("Voucher source reference is required.");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.entryDate) || Number.isNaN(Date.parse(input.entryDate + "T00:00:00Z"))) {
+  try { calendarDay(input.entryDate); } catch {
     throw new Error("Voucher entry date is invalid.");
   }
   if (!currencyAmount(input.amountInr)) throw new Error("Voucher amount must be positive finite INR in paise.");
-  if (!input.debitAccountCode?.trim() || !input.creditAccountCode?.trim() || input.debitAccountCode === input.creditAccountCode) {
+  if (!input.debitAccountCode?.trim() || !input.creditAccountCode?.trim() || input.debitAccountCode.trim() === input.creditAccountCode.trim()) {
     throw new Error("Voucher must use two different nonempty accounts.");
   }
   return {
