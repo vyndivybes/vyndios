@@ -4,6 +4,9 @@ import {
   AUTH_ALLOWED_HOSTS,
   AUTH_TRUSTED_ORIGINS,
   CLOUDFLARE_PRODUCTION_ORIGIN,
+  CODESPACES_PREVIEW_HOST,
+  CODESPACES_PREVIEW_ORIGIN,
+  resolveAuthTrustedOrigins,
   resolveAuthBaseURL,
   resolveAuthSecret,
 } from "./runtime-config.ts";
@@ -61,4 +64,14 @@ test("preview fallback remains available without a production database", () => {
     }),
     "preview-secret",
   );
+});
+
+test("Codespaces forwarded URLs are only accepted for explicit development previews", () => {
+  const production = resolveAuthBaseURL(undefined, false);
+  const development = resolveAuthBaseURL(undefined, true);
+  assert.equal(production.allowedHosts.includes(CODESPACES_PREVIEW_HOST), false);
+  assert.equal(development.allowedHosts.includes(CODESPACES_PREVIEW_HOST), true);
+  assert.equal(resolveAuthTrustedOrigins(false).includes(CODESPACES_PREVIEW_ORIGIN), false);
+  assert.equal(resolveAuthTrustedOrigins(true).includes(CODESPACES_PREVIEW_ORIGIN), true);
+  assert.deepEqual(production.allowedHosts, [...AUTH_ALLOWED_HOSTS]);
 });
