@@ -72,6 +72,7 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [codespacesPreview, setCodespacesPreview] = useState(false);
   const [granted, setGranted] = useState(false);
   const [bootMessage, setBootMessage] = useState<string | null>(null);
   const [introVisible, setIntroVisible] = useState(true);
@@ -80,6 +81,12 @@ function LoginPage() {
   const sceneHostRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLFormElement>(null);
   const sceneControlsRef = useRef<SceneControls | null>(null);
+
+  useEffect(() => {
+    setCodespacesPreview(
+      import.meta.env.DEV && window.location.hostname.endsWith(".app.github.dev"),
+    );
+  }, []);
 
   useEffect(() => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -632,6 +639,12 @@ function LoginPage() {
             </button>
 
             <div className="vy-login__secure"><ShieldCheck aria-hidden="true" />Session protected · governed access</div>
+            {codespacesPreview ? (
+              <p className="vy-login__access-note">
+                This preview uses a separate temporary database; production credentials will not work here.
+                <Link to="/signup"> Create a preview account</Link>.
+              </p>
+            ) : null}
             <Link to="/" className="vy-login__back">Return to VYNDI</Link>
           </form>
         </div>
