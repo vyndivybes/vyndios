@@ -6,6 +6,7 @@ import test from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 import { approveInventoryMaster } from "./inventory-master-fixture.mjs";
 import { pendingMigrations } from "./migration-plan.mjs";
+import { loadReceivablesAgingReport } from "../src/lib/finance/receivables-report.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
@@ -55,13 +56,13 @@ test("customer RMA -> credit note -> refund preserves original invoice and nets 
 
   await db.query(
     `insert into vyndi_invoices(
-      id,plan_month,units,asp_lakh,amount_lakh,status,source_reference,issued_by,
+      id,plan_month,units,asp_lakh,amount_lakh,status,source_reference,issued_by,issued_at,
       sale_type,spare_sale_id,recipient_name,recipient_address,delivery_address,place_of_supply_code,
       hsn_sac,item_description,unit_code,taxable_value_inr,tax_rate_pct,tax_mode,cgst_inr,sgst_inr,
       igst_inr,cess_inr,gst_inr,gross_amount_inr,reverse_charge,e_invoice_required,tax_evidence_reference,
       tax_profile_status,credit_terms_days,due_on,credit_terms_reference,credit_profile_status)
      values(
-      'INV-CUST-RET',1,1,0.0200,0.0200,'issued','INV-CUST-EVID','finance',
+      'INV-CUST-RET',1,1,0.0200,0.0200,'issued','INV-CUST-EVID','finance','2026-09-02T00:00:00Z',
       'spare_component','SPARE-CUST-1','Test Customer','Address','Address','33',
       '8714','Test component','NOS',2000,18,'cgst_sgst',180,180,0,0,360,2360,false,false,'TAX-CUST-EVID',
       'complete',0,'2026-09-02','TERMS-CUST','controlled')`
@@ -104,6 +105,14 @@ test("customer RMA -> credit note -> refund preserves original invoice and nets 
   assert.equal(Number(ledger.rows[0].refund_due_inr),0);
   assert.equal(Number(ledger.rows[0].credit_note_gross_inr),2360);
   assert.equal(Number(ledger.rows[0].refunded_inr),2360);
+  const sql={query:async(text,params)=>(await db.query(text,params)).rows};
+  const historic=await loadReceivablesAgingReport(sql,"2026-09-02");
+  assert.equal(historic.totalOutstandingInr,2360);
+  assert.equal(historic.reconciliation.reconciled,true);
+  const current=await loadReceivablesAgingReport(sql,(await sql.query("select max(entry_date)::text as day from epr_finance_journals"))[0].day);
+  assert.equal(current.totalOutstandingInr,0);
+  assert.equal(current.creditBalanceInr,0);
+  assert.equal(current.reconciliation.reconciled,true);
 });
 
 test("supplier GRN return -> debit note -> recoverable -> refund preserves FIFO and nets AP/ITC/cash", async (t) => {

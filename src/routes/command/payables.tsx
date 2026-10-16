@@ -2,6 +2,8 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { ArrowRight, BadgeCheck, Banknote, FileSearch, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { Kpi, Panel } from "@/components/kpi";
+import { PayablesAgingReportPanel } from "@/components/payables-aging-report";
+import { getPayablesAgingReport } from "@/lib/finance/payables-report-authority";
 import {
   approveSupplierInvoice,
   getPayablesData,
@@ -39,6 +41,7 @@ function Payables() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [reportVersion, setReportVersion] = useState(0);
   const [draft, setDraft] = useState({
     id: "",
     purchaseOrderId: "",
@@ -78,6 +81,7 @@ function Payables() {
   }
 
   async function run(task: () => Promise<unknown>, success: string) {
+    setReportVersion(version => version + 1);
     setBusy(true);
     setMessage("");
     try {
@@ -92,6 +96,7 @@ function Payables() {
   }
 
   async function submit() {
+    setReportVersion(version => version + 1);
     setBusy(true);
     setMessage("");
     try {
@@ -214,6 +219,9 @@ function Payables() {
       </div>
 
       {message ? <div role="status" className="rounded-lg border border-border bg-surface px-4 py-3 text-sm text-muted">{message}</div> : null}
+
+      <PayablesAgingReportPanel key={reportVersion} disabled={busy}
+        loadReport={asOfDate => getPayablesAgingReport({ data: { asOfDate } })} />
 
       <Panel title="Record supplier invoice" kicker="PO + accepted GRN + invoice">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

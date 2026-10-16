@@ -4,6 +4,7 @@ import { getSql } from "@/lib/db";
 import { requireBusinessActor } from "@/lib/business-actor";
 import { getCommandRole } from "@/lib/command-access";
 import { canPerform } from "@/lib/page-access";
+import { getRouteMeta } from "@/lib/page-metadata";
 import { postDispatch, reverseDispatch } from "@/lib/dispatch-authority";
 
 const id = z.string().trim().min(1).max(120);
@@ -28,6 +29,8 @@ export type InvoiceRecord = {
   aspLakh: number;
   amountLakh: number;
   grossAmountLakh: number;
+  balanceInr: number;
+  refundDueInr: number;
   taxableValueInr: number;
   gstInr: number;
   taxRatePct: number;
@@ -68,7 +71,13 @@ export type TaxRegistrationRecord = {
 
 async function requireView() {
   const role = await getCommandRole();
-  if (!role || !canPerform(role, "view")) throw new Error("Shipment/revenue view permission denied.");
+  if (!role || !canPerform(role, "view", getRouteMeta("/command/receivables"))) throw new Error("Shipment/revenue view permission denied.");
+}
+
+async function requireReceivablesActor(permission: "edit" | "approve") {
+  const actor = await requireBusinessActor(permission);
+  if (!canPerform(actor.role, permission, getRouteMeta("/command/receivables"))) throw new Error("Receivables permission denied.");
+  return actor;
 }
 
 export const listShipmentRevenueLedger = createServerFn({ method: "GET" }).handler(async () => {
@@ -81,7 +90,9 @@ export const listShipmentRevenueLedger = createServerFn({ method: "GET" }).handl
     `select id,shipment_id,sales_order_id,plan_month,units,asp_lakh,amount_lakh,status,source_reference,
       taxable_value_inr,gst_inr,gross_amount_inr,tax_rate_pct,tax_mode,tax_profile_status,
       recipient_name,recipient_gstin,place_of_supply_code,hsn_sac,e_invoice_required,irn,
-      credit_terms_days,due_on,credit_terms_reference,credit_profile_status
+      credit_terms_days,due_on,credit_terms_reference,credit_profile_status,
+      (select balance_inr from vyndi_report_sales_ledger ledger where ledger.invoice_id=vyndi_invoices.id) as balance_inr,
+      (select refund_due_inr from vyndi_report_sales_ledger ledger where ledger.invoice_id=vyndi_invoices.id) as refund_due_inr
       from vyndi_invoices order by plan_month,id`,
   );
   const collections = await sql.query<Record<string, unknown>>(
@@ -101,6 +112,7 @@ export const listShipmentRevenueLedger = createServerFn({ method: "GET" }).handl
       return {
         id:String(r.id),shipmentId:String(r.shipment_id),salesOrderId:String(r.sales_order_id),planMonth:Number(r.plan_month),units:Number(r.units),
         aspLakh:Number(r.asp_lakh),amountLakh,grossAmountLakh:grossAmountInr>0?grossAmountInr/100000:amountLakh,
+        balanceInr:Number(r.balance_inr),refundDueInr:Number(r.refund_due_inr),
         taxableValueInr:Number(r.taxable_value_inr ?? amountLakh*100000),gstInr:Number(r.gst_inr ?? 0),taxRatePct:Number(r.tax_rate_pct ?? 0),
         taxMode:String(r.tax_mode ?? "pending") as InvoiceRecord["taxMode"],taxProfileStatus:String(r.tax_profile_status ?? "pending") as InvoiceRecord["taxProfileStatus"],
         recipientName:String(r.recipient_name ?? ""),recipientGstin:String(r.recipient_gstin ?? ""),placeOfSupplyCode:String(r.place_of_supply_code ?? ""),
@@ -155,7 +167,7 @@ export const issueInvoice = createServerFn({ method: "POST" })
     creditTermsReference:sourceReference,
   }))
   .handler(async ({ data }) => {
-    const actor = await requireBusinessActor("edit");
+    const actor = await requireReceivablesActor("edit");
     if (data.eInvoiceRequired && (!data.irn || !data.irnAckNumber || !data.irnAckAt)) {
       throw new Error("IRN, acknowledgement number and acknowledgement timestamp are required for an e-invoice.");
     }
@@ -179,7 +191,7 @@ export const issueInvoice = createServerFn({ method: "POST" })
 export const voidInvoice = createServerFn({ method: "POST" })
   .validator(z.object({ id, reason:z.string().trim().min(1).max(500) }))
   .handler(async ({ data }) => {
-    const actor = await requireBusinessActor("edit");
+    const actor = await requireReceivablesActor("approve");
     const sql = await getSql();
     const rows = await sql.query<{ revision:number|string }>(`select void_vyndi_invoice($1,$2,$3,$4) as revision`,[data.id,data.reason,actor.userId,actor.role]);
     return { id:data.id, revision:Number(rows[0]?.revision ?? 0) };
@@ -188,7 +200,7 @@ export const voidInvoice = createServerFn({ method: "POST" })
 export const postCollection = createServerFn({ method: "POST" })
   .validator(z.object({ id, invoiceId:id, planMonth:month, amountLakh:z.number().positive(), sourceReference }))
   .handler(async ({ data }) => {
-    const actor = await requireBusinessActor("edit");
+    const actor = await requireReceivablesActor("edit");
     const sql = await getSql();
     const rows = await sql.query<{ post_vyndi_collection:string }>(`select post_vyndi_collection($1,$2,$3,$4,$5,$6,$7)`,[data.id,data.invoiceId,data.planMonth,data.amountLakh,data.sourceReference,actor.userId,actor.role]);
     return { id:rows[0]?.post_vyndi_collection ?? data.id };
@@ -197,7 +209,7 @@ export const postCollection = createServerFn({ method: "POST" })
 export const reverseCollection = createServerFn({ method: "POST" })
   .validator(z.object({ id, reason:z.string().trim().min(1).max(500) }))
   .handler(async ({ data }) => {
-    const actor = await requireBusinessActor("edit");
+    const actor = await requireReceivablesActor("approve");
     const sql = await getSql();
     const rows = await sql.query<{ revision:number|string }>(`select reverse_vyndi_collection($1,$2,$3,$4) as revision`,[data.id,data.reason,actor.userId,actor.role]);
     return { id:data.id, revision:Number(rows[0]?.revision ?? 0) };
