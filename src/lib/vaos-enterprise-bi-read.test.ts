@@ -57,7 +57,19 @@ test("BI counts use entire scoped source, not the page size; one query per ledge
  assert.equal(first.currentAttentionCount,113);
  assert.equal(first.excludedTrainingCount,2);
  assert.equal(first.sources.length,2);
+ assert.equal(first.query.sql,calls[0].query);
+ assert.deepEqual(first.query.parameters,calls[0].params);
  assert.ok(calls.every(x=>x.query.includes('not training')));
+});
+
+test('dashboard refresh uses one primary query, with a bounded CRM exception',async()=>{
+ const calls:string[]=[];
+ const sql={query:async(q:string)=>{calls.push(q);return [{summary:[],records:[]}];}};
+ await readEnterpriseBi(sql as never,{employeeId:'finance',from:'2026-10-01',to:'2026-10-15',limit:5},{primaryOnly:true});
+ assert.equal(calls.length,1);assert.match(calls[0],/epr_finance_journals/);
+ calls.length=0;
+ const packet=await readEnterpriseBi(sql as never,{employeeId:'commercial',from:'2026-10-01',to:'2026-10-15',limit:5},{primaryOnly:true,crm:true});
+ assert.equal(calls.length,2);assert.equal(packet.departments[0].sources[1].sourceTable,'vyndi_crm_activities');
 });
 
 test("undated pending cases remain visible in current backlog when no period event occurred",async()=>{
