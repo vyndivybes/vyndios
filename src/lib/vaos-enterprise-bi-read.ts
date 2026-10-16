@@ -35,7 +35,7 @@ export const VYNDI_BI_RELATED:Record<Employee,readonly string[]>={
  knowledge:["vyndi_engineering_document_revisions","vibpe_knowledge_claims"],
  release:["vyndi_quality_inspections"],
  qa:["vyndi_quality_capas","vyndi_quality_inspections"],
- commercial:["vyndi_shipments","vyndi_collections"],
+ commercial:["vyndi_shipments","vyndi_collections","vyndi_crm_activities"],
  procurement:["vyndi_goods_receipts","vyndi_supplier_invoices"],
  inventory:["vyndi_inventory_balance","epr_inventory_stocktakes","epr_inventory_stocktake_lines"],
  production:["epr_production_job_card_lines"],
@@ -67,6 +67,7 @@ const EVENT_FIELDS=["actual_finish","closed_at","completed_at","decided_at","rel
 "effective_on","work_date","effective_at","requested_at","updated_at","created_at"];
 const STATUS_FIELDS=["status","operational_status","lifecycle_status","issue_status","inspection_status","attendance_status","qualification_status","readiness_status","state","outcome","stage","decision","result","event_type","action"];
 const scalar=(v:unknown)=>v==null||["string","number","boolean"].includes(typeof v);
+export const biToday=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const validDay=(v:string)=>/^\d{4}-\d{2}-\d{2}$/.test(v)&&Number.isFinite(Date.parse(v))&&new Date(v).toISOString().slice(0,10)===v;
 export function validateBiScope(input: Record<string,unknown>) {
  const from=String(input.from??""),to=String(input.to??"");
@@ -75,7 +76,7 @@ export function validateBiScope(input: Record<string,unknown>) {
  const offset=Number(input.offset??0),limit=Number(input.limit??50);
  if(!validDay(from)||!validDay(to)
    ||from>to|| Date.parse(to)-Date.parse(from)>366*86400000
-   ||to>new Date().toISOString().slice(0,10)
+   ||to>biToday()
    ||!Number.isSafeInteger(offset)||offset<0||offset>5000
    ||!Number.isSafeInteger(limit)||limit<1||limit>100
    ||(employeeId!=="all"&&!Object.hasOwn(VYNDI_BI_DEPARTMENTS,employeeId))) {
@@ -127,8 +128,7 @@ async function readOne(sql:Sql,employeeId:Employee,from:string,to:string,offset:
  or coalesce(t.rec->>'source_reference',t.rec->>'source_ref','') ~* '^(test:|fixture:|synthetic:|training:|qualification:|canary:)')`;
  // One statement gives internally consistent totals and detail, scanning a source
  // once. Only the statically governed table names above reach this query.
- const [result]=await sql.query<{summary:{status:string;quantity:number;current:number;undated:number;training:number;unknown:number}[];records:Record<string,unknown>[]}>(
-  `with source as materialized (
+ const querySql=`with source as materialized (
     select t.rec,${dateSql('t.rec')} as date,${status} as status,${training} as training,
      coalesce(t.rec->>'record_origin','') !~* '^(business|production|actual)$' as unknown_origin
     from (select to_jsonb(r) as rec from ${table} r) t
@@ -143,7 +143,9 @@ async function readOne(sql:Sql,employeeId:Employee,from:string,to:string,offset:
     select (select jsonb_object_agg(k,v) from jsonb_each(rec) e(k,v) where k=any($5::text[])) as rec from source where not training and date between $1 and $2
     order by date desc,coalesce(rec->>'id','') desc,rec::text limit $3 offset $4
    ) select coalesce((select jsonb_agg(to_jsonb(s) order by s.status) from summary s),'[]'::jsonb) as summary,
-     coalesce((select jsonb_agg(rec) from page),'[]'::jsonb) as records`,[from,to,limit,offset,[...new Set([...SAFE_FIELDS,...EVENT_FIELDS])]]);
+     coalesce((select jsonb_agg(rec) from page),'[]'::jsonb) as records`;
+ const parameters=[from,to,limit,offset,[...new Set([...SAFE_FIELDS,...EVENT_FIELDS])]];
+ const [result]=await sql.query<{summary:{status:string;quantity:number;current:number;undated:number;training:number;unknown:number}[];records:Record<string,unknown>[]}>(querySql,parameters);
  if(!result||!Array.isArray(result.summary)||!Array.isArray(result.records))throw Error('BI_SOURCE_SHAPE');
  const statusDistribution=result.summary.filter(r=>r.quantity>0).map(r=>({status:r.status,count:r.quantity}));
  const currentStatusDistribution=result.summary.filter(r=>r.current>0).map(r=>({status:r.status,count:r.current}));
@@ -151,6 +153,7 @@ async function readOne(sql:Sql,employeeId:Employee,from:string,to:string,offset:
  const currentStates=biStateCounts(currentStatusDistribution,employeeId);
  const sum=(key:'undated'|'training'|'unknown')=>result.summary.reduce((n,r)=>n+r[key],0);
  return {sourceTable:table,status:'OBSERVED' as const,
+  query:{id:'vyndi.source-state.v1',sql:querySql,parameters,readOnly:true},
   periodEventCount:total,flaggedStatusCount:biStateCounts(statusDistribution,employeeId).blocked,statusDistribution,
   currentSourceCount:currentStatusDistribution.reduce((sum,r)=>sum+r.count,0),
   currentAttentionCount:currentStates.pending+currentStates.blocked,currentStatusDistribution,
@@ -162,7 +165,7 @@ async function readOne(sql:Sql,employeeId:Employee,from:string,to:string,offset:
   forecast:{status:'UNAVAILABLE',reason:'No independently qualified dated workforce forecast in this source.'}};
 }
 /** Fail a single missing or uncommissioned department independently, never invent zeros. */
-export async function readEnterpriseBi(sql:Sql,input:Record<string,unknown>){
+export async function readEnterpriseBi(sql:Sql,input:Record<string,unknown>,options:{primaryOnly?:boolean;crm?:boolean}={}){
  const scope=validateBiScope(input);
  const selected=(scope.employeeId==="all"?Object.keys(VYNDI_BI_DEPARTMENTS):[scope.employeeId]) as Employee[];
  const results=[];
@@ -171,7 +174,7 @@ export async function readEnterpriseBi(sql:Sql,input:Record<string,unknown>){
  for(const employeeId of selected){
   const meta=VYNDI_BI_DEPARTMENTS[employeeId];
   const sources=[];
-  for(const table of [meta.table,...VYNDI_BI_RELATED[employeeId]]){
+  for(const table of [meta.table,...(options.crm&&employeeId==='commercial'?['vyndi_crm_activities']:options.primaryOnly?[]:VYNDI_BI_RELATED[employeeId])]){
    try{sources.push(await readOne(sql,employeeId,scope.from,scope.to,
     scope.sourceTable&&scope.sourceTable!==table?0:scope.offset,
     scope.employeeId==='all'?Math.min(scope.limit,5):scope.limit,table));}
@@ -186,6 +189,7 @@ export async function readEnterpriseBi(sql:Sql,input:Record<string,unknown>){
  }
  let businessPlanComparison;
  try{
+  if(options.primaryOnly)throw Error('COMPARISON_NOT_REQUESTED');
   const learning=await buildForecastLearningFromSql(sql,{from:scope.from,to:scope.to});
   businessPlanComparison={status:learning.samples?'CLOSED_PERIOD_COMPARISON':'UNAVAILABLE',
    scope:'ENTERPRISE_PRODUCT_DEMAND_NOT_EMPLOYEE_OUTPUT',

@@ -78,7 +78,7 @@ async function executeRead(
   limit: number,
   input: Record<string, unknown> = {},
 ) {
-  if (actionType === "ORCHESTRATOR.OBSERVE_ENTERPRISE_BI") return readEnterpriseBi(sql,input);
+  if (actionType === "ORCHESTRATOR.OBSERVE_ENTERPRISE_BI") return readEnterpriseBi(sql,input,{primaryOnly:input.primaryOnly===true,crm:input.crm===true});
 
   if (actionType === "PROJECT.OBSERVE_SCHEDULE") {
     const {projectId}=validateScheduleProjectInput(input);
