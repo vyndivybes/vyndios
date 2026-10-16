@@ -30,7 +30,9 @@ The result contains contributing journal IDs, ledger balance, subledger balance,
 
 ## Payable database report
 
-`getPayablesAgingReport({ data: { asOfDate } })` is a read-only TanStack GET server function. It requires existing view permission for `/command/payables` before opening the database. It is not yet wired to a report panel in that workspace.
+`getPayablesAgingReport({ data: { asOfDate } })` is a read-only TanStack GET server function. It requires existing view permission for `/command/payables` before opening the database. The existing Payables workspace calls it from an on-demand report panel. An unavailable report does not block the invoice/payment registers.
+
+The panel requires an explicit report date and displays exact-paise bill totals, ageing buckets, posted GL balance, signed difference and supporting journal IDs. Changing the date clears the previous snapshot and invalidates any in-flight result. Starting a local payable mutation remounts the report panel so its prior snapshot cannot be mistaken for current balances. Loading, error, empty and difference states are explicit; a diagnostic match never grants approval.
 
 `loadPayablesAgingReport` reads invoice, payment, supplier-return and journal data in a single SQL statement, so concurrent changes cannot mix snapshots. No result limits silently truncate the books. The current schema holds the single Vāyú Shastr entity and INR invoice amounts; no caller-supplied tenant/company selector is accepted.
 
@@ -42,4 +44,4 @@ All posted account-2000 entries, including opening and unmapped manual postings,
 
 Tests run the real migrations and supplier-payment/reversal/return functions in isolated PGlite, check prior-date and current-date balances, and verify no journals/audit events are created by report reads. Authorization tests execute the report handler with controlled identity/database boundaries and verify rejection occurs before database access.
 
-Receivable database adapters, UI consumers, accountant-reviewed reports, production scale, browser journeys and live deployment remain unverified. No complete TallyPrime parity or live finance certification is claimed.
+Receivable database adapters, accountant-reviewed reports, production scale, authenticated full-application browser journeys and live deployment remain unverified. No complete TallyPrime parity or live finance certification is claimed.
