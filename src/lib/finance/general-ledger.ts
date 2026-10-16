@@ -80,6 +80,14 @@ export function validateJournal(entry: Pick<JournalEntry, "lines">, chart: Ledge
   if (entry.lines.length < 2) errors.push("A journal entry requires at least two lines.");
   for (const line of entry.lines) {
     if (!knownAccounts.has(line.accountCode)) errors.push(`Unknown account ${line.accountCode}.`);
+    // Reject invalid source values instead of silently clamping negatives to zero.
+    // This protects manually constructed journals before posting to the ledger.
+    for (const [side, raw] of [["debit", line.debitInr], ["credit", line.creditInr]] as const) {
+      if (raw === undefined) continue;
+      if (!Number.isFinite(raw) || raw < 0 || Math.abs(raw * 100 - Math.round(raw * 100)) > 1e-6) {
+        errors.push(`Account ${line.accountCode} has an invalid ${side} amount; amounts must be nonnegative finite INR values in paise.`);
+      }
+    }
     const debit = amount(line.debitInr);
     const credit = amount(line.creditInr);
     if ((debit > 0 && credit > 0) || (debit === 0 && credit === 0)) {
