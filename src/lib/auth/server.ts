@@ -16,7 +16,7 @@ import {
   PREVIEW_CLIENT_SECRET,
 } from "./preview";
 import { resolvePostgresTransport } from "../postgres-runtime";
-import { AUTH_TRUSTED_ORIGINS, resolveAuthBaseURL, resolveAuthSecret } from "./runtime-config";
+import { resolveAuthTrustedOrigins, resolveAuthBaseURL, resolveAuthSecret } from "./runtime-config";
 import { excessActiveSessionTokens } from "./session-concurrency";
 import { VYNDI_SESSION_POLICY } from "./session-policy";
 import { emitOperationalEvent } from "../observability/server";
@@ -64,10 +64,11 @@ const previewAllowedHosts: string[] = [...PREVIEW_ALLOWED_HOSTS];
 // Hosted preview aliases therefore issue host-local
 // cookies and callbacks even if BETTER_AUTH_URL is missing or was scoped to a
 // different deployment target.
-const baseURL = resolveAuthBaseURL(explicitBaseURL);
+const developmentPreview = !productionRuntime && import.meta.env.DEV;
+const baseURL = resolveAuthBaseURL(explicitBaseURL, developmentPreview);
 
 const trustedOrigins: string[] = [
-  ...AUTH_TRUSTED_ORIGINS,
+  ...resolveAuthTrustedOrigins(developmentPreview),
   ...(explicitBaseURL ? [explicitBaseURL] : []),
   ...previewAllowedHosts,
   ...previewAllowedHosts.flatMap((host) => [`https://${host}`, `http://${host}`]),
