@@ -1,14 +1,31 @@
-# VYNDI OS without a Cloudflare deployment
+# VYNDI OS: Codespaces preview without a Cloudflare deployment
 
-Open GitHub Codespaces on branch `development/no-cloudflare-preview`, or clone it locally.
+## Recover from `no local hyperdrive connection string` / HTTP 502
+
+The `development/no-cloudflare-preview` branch now detects a GitHub Codespace during `vite dev`. **Only in the Vite development server**, it removes the Hyperdrive binding from the in-memory Cloudflare plugin configuration, allowing the existing PGLite fallback to run. The real `wrangler.jsonc` remains untouched. Production builds, deploys, and regular local runs retain the real Hyperdrive configuration.
+
+In the **existing Codespaces terminal**, on this branch:
 
 ```sh
-npm ci
+git status --short
+git pull --ff-only origin development/no-cloudflare-preview
 npm run dev
 ```
 
-Open forwarded port 8080 in the Codespaces Ports panel. The frontend and development server run inside the Codespace; no Cloudflare deployment is requested. Cloudflare-specific runtime bindings, authentication, database and external provider features may require **nonproduction** configuration. Do not store production secrets in the repository or Codespace.
+If `git status --short` lists local changes, first inspect them; do not discard work or force reset. If the `npm run dev` startup succeeds, open **Ports > 8080 > Open in Browser** and refresh the previous HTTP 502 page.
 
-The separate `offline-preview` workflow builds an artifact if GitHub Actions permits running it. This repository uses TanStack Start plus a Cloudflare Vite integration, so the generated `dist` directory is *not guaranteed to be a standalone static website*. A functioning browser preview should use the development server above.
+On a non-Codespaces machine, opt into the same embedded-database preview deliberately:
 
-GitHub may require a workflow on the default branch before the **Run workflow** button is available. Avoid merging this branch merely to expose the button while Cloudflare automatic builds remain connected.
+```sh
+VYNDI_EMBEDDED_DB_PREVIEW=1 npm run dev
+```
+
+For Windows PowerShell use `$env:VYNDI_EMBEDDED_DB_PREVIEW='1'; npm run dev`.
+
+**Limitations:** PGLite contains local, nonproduction data; existing company records and PostgreSQL-only transactions are not available in this fallback. Some finance, login, remote integration and Cloudflare-specific features may require a staging database or credentials. Never use production `DATABASE_URL` to test this preview and do not set a fake PostgreSQL URL.
+
+No `wrangler deploy` or Cloudflare Pages/Workers production build is required. GitHub Codespaces may consume its own allowance.
+
+## Manual GitHub Actions workflow
+
+The `offline-preview` workflow can prepare an artifact without a Cloudflare deploy. This project uses TanStack Start with the Cloudflare Vite plugin, so the resulting `dist` is not guaranteed to be a standalone static site. Use the Codespaces preview server for interactive UI evaluation. GitHub may require a workflow to be present on the default branch before it exposes the **Run workflow** button; do not merge solely to enable this while automatic Cloudflare builds are connected.
