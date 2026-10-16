@@ -18,9 +18,30 @@ export const AUTH_TRUSTED_ORIGINS = [
   "http://[::1]:8080",
 ] as const;
 
-export function resolveAuthBaseURL(explicitBaseURL: string | undefined) {
+/**
+ * GitHub Codespaces forwards a private development server at
+ * https://<codespace>-8080.app.github.dev. Never add the wildcard to
+ * production's permanent allowlist.
+ */
+export const CODESPACES_PREVIEW_HOST = "*.app.github.dev";
+export const CODESPACES_PREVIEW_ORIGIN = "https://*.app.github.dev";
+
+export function resolveAuthTrustedOrigins(developmentPreview: boolean): string[] {
+  return [
+    ...AUTH_TRUSTED_ORIGINS,
+    ...(developmentPreview ? [CODESPACES_PREVIEW_ORIGIN] : []),
+  ];
+}
+
+export function resolveAuthBaseURL(
+  explicitBaseURL: string | undefined,
+  developmentPreview = false,
+) {
   return {
-    allowedHosts: [...AUTH_ALLOWED_HOSTS],
+    allowedHosts: [
+      ...AUTH_ALLOWED_HOSTS,
+      ...(developmentPreview ? [CODESPACES_PREVIEW_HOST] : []),
+    ],
     fallback: explicitBaseURL ?? CLOUDFLARE_PRODUCTION_ORIGIN,
     protocol: "auto" as const,
   };
