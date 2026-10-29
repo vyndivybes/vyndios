@@ -29,3 +29,10 @@ Raw transcripts should not be imported by default. Show attributable, link-backe
 The Fireflies endpoint is `https://api.fireflies.ai/mcp`. Its authorization is **not transferable** from ChatGPT to VYNDI OS. This document is intentionally implementation-neutral until a VAOS provider adapter and evidence mappings are qualified.
 
 References: `docs/VYNDI-H5-GOVERNED-INTEGRATIONS-REV1.md`; `AGENTS.project.md`; https://guide.fireflies.ai/articles/8272956938-learn-about-the-fireflies-mcp-server-model-context-protocol
+
+## Implementation update (29 October 2026)
+
+`src/lib/fireflies-meeting-evidence.ts` implements a fail-closed mapper from an independently authorized VAOS Fireflies summary response to `VibpeKnowledgeEvidence` classified `external-reference`. It rejects mismatched accounts, missing approval, transcript operations and malformed/markup-tainted summaries. It cannot authorize business transactions and does not persist raw transcripts. `scripts/fireflies-meeting-evidence.test.mjs` is included in the repository test scripts and passed three focused isolated tests.
+
+**Not live:** the H5 approved contract, actor-authenticated server invocation, VAOS API route, production credential, consented meeting smoke, CI verification and deployment have not been completed. This code is an advisory evidence adapter, not a production import or autonomous workflow.
+
