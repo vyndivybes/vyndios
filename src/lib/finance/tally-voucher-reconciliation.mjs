@@ -1,4 +1,5 @@
 /** Read-only voucher-line comparison; caller must provide trusted, normalized source exports. */
+/** @param {number} value */
 const money = value => {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 ||
       !Number.isSafeInteger(Math.round(value * 100)) ||
@@ -6,6 +7,8 @@ const money = value => {
     throw new Error('Invalid voucher monetary value');
   return Math.round(value * 100);
 };
+/** @typedef {{voucherType:string,voucherNumber:string,date:string,accountCode:string,debitInr:number,creditInr:number}} VoucherRow */
+/** @param {VoucherRow[]} rows @param {string} origin */
 const canonical = (rows, origin) => {
   if (!Array.isArray(rows)) throw new Error('Invalid voucher records');
   const out = new Map();
@@ -22,6 +25,7 @@ const canonical = (rows, origin) => {
   }
   return out;
 };
+/** @param {VoucherRow[]} vyndiRows @param {VoucherRow[]} tallyRows */
 export function reconcileTallyVouchers(vyndiRows, tallyRows) {
   const v = canonical(vyndiRows,'VYNDI');
   const t = canonical(tallyRows,'Tally');
