@@ -13,7 +13,7 @@ const canonical = (rows, origin) => {
   if (!Array.isArray(rows)) throw new Error('Invalid voucher records');
   const out = new Map();
   for (const r of rows) {
-    if (!r || !['voucherType','voucherNumber','accountCode'].every(k => typeof r[k] === 'string' && r[k].trim()) ||
+    if (!r || !(/** @type {Array<'voucherType'|'voucherNumber'|'accountCode'>} */ (['voucherType','voucherNumber','accountCode'])).every(k => typeof r[k] === 'string' && r[k].trim()) ||
         typeof r.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(r.date) ||
         !Number.isFinite(Date.parse(r.date + 'T00:00:00Z')) ||
         new Date(r.date + 'T00:00:00Z').toISOString().slice(0,10) !== r.date)
