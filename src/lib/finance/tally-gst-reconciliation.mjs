@@ -9,6 +9,7 @@ function paise(value) {
     throw new Error('Invalid GST monetary value');
   return Math.round(value*100);
 }
+/** @type {Array<'taxableInr'|'cgstInr'|'sgstInr'|'igstInr'|'cessInr'>} */
 const taxFields=['taxableInr','cgstInr','sgstInr','igstInr','cessInr'];
 /** @typedef {{invoiceId:string,period:string,gstin:string,taxableInr:number,cgstInr:number,sgstInr:number,igstInr:number,cessInr:number}} GstRow */
 /** @param {GstRow[]} records @param {string} source */
