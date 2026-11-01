@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 /** Server-side evidence hashing. Call only with authenticated and authorized source bytes.
  * Does not sign provenance or certify statutory completeness.
  */
+/** @param {{type:string,reference:string,bytes:Uint8Array,maxBytes?:number}} input */
 export async function createVerifiedCaEvidence({type,reference,bytes,maxBytes=10_000_000}) {
   if(typeof type!=='string' || !/^[a-z][a-z0-9_]{1,63}$/.test(type))
     throw new Error('Invalid evidence type');
