@@ -1,0 +1,22 @@
+name: Fireflies evidence map qualification
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/lib/fireflies-meeting-evidence.ts'
+      - 'scripts/fireflies-meeting-evidence.test.mjs'
+      - 'package.json'
+      - '.github/workflows/fireflies-mcp-qualification.yml'
+permissions:
+  contents: read
+jobs:
+  advisory-only-boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify provider summary never becomes business truth
+        run: node --experimental-strip-types --test scripts/fireflies-meeting-evidence.test.mjs
