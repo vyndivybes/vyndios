@@ -1,6 +1,7 @@
 /** Strict read-only adapter for manually normalized Tally trial-balance CSV.
  * Input format must be Ledger,Debit,Credit; no writes or automated posting.
  */
+/** @param {string} input */
 function parseCsv(input) {
   if (typeof input !== 'string' || input.length > 2_000_000) throw new Error('Invalid CSV size');
   const rows=[]; let field='', row=[], quoted=false, closed=false;
@@ -17,6 +18,7 @@ function parseCsv(input) {
   if(field.length || row.length){row.push(field);if(row.some(v=>v.trim()))rows.push(row)}
   return rows;
 }
+/** @param {string} raw */
 function amount(raw) {
   const x=raw.trim();
   if(!/^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?$/.test(x))throw new Error('Invalid monetary value');
@@ -24,6 +26,7 @@ function amount(raw) {
   if(!Number.isFinite(v) || !Number.isSafeInteger(Math.round(v*100)))throw new Error('Invalid monetary value');
   return v;
 }
+/** @param {string} csv @param {Record<string,string>} approvedMapping */
 export function importTallyTrialBalanceCsv(csv, approvedMapping) {
   if(!approvedMapping || typeof approvedMapping!=='object' || Array.isArray(approvedMapping))throw new Error('Approved mapping required');
   const parsed=parseCsv(csv.replace(/^\uFEFF/,''));
