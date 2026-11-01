@@ -39,3 +39,12 @@ In **Finance → Financial Statements**, use the **Tally / CA reconciliation** p
 - Full development regression, typecheck and bundle must pass at the latest commit.
 - Reviewer should test with representative, authorized exports and validate account-code mapping and real opening/closing balance conventions.
 - Never merge/release this feature merely because arithmetic examples pass. Production rollout is separately governed; the existing `main` production Worker is unchanged.
+
+## Acceptance checklist
+
+- Confirm the uploaded CSV originates from the intended Tally company and accounting period.
+- Verify every included line is an individual ledger rather than a group subtotal.
+- Have a reviewer approve the explicit ledger-to-account mapping outside the browser.
+- Retain the original file and independently verify its SHA-256 matches the exported report.
+- Resolve every exception before relying on the comparison; matched totals do not prove source completeness.
+- Obtain separate CA review and applicable statutory evidence before any certification claim.
