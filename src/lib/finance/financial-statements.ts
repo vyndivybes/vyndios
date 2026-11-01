@@ -89,6 +89,7 @@ export type FinancialStatementPack = {
     openingCashInr: number;
     closingCashInr: number;
     netChangeInCashInr: number;
+    directCashCapexInr: number;
     reconciliationDifferenceInr: number;
   };
   fundFlow: {
@@ -180,6 +181,7 @@ function cashMovements(lines: StatementLedgerLine[]) {
   let customerCash = 0;
   let supplierCashPaid = 0;
   let otherOperatingNetOutflow = 0;
+  let directCashCapexInr = 0;
 
   for (const journalLines of groups.values()) {
     const bankDelta = round(journalLines
@@ -199,6 +201,17 @@ function cashMovements(lines: StatementLedgerLine[]) {
       /funding|equity|capital[_ -]?(receipt|contribution)|debt|loan/.test(sourceType);
 
     if (isInvesting) {
+      const fixedAssetDelta = round(journalLines.filter((line) => line.accountCode === "1500")
+        .reduce((total, line) => total + line.debitInr - line.creditInr, 0));
+      // Only separately evidenced direct bank-to-fixed-asset spend is counted.
+      // A bank payment that clears a prior asset payable is not independently
+      // identifiable here and must NOT be claimed as fully covered CAPEX.
+      if (bankDelta < -EPSILON && fixedAssetDelta > EPSILON) {
+        directCashCapexInr = round(directCashCapexInr + Math.min(-bankDelta, fixedAssetDelta));
+      } else if (bankDelta > EPSILON && fixedAssetDelta < -EPSILON &&
+                 /^(journal_reversal|fixed_asset_(refund|purchase_reversal))$/.test(sourceType)) {
+        directCashCapexInr = round(directCashCapexInr - Math.min(bankDelta, -fixedAssetDelta));
+      }
       investing = round(investing + bankDelta);
       continue;
     }
@@ -236,6 +249,7 @@ function cashMovements(lines: StatementLedgerLine[]) {
     customerCash,
     supplierCashPaid,
     otherOperatingNetOutflow,
+    directCashCapexInr,
     netChange: round(operating + investing + financing),
   };
 }
@@ -466,6 +480,7 @@ export function buildFinancialStatements(input: {
       openingCashInr: openingCash,
       closingCashInr: closingCash,
       netChangeInCashInr: cash.netChange,
+      directCashCapexInr: cash.directCashCapexInr,
       reconciliationDifferenceInr: round(closingCash - openingCash - cash.netChange),
     },
     fundFlow: {
