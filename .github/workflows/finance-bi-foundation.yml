@@ -1,0 +1,23 @@
+name: Finance BI foundation qualification
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/lib/finance/financial-statements.ts'
+      - 'src/lib/finance/financial-intelligence.ts'
+      - 'src/lib/finance/financial-intelligence.test.ts'
+      - 'src/routes/command/accounting-statements.tsx'
+      - '.github/workflows/finance-bi-foundation.yml'
+permissions:
+  contents: read
+jobs:
+  ledger-kpis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Finance statement and BI focused tests
+        run: node --experimental-strip-types --test src/lib/finance/financial-statements.test.ts src/lib/finance/financial-intelligence.test.ts
