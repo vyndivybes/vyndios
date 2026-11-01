@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Download, FileSpreadsheet, Printer, Scale } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Kpi, Panel } from "@/components/kpi";
+import { TallyCaReconciliation } from "@/components/tally-ca-reconciliation";
 import { getAccountingStatements } from "@/lib/finance/accounting-authority";
 import type {
   FinancialStatementPack,
@@ -135,6 +136,8 @@ function AccountingStatements() {
           <Link to="/command/financial-cockpit" className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted hover:border-accent hover:text-accent">Finance Overview</Link>
         </div>
       </header>
+
+      <TallyCaReconciliation key={`${pack.period.fromDate}-${pack.period.toDate}`} pack={pack} />
 
       <Panel title="Statement control" kicker="Period · basis · output">
         <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr_auto] lg:items-end">
