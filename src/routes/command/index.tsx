@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { BusinessIntelligenceStudio } from "@/components/business-intelligence-studio";
 import { Kpi, Panel } from "@/components/kpi";
 import { FOUNDER_GATES, FOUNDER_STATUS_LABELS, resolveFounderActions } from "@/lib/data/founder-command";
 import { listCanonicalCashAuthority } from "@/lib/finance-governance-authority";
@@ -69,6 +70,7 @@ function CommandCentre() {
 
   return (
     <div className="space-y-6">
+      <BusinessIntelligenceStudio />
       <header className="flex flex-col gap-4 border-b border-border pb-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-[11px] uppercase tracking-[0.2em] text-green">Command · today’s operating control</p>
