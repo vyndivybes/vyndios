@@ -13,6 +13,9 @@
 - Added an offline invoice/period/GSTIN keyed comparison of VYNDI and an externally provided GST register; detects missing invoices, duplicate identities, and mismatched taxable/CGST/SGST/IGST/cess amounts. This does **not** call GSTN, verify GSTR-1/3B/2B returns, or attest correctness of the external evidence.
 - GST tests: `node --test scripts/tally-gst-reconciliation.test.mjs`.
 
+- Added a consolidated read-only CA reconciliation summary combining trial balance, voucher and GST reports, explicitly blocking missing inputs and inconsistencies. `review_candidate` is **not** CA sign-off or statutory readiness.
+- Dashboard contract tests: `node --test scripts/ca-reconciliation-dashboard.test.mjs`.
+
 ## Mandatory gates before production activation
 1. Design signed, approved Tally-to-VYNDI chart-of-accounts mappings (never fuzzy match by ledger name).
 2. Implement a documented TallyPrime-supported import adapter with strict schema, provenance, period boundaries, checksum and replay handling.
