@@ -35,4 +35,5 @@ jobs:
             scripts/ca-evidence-hashing.test.mjs \
             scripts/ca-qualification-pipeline.test.mjs \
             scripts/ca-certificate-controls.test.mjs \
-            scripts/ca-certificate-register-contract.test.mjs
+            scripts/ca-certificate-register-contract.test.mjs \
+            scripts/ca-certificate-migration-shape.test.mjs
