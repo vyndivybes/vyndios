@@ -2,7 +2,7 @@ name: Development CI
 
 on:
   pull_request:
-    branches: [main, "feat/finance-tally-xml-response-f3"]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
