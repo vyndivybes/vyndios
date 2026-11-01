@@ -16,6 +16,9 @@
 - Added a consolidated read-only CA reconciliation summary combining trial balance, voucher and GST reports, explicitly blocking missing inputs and inconsistencies. `review_candidate` is **not** CA sign-off or statutory readiness.
 - Dashboard contract tests: `node --test scripts/ca-reconciliation-dashboard.test.mjs`.
 
+- Added read-only hash-referenced CA evidence manifest requiring a trial balance, voucher register, GST register, and exception-free reconciliations. This module validates **hash syntax only**; a trusted evidence collector must independently verify file contents and sign provenance. The `review_ready` status is not CA certification.
+- Evidence manifest tests: `node --test scripts/ca-evidence-manifest.test.mjs`.
+
 ## Mandatory gates before production activation
 1. Design signed, approved Tally-to-VYNDI chart-of-accounts mappings (never fuzzy match by ledger name).
 2. Implement a documented TallyPrime-supported import adapter with strict schema, provenance, period boundaries, checksum and replay handling.
