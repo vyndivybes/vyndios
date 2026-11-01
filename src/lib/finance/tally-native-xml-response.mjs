@@ -94,7 +94,7 @@ function displayAmount(raw) {
     throw new Error('Invalid report amount');
   return Math.round(n*100)/100;
 }
-/** @param {XmlNode} node @param {string} tag */
+/** @param {XmlNode} node @param {string} tag @returns {boolean} */
 function anyTag(node,tag) {
   return node.tag===tag || node.children.some(childNode=>anyTag(childNode,tag));
 }
