@@ -21,3 +21,31 @@ jobs:
           node-version: '24'
       - name: Finance statement and BI focused tests
         run: node --experimental-strip-types --test src/lib/finance/financial-statements.test.ts src/lib/finance/financial-intelligence.test.ts
+  production-baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify existing production health before code release
+        run: |
+          node --input-type=module <<'NODE'
+          const url="https://vyndios.vayushastr.workers.dev/api/runtime/health";
+          const response=await fetch(url,{headers:{"cache-control":"no-cache"},signal:AbortSignal.timeout(20000)});
+          const result=await response.json().catch(()=>({}));
+          const evidence={
+            status:response.status,
+            ok:result?.ok===true,
+            sourceSha:result?.sourceSha??null,
+            database:result?.checks?.database??"unavailable",
+            schema:result?.checks?.schema??"unknown",
+            pendingMigrationCount:result?.pendingMigrationCount??null,
+            latestExpectedMigration:result?.latestExpectedMigration??null,
+            latestAppliedMigration:result?.latestAppliedMigration??null,
+            migrationCounts:result?.migrationCounts??null,
+          };
+          console.log("Production baseline readiness",JSON.stringify(evidence));
+          if(response.status!==200 || evidence.ok!==true) process.exitCode=1;
+          NODE
+
