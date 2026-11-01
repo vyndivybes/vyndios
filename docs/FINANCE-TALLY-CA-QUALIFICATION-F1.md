@@ -10,6 +10,9 @@
 - Added read-only voucher-line reconciliation (composite voucher type, reference, date and account code) with amount mismatch and missing-line blockers. Caller must provide normalized exports; this is not a live Tally API connector.
 - Voucher tests: `node --test scripts/tally-voucher-reconciliation.test.mjs`.
 
+- Added an offline invoice/period/GSTIN keyed comparison of VYNDI and an externally provided GST register; detects missing invoices, duplicate identities, and mismatched taxable/CGST/SGST/IGST/cess amounts. This does **not** call GSTN, verify GSTR-1/3B/2B returns, or attest correctness of the external evidence.
+- GST tests: `node --test scripts/tally-gst-reconciliation.test.mjs`.
+
 ## Mandatory gates before production activation
 1. Design signed, approved Tally-to-VYNDI chart-of-accounts mappings (never fuzzy match by ledger name).
 2. Implement a documented TallyPrime-supported import adapter with strict schema, provenance, period boundaries, checksum and replay handling.
