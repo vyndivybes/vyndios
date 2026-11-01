@@ -133,6 +133,7 @@ function AccountingStatements() {
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
           <Link to="/command/accounting" className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted hover:border-accent hover:text-accent">Accounting Workbench</Link>
+          <Link to="/command/ca-certificate-register" className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted hover:border-accent hover:text-accent">CA-Signed Accounts Register</Link>
           <Link to="/command/financial-cockpit" className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted hover:border-accent hover:text-accent">Finance Overview</Link>
         </div>
       </header>
