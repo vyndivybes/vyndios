@@ -1,6 +1,7 @@
 /** Pure read-only TallyPrime report export builder. No network or writes. */
 /** @param {string} value */
 function xmlEscape(value) {
+  /** @type {Record<string,string>} */
   const entities = {'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&apos;'};
   return value.replace(/[&<>"']/g, character => entities[character]);
 }
@@ -18,7 +19,7 @@ export function buildTallyPrimeTrialBalanceExport(request) {
   if (!request || typeof request !== 'object') throw new Error('Invalid company request');
   const {company,fromDate,toDate} = request;
   if (typeof company !== 'string' || !company || company!==company.trim() ||
-      company.length>160 || Array.from(company).some(c=>c.codePointAt(0)<32))
+      company.length>160 || Array.from(company).some(c=>c.charCodeAt(0)<32))
     throw new Error('Invalid company name');
   const start=parseAccountingDate(fromDate), end=parseAccountingDate(toDate);
   if(start>end || end-start>366*86400000)
