@@ -23,6 +23,7 @@ jobs:
           node --experimental-strip-types --test \
             scripts/tally-trial-balance-reconciliation.test.mjs \
             scripts/tally-import.test.mjs \
+            scripts/tally-native-xml-export.test.mjs \
             scripts/tally-voucher-reconciliation.test.mjs \
             scripts/tally-gst-reconciliation.test.mjs \
             scripts/ca-reconciliation-dashboard.test.mjs \
