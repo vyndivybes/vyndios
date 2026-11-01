@@ -3,6 +3,7 @@ import { Download, FileSpreadsheet, Printer, Scale } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Kpi, Panel } from "@/components/kpi";
 import { TallyCaReconciliation } from "@/components/tally-ca-reconciliation";
+import { projectFinancialIntelligence } from "@/lib/finance/financial-intelligence";
 import { getAccountingStatements } from "@/lib/finance/accounting-authority";
 import type {
   FinancialStatementPack,
@@ -49,6 +50,7 @@ const csvEscape = (value: string) => `"${value.replaceAll('"', '""')}"`;
 function AccountingStatements() {
   const initial = Route.useLoaderData();
   const [pack, setPack] = useState<FinancialStatementPack>(initial);
+  const bi = projectFinancialIntelligence(pack);
   const [range, setRange] = useState(initial.period);
   const [basis, setBasis] = useState<Basis>("accrual");
   const [statement, setStatement] = useState<StatementKey>("trading");
@@ -181,6 +183,22 @@ function AccountingStatements() {
         <Kpi label="Balance check" value={money(Math.abs(pack.balanceSheet.balanceDifferenceInr))} hint="Assets − L+E" tone={Math.abs(pack.balanceSheet.balanceDifferenceInr) <= 0.01 ? "ok" : "danger"} />
         <Kpi label="Cash-flow check" value={money(Math.abs(pack.cashFlow.reconciliationDifferenceInr))} hint="Closing − opening − flows" tone={Math.abs(pack.cashFlow.reconciliationDifferenceInr) <= 0.01 ? "ok" : "danger"} />
       </div>
+
+      <Panel title="Financial & operational intelligence" kicker="Posted actuals · management diagnostics">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Kpi label="Operating cash flow" value={bi.operatingCashFlowInr === null ? "Unavailable" : money(bi.operatingCashFlowInr)} hint="Bank-ledger classified cash movements" />
+          <Kpi label="Direct asset-bank CAPEX" value={bi.directCashCapexInr === null ? "Unavailable" : money(bi.directCashCapexInr)} hint="Subset of cash CAPEX; not all purchases" />
+          <Kpi label="Indicative FCF · direct CAPEX only" value={bi.indicativeFreeCashFlowInr === null ? "Unavailable" : money(bi.indicativeFreeCashFlowInr)} hint="Operating cash less identifiable direct CAPEX" />
+          <Kpi label="Net working capital" value={bi.workingCapitalInr === null ? "Unavailable" : money(bi.workingCapitalInr)} hint="Closing current assets less current liabilities" />
+          <Kpi label="Gross margin" value={bi.grossMarginPct === null ? "Unavailable" : bi.grossMarginPct.toFixed(2) + "%"} hint="Revenue less COGS / revenue" />
+          <Kpi label="Net margin" value={bi.netMarginPct === null ? "Unavailable" : bi.netMarginPct.toFixed(2) + "%"} hint="Accrual net result / revenue" />
+          <Kpi label="DSO · indicative" value={bi.dsoDays === null ? "Unavailable" : bi.dsoDays.toFixed(1) + " days"} hint="Closing trade receivables / period sales" />
+          <Kpi label="Inventory days · indicative" value={bi.dioDays === null ? "Unavailable" : bi.dioDays.toFixed(1) + " days"} hint="Closing inventory / period COGS" />
+          <Kpi label="Payables / COGS days" value={bi.payablesToCogsDays === null ? "Unavailable" : bi.payablesToCogsDays.toFixed(1) + " days"} hint="Not formal purchase-based DPO" />
+          <Kpi label="Cash cycle · proxy" value={bi.cashConversionCycleProxyDays === null ? "Unavailable" : bi.cashConversionCycleProxyDays.toFixed(1) + " days"} hint="DSO + inventory days − payables proxy" />
+        </div>
+        <p className="mt-3 text-xs text-muted" role="status">Evidence status: {bi.status}. {bi.note}</p>
+      </Panel>
 
       <nav className="grid gap-2 sm:grid-cols-4 xl:grid-cols-7 print:hidden" aria-label="Financial statements">
         {statementLabels.map(([key, label]) => (
