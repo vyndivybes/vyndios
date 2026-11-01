@@ -2,6 +2,9 @@
  * this module does not verify file bytes, sign audit opinions or mutate books.
  */
 const required=['trial_balance','voucher_register','gst_register'];
+/** @typedef {{ status:string,totalExceptions:number,sections:Record<string,{status:string,exceptionCount:number}> }} CaReconciliationReport */
+/** @typedef {{type:string,reference:string,sha256:string}} CaEvidenceRecord */
+/** @param {{period:string,report:CaReconciliationReport,evidence:CaEvidenceRecord[]}} input */
 export function buildCaEvidenceManifest({period,report,evidence}) {
   if(typeof period!=='string' || !/^\d{4}-(0[1-9]|1[0-2])$/.test(period))
     throw new Error('Invalid accounting period');
@@ -10,7 +13,9 @@ export function buildCaEvidenceManifest({period,report,evidence}) {
      !report.sections || typeof report.sections!=='object')
     throw new Error('Invalid reconciliation report');
   if(!Array.isArray(evidence))throw new Error('Invalid evidence list');
-  const seen=new Set(), verified=[];
+  const seen=new Set();
+  /** @type {CaEvidenceRecord[]} */
+  const verified=[];
   for(const row of evidence) {
     if(!row || typeof row.type!=='string' || typeof row.reference!=='string' ||
        !row.reference.trim() || typeof row.sha256!=='string' || !/^[a-fA-F0-9]{64}$/.test(row.sha256))
