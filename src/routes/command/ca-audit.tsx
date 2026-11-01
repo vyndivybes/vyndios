@@ -148,6 +148,7 @@ function CAAudit() {
           This page evaluates the live management-accounting model; it does not own a second finance model. It is a software and management-control gate, not a statutory audit, tax opinion, certificate or filing.
         </p>
         <div className="mt-3 flex flex-wrap gap-3 text-sm font-semibold">
+          <Link to="/command/ca-certificate-register" className="text-accent">CA-Signed Accounts Register →</Link>
           <Link to="/command/accounting" className="text-accent">Accounting Workbench →</Link>
           <Link to="/command/accounting-statements" className="text-accent">Financial Statements →</Link>
           <Link to="/command/cash" className="text-accent">Cash →</Link>
