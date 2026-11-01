@@ -3,6 +3,7 @@ import { ArrowRight, ClipboardCheck, PackageCheck, ShieldAlert } from "lucide-re
 import { useState } from "react";
 import { GovernedLifecycle } from "@/components/governed-lifecycle";
 import { Kpi, Panel } from "@/components/kpi";
+import { Store01SupplierIntake } from "@/components/store01-supplier-intake";
 import {
   postGoodsReceiptWithIdentity,
   resolveGoodsReceiptWithIdentity,
@@ -191,6 +192,31 @@ function Receiving() {
           {message}
         </div>
       ) : null}
+
+      <Store01SupplierIntake
+        purchaseOrders={data.purchaseOrders}
+        onPrepare={(intake) => {
+          setDraft((current) => ({
+            ...current,
+            purchaseOrderId: intake.purchaseOrderId,
+            quantityReceived: intake.quantityReceived,
+            quantityAccepted: 0,
+            quantityRejected: 0,
+            inspectionStatus: "quarantine",
+            sourceReference: intake.sourceReference,
+            notes: [
+              "Store 01 receiving preflight; physical inspection pending.",
+              `Invoice evidence: ${intake.invoiceEvidenceReference}`,
+              intake.temperatureLogReference ? `Temperature/out-time evidence: ${intake.temperatureLogReference}` : "",
+            ].filter(Boolean).join(" ").slice(0, 1000),
+          }));
+          setIdentityDraft((current) => ({
+            ...current,
+            invoiceReference: intake.invoiceNumber,
+          }));
+          setMessage("Store 01 intake transferred to a QUARANTINED GRN draft. Review fields below and submit with your authorized identity. Supplier invoice must be recorded separately in Payables.");
+        }}
+      />
 
       <Panel title="Post goods receipt" kicker="PO → incoming inspection → identity → FIFO stock">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

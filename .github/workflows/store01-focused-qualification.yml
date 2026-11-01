@@ -1,0 +1,24 @@
+name: Store 01 focused qualification
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/store01-focused-qualification.yml'
+      - 'src/lib/store01-dock-preflight.test.ts'
+      - 'src/lib/store01-dock-preflight.ts'
+      - 'src/components/store01-supplier-intake.tsx'
+      - 'src/routes/command/receiving.tsx'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  store01-unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Store 01 non-actuating regression
+        run: node --experimental-strip-types --test src/lib/store01-dock-preflight.test.ts
