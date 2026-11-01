@@ -1,5 +1,12 @@
-name: Finance BI Controlled VYNDI Release
+name: Finance BI Production Verification
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/lib/finance/financial-statements.ts'
+      - 'src/lib/finance/financial-intelligence.ts'
+      - 'src/routes/command/accounting-statements.tsx'
+      - '.github/workflows/finance-bi-controlled-release.yml'
   push:
     branches: [main]
     paths:
@@ -10,45 +17,27 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: vyndios-controlled-worker-deploy
-  cancel-in-progress: false
+  group: finance-bi-production-verification-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
-  deploy-reviewed-main:
+  qualified-source-and-deployed-sha:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
-      CLOUDFLARE_ACCOUNT_ID: e20ce7032f6475caaf1197b09d3fe164
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      WORKERS_CI_COMMIT_SHA: ${{ github.sha }}
-      VITE_AUTH_ENABLED: "true"
+      VYNDI_TEST_BASE_URL: https://vyndios.vayushastr.workers.dev
+      VYNDI_TEST_EXPECTED_SHA: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: main
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: npm
-      - name: Enforce exact reviewed SHA and existing deploy credential
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$WORKERS_CI_COMMIT_SHA"
-          test -n "$CLOUDFLARE_API_TOKEN" || { echo "::error::VYNDI_DEPLOY_HOLD: GitHub Cloudflare deploy credential unavailable"; exit 1; }
-      - run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Re-run finance source qualifications
+      - name: Install reviewed dependency lockfile
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify source-governed financial accounting and BI regressions
         run: node --experimental-strip-types --test src/lib/finance/financial-statements.test.ts src/lib/finance/financial-intelligence.test.ts
-      - name: Verify current schema and build bundle (no runtime migration)
+      - name: Verify migration numbering and build bundle
         run: npm run build:bundle
-      - name: Reject stale main before deploying
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$WORKERS_CI_COMMIT_SHA"
-      - name: Deploy to existing Worker preserving secrets
-        run: npx --yes wrangler@4.136.3 deploy --config wrangler.jsonc
-      - name: Confirm exact SHA, schema and database are healthy
-        env:
-          VYNDI_TEST_BASE_URL: https://vyndios.vayushastr.workers.dev
-          VYNDI_TEST_EXPECTED_SHA: ${{ github.sha }}
+      - name: Confirm independently deployed exact commit, schema and health
+        if: github.event_name == 'push'
         run: node scripts/production-deployment-readiness.mjs
