@@ -7,6 +7,9 @@
 - No voucher posting, remote Tally access, automatic statutory submission, or CA certification.
 - Contract tests: `node --experimental-strip-types --test scripts/tally-trial-balance-reconciliation.test.mjs`.
 
+- Added read-only voucher-line reconciliation (composite voucher type, reference, date and account code) with amount mismatch and missing-line blockers. Caller must provide normalized exports; this is not a live Tally API connector.
+- Voucher tests: `node --test scripts/tally-voucher-reconciliation.test.mjs`.
+
 ## Mandatory gates before production activation
 1. Design signed, approved Tally-to-VYNDI chart-of-accounts mappings (never fuzzy match by ledger name).
 2. Implement a documented TallyPrime-supported import adapter with strict schema, provenance, period boundaries, checksum and replay handling.
