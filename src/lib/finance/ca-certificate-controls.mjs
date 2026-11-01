@@ -1,9 +1,11 @@
 /** External Chartered Accountant certificate controls.
  * This module NEVER signs, issues, or verifies certificates with ICAI.
  */
+/** @param {unknown} value */
 const dateOk = value => typeof value==='string' && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value) &&
   Number.isFinite(Date.parse(value+'T00:00:00Z')) &&
   new Date(value+'T00:00:00Z').toISOString().slice(0,10)===value;
+/** @param {unknown} value */
 const safeReference = value => typeof value==='string' && value.trim().length>=5 &&
   value.trim().length<=500 && !/[\x00-\x1f]/.test(value);
 /** @typedef {{id:string,type:'financial_statements'|'tax_audit'|'gst_audit'|'other_certificate',periodFrom:string,periodTo:string,signedOn:string,caName:string,membershipNumber:string,udin:string,signedDocumentSha256:string,signedDocumentReference:string}} CaCertificateInput */
