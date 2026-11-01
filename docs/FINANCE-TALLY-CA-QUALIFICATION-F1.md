@@ -19,6 +19,9 @@
 - Added read-only hash-referenced CA evidence manifest requiring a trial balance, voucher register, GST register, and exception-free reconciliations. This module validates **hash syntax only**; a trusted evidence collector must independently verify file contents and sign provenance. The `review_ready` status is not CA certification.
 - Evidence manifest tests: `node --test scripts/ca-evidence-manifest.test.mjs`.
 
+- Added Node-only SHA-256 hashing of **actual evidence bytes**, with nonempty and bounded-file requirements: `src/lib/finance/ca-evidence-hashing.mjs`. This server utility does not attest provenance, source completeness, authorization, or a CA signature. It is not a Cloudflare Worker endpoint.
+- Hashing tests: `node --test scripts/ca-evidence-hashing.test.mjs`.
+
 ## Mandatory gates before production activation
 1. Design signed, approved Tally-to-VYNDI chart-of-accounts mappings (never fuzzy match by ledger name).
 2. Implement a documented TallyPrime-supported import adapter with strict schema, provenance, period boundaries, checksum and replay handling.
