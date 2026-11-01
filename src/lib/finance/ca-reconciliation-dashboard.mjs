@@ -3,7 +3,7 @@
  */
 const configs={trialBalance:'differences',vouchers:'exceptions',gst:'exceptions'};
 /** @typedef {{reason:string,key?:string,code?:string}} AuditException */
-/** @typedef {{status:'reconciled'|'blocked',differences?:AuditException[],exceptions?:AuditException[],vyndiBalanced?:boolean,tallyBalanced?:boolean}} CaSectionReport */
+/** @typedef {{status:string,differences?:AuditException[],exceptions?:AuditException[],vyndiBalanced?:boolean,tallyBalanced?:boolean}} CaSectionReport */
 /** @param {Record<string,CaSectionReport|null|undefined>} input */
 export function buildCaReconciliationDashboard(input) {
   if (!input || typeof input!=='object' || Array.isArray(input)) throw new Error('Invalid audit report');
