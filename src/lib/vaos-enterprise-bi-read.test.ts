@@ -11,7 +11,7 @@ test("scope is bounded and never interpolates untrusted source identifiers",()=>
  {employeeId:"all",from:"2024-01-01",to:"2026-10-15"},
  {employeeId:"all",from:"2026-10-10",to:"2026-10-15",limit:101},
  {employeeId:"all",from:"2026-10-10",to:"2026-10-15",offset:-1},
- {employeeId:"all",from:"2026-10-20",to:"2026-10-21"}])
+ {employeeId:"all",from:"2099-10-20",to:"2099-10-21"}])
  assert.throws(()=>validateBiScope(x),/INVALID_BI_SCOPE/);
 });
 test("source field projection never leaks free-text PII or secrets",()=>{
