@@ -268,12 +268,15 @@ test("Stage 2 order → production → quality → dispatch → invoice → rece
   await assert.rejects(()=>db.query(`select post_vyndi_collection($1,$2,$3,$4,$5,$6,$7)`,["COL-OVER","INV-STAGE2",7,2,"BANK-OVER","test-user","finance"]),/exceeds open gross invoice receivable/);
   await assert.rejects(()=>db.query(`select void_vyndi_invoice($1,$2,$3,$4)`,["INV-STAGE2","wrong order","test-user","finance"]),/Reverse posted collections before voiding invoice/);
 
-  await db.query(`select reverse_vyndi_collection($1,$2,$3,$4)`,["COL-STAGE2","bank reversal","test-user","finance"]);
+  await assert.rejects(()=>db.query(`select reverse_vyndi_collection($1,$2,$3,$4)`,["COL-STAGE2","unauthorized reversal","other-manager","management"]),/approval authority/);
+  await assert.rejects(()=>db.query(`select reverse_vyndi_collection($1,$2,$3,$4)`,["COL-STAGE2","self reversal","test-user","finance"]),/different authorised user/);
+  await db.query(`select reverse_vyndi_collection($1,$2,$3,$4)`,["COL-STAGE2","bank reversal","finance-checker","finance"]);
   const reversedCash=await db.query(`select cash_reversal_revision,reversed_closing_cash_lakh from vyndi_collections where id='COL-STAGE2'`);
   assert.ok(Number(reversedCash.rows[0].cash_reversal_revision)>=1); assert.equal(Number(reversedCash.rows[0].reversed_closing_cash_lakh),5);
   const afterCollectionReversalCash=await db.query(`select closing_cash,receivables from vyndi_monthly_actuals where plan_month=7 and verified=true`);
   assert.equal(Number(afterCollectionReversalCash.rows[0].closing_cash),5); assert.equal(Number(afterCollectionReversalCash.rows[0].receivables),2.5);
-  await db.query(`select void_vyndi_invoice($1,$2,$3,$4)`,["INV-STAGE2","credit and reissue","test-user","finance"]);
+  await assert.rejects(()=>db.query(`select void_vyndi_invoice($1,$2,$3,$4)`,["INV-STAGE2","self void","test-user","finance"]),/different authorised user/);
+  await db.query(`select void_vyndi_invoice($1,$2,$3,$4)`,["INV-STAGE2","credit and reissue","finance-checker","finance"]);
   const afterVoid=await db.query(`select revenue,units,receivables from vyndi_monthly_transaction_actuals where plan_month=6`);
   assert.equal(Number(afterVoid.rows[0].revenue),0); assert.equal(Number(afterVoid.rows[0].units),0); assert.equal(Number(afterVoid.rows[0].receivables),0);
   await db.query(`select reverse_vyndi_shipment($1,$2,$3,$4)`,["SHIP-STAGE2","dispatch cancelled","test-user","operations"]);
