@@ -1,9 +1,11 @@
-name: Finance F1 Tally CA Qualification
+name: Finance Accounting and CA Evidence Qualification
 on:
   pull_request:
     paths:
       - 'src/lib/finance/tally-*'
       - 'src/lib/finance/ca-*'
+      - 'src/routes/command/ca-certificate-register.tsx'
+      - 'migrations/0194_ca_certificate_evidence_register.sql'
       - 'scripts/tally-*'
       - 'scripts/ca-*'
       - '.github/workflows/finance-f1-qualification.yml'
@@ -31,4 +33,7 @@ jobs:
             scripts/ca-reconciliation-dashboard.test.mjs \
             scripts/ca-evidence-manifest.test.mjs \
             scripts/ca-evidence-hashing.test.mjs \
-            scripts/ca-qualification-pipeline.test.mjs
+            scripts/ca-qualification-pipeline.test.mjs \
+            scripts/ca-certificate-controls.test.mjs \
+            scripts/ca-certificate-register-contract.test.mjs \
+            scripts/ca-certificate-migration-shape.test.mjs
