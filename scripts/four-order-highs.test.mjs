@@ -54,3 +54,21 @@ test("four-order HiGHS commissioning: actual MILP, independent feasibility and a
  api.compileFourOrderHighs(acceptance,bom,capacity);
  assert.equal(JSON.stringify({acceptance,bom,capacity}),before);
 });
+
+test("simulation authority remains authenticated, consented, fresh and write-free",async()=>{
+ const {readFile}=await import("node:fs/promises");
+ const authority=await readFile(new URL("../src/lib/ibpe-simulation-authority.ts",import.meta.url),"utf8");
+ for(const name of ["prepareFourOrderHighs","validateFourOrderHighs"]){
+  const block=authority.slice(authority.indexOf("export const "+name));
+  assert.match(block,/middleware\(\[authMiddleware\]\)/);
+  assert.match(block,/requireBusinessActor\("view"/);
+ }
+ assert.match(authority,/confirmation:z.literal\("SIMULATION_ONLY"\)/);
+ assert.match(authority,/current.modelHash!==data.modelHash/);
+ assert.match(authority,/verifyFourOrderHighs\(current.model,data.raw\)/);
+ assert.doesNotMatch(authority,/\b(?:insert into|delete from|update\s+vyndi_|approve_vyndi_production_batch)\b/i);
+ const page=await readFile(new URL("../src/routes/command/ibpe-operating-workspace_.simulation.tsx",import.meta.url),"utf8");
+ assert.match(page,/!consent\|\|!solverConsent\|\|running/);
+ assert.match(page,/setConsent\(false\)/);
+ assert.match(page,/REAL readiness remains HOLD/);
+});

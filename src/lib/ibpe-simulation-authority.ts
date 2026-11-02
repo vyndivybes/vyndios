@@ -118,6 +118,7 @@ export const validateFourOrderHighs = createServerFn({method:"POST"})
    ...result,mode:"SIMULATION_ONLY" as const,productionAuthorized:false as const,
    financiallyAuthoritative:false as const,persisted:false as const,
    version:FOUR_ORDER_HIGHS_VERSION,sourceSha:current.sourceSha,
+   validatedBy:context.userId,validatedAt:new Date().toISOString(),solverPackage:"highs@1.15.3",
    sourceHash:current.model.sourceHash,inputHash:current.ibpe.inputHash,
    modelHash:current.modelHash,resultHash:hash({modelHash:current.modelHash,result}),
    solverReportedStatus:data.raw.Status,ibpe:current.ibpe,
