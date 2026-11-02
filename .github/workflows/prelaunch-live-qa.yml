@@ -1,0 +1,38 @@
+name: Bounded prelaunch live qualification
+on:
+  push:
+    branches: [qa/prelaunch-live-20261102]
+permissions:
+  contents: read
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      VYNDI_TEST_BASE_URL: https://vyndios.vayushastr.workers.dev
+      VYNDI_TEST_EMAIL: ${{ secrets.VYNDI_TEST_EMAIL }}
+      VYNDI_TEST_PASSWORD: ${{ secrets.VYNDI_TEST_PASSWORD }}
+      VYNDI_TEST_EXPECTED_SHA: d276f86b0eda71a1a94afcde20e1c5fc3009f4f4
+      VYNDI_SLO_ENFORCE_LATENCY: "1"
+      VYNDI_SLO_SAMPLE_COUNT: "5"
+      VYNDI_SLO_ROUTE_P95_LIMIT_MS: "4000"
+      VYNDI_SLO_ROUTE_P99_LIMIT_MS: "8000"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install chromium
+      - name: Production boundary desktop and mobile
+        run: node scripts/prelaunch-live-qa.mjs
+      - name: Protected routes independent re-observation
+        if: ${{ !cancelled() }}
+        run: npm run test:browser:production
+      - name: SLO independent observation
+        if: ${{ !cancelled() }}
+        run: npm run observe:slo
+      - name: Operator viewport independent qualification
+        if: ${{ !cancelled() }}
+        run: npm run test:ux:production
