@@ -17,7 +17,7 @@ export const getProductionJobCardView = createServerFn({ method: "GET" })
       select o.id,o.revision,o.plan_month,o.units,o.variant_id,o.variant_name,o.status,
              c.id as job_card_id,c.status as job_card_status,c.sales_order_revision as job_card_revision,
              c.batch_code,c.approved_at::text as job_card_approved_at
-        from vyndi_sales_orders o
+        from vyndi_operational_sales_orders o
         left join epr_production_job_cards c on c.sales_order_id=o.id and c.superseded_at is null
        where o.status='confirmed'
        order by o.plan_month,o.id
