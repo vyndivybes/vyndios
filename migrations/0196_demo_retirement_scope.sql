@@ -161,6 +161,32 @@ create or replace view vyndi_committed_procurement_requirements as
    and r.sku is not null and r.issue_status<>'issued'
  group by r.due_month,r.sku,r.unit;
 
+-- IBPE Operating Workspace reports use operational projections. Keep original
+-- ERP reports unfiltered and available for audited historical reconciliation.
+-- Exclude ONLY an activated exact-ID retirement case, never an unrelated orphan
+-- production card that needs QA visibility.
+create or replace view vyndi_operational_report_order_book_sync as
+  select r.* from vyndi_report_order_book_sync r
+  where not exists (
+    select 1 from vyndi_sales_orders original
+    where original.id=r.sales_order_id
+      and not exists (select 1 from vyndi_operational_sales_orders active where active.id=original.id)
+  );
+create or replace view vyndi_operational_report_order_backlog as
+  select r.* from vyndi_report_order_backlog r
+  where not exists (
+    select 1 from vyndi_sales_orders original
+    where original.id=r.sales_order_id
+      and not exists (select 1 from vyndi_operational_sales_orders active where active.id=original.id)
+  );
+create or replace view vyndi_operational_report_production_release_gate as
+  select r.* from vyndi_report_production_release_gate r
+  where not exists (
+    select 1 from vyndi_sales_orders original
+    where original.id=r.sales_order_id
+      and not exists (select 1 from vyndi_operational_sales_orders active where active.id=original.id)
+  );
+
 -- No external/browser grants, no transition endpoint, no automated activation.
 revoke all on vyndi_demo_retirement_cases from public;
 revoke all on vyndi_demo_retirement_events from public;
@@ -170,5 +196,6 @@ do $demo_reader$
 begin
  if exists (select 1 from pg_roles where rolname='hyperdrive-user') then
   execute 'grant select on vyndi_operational_sales_orders to "hyperdrive-user"';
+  execute 'grant select on vyndi_operational_report_order_book_sync, vyndi_operational_report_order_backlog, vyndi_operational_report_production_release_gate to "hyperdrive-user"';
  end if;
 end $demo_reader$;
