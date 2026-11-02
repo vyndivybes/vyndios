@@ -134,6 +134,9 @@ function IbpeOperatingWorkspace() {
           <Link to="/command/control-tower" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:border-accent hover:text-fg">
             Control Tower
           </Link>
+          <Link to="/command/ibpe-operating-workspace/simulation" className="rounded-md border border-warn/60 px-3 py-2 text-xs text-warn hover:bg-warn/10">
+            Test/demo: 4-order simulation
+          </Link>
         </div>
         <p className="mt-2 text-xs text-subtle print:hidden">{snapshotState}</p>
       </header>
