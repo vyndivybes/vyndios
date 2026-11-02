@@ -1,6 +1,29 @@
 -- 0196: audited synthetic/demo retirement classifications; source transactions are immutable.
 -- This migration creates no classification. Production projections are unchanged
 -- until an independently approved case is activated by an authorized future workflow.
+-- Fail closed before any DDL if the runtime identity can bypass row-security
+-- or inherits administrator capabilities. Public schema grants are insufficient
+-- when hyperdrive-user inherits neon_superuser (observed on 2026-11-02).
+do $demo_runtime_role_gate$
+begin
+ if exists (
+   select 1 from pg_roles runtime
+   where runtime.rolname='hyperdrive-user'
+     and (
+       runtime.rolsuper or runtime.rolbypassrls or runtime.rolcreaterole
+       or runtime.rolcreatedb or runtime.rolreplication
+       or exists (
+         select 1 from pg_roles elevated
+         where elevated.rolname='neon_superuser'
+           and pg_has_role(runtime.oid,elevated.oid,'member')
+       )
+     )
+ ) then
+   raise exception 'DEMO_RUNTIME_ROLE_UNSAFE: rotate to an independently qualified least-privilege Hyperdrive identity before installing demo retirement';
+ end if;
+end;
+$demo_runtime_role_gate$;
+
 create table if not exists vyndi_demo_retirement_cases (
  case_id text primary key,
  sales_order_id text not null unique references vyndi_sales_orders(id) on delete restrict,
