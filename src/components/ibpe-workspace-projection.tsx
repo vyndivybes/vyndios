@@ -153,18 +153,19 @@ export function IbpeWorkspaceProjection() {
   </div>;
   return <div className="border-b border-border bg-surface/50 px-4 py-2 text-xs">
     <div className="mx-auto flex max-w-[1800px] flex-wrap items-center gap-x-3 gap-y-1">
-      <span className="font-semibold text-fg">{VIBPE_COPILOT_LABEL} · {IBPE_CORE_LABEL} · {current.label}</span>
+      <span className="font-semibold text-fg">{VIBPE_COPILOT_LABEL} · {IBPE_CORE_LABEL} · REAL baseline only · {current.label}</span>
       {run ? <>
         <span className="text-muted">R{run.approvedPlanRevision} · {run.inputHash.slice(0,8)} · {run.sourceSha.slice(0,7)}</span>
         <span className="text-muted">Health {run.result.summary.businessHealthScore}/100</span>
         <span className="text-muted">{findings.length > 0 ? findings.map((f)=>f.title).filter(Boolean).join(" · ") : "No workspace findings"}</span>
       </> : <span className={readiness && !readiness.ready ? "text-warn" : "text-muted"}>{status}</span>}
       {!run && blockerActions.map((check)=><Link key={check.actionTo} to={check.actionTo as never} className="font-semibold text-accent hover:underline">Fix {check.label} →</Link>)}
-      <div className="ml-auto flex items-center gap-3">
+      <div className="ml-auto flex flex-wrap items-center gap-3">
+        <Link to="/command/ibpe-operating-workspace/simulation" aria-label="Run four-order simulation IBPE" className="inline-flex min-h-11 items-center rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 font-semibold text-accent hover:bg-accent/20">Run simulation IBPE →</Link>
         <button type="button" disabled={busy} onClick={()=>void loadStatus()} className="font-semibold text-muted hover:text-accent disabled:opacity-50">{busy?"Loading…":"Load IBPE status"}</button>
         <button type="button" disabled={busy} onClick={()=>void execute()} className="font-semibold text-accent disabled:opacity-50">{busy?"Checking…":"Run governed IBPE"}</button>
       </div>
-      {run ? <span className="w-full text-[10px] text-subtle">{status} · Advisory only — decisions require authorised action in the owning transaction workspace.</span> : readiness && !readiness.ready ? <span className="w-full text-[10px] text-subtle">The engine is authorised. Complete the highlighted governed prerequisites before a baseline can be persisted.</span> : null}
+      {run ? <span className="w-full text-[10px] text-subtle">{status} · Advisory only — decisions require authorised action in the owning transaction workspace.</span> : readiness && !readiness.ready ? <span className="w-full text-[10px] text-subtle">These prerequisites apply only to the REAL governed baseline. Simulation does not require a physical production release; use Run simulation IBPE above.</span> : null}
     </div>
   </div>;
 }
