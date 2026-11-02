@@ -147,6 +147,10 @@ export function IbpeWorkspaceProjection() {
     }
   }
 
+  if(pathname==="/command/ibpe-operating-workspace/simulation")return <div className="border-b border-accent/50 bg-accent/10 px-4 py-3 text-xs">
+    <strong>SIMULATION ONLY · IBPE + HiGHS</strong> · Independent scenario readiness appears below. Real production approvals and saved governed packets do not authorize this scenario.
+    <Link to="/command/ibpe-operating-workspace/optimizer" className="ml-3 text-accent underline">View REAL optimizer gates</Link>
+  </div>;
   return <div className="border-b border-border bg-surface/50 px-4 py-2 text-xs">
     <div className="mx-auto flex max-w-[1800px] flex-wrap items-center gap-x-3 gap-y-1">
       <span className="font-semibold text-fg">{VIBPE_COPILOT_LABEL} · {IBPE_CORE_LABEL} · {current.label}</span>
