@@ -67,6 +67,8 @@ const EVENT_FIELDS=["actual_finish","closed_at","completed_at","decided_at","rel
 "effective_on","work_date","effective_at","requested_at","updated_at","created_at"];
 const STATUS_FIELDS=["status","operational_status","lifecycle_status","issue_status","inspection_status","attendance_status","qualification_status","readiness_status","state","outcome","stage","decision","result","event_type","action"];
 const scalar=(v:unknown)=>v==null||["string","number","boolean"].includes(typeof v);
+/** Shared dashboard date boundary; match the canonical UTC BI scope validation. */
+export const biToday = (): string => new Date().toISOString().slice(0, 10);
 const validDay=(v:string)=>/^\d{4}-\d{2}-\d{2}$/.test(v)&&Number.isFinite(Date.parse(v))&&new Date(v).toISOString().slice(0,10)===v;
 export function validateBiScope(input: Record<string,unknown>) {
  const from=String(input.from??""),to=String(input.to??"");
