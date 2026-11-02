@@ -90,3 +90,11 @@ test("simulation requires mounted client readiness before consent is interactive
  const browser=await readFile(new URL("../scripts/four-order-simulation-browser-acceptance.mjs",import.meta.url),"utf8");
  assert.match(browser,/data-simulation-interactive="ready"/);
 });
+
+test("every governed status bar exposes the separate simulation entry",async()=>{
+ const {readFile}=await import("node:fs/promises");
+ const projection=await readFile(new URL("../src/components/ibpe-workspace-projection.tsx",import.meta.url),"utf8");
+ assert.match(projection,/<Link[^>]*to="\/command\/ibpe-operating-workspace\/simulation"[^>]*aria-label="Run four-order simulation IBPE"/);
+ assert.match(projection,/REAL baseline only/);
+ assert.match(projection,/Simulation does not require a physical production release/);
+});
