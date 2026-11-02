@@ -72,3 +72,11 @@ test("simulation authority remains authenticated, consented, fresh and write-fre
  assert.match(page,/setConsent\(false\)/);
  assert.match(page,/REAL readiness remains HOLD/);
 });
+
+test("historic optimizer acceptance cannot be mistaken for current REAL readiness",async()=>{
+ const {readFile}=await import("node:fs/promises");
+ const page=await readFile(new URL("../src/routes/command/ibpe-operating-workspace_.optimizer.tsx",import.meta.url),"utf8");
+ assert.match(page,/Historical receipt only/);
+ assert.match(page,/Accepted when recorded/);
+ assert.doesNotMatch(page,/>Accepted for execution<\/p>/);
+});

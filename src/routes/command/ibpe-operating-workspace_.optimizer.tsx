@@ -220,7 +220,8 @@ function GovernedOptimizerPage() {
         ) : null}
       </Panel>
 
-      <Panel title="Latest persisted run" kicker="Immutable advisory evidence for the selected packet">
+      <Panel title="Latest persisted run" kicker="Historical advisory receipt for the selected packet">
+        <p className="mb-4 rounded-lg border border-warn/30 bg-warn/5 p-3 text-sm text-warn">Historical receipt only. Recorded acceptance and planning disposition do not establish current REAL readiness. The current execution gate above controls new optimizer runs; physical manufacturing still requires its independent approvals.</p>
         {state.recentRun ? (
           <>
             {state.recentRun.cash_planning_disposition === "funding-required" ? (
@@ -250,7 +251,7 @@ function GovernedOptimizerPage() {
               <div><p className="text-xs text-muted">Run</p><p className="mt-1 font-mono text-xs text-fg">{state.recentRun.id}</p></div>
               <div><p className="text-xs text-muted">Mathematical status</p><p className="mt-1 text-fg">{state.recentRun.optimization_status}</p></div>
               <div><p className="text-xs text-muted">Cash governance</p><p className="mt-1 text-fg">{state.recentRun.cash_guardrail_status ?? "not-evaluated"}</p></div>
-              <div><p className="text-xs text-muted">Planning disposition</p><p className="mt-1 text-fg">{state.recentRun.cash_planning_disposition ?? "legacy / not classified"}</p></div>
+              <div><p className="text-xs text-muted">Recorded planning disposition</p><p className="mt-1 text-fg">{state.recentRun.cash_planning_disposition ?? "legacy / not classified"}</p></div>
               <div><p className="text-xs text-muted">Funding evidence basis</p><p className="mt-1 text-fg">{state.recentRun.funding_evidence_basis ?? "legacy / not classified"}</p></div>
               <div><p className="text-xs text-muted">Authoritative for funding decision</p><p className="mt-1 text-fg">{state.recentRun.funding_evidence_basis ? (recentFundingAuthoritative ? "yes" : "no") : "legacy / not classified"}</p></div>
               <div><p className="text-xs text-muted">{recentFundingProvisional ? "First modeled cash gap" : "First funding need"}</p><p className="mt-1 text-fg">{fundingText(state.recentRun.first_funding_need_lakh)}</p></div>
@@ -258,7 +259,7 @@ function GovernedOptimizerPage() {
               <div><p className="text-xs text-muted">{recentFundingProvisional ? "Peak scenario capital exposure" : "Peak additional funding"}</p><p className="mt-1 text-fg">{fundingText(state.recentRun.peak_additional_funding_lakh)}</p></div>
               <div><p className="text-xs text-muted">{recentFundingProvisional ? "Peak scenario period" : "Peak funding period"}</p><p className="mt-1 text-fg">{state.recentRun.peak_funding_period ? `Period ${state.recentRun.peak_funding_period}` : "—"}</p></div>
               <div><p className="text-xs text-muted">Baseline reserve funding need</p><p className="mt-1 text-fg">{fundingText(state.recentRun.baseline_reserve_funding_need_lakh)}</p></div>
-              <div><p className="text-xs text-muted">Accepted for execution</p><p className="mt-1 text-fg">{state.recentRun.accepted ? "yes" : "no"}</p></div>
+              <div><p className="text-xs text-muted">Accepted when recorded</p><p className="mt-1 text-fg">{state.recentRun.accepted ? "yes" : "no"}</p></div>
               <div><p className="text-xs text-muted">Objective</p><p className="mt-1 text-fg">{state.recentRun.objective_value ?? "—"}</p></div>
               <div><p className="text-xs text-muted">Created</p><p className="mt-1 text-fg">{new Date(state.recentRun.created_at).toLocaleString("en-IN")}</p></div>
             </div>
