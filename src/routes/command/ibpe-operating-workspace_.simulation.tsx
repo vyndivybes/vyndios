@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { getFourOrderSimulationPreview, runAcceptedFourOrderSimulation, prepareFourOrderHighs, validateFourOrderHighs } from "@/lib/ibpe-simulation-authority";
 
@@ -12,6 +12,8 @@ export const Route = createFileRoute("/command/ibpe-operating-workspace_/simulat
 function FourOrderSimulationPage() {
  const preview=Route.useLoaderData();
  const router=useRouter();
+ const [hydrated,setHydrated]=useState(false);
+ useEffect(()=>{setHydrated(true)},[]);
  const [consent,setConsent]=useState(false);
  const [solverConsent,setSolverConsent]=useState(false);
  const [highs,setHighs]=useState<Awaited<ReturnType<typeof validateFourOrderHighs>>|null>(null);
@@ -51,7 +53,7 @@ function FourOrderSimulationPage() {
    await router.invalidate();
   }finally{setRunning(false);setPhase("");}
  }
- return <main className="space-y-6">
+ return <main data-simulation-interactive={hydrated?"ready":"loading"} className="space-y-6">
   <header className="space-y-2">
    <p className="text-xs font-semibold uppercase tracking-widest text-accent">VYNDI IBPE / Simulation authority</p>
    <h1 className="font-display text-3xl">Four-order simulation: IBPE + HiGHS</h1>
@@ -78,10 +80,10 @@ function FourOrderSimulationPage() {
     </table>
    </div>
    <label className="flex gap-3 text-sm">
-    <input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)} />
+    <input type="checkbox" disabled={!hydrated||running} checked={consent} onChange={e=>setConsent(e.target.checked)} />
     <span>I accept these four specific demo orders as <strong>SIMULATION ONLY</strong>. I acknowledge that no real job card or physical approval is changed and the cash and stock values are placeholders.</span>
    </label>
-   <button type="button" disabled={!consent||running}
+   <button type="button" disabled={!hydrated||!consent||running}
      className="rounded-lg border border-accent bg-accent/10 px-4 py-2 text-sm font-semibold text-accent disabled:opacity-40"
      onClick={()=>void run()}>{running?"Running isolated IBPE math…":"Accept and run simulation IBPE"}</button>
    {error?<p role="alert" className="text-sm text-warn">{error}</p>:null}

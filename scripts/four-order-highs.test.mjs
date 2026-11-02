@@ -80,3 +80,13 @@ test("historic optimizer acceptance cannot be mistaken for current REAL readines
  assert.match(page,/Accepted when recorded/);
  assert.doesNotMatch(page,/>Accepted for execution<\/p>/);
 });
+
+test("simulation requires mounted client readiness before consent is interactive",async()=>{
+ const {readFile}=await import("node:fs/promises");
+ const page=await readFile(new URL("../src/routes/command/ibpe-operating-workspace_.simulation.tsx",import.meta.url),"utf8");
+ assert.match(page,/useEffect\(\(\)=>\{setHydrated\(true\)\},\[\]\)/);
+ assert.match(page,/data-simulation-interactive=\{hydrated\?"ready":"loading"\}/);
+ assert.match(page,/type="checkbox" disabled=\{!hydrated\|\|running\} checked=\{consent\}/);
+ const browser=await readFile(new URL("../scripts/four-order-simulation-browser-acceptance.mjs",import.meta.url),"utf8");
+ assert.match(browser,/data-simulation-interactive="ready"/);
+});
