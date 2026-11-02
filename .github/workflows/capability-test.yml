@@ -17,5 +17,7 @@ jobs:
       - name: Reject unsafe capability targets
         run: node --test scripts/capability-test-target.test.mjs
       - run: npm ci
+      - name: Synthetic four-order fixture
+        run: node --test scripts/capability-test-fixture.test.mjs
       - name: Existing IBPE and manufacturing control qualification
         run: npm run test:mes:golden && npm run test:simulation-highs

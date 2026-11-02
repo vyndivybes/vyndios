@@ -14,7 +14,6 @@ test("rejects production, existing rehearsal, unencrypted, ambiguous and missing
   for (const patch of [
     {workerName:"vyndios"}, {workerName:"vyndios-stage9-isolated"},
     {confirmation:""}, {databaseUrl:""},
-    {databaseUrl:target.databaseUrl.replace("vy ndios".replace(" ",""),"vyndios")},
     {databaseUrl:target.databaseUrl.replace("/vyndios_capability_test","/stage9")},
     {databaseUrl:target.databaseUrl.replace("/vyndios_capability_test","/neondb")},
     {databaseUrl:target.databaseUrl.replace("ep-spring-hat-b49hupiw-pooler","production")},
