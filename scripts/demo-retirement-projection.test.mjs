@@ -27,6 +27,16 @@ async function setup(t) {
       ('REAL-CARD-1','REAL-SO-1',2,'released',null),
       ('REAL-CARD-2','REAL-SO-2',3,'released',null),
       ('REAL-CARD-3','REAL-SO-3',2,'released',null);
+    create view vyndi_report_order_book_sync as
+      select o.id as sales_order_id,
+        case when c.sales_order_revision is distinct from o.revision then 'STALE_JOB_CARD'
+             else 'SYNCED' end as sync_status
+        from vyndi_sales_orders o left join epr_production_job_cards c on c.sales_order_id=o.id;
+    create view vyndi_report_order_backlog as
+      select id as sales_order_id from vyndi_sales_orders where status in ('lead','confirmed');
+    create view vyndi_report_production_release_gate as
+      select c.id as job_card_id,c.sales_order_id,c.status
+        from epr_production_job_cards c;
   `);
   await db.exec(await readFile(migration, "utf8"));
   return db;
@@ -127,4 +137,39 @@ test("retirement projection does not alter booked inventory or COGS evidence",as
   assert.deepEqual(after.rows,before.rows,"retiring prospective demand must never rewrite booked finance/stock");
   assert.equal(Number(after.rows[0].cogs),1500);
   assert.equal(Number(after.rows[0].inventory_delta),-1500);
+});
+
+test("IBPE control-room uses scoped reports without hiding original audit reports",async(t)=>{
+  const db=await setup(t);
+  for (const [base,view] of [
+    ["vyndi_report_order_book_sync","vyndi_operational_report_order_book_sync"],
+    ["vyndi_report_order_backlog","vyndi_operational_report_order_backlog"],
+    ["vyndi_report_production_release_gate","vyndi_operational_report_production_release_gate"],
+  ]) {
+    assert.equal(Number((await db.query(`select count(*) as n from ${base}`)).rows[0].n),4);
+    assert.equal(Number((await db.query(`select count(*) as n from ${view}`)).rows[0].n),4);
+  }
+  await proposed(db);
+  await act(db,"approved","checker","req-approve");
+  await act(db,"activated","checker","req-activate");
+  for (const [base,view] of [
+    ["vyndi_report_order_book_sync","vyndi_operational_report_order_book_sync"],
+    ["vyndi_report_order_backlog","vyndi_operational_report_order_backlog"],
+    ["vyndi_report_production_release_gate","vyndi_operational_report_production_release_gate"],
+  ]) {
+    assert.equal(Number((await db.query(`select count(*) as n from ${base}`)).rows[0].n),4,"original report is audit-visible");
+    assert.equal(Number((await db.query(`select count(*) as n from ${view}`)).rows[0].n),3,"IBPE-only projection excludes exact case");
+  }
+  await act(db,"reversed","checker","req-reverse");
+  for (const view of [
+    "vyndi_operational_report_order_book_sync",
+    "vyndi_operational_report_order_backlog",
+    "vyndi_operational_report_production_release_gate",
+  ]) {
+    assert.equal(Number((await db.query(`select count(*) as n from ${view}`)).rows[0].n),4);
+  }
+  const report=await readFile(new URL("../src/lib/erp-suite-reports.ts",import.meta.url),"utf8");
+  assert.match(report,/sql`select \* from vyndi_operational_report_order_book_sync order by sync_status/);
+  assert.match(report,/sql`select \* from vyndi_operational_report_order_backlog order by plan_month/);
+  assert.match(report,/sql`select \* from vyndi_operational_report_production_release_gate order by gate_status/);
 });
