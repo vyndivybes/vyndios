@@ -5,14 +5,12 @@ import { useEffect } from "react";
 export function AppErrorComponent({ error }: ErrorComponentProps) {
   // TanStack Router may deliver any thrown value here, including primitives.
   // Never access properties before narrowing; preserve the 401 redirect boundary.
-  const details = typeof error === "object" && error !== null
-    ? (error as Record<string, unknown>)
-    : null;
-  const message = typeof details?.message === "string"
-    ? details.message
-    : typeof error === "string" ? error : "";
-  const unauthenticated =
-    message === "Unauthorized" || details?.status === 401;
+  const objectError = typeof error === "object" && error !== null;
+  const message = typeof error === "string" ? error
+    : objectError && "message" in error && typeof error.message === "string"
+      ? error.message : "";
+  const status = objectError && "status" in error ? error.status : undefined;
+  const unauthenticated = message === "Unauthorized" || status === 401;
 
   useEffect(() => {
     if (!unauthenticated) return;
