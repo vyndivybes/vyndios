@@ -1,0 +1,54 @@
+name: Lint dependency compatibility candidate
+on:
+  pull_request:
+    branches: [main]
+    paths: [.github/workflows/lint-security-candidate.yml]
+permissions:
+  contents: read
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Qualify patched minimatch candidate without changing repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm pkg set overrides.minimatch=11.0.1
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm ci --ignore-scripts --no-audit --no-fund
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {ESLint} from 'eslint';
+          const rules=new ESLint({overrideConfigFile:true,overrideConfig:[{files:['**/*.mjs'],rules:{'no-debugger':'error'}}]});
+          const [bad]=await rules.lintText('debugger;',{filePath:'security-probe.mjs'});
+          assert.ok(bad.messages.some(m=>m.ruleId==='no-debugger'));
+          const [good]=await rules.lintText('const x = 1;',{filePath:'security-probe.mjs'});
+          assert.equal(good.errorCount,0);
+          const repo=new ESLint();
+          for(const filePath of ['src/lib/security-probe.ts','src/routes/security-probe.tsx']){
+            assert.ok(await repo.calculateConfigForFile(filePath),'Repository lint config must cover '+filePath);
+            const [result]=await repo.lintText('export const auditProbe: number = 1;\n',{filePath});
+            assert.ok(!result.messages.some(m=>m.fatal),'Lint parser/config must execute');
+          }
+          console.log('VYNDI_LINT_COMPATIBILITY_PASS');
+          NODE
+          npm audit --json > /tmp/vyndi-lint-audit.json || true
+          node --input-type=module <<'NODE'
+          import {readFileSync} from 'node:fs';
+          const audit=JSON.parse(readFileSync('/tmp/vyndi-lint-audit.json','utf8'));
+          console.log('VYNDI_AUDIT_AFTER:'+JSON.stringify({counts:audit.metadata?.vulnerabilities,error:audit.error}));
+          if(audit.error||audit.metadata?.vulnerabilities?.total!==0)throw Error('Candidate does not clear full audit');
+          for(const file of ['package.json','package-lock.json']){
+            const data=readFileSync(file).toString('base64');
+            console.log('VYNDI_FILE_BEGIN:'+file);
+            for(let i=0;i<data.length;i+=12000)console.log('VYNDI_FILE_CHUNK:'+data.slice(i,i+12000));
+            console.log('VYNDI_FILE_END:'+file);
+          }
+          NODE
