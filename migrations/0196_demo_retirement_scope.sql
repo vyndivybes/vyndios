@@ -141,3 +141,11 @@ create or replace view vyndi_committed_procurement_requirements as
 -- No external/browser grants, no transition endpoint, no automated activation.
 revoke all on vyndi_demo_retirement_cases from public;
 revoke all on vyndi_demo_retirement_events from public;
+-- Existing Hyperdrive server reader can select only the derived operational view.
+-- It is NOT granted write access to the classification or append-only evidence.
+do $demo_reader$
+begin
+ if exists (select 1 from pg_roles where rolname='hyperdrive-user') then
+  execute 'grant select on vyndi_operational_sales_orders to "hyperdrive-user"';
+ end if;
+end $demo_reader$;
