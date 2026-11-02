@@ -1,3 +1,5 @@
+import {assertPhysicalProductionOrder} from "./four-order-demo-scope.ts";
+import {assertPhysicalJobCard,assertPhysicalReservation} from "./production-demo-guard.ts";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { authMiddleware } from "@/lib/auth/middleware";
@@ -74,6 +76,7 @@ async function activeReleasedMappings(
   sql: Awaited<ReturnType<typeof getSql>>,
   order: OrderRow,
 ): Promise<{ bomRevision: string; rows: MappingRow[]; authority: "variant" | "family-standard" }> {
+  assertPhysicalProductionOrder(order.id);
   if (!order.model_tier || !order.variant_id) {
     throw new Error("A confirmed order must reference an exact released VYNDI variant.");
   }
@@ -225,6 +228,7 @@ export const syncProductionJobCard = createServerFn({ method: "POST" })
       [data.salesOrderId],
     );
     if (!order) throw new Error("Sales order not found in the central order authority.");
+    assertPhysicalProductionOrder(order.id);
 
     const [existing] = await sql.query<{ id: string; status: string; sales_order_revision: number | string; bom_revision:string|null; approved_at:string|null }>(
       `select id,status,sales_order_revision,bom_revision,approved_at::text as approved_at from epr_production_job_cards where sales_order_id=$1 and superseded_at is null limit 1`,
@@ -277,6 +281,7 @@ export const refreshProductionReservations = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const actor = await requireBusinessActor("edit", { userId: context.userId, email: context.userEmail });
     const sql = await getSql();
+    await assertPhysicalJobCard(sql,data.jobCardId);
     const lines = await sql.query<{ id: string }>(`select id from epr_production_job_card_lines where job_card_id=$1 and sku is not null order by id`, [data.jobCardId]);
     for (const line of lines) {
       await sql.query(`select * from reserve_epr_inventory_for_job_line($1,$2,$3,$4,$5)`, [`RES-${crypto.randomUUID()}`, data.jobCardId, line.id, actor.userId, actor.role]);
@@ -290,6 +295,7 @@ export const issueProductionReservation = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const actor = await requireBusinessActor("edit", { userId: context.userId, email: context.userEmail });
     const sql = await getSql();
+    await assertPhysicalReservation(sql,data.reservationId);
     const movementId = `MOV-${crypto.randomUUID()}`;
     const ledgerId = `LED-${crypto.randomUUID()}`;
     const rows = await sql.query<{ movement_id:string; ledger_id:string; resulting_balance:number|string; cogs_inr:number|string }>(

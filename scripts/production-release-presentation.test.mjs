@@ -31,3 +31,20 @@ test("simulation and Production explain the pre-production state without rewriti
  assert.match(sim,/legacy\/demo/);
  assert.match(sim,/design confirmation/i);
 });
+
+test("exact demo IDs cannot enter physical approval or inventory side effects",async()=>{
+ const {FOUR_ORDER_DEMO_IDS,assertPhysicalProductionOrder}=await import("../src/lib/four-order-demo-scope.ts");
+ const {assertPhysicalJobCard,assertPhysicalReservation}=await import("../src/lib/production-demo-guard.ts");
+ for(const id of FOUR_ORDER_DEMO_IDS){
+  assert.throws(()=>assertPhysicalProductionOrder(id),/Demo|physical|Design/);
+  const sql={query:async()=>[{sales_order_id:id}]};
+  await assert.rejects(()=>assertPhysicalJobCard(sql,"card"),/Demo|physical/);
+  await assert.rejects(()=>assertPhysicalReservation(sql,"reservation"),/Demo|physical/);
+ }
+ assert.doesNotThrow(()=>assertPhysicalProductionOrder("REAL-NEW-ORDER"));
+ await assert.rejects(()=>assertPhysicalJobCard({query:async()=>[]},"missing"),/not found/);
+ const approval=await readFile(new URL("../src/lib/production-release-authority.ts",import.meta.url),"utf8");
+ assert.ok(approval.indexOf("await assertPhysicalJobCard")<approval.indexOf("select * from approve_vyndi_production_batch"));
+ const card=await readFile(new URL("../src/lib/production-job-card.ts",import.meta.url),"utf8");
+ assert.ok(card.indexOf("await assertPhysicalReservation")<card.indexOf("select * from consume_epr_inventory_reservation"));
+});

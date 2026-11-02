@@ -1,5 +1,4 @@
 name: Dependency security qualification
-
 on:
   pull_request:
     branches: [main]
@@ -8,10 +7,8 @@ on:
       - package-lock.json
       - .github/workflows/dependency-security.yml
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
   dependency-audit:
     runs-on: ubuntu-latest
@@ -22,31 +19,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Inspect current audit and generate uncommitted compatible candidate
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm ci --ignore-scripts --no-audit --no-fund
-          npm audit --json > /tmp/vyndi-audit-before.json || true
-          npm install --package-lock-only --ignore-scripts --save-exact --no-fund @tanstack/react-start@1.168.60 better-auth@1.7.15 zod@4.6.7 > /tmp/vyndi-fix-output.txt 2>&1
-          npm audit --json > /tmp/vyndi-audit-after.json || true
-          node --input-type=module <<'NODE'
-          import {readFileSync} from 'node:fs';
-          for(const phase of ['before','after']){
-            const a=JSON.parse(readFileSync('/tmp/vyndi-audit-'+phase+'.json','utf8'));
-            console.log('VYNDI_AUDIT_'+phase.toUpperCase()+':'+JSON.stringify({
-              counts:a.metadata?.vulnerabilities,error:a.error,
-              vulnerabilities:Object.values(a.vulnerabilities||{}).map(v=>({
-                name:v.name,severity:v.severity,isDirect:v.isDirect,range:v.range,
-                fixAvailable:v.fixAvailable,nodes:v.nodes,
-                via:v.via.map(x=>typeof x==='string'?x:{name:x.name,title:x.title,url:x.url,range:x.range})
-              }))
-            }));
-          }
-          for(const file of ['package.json','package-lock.json']){
-            const data=readFileSync(file).toString('base64');
-            console.log('VYNDI_FILE_BEGIN:'+file);
-            for(let i=0;i<data.length;i+=12000)console.log('VYNDI_FILE_CHUNK:'+data.slice(i,i+12000));
-            console.log('VYNDI_FILE_END:'+file);
-          }
-          NODE
+      - name: Install exact lock without lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Production dependencies must have no known advisories
+        run: npm audit --omit=dev --audit-level=moderate
+      - name: Report full dependency tree and block high or critical findings
+        run: npm audit --audit-level=high

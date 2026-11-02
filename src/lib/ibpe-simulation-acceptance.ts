@@ -7,12 +7,8 @@ import { createHash } from "node:crypto";
 import { runRuntimeIbpe, RUNTIME_IBPE_ENGINE_VERSION, type RuntimeIbpeInput } from "./ibpe-runtime-parity.ts";
 import type { ProductLineId } from "./finance/model.ts";
 
-export const FOUR_ORDER_DEMO_IDS = [
-  "SO-02ca96da-5206-4b94-9fef-062a2a992919",
-  "SO-69e011a9-2c99-4ffa-82f7-39eef01bf05e",
-  "SO-800d46b7-d354-4e80-a3a9-d6c2207be5bf",
-  "SO-991bfe7e-85f6-4849-a5d0-04c2792606e3",
-] as const;
+import { FOUR_ORDER_DEMO_IDS } from "./four-order-demo-scope.ts";
+export { FOUR_ORDER_DEMO_IDS } from "./four-order-demo-scope.ts";
 export const FOUR_ORDER_SIMULATION_VERSION = "VYNDI-SIM-FOUR-ORDER-1.0.0" as const;
 const ids = new Set<string>(FOUR_ORDER_DEMO_IDS);
 const expectedStale = "SO-800d46b7-d354-4e80-a3a9-d6c2207be5bf";

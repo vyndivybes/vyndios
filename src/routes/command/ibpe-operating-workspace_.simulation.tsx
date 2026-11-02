@@ -59,8 +59,8 @@ function FourOrderSimulationPage() {
    <Link className="text-sm text-accent underline" to="/command/ibpe-operating-workspace">Return to governed IBPE</Link>
   </header>
   <section className="rounded-xl border border-warn/50 p-4">
-   <h2 className="font-semibold text-warn">REAL readiness: HOLD · separate from simulation</h2>
-   <p className="mt-1 text-sm text-muted">Three released job cards have no recorded physical approval evidence. The R3 order has a held R2 card, consumed material, a serial traveller and a received PO. We create only a virtual R3 successor in memory; the original cards and booked ₹1,500 cost history are never rewritten.</p>
+   <h2 className="font-semibold text-warn">REAL readiness: NOT RELEASED · design confirmation required</h2>
+   <p className="mt-1 text-sm text-muted">Design confirmation is pending; there are no approved real job cards. Three legacy/demo card rows carry a stored released label without physical approval provenance. The R3 demo order retains its held R2 history. Only a virtual R3 successor is created in memory; original card, stock, PO and cost histories are preserved.</p>
   </section>
   <section className="rounded-xl border border-border p-4 space-y-3">
    <h2 className="font-semibold">Frozen source preview</h2>
@@ -122,7 +122,7 @@ function FourOrderSimulationPage() {
     <p>Order source SHA-256: {highs.sourceHash}</p><p>IBPE input SHA-256: {highs.inputHash}</p>
     <p>Model SHA-256: {highs.modelHash}</p><p>Validated result SHA-256: {highs.resultHash}</p>
    </div>
-   <p className="text-sm text-warn">Memory-only receipt. REAL readiness remains HOLD. No persisted optimizer packet or manufacturing authority is created.</p>
+   <p className="text-sm text-warn">Memory-only receipt. REAL readiness remains HOLD for design confirmation; production is NOT RELEASED. No persisted optimizer packet or manufacturing authority is created.</p>
    <ul className="list-disc pl-5 text-xs text-muted">{highs.assumptions.map(a=><li key={a}>{a}</li>)}</ul>
   </section>:null}
  </main>;

@@ -10,6 +10,8 @@ import { getProductionJobCardView } from "@/lib/production-job-card-view";
 import { issueProductionReservation, syncProductionJobCard } from "@/lib/production-job-card";
 import { approveProductionBatch } from "@/lib/production-release-authority";
 import { requestProductionChange, approveProductionChange, applyProductionChange, rejectProductionChange } from "@/lib/production-change-authority";
+import { jobCardReleasePresentation } from "@/lib/production-release-presentation";
+import { isFourOrderDemoOrder } from "@/lib/four-order-demo-scope";
 import { useVeloxis } from "@/lib/store";
 import { VYNDI_PRINT_BRAND_CSS, vyndiPrintBrandMarkup } from "@/lib/print-brand";
 
@@ -145,11 +147,11 @@ function printRequisitionRecord({
       <div><span class="label">Issue progress</span><span class="value">${issuedLines}/${materialLines.length} material line(s)</span></div>
       <div><span class="label">Traveller / serial</span><span class="value">${travellerText}</span></div>
       <div><span class="label">Quantity</span><span class="value">${escapePrintHtml(`${Number(card.units)} bike(s)`)}</span></div>
-      <div><span class="label">Production status</span><span class="value">${escapePrintHtml(card.status ?? "—")}</span></div>
+      <div><span class="label">Stored record status</span><span class="value">${escapePrintHtml(card.status ?? "—")}</span></div>
       <div><span class="label">Record generated</span><span class="value">${escapePrintHtml(generatedAt)}</span></div>
     </section>
 
-    <p class="note">Generated from the released BOM. Stores records actual FIFO reservation and issue evidence against the compatible traveller genealogy. This document is a controlled transaction record; it is not a screenshot of the operating workspace.</p>
+    <p class="note">Historical source record. Stored status and approver fields are not physical release authority. Design confirmation and genuine engineering/production approvals are required before manufacture. Generated from the recorded BOM. Stores records actual FIFO reservation and issue evidence against the compatible traveller genealogy. This document is a controlled transaction record; it is not a screenshot of the operating workspace.</p>
 
     <table>
       <thead><tr><th>#</th><th>SKU / material item</th><th>Req.</th><th>Res.</th><th>Issued</th><th>Short</th><th>Status</th><th>Reservation / issue evidence</th></tr></thead>
@@ -193,7 +195,9 @@ function ProductionWorkspace() {
   const totalPlannedUnits = planRows.reduce((sum, row) => sum + row.units, 0);
   const trough = accountingRows.reduce((minimum, row) => row.closingCash < minimum.closingCash ? row : minimum, accountingRows[0]);
 
-  const approvedCards = cards.filter((card: any) => Boolean(card.approved_at)).length;
+  const presentationFor=(card:any)=>jobCardReleasePresentation(card,(orders as any[]).find(o=>o.id===card.sales_order_id)?.revision);
+  const approvedCards = cards.filter((card:any)=>presentationFor(card).approvalRecorded).length;
+  const demoCards=cards.filter((card:any)=>presentationFor(card).isDemo).length;
   const confirmedOrderUnits = orders.reduce((sum: number, order: any) => sum + Number(order.units ?? 0), 0);
   const shortages = lines.filter((line: any) => Number(line.shortage_quantity ?? 0) > 0 && Boolean(line.sku)).length;
   const draftPos = cards.reduce((sum: number, card: any) => sum + Number(card.po_draft_count ?? 0), 0);
@@ -221,7 +225,7 @@ function ProductionWorkspace() {
     }
   }
 
-  const normalReconciliation = ordersNeedingJobCard.filter((order: any) => !order.job_card_approved_at);
+  const normalReconciliation = ordersNeedingJobCard.filter((order: any) => !isFourOrderDemoOrder(String(order.id)) && !order.job_card_approved_at);
 
   async function reconcileAll() {
     if (!normalReconciliation.length) {
@@ -303,9 +307,14 @@ function ProductionWorkspace() {
         </Link>
       </header>
 
+      {demoCards>0?<section aria-label="Pre-production release boundary" className="rounded-xl border border-warn/40 bg-warn/5 p-4">
+        <h2 className="font-semibold text-warn">NOT RELEASED · Design confirmation required</h2>
+        <p className="mt-2 text-sm text-muted">The design is not confirmed for physical production. These four legacy/demo orders, stored release labels and historic approval fields are reference history. They do not represent approved real job cards. Existing stock, cost and PO history is preserved.</p>
+        <Link to="/command/ibpe-operating-workspace/simulation" className="mt-3 inline-block text-sm text-accent underline">Use the four-order simulation →</Link>
+      </section>:null}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
         <Kpi label="Confirmed orders" value={String(orders.length)} hint={`${confirmedOrderUnits} committed unit(s) from Commercial`} tone={orders.length ? "ok" : "warn"} />
-        <Kpi label="Job cards" value={String(cards.length)} hint={`${approvedCards} approved builds`} />
+        <Kpi label="Job cards" value={String(cards.length)} hint={`${approvedCards} real approvals recorded · ${demoCards} demo / legacy`} />
         <Kpi label="Missing / stale" value={String(ordersNeedingJobCard.length)} hint={`${synchronizedOrders.length}/${orders.length} confirmed orders on current job-card revision`} tone={ordersNeedingJobCard.length ? "danger" : "ok"} />
         <Kpi label="Travellers" value={String(travellers.length)} hint="Auto-registered genealogy" />
         <Kpi label="Shortage lines" value={String(shortages)} hint="Stock required" tone={shortages ? "danger" : "ok"} />
@@ -340,7 +349,7 @@ function ProductionWorkspace() {
                   <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold text-fg">{order.variant_name ?? order.variant_id ?? order.id}</p><p className="mt-1 font-mono text-[10px] text-subtle">{order.id}</p></div><span className="text-[10px] font-bold uppercase text-warn">{order.job_card_id ? "STALE" : "MISSING"}</span></div>
                   <p className="mt-3 text-xs text-muted">Order R{order.revision} · {order.units} unit(s) · M{order.plan_month}</p>
                   <p className="mt-1 text-[10px] text-subtle">Job card: {order.job_card_id ? `${order.job_card_id} R${order.job_card_revision ?? "—"}` : "not created"}</p>
-                  {order.job_card_approved_at ? (() => {
+                  {isFourOrderDemoOrder(String(order.id)) ? <p className="mt-3 text-xs text-warn">Legacy/demo revision history retained. Use the simulation; design confirmation and genuine release evidence precede any real production action.</p> : order.job_card_approved_at ? (() => {
                     const change = (changes as any[]).find((row) =>
                       row.previous_job_card_id === order.job_card_id &&
                       Number(row.requested_sales_revision) === Number(order.revision) &&
@@ -418,7 +427,8 @@ function ProductionWorkspace() {
               const cardLines = lines.filter((line: any) => line.job_card_id === card.id);
               const linkedTravellers = travellers.filter((traveller: any) => traveller.job_card_id === card.id && traveller.status !== "rejected");
               const shortageCount = cardLines.filter((line: any) => line.sku && Number(line.shortage_quantity ?? 0) > 0).length;
-              const approved = Boolean(card.approved_at);
+              const releaseState=presentationFor(card);
+              const approved = releaseState.approvalRecorded;
               const requisitionId = `MR-${String(card.batch_code ?? card.id).replace(/^BATCH-/, "")}`;
               const materialLines = cardLines.filter((line: any) => Boolean(line.sku));
               const issuedLines = materialLines.filter((line: any) => line.issue_status === "issued").length;
@@ -434,7 +444,7 @@ function ProductionWorkspace() {
                       <Metric label="Material state" value={shortageCount ? `${shortageCount} shortage line(s)` : "Ready"} />
                     </div>
                     <div className="min-w-56 rounded-lg border border-border bg-bg p-3">
-                      {approved ? (
+                      {releaseState.isDemo ? <><p className="text-xs font-semibold text-warn">{releaseState.label}</p><p className="mt-2 text-xs text-muted">Stored status: {releaseState.storedStatus} · historical fields retained</p><Link to="/command/ibpe-operating-workspace/simulation" className="mt-2 inline-block text-xs text-accent underline">Open simulation</Link></> : approved ? (
                         <>
                           <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-green">Approved build</p>
                           <p className="mt-1 font-mono text-xs text-fg">{card.batch_code}</p>
@@ -458,7 +468,7 @@ function ProductionWorkspace() {
                       <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                         <Metric label="Job card / order" value={`${card.id} · ${card.sales_order_id}`} />
                         <Metric label="Requested by" value={card.created_by ?? "—"} />
-                        <Metric label="Approved by" value={card.approved_by ?? "Approval pending"} />
+                        <Metric label="Approved by" value={releaseState.isDemo ? `Historical field: ${card.approved_by ?? "none"}` : card.approved_by ?? "Approval pending"} />
                         <Metric label="Issue progress" value={`${issuedLines}/${materialLines.length} material line(s)`} />
                       </div>
                       <button
@@ -502,7 +512,7 @@ function ProductionWorkspace() {
                               <p>Reservation: {line.reservation_id ?? "Not available"}</p>
                               <p>{line.reservation_status === "consumed" ? `Issued by ${line.consumed_by ?? "recorded operator"}${line.consumed_at ? ` · ${String(line.consumed_at).replace("T", " ").slice(0, 16)} UTC` : ""}` : line.reserved_by ? `Reserved by ${line.reserved_by}${line.reserved_at ? ` · ${String(line.reserved_at).replace("T", " ").slice(0, 16)} UTC` : ""}` : "Awaiting stock reservation"}</p>
                             </div>
-                            {line.sku && line.issue_status !== "issued" && fullyReserved && compatibleTravellers.length > 0 ? (
+                            {!releaseState.isDemo && line.sku && line.issue_status !== "issued" && fullyReserved && compatibleTravellers.length > 0 ? (
                               <div className="mt-3">
                                 {compatibleTravellers.length > 1 ? (
                                   <select value={selectedTraveller[line.id] ?? ""} onChange={(event) => setSelectedTraveller((current) => ({ ...current, [line.id]: event.target.value }))} className="control mb-2 text-xs">
@@ -536,7 +546,7 @@ function ProductionWorkspace() {
               <article key={traveller.id} className="rounded-xl border border-border bg-bg-elevated/30 p-4">
                 <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] uppercase tracking-[0.14em] text-subtle">{traveller.id}</p><p className="mt-1 text-lg font-semibold text-fg">{traveller.serial_number}</p></div><span className={`text-[10px] font-bold uppercase tracking-[0.14em] ${statusTone(String(traveller.status))}`}>{String(traveller.status).replaceAll("_", " ")}</span></div>
                 <div className="mt-4 grid grid-cols-2 gap-3 text-xs"><Metric label="Job card" value={traveller.job_card_id ?? "Pilot / legacy"} /><Metric label="Commercial order" value={traveller.sales_order_id ?? "—"} /><Metric label="Family" value={traveller.model_name ?? "—"} /><Metric label="BOM" value={traveller.bom_revision ?? "—"} /></div>
-                <p className="mt-3 text-[11px] text-subtle">Production approval is recorded as accepted EPR-04 release evidence. Subsequent build, quality and final-release gates remain separately controlled.</p>
+                <p className="mt-3 text-[11px] text-subtle">{isFourOrderDemoOrder(String(traveller.sales_order_id)) ? "Legacy/demo traveller history only. No approved physical production release is represented." : "Recorded traveller genealogy does not replace independent design, build, quality and final-release approvals."}</p>
               </article>
             ))}
           </div>
