@@ -29,6 +29,9 @@ jobs:
       - name: Install
         run: npm ci
 
+      - name: Four-order simulation HiGHS commissioning
+        run: node --experimental-strip-types --test scripts/four-order-highs.test.mjs
+
       - name: Production exact-SHA fail-closed regression
         run: node --test scripts/production-deployment-readiness.test.mjs scripts/production-assurance-policy.test.mjs
 

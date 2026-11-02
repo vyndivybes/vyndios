@@ -178,7 +178,7 @@ export function runFourOrderSimulation(
    "Only four explicitly selected demo orders are accepted; real job-card approvals remain missing.",
    "Material inventory begins at zero; no actual stock/PO/reservations are imported.",
    "Cash begins at zero; no real payments, tax, revenue or COGS enter this simulation.",
-   "HiGHS optimization, production deployment, physical release and funding certification are NOT executed or authorized.",
+   "This IBPE receipt alone does not execute HiGHS. Physical release and funding certification are never authorized by simulation.",
   ],
  };
 }

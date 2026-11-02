@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { compileFourOrderHighs, verifyFourOrderHighs, FOUR_ORDER_HIGHS_VERSION } from "./four-order-highs.ts";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { authMiddleware } from "./auth/middleware.ts";
@@ -53,6 +55,11 @@ export const runAcceptedFourOrderSimulation = createServerFn({ method:"POST" })
    const current=await liveSimulationSource();
    if(data.expectedSourceHash!==current.sourceHash)
      throw new Error("Simulation source revision/card/approval changed. Refresh preview and review before consenting again.");
+   const {bom,capacity}=await simulationPlanningSources();
+   return runFourOrderSimulation(current,bom,capacity);
+ });
+
+async function simulationPlanningSources(){
    const sql=await getSql();
    const [bom,capacity]=await Promise.all([
      sql.query<PlanningBomRow>(
@@ -70,5 +77,55 @@ export const runAcceptedFourOrderSimulation = createServerFn({ method:"POST" })
          where planning_status='approved' order by sequence,work_centre_id`,
      ),
    ]);
-   return runFourOrderSimulation(current,bom,capacity);
+
+ return {bom,capacity};
+}
+
+const consent=z.object({confirmation:z.literal("SIMULATION_ONLY"),expectedSourceHash:z.string().regex(/^[a-f0-9]{64}$/)});
+const hash=(value:unknown)=>createHash("sha256").update(JSON.stringify(value)).digest("hex");
+async function prepareHighs(expectedSourceHash:string){
+ const acceptance=await liveSimulationSource();
+ if(acceptance.sourceHash!==expectedSourceHash)throw Error("Simulation source changed. Refresh and consent again.");
+ const {bom,capacity}=await simulationPlanningSources();
+ const sourceSha=(process.env.VYNDI_SOURCE_SHA||process.env.WORKERS_CI_COMMIT_SHA||process.env.GITHUB_SHA||"").trim();
+ if(!/^[a-f0-9]{40}$/i.test(sourceSha))throw Error("Deployed source SHA unavailable");
+ const model=compileFourOrderHighs(acceptance,bom,capacity);
+ const ibpe=runFourOrderSimulation(acceptance,bom,capacity);
+ const modelHash=hash({sourceSha,model});
+ return {sourceSha,modelHash,model,ibpe};
+}
+export const prepareFourOrderHighs = createServerFn({method:"POST"})
+ .middleware([authMiddleware]).validator(consent)
+ .handler(async({data,context})=>{
+  await requireBusinessActor("view",{userId:context.userId,email:context.userEmail});
+  return prepareHighs(data.expectedSourceHash);
+ });
+export const validateFourOrderHighs = createServerFn({method:"POST"})
+ .middleware([authMiddleware])
+ .validator(consent.extend({
+  modelHash:z.string().regex(/^[a-f0-9]{64}$/),
+  raw:z.object({Status:z.string().max(80),ObjectiveValue:z.number().finite(),
+   Columns:z.record(z.string().max(80),z.object({Primal:z.number().finite()}).strict())
+    .refine(x=>Object.keys(x).length<=5000,"Too many solver columns")}).strict(),
+ }))
+ .handler(async({data,context})=>{
+  await requireBusinessActor("view",{userId:context.userId,email:context.userEmail});
+  const current=await prepareHighs(data.expectedSourceHash);
+  if(current.modelHash!==data.modelHash)throw Error("Simulation BOM, capacity or deployed source changed. Review and run again.");
+  const result=verifyFourOrderHighs(current.model,data.raw);
+  if(!result.valid)throw Error("Simulation primal rejected: "+result.issues.slice(0,6).join("; "));
+  return {
+   ...result,mode:"SIMULATION_ONLY" as const,productionAuthorized:false as const,
+   financiallyAuthoritative:false as const,persisted:false as const,
+   version:FOUR_ORDER_HIGHS_VERSION,sourceSha:current.sourceSha,
+   validatedBy:context.userId,validatedAt:new Date().toISOString(),solverPackage:"highs@1.15.3",
+   sourceHash:current.model.sourceHash,inputHash:current.ibpe.inputHash,
+   modelHash:current.modelHash,resultHash:hash({modelHash:current.modelHash,result}),
+   solverReportedStatus:data.raw.Status,ibpe:current.ibpe,
+   assumptions:["Whole orders scheduled in monthly buckets, no splitting or early production.",
+    "Every approved work centre constrains every bicycle using its planning standard; no detailed routing or physical release.",
+    "Virtual unlimited zero-lead supply exactly equals BOM requirements in the scheduled month. No real supplier, stock, PO or cost.",
+    "Weighted lateness objective only. Zero cash, no financing or accounting model.",
+    "Result is a memory-only simulation receipt. Server independently validates feasibility, not a proof of solver optimality."],
+  };
  });

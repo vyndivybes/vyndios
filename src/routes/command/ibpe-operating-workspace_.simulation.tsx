@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { getFourOrderSimulationPreview, runAcceptedFourOrderSimulation } from "@/lib/ibpe-simulation-authority";
+import { getFourOrderSimulationPreview, runAcceptedFourOrderSimulation, prepareFourOrderHighs, validateFourOrderHighs } from "@/lib/ibpe-simulation-authority";
+
+import { solveFourOrderSimulation } from "@/lib/four-order-highs-client";
 
 export const Route = createFileRoute("/command/ibpe-operating-workspace_/simulation")({
  loader: () => getFourOrderSimulationPreview(),
@@ -11,31 +13,53 @@ function FourOrderSimulationPage() {
  const preview=Route.useLoaderData();
  const router=useRouter();
  const [consent,setConsent]=useState(false);
+ const [solverConsent,setSolverConsent]=useState(false);
+ const [highs,setHighs]=useState<Awaited<ReturnType<typeof validateFourOrderHighs>>|null>(null);
+ const [phase,setPhase]=useState("");
  const [running,setRunning]=useState(false);
  const [error,setError]=useState("");
  const [receipt,setReceipt]=useState<Awaited<ReturnType<typeof runAcceptedFourOrderSimulation>>|null>(null);
  async function run() {
   if(!consent||running)return;
-  setRunning(true);setError("");setReceipt(null);
+  setRunning(true);setError("");setReceipt(null);setHighs(null);setSolverConsent(false);
   try{
    const result=await runAcceptedFourOrderSimulation({data:{
     confirmation:"SIMULATION_ONLY",expectedSourceHash:preview.sourceHash,
    }});
    setReceipt(result);
   }catch(e){
+   setConsent(false);
    setError(e instanceof Error?e.message:"Simulation blocked by source authority.");
    await router.invalidate();
   }finally{setRunning(false)}
  }
+ async function optimize(){
+  if(!consent||!solverConsent||running)return;
+  setRunning(true);setError("");setHighs(null);
+  try {
+   setPhase("Preparing fresh simulation inputs…");
+   const prepared=await prepareFourOrderHighs({data:{confirmation:"SIMULATION_ONLY",expectedSourceHash:preview.sourceHash}});
+   setPhase("Solving simulation MILP with HiGHS…");
+   const raw=await solveFourOrderSimulation(prepared.model.lp);
+   setPhase("Independently validating on the server…");
+   const validated=await validateFourOrderHighs({data:{confirmation:"SIMULATION_ONLY",expectedSourceHash:preview.sourceHash,modelHash:prepared.modelHash,
+    raw:{Status:raw.Status,ObjectiveValue:raw.ObjectiveValue!,Columns:raw.Columns!}}});
+   setHighs(validated);setReceipt(validated.ibpe);
+  }catch(e){
+   setError(e instanceof Error?e.message:"Simulation optimizer blocked");
+   setConsent(false);setSolverConsent(false);
+   await router.invalidate();
+  }finally{setRunning(false);setPhase("");}
+ }
  return <main className="space-y-6">
   <header className="space-y-2">
    <p className="text-xs font-semibold uppercase tracking-widest text-accent">VYNDI IBPE / Simulation authority</p>
-   <h1 className="font-display text-3xl">Four-order simulation acceptance</h1>
+   <h1 className="font-display text-3xl">Four-order simulation: IBPE + HiGHS</h1>
    <p className="max-w-4xl text-sm text-muted">Sandbox mathematics only. The four confirmed demo orders below become accepted <strong>simulation inputs</strong>. This does not authorize real production, engineering change, procurement, finance, stock consumption or funding.</p>
    <Link className="text-sm text-accent underline" to="/command/ibpe-operating-workspace">Return to governed IBPE</Link>
   </header>
   <section className="rounded-xl border border-warn/50 p-4">
-   <h2 className="font-semibold text-warn">Independent REAL production gates remain blocked</h2>
+   <h2 className="font-semibold text-warn">REAL readiness: HOLD · separate from simulation</h2>
    <p className="mt-1 text-sm text-muted">Three released job cards have no recorded physical approval evidence. The R3 order has a held R2 card, consumed material, a serial traveller and a received PO. We create only a virtual R3 successor in memory; the original cards and booked ₹1,500 cost history are never rewritten.</p>
   </section>
   <section className="rounded-xl border border-border p-4 space-y-3">
@@ -71,8 +95,35 @@ function FourOrderSimulationPage() {
     <p className="text-sm">Simulated procurement rows <strong className="block text-xl">{receipt.summary.fulfillmentShortageSkuMonths}</strong></p>
    </div>
    <p className="font-mono text-xs break-all text-muted">Input SHA-256: {receipt.inputHash}</p>
-   <p className="text-sm text-muted">IBPE engine {receipt.engineVersion} executed against a memory-only zero-opening-stock, zero-cash scenario. HiGHS is not run by this page.</p>
+   <p className="text-sm text-muted">IBPE engine {receipt.engineVersion} executed against a memory-only zero-opening-stock, zero-cash scenario. Run the separately consented simulation HiGHS step below to validate a schedule and virtual material plan.</p>
+   <div className="space-y-3 border-t border-border pt-4">
+    <h3 className="font-semibold">SIMULATION readiness: IBPE complete · {highs?"HiGHS primal validated":"HiGHS awaiting consent"}</h3>
+    <p className="text-sm text-muted">Schedule whole orders in months 1–36, without early production. Every work centre uses its approved planning standard for every bicycle. Virtual unlimited zero-lead supply covers the scheduled BOM demand. Minimize weighted lateness. No supplier, finance or physical release authority.</p>
+    <label className="flex gap-3 text-sm"><input type="checkbox" checked={solverConsent} disabled={running} onChange={e=>{setSolverConsent(e.target.checked);setHighs(null)}}/>
+     <span>I consent to a memory-only <strong>SIMULATION HiGHS</strong> run and server feasibility verification. No stock, PO, finance or production record will be written. The solver uses this browser's isolated Web Worker; no PC installation or local service is needed.</span>
+    </label>
+    <button type="button" disabled={!consent||!solverConsent||running} onClick={()=>void optimize()}
+     className="rounded-lg border border-accent px-4 py-3 text-sm font-semibold text-accent disabled:opacity-40">{running?phase||"Running simulation…":"Run simulation-only HiGHS"}</button>
+    <p role="status" className="text-sm text-muted">{phase}</p>
+   </div>
    <ul className="list-disc pl-5 text-xs text-muted">{receipt.limitations.map(x=><li key={x}>{x}</li>)}</ul>
+  </section>:null}
+  {highs?<section aria-label="Validated simulation optimizer receipt" className="rounded-xl border border-accent/50 p-4 space-y-3">
+   <h2 className="font-semibold text-accent">SIMULATION PASS: HiGHS {highs.solverReportedStatus} · independent primal validation passed</h2>
+   <p className="text-sm">Objective {highs.objective} weighted unit-month lateness · {highs.variableCount} validated variables · {highs.procurement.length} virtual material rows</p>
+   <div className="overflow-auto"><table className="w-full text-left text-sm"><thead><tr><th>Demo order</th><th>Simulated month</th><th>Units</th></tr></thead>
+    <tbody>{highs.schedule.map(o=><tr key={o.orderId}><td className="py-2 font-mono text-xs">{o.orderId}</td><td>{o.month}</td><td>{o.units}</td></tr>)}</tbody>
+   </table></div>
+   <details><summary className="cursor-pointer text-sm">Virtual material plan</summary><div className="overflow-auto"><table className="w-full text-left text-sm">
+    <thead><tr><th>SKU</th><th>Month</th><th>Virtual quantity</th></tr></thead><tbody>{highs.procurement.map(p=><tr key={p.sku+":"+p.month}><td>{p.sku}</td><td>{p.month}</td><td>{p.quantity}</td></tr>)}</tbody>
+   </table></div></details>
+   <div className="space-y-1 break-all font-mono text-xs text-muted">
+    <p>Simulation optimizer {highs.version}</p><p>Deployed source SHA: {highs.sourceSha}</p>
+    <p>Order source SHA-256: {highs.sourceHash}</p><p>IBPE input SHA-256: {highs.inputHash}</p>
+    <p>Model SHA-256: {highs.modelHash}</p><p>Validated result SHA-256: {highs.resultHash}</p>
+   </div>
+   <p className="text-sm text-warn">Memory-only receipt. REAL readiness remains HOLD. No persisted optimizer packet or manufacturing authority is created.</p>
+   <ul className="list-disc pl-5 text-xs text-muted">{highs.assumptions.map(a=><li key={a}>{a}</li>)}</ul>
   </section>:null}
  </main>;
 }

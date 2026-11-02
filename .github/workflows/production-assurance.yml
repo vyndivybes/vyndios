@@ -100,6 +100,9 @@ jobs:
           timeout --signal=TERM --kill-after=15s 180s npx playwright install chromium
           node --input-type=module -e "$probe"
 
+      - name: Four-order simulation HiGHS desktop and mobile acceptance
+        run: node scripts/four-order-simulation-browser-acceptance.mjs
+
       - name: Independent four-department browser acceptance
         run: npm run test:browser:departments
 
