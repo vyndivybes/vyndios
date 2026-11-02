@@ -12,6 +12,14 @@ async function setup(t) {
     create table vyndi_sales_orders(id text primary key, revision integer not null, status text not null);
     create table epr_production_job_cards(id text primary key, sales_order_id text not null,
       sales_order_revision integer not null, status text not null, superseded_at timestamptz);
+    create table vyndi_live_job_card_requirements(sales_order_id text, due_month integer,
+      sku text, unit text, required_quantity numeric, reserved_quantity numeric,
+      physical_quantity numeric, available_to_promise numeric,job_card_status text,issue_status text);
+    insert into vyndi_live_job_card_requirements values
+      ('DEMO-SO',1,'DEMO-SKU','pcs',1,0,0,0,'released','required'),
+      ('REAL-SO-1',1,'REAL-SKU-1','pcs',1,0,0,0,'released','required'),
+      ('REAL-SO-2',1,'REAL-SKU-2','pcs',1,0,0,0,'released','required'),
+      ('REAL-SO-3',1,'REAL-SKU-3','pcs',1,0,0,0,'released','required');
     insert into vyndi_sales_orders values ('DEMO-SO',3,'confirmed'),('REAL-SO-1',2,'confirmed'),
       ('REAL-SO-2',3,'confirmed'),('REAL-SO-3',2,'confirmed');
     insert into epr_production_job_cards values
@@ -52,6 +60,8 @@ test("active demo exclusion affects exactly one order and reversal restores the 
   await act(db,"approved","checker","req-approve");
   await act(db,"activated","checker","req-activate");
   assert.deepEqual((await visible(db)).rows.map(row=>row.id),["REAL-SO-1","REAL-SO-2","REAL-SO-3"]);
+  const prospective=await db.query("select sku from vyndi_committed_procurement_requirements order by sku");
+  assert.deepEqual(prospective.rows.map(row=>row.sku),["REAL-SKU-1","REAL-SKU-2","REAL-SKU-3"]);
   const originals=await db.query("select count(*)::int AS n from vyndi_sales_orders");
   assert.equal(originals.rows[0].n,4,"original truth is never removed");
   await act(db,"reversed","checker","req-reverse");
