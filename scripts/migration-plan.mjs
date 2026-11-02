@@ -55,6 +55,7 @@ function migrationSortKey(name) {
  * @returns {void}
  */
 export function assertNoAppliedMigrationPrefixConflicts(paths, applied) {
+  /** @param {string} name */
   const numericPrefix = (name) => {
     const match = /^(\d+)_.*\.sql$/.exec(name);
     const number = match ? Number(match[1]) : NaN;
