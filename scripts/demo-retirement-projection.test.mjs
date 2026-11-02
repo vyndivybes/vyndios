@@ -100,3 +100,31 @@ test("business projections use the active-only view, while original source table
   assert.doesNotMatch(sql,/delete\s+from\s+(vyndi_sales_orders|epr_production_job_cards|epr_inventory)/i);
   assert.doesNotMatch(sql,/update\s+(vyndi_sales_orders|epr_production_job_cards|epr_inventory)/i);
 });
+
+
+test("deployment refuses a runtime database role inheriting neon_superuser",async(t)=>{
+  const db=new PGlite(); await db.waitReady; t.after(()=>db.close());
+  await db.exec('create role neon_superuser; create role "hyperdrive-user"; grant neon_superuser to "hyperdrive-user";');
+  const source=await readFile(migration,"utf8");
+  await assert.rejects(db.exec(source),/DEMO_RUNTIME_ROLE_UNSAFE/);
+});
+
+test("retirement projection does not alter booked inventory or COGS evidence",async(t)=>{
+  const db=await setup(t);
+  await db.exec(`
+    create table demo_inventory_ledger(order_id text, value_delta_inr numeric);
+    create table demo_cogs_ledger(order_id text, cogs_inr numeric);
+    insert into demo_inventory_ledger values('DEMO-SO',-1500);
+    insert into demo_cogs_ledger values('DEMO-SO',1500);
+  `);
+  const before=await db.query(`select (select sum(value_delta_inr) from demo_inventory_ledger) inventory_delta,
+    (select sum(cogs_inr) from demo_cogs_ledger) cogs`);
+  await proposed(db);
+  await act(db,"approved","checker","req-approve");
+  await act(db,"activated","checker","req-activate");
+  const after=await db.query(`select (select sum(value_delta_inr) from demo_inventory_ledger) inventory_delta,
+    (select sum(cogs_inr) from demo_cogs_ledger) cogs`);
+  assert.deepEqual(after.rows,before.rows,"retiring prospective demand must never rewrite booked finance/stock");
+  assert.equal(Number(after.rows[0].cogs),1500);
+  assert.equal(Number(after.rows[0].inventory_delta),-1500);
+});
