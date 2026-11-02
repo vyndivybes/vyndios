@@ -3,9 +3,16 @@ import { TriangleAlert } from "lucide-react";
 import { useEffect } from "react";
 
 export function AppErrorComponent({ error }: ErrorComponentProps) {
+  // TanStack Router may deliver any thrown value here, including primitives.
+  // Never access properties before narrowing; preserve the 401 redirect boundary.
+  const details = typeof error === "object" && error !== null
+    ? (error as Record<string, unknown>)
+    : null;
+  const message = typeof details?.message === "string"
+    ? details.message
+    : typeof error === "string" ? error : "";
   const unauthenticated =
-    error.message === "Unauthorized" ||
-    ("status" in error && error.status === 401);
+    message === "Unauthorized" || details?.status === 401;
 
   useEffect(() => {
     if (!unauthenticated) return;
@@ -33,7 +40,7 @@ export function AppErrorComponent({ error }: ErrorComponentProps) {
       </span>
       <h1 className="text-lg font-semibold">Something went wrong</h1>
       <p className="max-w-md text-sm break-words text-zinc-500 dark:text-zinc-400">
-        {error.message || "An unexpected error occurred. Try reloading the page."}
+        {message || "An unexpected error occurred. Try reloading the page."}
       </p>
     </main>
   );
