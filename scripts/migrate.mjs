@@ -6,7 +6,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import pg from "pg";
-import { pendingMigrations } from "./migration-plan.mjs";
+import { pendingMigrations, assertNoAppliedMigrationPrefixConflicts } from "./migration-plan.mjs";
 import { migrationEnvironmentDecision } from "./migration-environment.mjs";
 import { requireDestructiveMigrationEvidence } from "./migration-risk.mjs";
 
@@ -68,6 +68,9 @@ async function main() {
       "CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())",
     );
     const applied = (await client.query("SELECT name FROM _migrations")).rows.map((r) => r.name);
+    // Reject historical branch reuse of a production-applied migration number
+    // before any migration SQL runs, even when filenames differ by basename.
+    assertNoAppliedMigrationPrefixConflicts(entries, applied);
 
     let count = 0;
     for (const { name, path } of pendingMigrations(entries, applied)) {

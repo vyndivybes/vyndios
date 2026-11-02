@@ -42,6 +42,50 @@ function migrationSortKey(name) {
 }
 
 /**
+ * Fail closed when a pending deployable migration reuses a numeric prefix that
+ * the actual production _migrations ledger already assigned to another file.
+ *
+ * Existing 0001-0099 migration history includes documented, intentionally
+ * duplicated legacy prefixes; only prefixes >= 0100 are uniquely reserved.
+ * A matching basename is safe, and an applied-only tombstone with no matching
+ * deployable file is preserved. This does NOT rewrite or rename database rows.
+ *
+ * @param {Iterable<string>} paths root deployable filenames
+ * @param {Iterable<string>} applied applied _migrations basenames
+ * @returns {void}
+ */
+export function assertNoAppliedMigrationPrefixConflicts(paths, applied) {
+  /** @param {string} name */
+  const numericPrefix = (name) => {
+    const match = /^(\d+)_.*\.sql$/.exec(name);
+    const number = match ? Number(match[1]) : NaN;
+    return Number.isSafeInteger(number) && number >= 100 ? number : null;
+  };
+  const appliedByPrefix = new Map();
+  for (const name of applied) {
+    const prefix = numericPrefix(name);
+    if (prefix === null) continue;
+    const names = appliedByPrefix.get(prefix) ?? new Set();
+    names.add(name);
+    appliedByPrefix.set(prefix, names);
+  }
+  const conflicts = [];
+  for (const path of paths) {
+    if (!isMigrationFile(path)) continue;
+    const name = migrationName(path);
+    const prefix = numericPrefix(name);
+    if (prefix === null) continue;
+    const occupied = appliedByPrefix.get(prefix);
+    if (occupied && !occupied.has(name)) {
+      conflicts.push(`${String(prefix).padStart(4, "0")}: applied ${[...occupied].sort().join(", ")}; proposed ${name}`);
+    }
+  }
+  if (conflicts.length) {
+    throw new Error("Applied migration prefix collision: " + conflicts.sort().join(" | ") + ". Preserve the applied ledger; rebase proposed files with unique new prefixes.");
+  }
+}
+
+/**
  * Migrations in `paths` that are not yet in `applied`, in apply order.
  * Non-`.sql` entries (a `readdir` also yields `migrations/auth/`) are dropped.
  * @param {Iterable<string>} paths
