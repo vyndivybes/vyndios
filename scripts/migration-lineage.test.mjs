@@ -3,6 +3,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { assertNoAppliedMigrationPrefixConflicts } from "./migration-plan.mjs";
 
 const here=dirname(fileURLToPath(import.meta.url));
 const migrationsDir=join(here,"..","migrations");
@@ -29,4 +30,44 @@ test("historical applied-only migrations are explicit immutable lineage, never d
   }
 
   assert.ok(seen.has("0023_operating_plan_versions.sql"),"known production-only historical migration must remain documented");
+});
+
+test("deployment refuses applied 0149 HR migration that would replace the real CRM migration",()=>{
+  assert.throws(
+    ()=>assertNoAppliedMigrationPrefixConflicts(
+      ["0149_vaos_people_master_operational_write.sql"],
+      ["0149_native_commercial_crm.sql"],
+    ),
+    /0149.*0149_native_commercial_crm\.sql.*0149_vaos_people_master_operational_write\.sql/,
+  );
+});
+
+test("deployment refuses finance 0194/0195 branches against applied CA and BI migrations",()=>{
+  assert.throws(
+    ()=>assertNoAppliedMigrationPrefixConflicts(
+      ["0194_finance_journal_exact_paise.sql","0195_receivables_independent_reversal.sql"],
+      ["0194_ca_certificate_evidence_register.sql","0195_conversational_bi.sql"],
+    ),
+    /0194.*0194_ca_certificate_evidence_register\.sql.*0194_finance_journal_exact_paise\.sql/,
+  );
+});
+
+test("exact matching migrations and missing historical source files remain legal",()=>{
+  assert.doesNotThrow(()=>assertNoAppliedMigrationPrefixConflicts(
+    ["0194_ca_certificate_evidence_register.sql","0195_conversational_bi.sql"],
+    ["0194_ca_certificate_evidence_register.sql","0195_conversational_bi.sql","0023_operating_plan_versions.sql"],
+  ));
+});
+
+test("approved historical duplicate prefixes remain valid and new high-numbered migrations are allowed",()=>{
+  assert.doesNotThrow(()=>assertNoAppliedMigrationPrefixConflicts(
+    ["0072_verified_management_actuals.sql","0196_proposed_additive.sql"],
+    ["0072_advanced_planning_authority_workbench.sql","0195_conversational_bi.sql"],
+  ));
+});
+
+test("deploy migrator must enforce applied-ledger prefix guard before applying SQL", async()=>{
+  const text=await readFile(join(here,"migrate.mjs"),"utf8");
+  assert.match(text,/assertNoAppliedMigrationPrefixConflicts\(entries, applied\)/);
+  assert.ok(text.indexOf("assertNoAppliedMigrationPrefixConflicts(entries, applied)")<text.indexOf("for (const { name, path } of pendingMigrations(entries, applied))"));
 });
