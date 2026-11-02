@@ -341,7 +341,7 @@ function ProductionWorkspace() {
           <div className="mt-4 space-y-3">
             <div className="flex flex-col gap-3 rounded-lg border border-warn/40 bg-warn/5 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div><p className="text-sm font-semibold text-warn">{ordersNeedingJobCard.length} confirmed order(s) are not on the current Production revision.</p><p className="mt-1 text-xs text-muted">Reconciliation validates the controlled BOM before creating or refreshing the job card. It does not approve the bike/batch.</p></div>
-              <Button disabled={busyAction !== null || normalReconciliation.length === 0} onClick={() => void reconcileAll()}>{normalReconciliation.length === 0 ? "Controlled change required" : busyAction === "sync:all" ? "Reconciling…" : "Reconcile all"}</Button>
+              <Button disabled={busyAction !== null || normalReconciliation.length === 0} onClick={() => void reconcileAll()}>{normalReconciliation.length === 0 ? (demoCards>0 && demoCards===cards.length ? "Demo history · simulation only" : "Controlled change required") : busyAction === "sync:all" ? "Reconciling…" : "Reconcile all"}</Button>
             </div>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {ordersNeedingJobCard.map((order: any) => (

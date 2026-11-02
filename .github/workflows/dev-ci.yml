@@ -29,6 +29,9 @@ jobs:
       - name: Install
         run: npm ci
 
+      - name: Better Auth 1.7 compatibility
+        run: npm run test:auth-1-7
+
       - name: Pre-production release presentation regression
         run: node --experimental-strip-types --test scripts/production-release-presentation.test.mjs
 

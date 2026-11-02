@@ -19,10 +19,11 @@ Simulation remains independently accessible and does not confer physical authori
 Hosted audit of the original lock reports 24 findings: 6 critical, 2 high, 14 moderate and 2 low.
 An uncommitted compatible candidate still left Better Auth affected and changed unrelated packages, so it was not adopted.
 The targeted candidate pins patched TanStack Start 1.168.60, Better Auth 1.7.15 and Zod 4.6.7 with the corresponding resolved dependency tree.
-Hosted audit of that candidate reports 0 critical, 0 high, 0 low and 14 moderate findings.
-The remaining findings are the development lint chain affected by minimatch GHSA-g3hv-75wg-m249. Do not claim a clean full-tree audit.
-Do not downgrade/remove linting or force an incompatible minimatch major override merely to erase the count.
-Qualification now requires a clean production-dependency audit and blocks high/critical findings across the full tree.
+The first targeted candidate left 14 moderate lint-chain findings. A separate hosted minimatch 11.0.1 candidate passed actual ESLint rule execution, repository config matching and TypeScript/TSX parsing, and its full audit reports zero findings.
+The qualified minimatch override is adopted with a permanent compatibility regression. No lint package or linting check was removed.
+Qualification now requires zero known advisories in both production and full dependency trees.
+Better Auth 1.7 removed genericOAuthClient and moved generic sign-in to the standard social API. Client and popup calls are migrated together; Grok identity uses immutable OpenID sub and PKCE remains enabled.
+Production has only credential-provider account rows and no duplicate provider/account keys. Better Auth 1.7.15 keeps the 1.6 account schema; no production auth-account backfill is performed.
 No unreviewed blanket npm audit fix --force was used.
 
 ## Runtime credential boundary

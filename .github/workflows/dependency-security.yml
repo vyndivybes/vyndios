@@ -21,7 +21,9 @@ jobs:
           cache: npm
       - name: Install exact lock without lifecycle scripts
         run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Lint compatibility qualification
+        run: node --test scripts/lint-security-compatibility.test.mjs
       - name: Production dependencies must have no known advisories
         run: npm audit --omit=dev --audit-level=moderate
-      - name: Report full dependency tree and block high or critical findings
-        run: npm audit --audit-level=high
+      - name: Full dependency tree must have zero known advisories
+        run: npm audit --audit-level=low
