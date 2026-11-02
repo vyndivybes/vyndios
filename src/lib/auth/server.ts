@@ -6,6 +6,7 @@ import { randomBytes } from "node:crypto";
 import { ensureDbReady, getPglite } from "../db";
 import { emailAndPasswordEnabled } from "./email-password";
 import { GATE_PROVIDER_ID, gateIdentitySessions } from "./gate-session.server";
+import { grokAccountSubject } from "./provider-subject";
 import { GROK_PROVIDERS } from "./providers";
 import { pgliteDialect } from "./pglite-dialect";
 import { requestSafePostgresDialect } from "./postgres-dialect";
@@ -207,6 +208,7 @@ const grokOAuthPlugin = authConfigured
   ? genericOAuth({
       config: GROK_PROVIDERS.map(({ providerId, idp }) => ({
         providerId,
+        accountSubject: ({profile}) => grokAccountSubject(profile),
         clientId: grokClientId as string,
         clientSecret: grokClientSecret as string,
         authorizationUrl: grokAuthorizationUrl,

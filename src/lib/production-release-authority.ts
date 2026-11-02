@@ -1,3 +1,4 @@
+import {assertPhysicalJobCard} from "./production-demo-guard.ts";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { authMiddleware } from "@/lib/auth/middleware";
@@ -10,6 +11,7 @@ export const approveProductionBatch = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const actor = await requireBusinessActor("approve", { userId: context.userId, email: context.userEmail });
     const sql = await getSql();
+    await assertPhysicalJobCard(sql,data.jobCardId);
     const rows = await sql.query<{
       job_card_id: string;
       batch_code: string;

@@ -1,0 +1,29 @@
+name: Dependency security qualification
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - package.json
+      - package-lock.json
+      - .github/workflows/dependency-security.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  dependency-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install exact lock without lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Lint compatibility qualification
+        run: node --test scripts/lint-security-compatibility.test.mjs
+      - name: Production dependencies must have no known advisories
+        run: npm audit --omit=dev --audit-level=moderate
+      - name: Full dependency tree must have zero known advisories
+        run: npm audit --audit-level=low
