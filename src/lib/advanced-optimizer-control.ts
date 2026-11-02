@@ -1,14 +1,18 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireBusinessActor } from "./business-actor.ts";
 import { getSql } from "./db.ts";
+import { assessAdvancedOptimizerLineage } from "./advanced-optimizer-lineage.ts";
 
 type LatestPacketRow = {
   id: string;
   parent_ibpe_run_id: string;
+  source_sha: string;
   packet_version: string;
   advanced_model_version: string;
   created_at: string;
 };
+
+type LatestIbpeRow = { id: string; source_sha: string };
 
 type LatestRunRow = {
   id: string;
@@ -48,7 +52,7 @@ export const getAdvancedOptimizerControlState = createServerFn({ method: "GET" }
     await requireBusinessActor("view");
     const sql = await getSql();
     const packets = await sql.query<LatestPacketRow>(
-      `select id,parent_ibpe_run_id,packet_version,advanced_model_version,created_at::text
+      `select id,parent_ibpe_run_id,source_sha,packet_version,advanced_model_version,created_at::text
          from vyndi_advanced_planning_packets
         where status='complete'
         order by created_at desc,id desc
@@ -71,6 +75,18 @@ export const getAdvancedOptimizerControlState = createServerFn({ method: "GET" }
       };
     }
 
+    const completedIbpe = await sql.query<LatestIbpeRow>(
+      `select id,source_sha from vyndi_ibpe_runs where status='complete' order by created_at desc,id desc limit 1`,
+    );
+    const deployedSourceSha = (
+      process.env.VYNDI_SOURCE_SHA
+      || process.env.WORKERS_CI_COMMIT_SHA
+      || process.env.CF_PAGES_COMMIT_SHA
+      || process.env.GITHUB_SHA
+      || ""
+    ).trim();
+    const lineage = assessAdvancedOptimizerLineage(packet, completedIbpe[0] ?? null, deployedSourceSha);
+
     const recentRuns = await sql.query<LatestRunRow>(
       `select id,request_id,accepted,optimization_status,cash_guardrail_status,
               cash_guardrail_json->>'planningDisposition' as cash_planning_disposition,
@@ -91,8 +107,8 @@ export const getAdvancedOptimizerControlState = createServerFn({ method: "GET" }
 
     return {
       packet,
-      readyForGovernedOptimization: true,
-      issues: [],
+      readyForGovernedOptimization: lineage.ready,
+      issues: lineage.issues,
       capitalEnvelope: null,
       recentRun: recentRuns[0] ?? null,
     };
