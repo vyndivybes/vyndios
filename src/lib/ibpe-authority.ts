@@ -124,7 +124,7 @@ async function readIbpeReadiness(sql: Sql): Promise<IbpeReadiness> {
       (select count(*) from vyndi_supply_planning_parameters where planning_status<>'retired') as supply_planning_rows,
       (select count(*) from vyndi_capacity_standards where planning_status<>'retired') as capacity_standard_rows,
       (select count(*)
-         from vyndi_sales_orders o
+         from vyndi_operational_sales_orders o
          left join epr_production_job_cards c on c.sales_order_id=o.id
         where o.status='confirmed'
           and (c.id is null or c.sales_order_revision<>o.revision or c.bom_revision is null
@@ -227,7 +227,7 @@ async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
   const model = buildModelWithInputs(plan.scenario, Boolean(plan.draw_standby), finance);
 
   const orders = await sql.query<{ plan_month:number|string; product_id:ProductLineId; confirmed:number|string }>(
-    `select plan_month,product_id,coalesce(sum(units),0) as confirmed from vyndi_sales_orders where status='confirmed' group by plan_month,product_id order by plan_month,product_id`,
+    `select plan_month,product_id,coalesce(sum(units),0) as confirmed from vyndi_operational_sales_orders where status='confirmed' group by plan_month,product_id order by plan_month,product_id`,
   );
   const actualProductRows = await sql.query<{ plan_month:number|string; product_id:ProductLineId; actual_units:number|string }>(
     `select i.plan_month,o.product_id,coalesce(sum(i.units),0) as actual_units
