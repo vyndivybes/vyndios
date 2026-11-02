@@ -17,13 +17,13 @@ revoke all on vyndi_private.bi_dashboards from public;
 -- Production server-side Hyperdrive role needs metadata-only table access.
 -- PGlite/local test roles do not necessarily exist: grant only if provisioned.
 -- No browser/anon grants and no DELETE/TRUNCATE privileges.
-do $
+do $bi_runtime$
 begin
  if exists (select 1 from pg_roles where rolname='hyperdrive-user') then
   execute 'grant usage on schema vyndi_private to "hyperdrive-user"';
   execute 'grant select, insert, update on vyndi_private.bi_dashboards to "hyperdrive-user"';
  end if;
-end $;
+end $bi_runtime$;
 
 -- Application DB role is server-only; every call uses requireBusinessActor,
 -- owner predicates and current canonical route permissions. No browser grants.
