@@ -13,7 +13,7 @@ try {
   assert.equal((await health.json()).sourceSha,expected);
   const page=await context.newPage();
   const errors=[];
-  page.on("pageerror",e=>errors.push(e.message));
+  page.on("pageerror",e=>{errors.push(e.message);console.error("VYNDI_BROWSER_PAGEERROR",e.message);});
   await page.goto(base+"/login?returnTo=%2Fcommand%2Fibpe-operating-workspace%2Fsimulation",{waitUntil:"domcontentloaded"});
   await page.locator(".vy-login.is-cinematic").waitFor({state:"visible",timeout:30000});
   await page.getByLabel(/Authorised Email/i).fill(process.env.VYNDI_TEST_EMAIL);
@@ -23,6 +23,7 @@ try {
   if(!page.url().endsWith("/simulation"))await page.goto(base+"/command/ibpe-operating-workspace/simulation",{waitUntil:"domcontentloaded"});
   await page.getByRole("heading",{name:"Four-order simulation: IBPE + HiGHS",exact:true}).waitFor({timeout:30000});
   assert.equal(await page.getByRole("button",{name:"Run governed IBPE",exact:true}).count(),0);
+  await page.locator('[data-simulation-interactive="ready"]').waitFor({state:"visible",timeout:30000});
   const ibpe=page.getByRole("button",{name:"Accept and run simulation IBPE",exact:true});
   assert.equal(await ibpe.isDisabled(),true);
   await page.getByRole("checkbox",{name:/I accept these four specific demo orders/}).check();
