@@ -12,7 +12,7 @@ export const readDashboardEvidence=createServerFn({method:'POST'}).validator(def
  const permitted=data.agents.filter(id=>allowed(actor.role,id));
  if(!permitted.length)throw Error('No permitted sources.');
  const d=authorizeDashboard(actor.role,{...data,agents:permitted});const sql=await getSql();
- const packets=[];for(const employeeId of d.agents)packets.push(await readEnterpriseBi(sql,{...d,employeeId,limit:5,offset:0},{primaryOnly:true,crm:d.metric==='crm'}));
+ const packets=[];for(const employeeId of d.agents)packets.push(await readEnterpriseBi(sql,{...d,employeeId,limit:5,offset:0}));
  // Explicit JSON transport prevents unknown source field values crossing the
  // server-function serialization boundary as unvalidated class instances.
  return {packet:JSON.stringify({enterprise:{...packets[0],scope:'permitted',departments:packets.flatMap(p=>p.departments)},workforce:null}),permittedAgents:permitted,allowedAgents:Object.keys(VYNDI_BI_DEPARTMENTS).filter(id=>allowed(actor.role,id))};
