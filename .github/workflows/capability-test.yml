@@ -1,0 +1,21 @@
+name: Capability test isolation
+on:
+  push:
+    branches: [qual/capability-test-20261103]
+permissions:
+  contents: read
+jobs:
+  isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Reject unsafe capability targets
+        run: node --test scripts/capability-test-target.test.mjs
+      - run: npm ci
+      - name: Existing IBPE and manufacturing control qualification
+        run: npm run test:mes:golden && npm run test:simulation-highs
