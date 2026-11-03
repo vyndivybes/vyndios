@@ -4,6 +4,8 @@ on:
     paths:
       - "scripts/stage9-signed-loopback-sandbox.mjs"
       - "scripts/vaos-stage9-signed-loopback.test.mjs"
+      - "scripts/stage9-pinned-vaos-reference.test.mjs"
+      - "vaos-reference/**"
       - "src/lib/vaos-knowledge-graph-export.ts"
       - "src/lib/vaos-knowledge-graph-export.test.ts"
       - "src/routes/api/vaos/bridge.ts"
@@ -25,13 +27,6 @@ jobs:
     steps:
       - name: VYNDI OS canonical code
         uses: actions/checkout@v4
-      - name: Pinned VAOS sender contract
-        uses: actions/checkout@v4
-        with:
-          repository: vyndivybes/vaos
-          ref: f8fa8ec2bcfb64e876d503d7a3a5a4d7c4353e2c
-          path: vaos-reference
-          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -43,6 +38,8 @@ jobs:
           echo "Only ephemeral PGlite and loopback are permitted."
       - name: Install existing pinned dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify pinned VAOS sender integrity
+        run: node --test scripts/stage9-pinned-vaos-reference.test.mjs
       - name: Signed VAOS → canonical VYNDI P2P, ephemeral loopback only
         run: node --experimental-strip-types --test scripts/vaos-stage9-signed-loopback.test.mjs
       - name: Verify repository-pinned VEDM graph read export
