@@ -16,6 +16,8 @@ on:
     paths:
       - "scripts/stage9-signed-loopback-sandbox.mjs"
       - "scripts/vaos-stage9-signed-loopback.test.mjs"
+      - "scripts/stage9-pinned-vaos-reference.test.mjs"
+      - "vaos-reference/**"
       - ".github/workflows/stage9-signed-loopback-qualification.yml"
   workflow_dispatch:
 permissions:
