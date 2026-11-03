@@ -29,6 +29,9 @@ jobs:
       - name: Install
         run: npm ci
 
+      - name: Session verification deadline
+        run: node --experimental-strip-types --test scripts/session-deadline.test.mjs
+
       - name: Better Auth 1.7 compatibility
         run: npm run test:auth-1-7
 
