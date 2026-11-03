@@ -60,3 +60,22 @@ test("Stage-3 qualification-only write bridge is atomic, compensated and does no
   assert.match(sql,/'cancelled'/);
   assert.match(sql,/COMPENSATED/);
 });
+
+test("new VEDM knowledge graph read action is signed, nonce protected and read-only",async()=>{
+ const route=await readFile(join(root,"src/routes/api/vaos/bridge.ts"),"utf8");
+ assert.match(route,/KNOWLEDGE\.OBSERVE_VEDM_GRAPH/);
+ assert.match(route,/compileVedmAuthorityGraph/);
+ assert.match(route,/projectVedmAuthorityGraphForVaos/);
+ assert.match(route,/claim_vyndi_vaos_bridge_nonce/);
+ assert.match(route,/readOnly: true/);
+ const source=await readFile(join(root,"src/lib/vaos-knowledge-graph-export.ts"),"utf8");
+ assert.match(source,/currentRuntimeAuthorityVerified:false/);
+ assert.match(source,/actionAuthorized:false/);
+});
+
+test("existing Cloudflare branch previews explicitly omit production database bindings and credentials",async()=>{
+ const config=JSON.parse(await readFile(join(root,"wrangler.jsonc"),"utf8"));
+ // Previews require this block and do not inherit production vars or bindings.
+ assert.deepEqual(config.previews,{});
+ assert.ok(config.hyperdrive.some(binding=>binding.binding==='HYPERDRIVE'));
+});

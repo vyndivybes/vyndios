@@ -5,6 +5,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "main": "src/server.ts",
   "keep_vars": true,
+  "previews": {},
   "hyperdrive": [
     {
       "binding": "HYPERDRIVE",

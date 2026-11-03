@@ -104,7 +104,8 @@
     "test:simulation-highs": "node --experimental-strip-types --test scripts/four-order-highs.test.mjs",
     "test:production-prelaunch": "node --experimental-strip-types --test scripts/production-release-presentation.test.mjs",
     "test:lint-security": "node --test scripts/lint-security-compatibility.test.mjs",
-    "test:auth-1-7": "node --experimental-strip-types --test scripts/auth-1-7-compatibility.test.mjs"
+    "test:auth-1-7": "node --experimental-strip-types --test scripts/auth-1-7-compatibility.test.mjs",
+    "test:vaos:brain": "node --experimental-strip-types --test src/lib/vaos-knowledge-graph-export.test.ts scripts/vaos-read-bridge-contract.test.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
