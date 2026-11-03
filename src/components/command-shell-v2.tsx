@@ -122,6 +122,14 @@ function ClientLink({
   );
 }
 
+/** Search aliases point to existing owning routes; they do not create parallel ERP pages. */
+const ERP_PAGE_SEARCH_ALIASES: Readonly<Record<string, string>> = {
+  "/command/sales": "CRM customer relationship management customer contacts sales leads followups",
+  "/command/people-office": "HR HRMS human resources employees staff payroll attendance leave",
+  "/command/production": "MES manufacturing execution system job cards travellers work in progress WIP",
+  "/command/accounting-statements": "Tally TallyPrime CA reconciliation trial balance voucher audit",
+};
+
 function CommandSearch({ role }: { role: CommandRole | null }) {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
@@ -132,7 +140,7 @@ function CommandSearch({ role }: { role: CommandRole | null }) {
     const needle = trimmed.toLowerCase();
     if (!needle) return [];
     return SEARCH_ENTRIES.filter((entry) => isAccessible(role, entry.to))
-      .filter((entry) => `${entry.label} ${entry.workspaceLabel} ${entry.section} ${entry.to}`.toLowerCase().includes(needle))
+      .filter((entry) => `${entry.label} ${entry.workspaceLabel} ${entry.section} ${entry.to} ${ERP_PAGE_SEARCH_ALIASES[entry.to] ?? ""}`.toLowerCase().includes(needle))
       .slice(0, 8);
   }, [role, trimmed]);
 
