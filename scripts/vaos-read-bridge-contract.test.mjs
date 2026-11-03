@@ -72,3 +72,10 @@ test("new VEDM knowledge graph read action is signed, nonce protected and read-o
  assert.match(source,/currentRuntimeAuthorityVerified:false/);
  assert.match(source,/actionAuthorized:false/);
 });
+
+test("existing Cloudflare branch previews explicitly omit production database bindings and credentials",async()=>{
+ const config=JSON.parse(await readFile(join(root,"wrangler.jsonc"),"utf8"));
+ // Previews require this block and do not inherit production vars or bindings.
+ assert.deepEqual(config.previews,{});
+ assert.ok(config.hyperdrive.some(binding=>binding.binding==='HYPERDRIVE'));
+});
