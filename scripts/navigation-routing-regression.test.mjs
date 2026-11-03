@@ -344,7 +344,7 @@ test("G6D: integrated forecast chain uses approved authorities end-to-end", () =
 });
 
 test("G7: Command leads with today's operational control and demotes program governance", () => {
-  assert.match(commandCentre, /Command · today’s operating control/);
+  assert.match(commandCentre, /Your workspace · today/);
   assert.match(commandCentre, /Today’s control room/);
   assert.match(commandCentre, /Exceptions now/);
   assert.match(commandCentre, /Fulfillment workflow/);

@@ -50,7 +50,7 @@ function isUsableReadiness(value: unknown): value is IbpeReadiness {
 }
 
 function readinessStatus(readiness: IbpeReadiness) {
-  if (readiness.ready) return "Ready to create governed IBPE baseline";
+  if (readiness.ready) return "Ready to run IBPE with approved records";
   const labels = readiness.checks.filter((check) => !check.ready).map((check) => check.label);
   return `Setup required: ${labels.join(" · ")}`;
 }
@@ -60,12 +60,12 @@ export function IbpeWorkspaceProjection() {
   const current = workspace(pathname);
   const [run,setRun] = useState<IbpeRun|null>(null);
   const [readiness,setReadiness] = useState<IbpeReadiness|null>(null);
-  const [status,setStatus] = useState("IBPE status not loaded");
+  const [status,setStatus] = useState("Check readiness before running IBPE");
   const [busy,setBusy] = useState(false);
 
   async function loadStatus() {
     setBusy(true);
-    setStatus("Loading governed IBPE status…");
+    setStatus("Checking IBPE readiness…");
     try {
       const [value,nextReadiness] = await Promise.all([getLatestIbpeRun(),getIbpeReadiness()]);
       if (!isUsableReadiness(nextReadiness)) {
@@ -82,11 +82,11 @@ export function IbpeWorkspaceProjection() {
       }
       if (!isUsableRun(value)) {
         setRun(null);
-        setStatus("Stored IBPE run uses an older or incomplete schema; create a new governed run.");
+        setStatus("These saved results use an older format. Run IBPE again to update them.");
         return;
       }
       setRun(value);
-      setStatus("Persisted governed run loaded");
+      setStatus("Saved IBPE results loaded");
     } catch (error) {
       setRun(null);
       setReadiness(null);
@@ -129,15 +129,15 @@ export function IbpeWorkspaceProjection() {
         setStatus(readinessStatus(nextReadiness));
         return;
       }
-      setStatus("Building governed database snapshot…");
+      setStatus("Preparing the latest planning inputs…");
       await runGovernedIbpe();
       const latest=await getLatestIbpeRun();
       if (isUsableRun(latest)) {
         setRun(latest);
-        setStatus("Governed IBPE run persisted");
+        setStatus("IBPE results saved");
       } else {
         setRun(null);
-        setStatus("IBPE run completed but returned an incomplete decision packet.");
+        setStatus("IBPE finished, but its results are incomplete. Refresh the status before trying again.");
       }
     } catch(e) {
       setRun(null);
@@ -148,8 +148,8 @@ export function IbpeWorkspaceProjection() {
   }
 
   if(pathname==="/command/ibpe-operating-workspace/simulation")return <div className="border-b border-accent/50 bg-accent/10 px-4 py-3 text-xs">
-    <strong>SIMULATION ONLY · IBPE + HiGHS</strong> · Independent scenario readiness appears below. Real production approvals and saved governed packets do not authorize this scenario.
-    <Link to="/command/ibpe-operating-workspace/optimizer" className="ml-3 text-accent underline">View REAL optimizer gates</Link>
+    <strong>SIMULATION ONLY · IBPE + HiGHS</strong> · Try the four demo orders below. These results are for testing and planning only.
+    <Link to="/command/ibpe-operating-workspace/optimizer" className="ml-3 text-accent underline">Review production requirements</Link>
   </div>;
   return <div className="border-b border-border bg-surface/50 px-4 py-2 text-xs">
     <div className="mx-auto flex max-w-[1800px] flex-wrap items-center gap-x-3 gap-y-1">
@@ -159,7 +159,7 @@ export function IbpeWorkspaceProjection() {
         <span className="text-muted">Health {run.result.summary.businessHealthScore}/100</span>
         <span className="text-muted">{findings.length > 0 ? findings.map((f)=>f.title).filter(Boolean).join(" · ") : "No workspace findings"}</span>
       </> : <span className={readiness && !readiness.ready ? "text-warn" : "text-muted"}>{status}</span>}
-      {!run && blockerActions.map((check)=><Link key={check.actionTo} to={check.actionTo as never} className="font-semibold text-accent hover:underline">Fix {check.label} →</Link>)}
+      {!run && blockerActions.map((check)=><Link key={check.actionTo} to={check.actionTo as never} className="font-semibold text-accent hover:underline">Review {check.label} →</Link>)}
       <div className="ml-auto flex flex-wrap items-center gap-3">
         <Link to="/command/ibpe-operating-workspace/simulation" aria-label="Run four-order simulation IBPE" className="inline-flex min-h-11 items-center rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 font-semibold text-accent hover:bg-accent/20">Run simulation IBPE →</Link>
         <button type="button" disabled={busy} onClick={()=>void loadStatus()} className="font-semibold text-muted hover:text-accent disabled:opacity-50">{busy?"Loading…":"Load IBPE status"}</button>
