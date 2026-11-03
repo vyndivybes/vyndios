@@ -1,18 +1,45 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { Panel } from "@/components/kpi";
 import { getVibpeOptimizerReleaseClosure } from "@/lib/vibpe-optimizer-release-closure";
 
 export const Route = createFileRoute("/command/ibpe-operating-workspace_/release")({
-  loader: async () => getVibpeOptimizerReleaseClosure(),
   component: VibpeOptimizerReleasePage,
 });
 
+type Closure = Awaited<ReturnType<typeof getVibpeOptimizerReleaseClosure>>;
+
 function VibpeOptimizerReleasePage() {
-  const closure = Route.useLoaderData();
+  const [closure, setClosure] = useState<Closure | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    let active = true;
+    setClosure(null);
+    setFailed(false);
+    void getVibpeOptimizerReleaseClosure().then(
+      (result) => { if (active) setClosure(result); },
+      () => { if (active) setFailed(true); },
+    );
+    return () => { active = false; };
+  }, [attempt]);
+  if (failed) return (
+    <section data-ibpe-release-state="error" role="alert">
+      <h1>Governed Optimizer Release</h1>
+      <p>Governed evidence is unavailable. Release readiness is unverified.</p>
+      <button type="button" onClick={() => setAttempt((value) => value + 1)}>Retry report</button>
+    </section>
+  );
+  if (!closure) return (
+    <section data-ibpe-release-state="loading" aria-busy="true">
+      <h1>Governed Optimizer Release</h1>
+      <p role="status">Loading authenticated release evidence.</p>
+    </section>
+  );
   const green = closure.verdict === "GREEN";
 
   return (
-    <div className="space-y-6">
+    <div data-ibpe-release-state="ready" className="space-y-6">
       <header>
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">VYNDI VIBPE · production closure</p>
         <h1 className="mt-1 font-display text-4xl">Governed Optimizer Release</h1>
