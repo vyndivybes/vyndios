@@ -9,5 +9,8 @@ import { buildIbpeOperatingWorkspace, type IbpeErpReportPack } from "./ibpe-oper
 
 export const getIbpeOperatingWorkspaceReport = createServerFn({ method: "GET" }).handler(async () => {
   const report = await getAllErpSuiteReports();
-  return buildIbpeOperatingWorkspace(report as IbpeErpReportPack);
+  // Explicit JSON transport keeps unknown SQL field types out of the
+  // TanStack server-function type boundary. The client checks the envelope
+  // and treats invalid/missing evidence as an error, never a healthy report.
+  return JSON.stringify(buildIbpeOperatingWorkspace(report as IbpeErpReportPack));
 });
