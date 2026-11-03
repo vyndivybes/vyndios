@@ -258,6 +258,14 @@ try {
         "IBPE report unavailable: authenticated read-only ERP evidence must load",
       );
     }
+    if (route === "/command/ibpe-operating-workspace/release") {
+      const ready = page.locator('[data-ibpe-release-state="ready"], [data-ibpe-release-state="error"]');
+      await ready.first().waitFor({ state: "visible", timeout: 60_000 });
+      assert.equal(
+        await page.locator("[data-ibpe-release-state]").getAttribute("data-ibpe-release-state"),
+        "ready",
+      );
+    }
     await page.locator("body").waitFor({ state: "visible", timeout: 30_000 });
     await page.waitForFunction(() => (document.body?.innerText || "").trim().length > 40, undefined, {
       timeout: 30_000,
