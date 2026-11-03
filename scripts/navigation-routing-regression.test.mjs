@@ -18,6 +18,7 @@ const decisionInbox = read("src/routes/command/decision-inbox.tsx");
 const controlTower = read("src/routes/command/control-tower.tsx");
 const managementIntelligence = read("src/routes/command/management-intelligence.tsx");
 const ibpeWorkspaceRoute = read("src/routes/command/ibpe-operating-workspace.tsx");
+const ibpeWorkspaceReport = read("src/lib/ibpe-operating-workspace-report.ts");
 const ibpeOperatingWorkspace = read("src/lib/ibpe-operating-workspace.ts");
 const ibpeProjection = read("src/components/ibpe-workspace-projection.tsx");
 
@@ -92,8 +93,10 @@ test("management intelligence remains a compatibility redirect", () => {
 
 test("IBPE Phase 1 workspace stays advisory and read-only", () => {
   assert.match(ibpeWorkspaceRoute, /createFileRoute\("\/command\/ibpe-operating-workspace"\)/);
-  assert.match(ibpeWorkspaceRoute, /getAllErpSuiteReports/);
-  assert.match(ibpeWorkspaceRoute, /buildIbpeOperatingWorkspace/);
+  assert.match(ibpeWorkspaceRoute, /getIbpeOperatingWorkspaceReport/);
+  assert.match(ibpeWorkspaceReport, /getAllErpSuiteReports/);
+  assert.match(ibpeWorkspaceReport, /buildIbpeOperatingWorkspace/);
+  assert.match(ibpeWorkspaceReport, /createServerFn/);
   assert.match(ibpeOperatingWorkspace, /mode: "read-only" as const/);
   assert.match(ibpeOperatingWorkspace, /canonicalWriteEnabled: false/);
   assert.match(ibpeOperatingWorkspace, /autonomousLearningEnabled: false/);

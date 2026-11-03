@@ -247,6 +247,17 @@ try {
       // SSR placeholders are never accepted as real departmental audit proof.
       await page.locator('[data-route-readiness="ready"]').waitFor({ state: "attached", timeout: 30_000 });
     }
+    if (route === "/command/ibpe-operating-workspace") {
+      // Route SSR must be responsive and its separate authenticated ERP read
+      // must actually succeed. Loading or error screens do not pass acceptance.
+      const settled = page.locator('[data-ibpe-readiness="ready"], [data-ibpe-readiness="error"]');
+      await settled.first().waitFor({ state: "visible", timeout: 60_000 });
+      assert.equal(
+        await page.locator("[data-ibpe-readiness]").getAttribute("data-ibpe-readiness"),
+        "ready",
+        "IBPE report unavailable: authenticated read-only ERP evidence must load",
+      );
+    }
     await page.locator("body").waitFor({ state: "visible", timeout: 30_000 });
     await page.waitForFunction(() => (document.body?.innerText || "").trim().length > 40, undefined, {
       timeout: 30_000,

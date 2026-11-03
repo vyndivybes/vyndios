@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Kpi, Panel } from "@/components/kpi";
-import { getAllErpSuiteReports } from "@/lib/erp-suite-reports";
-import { buildIbpeOperatingWorkspace, type IbpeErpReportPack } from "@/lib/ibpe-operating-workspace";
+import { getIbpeOperatingWorkspaceReport } from "@/lib/ibpe-operating-workspace-report";
+import type { buildIbpeOperatingWorkspace } from "@/lib/ibpe-operating-workspace";
 import {
   applyConfirmedIbpeBusinessUpdate,
   confirmIbpeBusinessUpdate,
@@ -11,10 +11,6 @@ import {
 } from "@/lib/ibpe-operating-governance";
 
 export const Route = createFileRoute("/command/ibpe-operating-workspace")({
-  loader: async () => {
-    const reports = await getAllErpSuiteReports();
-    return buildIbpeOperatingWorkspace(reports as IbpeErpReportPack);
-  },
   component: IbpeOperatingWorkspace,
 });
 
@@ -28,8 +24,69 @@ function number(value: unknown) {
   return Number(value ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
 }
 
+type IbpeWorkspaceData = ReturnType<typeof buildIbpeOperatingWorkspace>;
+
+/** The authenticated report can be slow or fail without blocking the page shell. */
 function IbpeOperatingWorkspace() {
-  const data = Route.useLoaderData();
+  const [report, setReport] = useState<IbpeWorkspaceData | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    setReport(null);
+    setFailed(false);
+    void getIbpeOperatingWorkspaceReport().then(
+      (payload) => {
+        if (!active) return;
+        try {
+          const result = JSON.parse(payload) as IbpeWorkspaceData;
+          if (
+            result?.schemaVersion !== "VYNDI-IBPE-OPERATING-WORKSPACE-1.0" ||
+            result?.source !== "canonical-erp-report-pack" ||
+            !Array.isArray(result.sections) ||
+            !result.sopSnapshot ||
+            typeof result.generatedAt !== "string"
+          ) throw new Error("Unqualified IBPE evidence envelope");
+          setReport(result);
+        } catch {
+          setFailed(true);
+        }
+      },
+      () => { if (active) setFailed(true); },
+    );
+    return () => { active = false; };
+  }, [attempt]);
+
+  if (failed) {
+    return (
+      <section data-ibpe-readiness="error" className="space-y-3" role="alert">
+        <h1 className="font-display text-3xl">IBPE Operating Workspace</h1>
+        <p>Governed ERP report unavailable. No data has been approved or changed. This workspace remains unverified until the report reloads.</p>
+        <button type="button" className="rounded-md border border-border px-3 py-2" onClick={() => setAttempt((value) => value + 1)}>
+          Retry protected report
+        </button>
+      </section>
+    );
+  }
+
+  if (!report) {
+    return (
+      <section data-ibpe-readiness="loading" aria-busy="true" className="space-y-3">
+        <h1 className="font-display text-3xl">IBPE Operating Workspace</h1>
+        <p role="status">Loading authenticated ERP evidence. No business records are being changed.</p>
+      </section>
+    );
+  }
+
+  return (
+    <div data-ibpe-readiness="ready">
+      <IbpeOperatingWorkspaceContent data={report} />
+    </div>
+  );
+}
+
+function IbpeOperatingWorkspaceContent({ data }: { data: IbpeWorkspaceData }) {
   const sop = data.sopSnapshot;
   const [updateInput, setUpdateInput] = useState("");
   const [proposalId, setProposalId] = useState("");
