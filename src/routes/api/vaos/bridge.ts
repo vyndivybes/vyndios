@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getSql } from "@/lib/db";
 import {readEnterpriseBi} from "@/lib/vaos-enterprise-bi-read";
+import {projectVedmAuthorityGraphForVaos} from "@/lib/vaos-knowledge-graph-export";
 import { readVaosFinancialStatements } from "@/lib/finance/vaos-financial-statements-export";
 import {classifyEngineeringBaselines, type BaselineSourceRow} from "@/lib/engineering-baseline-reconciliation";
 import {normalizeVaosScheduleExport,validateScheduleProjectInput} from "@/lib/vaos-schedule-export";
@@ -15,6 +16,7 @@ const WRITE_QUALIFICATION_PROFILE = "COMMERCIAL_WRITE_CANARY_V1";
 
 const READ_ACTIONS = new Set([
   "ORCHESTRATOR.OBSERVE_ENTERPRISE_BI",
+  "KNOWLEDGE.OBSERVE_VEDM_GRAPH",
   "COMMERCIAL.OBSERVE_PIPELINE",
   "PROCUREMENT.OBSERVE_SHORTAGE",
   "INVENTORY.OBSERVE_STOCK",
@@ -29,6 +31,7 @@ const READ_ACTIONS = new Set([
 
 const EXPECTED_EMPLOYEE: Record<string, string> = {
   "ORCHESTRATOR.OBSERVE_ENTERPRISE_BI": "orchestrator",
+  "KNOWLEDGE.OBSERVE_VEDM_GRAPH": "engineering-configuration",
   "COMMERCIAL.OBSERVE_PIPELINE": "commercial",
   "PROCUREMENT.OBSERVE_SHORTAGE": "procurement",
   "INVENTORY.OBSERVE_STOCK": "inventory",
@@ -43,6 +46,7 @@ const EXPECTED_EMPLOYEE: Record<string, string> = {
 
 const SOURCE_AUTHORITY: Record<string, string> = {
   "ORCHESTRATOR.OBSERVE_ENTERPRISE_BI": "getEnterpriseBusinessIntelligence",
+  "KNOWLEDGE.OBSERVE_VEDM_GRAPH": "compileVedmAuthorityGraph",
   "COMMERCIAL.OBSERVE_PIPELINE": "listSalesOrders",
   "PROCUREMENT.OBSERVE_SHORTAGE": "getConfiguredDemandShortages",
   "INVENTORY.OBSERVE_STOCK": "getAuthoritativeInventory",
@@ -78,6 +82,10 @@ async function executeRead(
   limit: number,
   input: Record<string, unknown> = {},
 ) {
+  if (actionType === "KNOWLEDGE.OBSERVE_VEDM_GRAPH") {
+    // Repository-pinned engineering authority graph; never current ERP release authority.
+    return projectVedmAuthorityGraphForVaos(new Date().toISOString().slice(0,10));
+  }
   if (actionType === "ORCHESTRATOR.OBSERVE_ENTERPRISE_BI") return readEnterpriseBi(sql,input);
 
   if (actionType === "PROJECT.OBSERVE_SCHEDULE") {
