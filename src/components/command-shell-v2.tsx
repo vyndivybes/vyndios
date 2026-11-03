@@ -196,7 +196,7 @@ function CommandSearch({ role }: { role: CommandRole | null }) {
       </form>
 
       <p className="mt-2 text-[10px] text-subtle">
-        Enter searches RBAC-filtered governed records and traceability. Matching pages remain quick navigation shortcuts.
+        Press Enter to search records you can access. Choose a matching page to open it directly.
       </p>
 
       {open && trimmed ? (
@@ -237,9 +237,9 @@ function CommandSearch({ role }: { role: CommandRole | null }) {
               ))}
             </div>
           ) : trimmed.length >= 2 ? (
-            <p className="px-3 py-2 text-xs text-muted" role="status">No page shortcut matched. Press Enter to search governed business records.</p>
+            <p className="px-3 py-2 text-xs text-muted" role="status">No matching page. Press Enter to search your records.</p>
           ) : (
-            <p className="px-3 py-2 text-xs text-muted" role="status">Type at least two characters to search governed records.</p>
+            <p className="px-3 py-2 text-xs text-muted" role="status">Type at least two characters to search records.</p>
           )}
         </div>
       ) : null}

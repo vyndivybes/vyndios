@@ -57,7 +57,7 @@ function VibpeAssurancePage() {
   if (state.status === "loading") return (
     <section data-route-readiness="loading" className="space-y-3">
       <h1 className="font-display text-4xl">VIBPE Assurance</h1>
-      <p className="text-sm text-muted">Loading governed assurance evidence…</p>
+      <p className="text-sm text-muted">Loading assurance results…</p>
     </section>
   );
   if (state.status === "error") return (
@@ -70,7 +70,7 @@ function VibpeAssurancePage() {
 }
 
 function VibpeAssuranceReady({ data }: { data: AssuranceData }) {
-  const [snapshotState, setSnapshotState] = useState("No assurance snapshot captured in this session.");
+  const [snapshotState, setSnapshotState] = useState("You haven't saved an assurance snapshot in this session.");
   const [fullExceptions, setFullExceptions] = useState<VibpeAssuranceException[] | null>(null);
   const [exceptionLoadState, setExceptionLoadState] = useState("");
   const [uiCapabilities, setUiCapabilities] = useState<Row[] | null>(null);
@@ -100,7 +100,7 @@ function VibpeAssuranceReady({ data }: { data: AssuranceData }) {
   }, [data.exceptionSummary.critical, data.exceptionSummary.warnings, surfaces, uiCoverage]);
 
   async function captureSnapshot() {
-    setSnapshotState("Capturing immutable assurance evidence…");
+    setSnapshotState("Saving a dated record of the current assurance results…");
     try {
       const result = await captureVibpeAssuranceSnapshot();
       setSnapshotState(
@@ -143,8 +143,8 @@ function VibpeAssuranceReady({ data }: { data: AssuranceData }) {
         </p>
         <h1 className="mt-1 font-display text-4xl">VIBPE Assurance</h1>
         <p className="mt-2 max-w-5xl text-sm leading-6 text-muted">
-          Evidence-first assurance across canonical business authority, governed workflows, gates, exception detection and runtime UI proof.
-          Backend authority and UI binding are deliberately assessed separately: an unproved route remains a gap and is never promoted to a false pass.
+          Review open issues, approval checks and evidence from the app's workflows.
+          Business-rule checks and browser checks are reported separately. A page without recorded test evidence stays unverified.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <button
@@ -287,7 +287,7 @@ function VibpeAssuranceReady({ data }: { data: AssuranceData }) {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm font-medium text-fg">Registered UI capabilities ({data.uiCapabilityCount.toLocaleString("en-IN")})</p>
-              <p className="mt-1 text-xs text-subtle">Detailed capability rows are excluded from the critical first-render payload.</p>
+              <p className="mt-1 text-xs text-subtle">Open the register to see the individual checks.</p>
             </div>
             {uiCapabilities === null ? (
               <button
