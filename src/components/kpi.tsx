@@ -15,7 +15,7 @@ export function Kpi({
 }) {
   return (
     <div className="vyndi-tansam-kpi relative min-h-[112px] rounded-xl border border-border bg-surface/45 p-4 transition-colors duration-200 hover:border-accent/35 sm:p-5">
-      <p className="vyndi-tansam-kicker text-[10px] font-medium text-muted sm:text-[11px]">{label}</p>
+      <p className="vyndi-tansam-kicker vyndi-ui-caption text-[10px] font-medium text-muted sm:text-[11px]">{label}</p>
       <p
         className={cn(
           "mt-3 break-words font-display text-2xl font-semibold tabular-nums tracking-tight text-fg sm:text-3xl",
@@ -68,7 +68,7 @@ export function Panel({
     <section ref={sectionRef} className={cn("vyndi-tansam-panel min-w-0 rounded-xl border border-border bg-surface/35 p-5 sm:p-6", className)}>
       <div className="flex min-w-0 items-start justify-between gap-4">
         <div className="min-w-0">
-          {kicker ? <p className="vyndi-tansam-kicker text-[11px] font-medium text-muted">{kicker}</p> : null}
+          {kicker ? <p className="vyndi-tansam-kicker vyndi-ui-caption text-[11px] font-medium text-muted">{kicker}</p> : null}
           <h2 className={cn("font-display text-xl font-semibold text-accent", kicker && "mt-1")}>{title}</h2>
         </div>
         {shouldPrint ? (
