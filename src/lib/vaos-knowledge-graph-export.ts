@@ -3,7 +3,7 @@
  * The canonical VEDM seed remains in vedm-authority-graph.ts. This is a
  * repository-reviewed engineering reference, NOT live ERP/PLM release state.
  */
-import {compileVedmAuthorityGraph,createVedmR3aSeed} from "./vedm-authority-graph";
+import {compileVedmAuthorityGraph,createVedmR3aSeed} from "./vedm-authority-graph.ts";
 
 function safeAsOf(value: string): string {
  if(!/^\d{4}-\d{2}-\d{2}$/.test(value)||Number.isNaN(Date.parse(value+"T00:00:00Z"))
