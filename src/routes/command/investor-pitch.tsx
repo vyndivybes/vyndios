@@ -37,7 +37,7 @@ function InvestorPitch() {
       <header className="border-b border-border pb-6">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">VYNDI · Investor showcase</p>
         <h1 className="mt-1 font-display text-4xl text-accent">Investment Case</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">A concise, evidence-led presentation of VYNDI for investors, board members and partners. Operational controls remain role-restricted; every link on this page opens a presentation-safe evidence surface.</p>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">Share product and business information with investors, board members and partners. Links on this page open read-only presentation views; operating controls remain restricted by role.</p>
         <div className="mt-4 flex flex-wrap gap-2"><span className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-muted">Showcase</span><span className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-muted">Evidence-led</span><span className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-muted">36-month horizon</span></div>
       </header>
 

@@ -103,7 +103,7 @@ export function CrmWorkspace({ orders, canWrite }: Props) {
         <span className="ml-2 text-xs font-normal text-muted">Customers, opportunities from the order ledger, follow-ups and history</span>
       </summary>
       <div className="mt-4 space-y-4">
-        {loading ? <p className="text-xs text-muted">Loading governed CRM register...</p> : null}
+        {loading ? <p className="text-xs text-muted">Loading customer records…</p> : null}
         {error ? <p role="alert" className="rounded-md border border-warn p-3 text-xs text-warn">{error}</p> : null}
         {message ? <p role="status" className="rounded-md border border-border p-3 text-xs text-muted">{message}</p> : null}
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">

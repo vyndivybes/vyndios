@@ -379,7 +379,7 @@ function PeopleOfficeActualSpend() {
     <header className="border-b border-border pb-6">
       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">Finance · transaction-driven expenditure</p>
       <h1 className="mt-1 font-display text-4xl text-accent">Expense & Reimbursement Register</h1>
-      <p className="mt-2 max-w-5xl text-sm leading-6 text-muted">Planning approval authorises a budget record; it does not spend cash. This register records company-funded, Founder / Director-paid and third-party-paid expenditure, plus external support received. Company-bank cash moves only on evidenced payment, reimbursement or bank receipt. Uncertain third-party help is held in External Support Clearing 2460 rather than being invented as income. Accrual month and cash month remain controlled separately.</p>
+      <p className="mt-2 max-w-5xl text-sm leading-6 text-muted">Record company expenses, costs paid by the founder or a third party, and external support received. Budget approval does not spend cash. Company cash changes only when a supported payment, reimbursement or bank receipt is posted. Unclassified third-party support stays in External Support Clearing 2460. The expense month and payment month are recorded separately.</p>
       <div className="mt-3 flex flex-wrap gap-4 text-sm font-semibold"><Link to="/command/people-office" className="text-accent">People & Office plans →</Link><Link to="/command/accounting" className="text-accent">Accounting →</Link><Link to="/command/cash" className="text-accent">Cash authority →</Link></div>
     </header>
 

@@ -30,7 +30,7 @@ function Intelligence() {
       <div>
         <p className="text-[11px] uppercase tracking-[0.2em] text-green">VYNDI intelligence · governed IBPE evidence</p>
         <h1 className="mt-1 font-display text-4xl text-accent">Product Intelligence</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">Planning, demand, funding and risk signals from the latest persisted IBPE run. This read-only view never approves or posts a business action.</p>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">Review planning, demand, funding and risk signals from the latest saved IBPE run. This view is read-only; approvals and postings happen in their operating workspaces.</p>
       </div>
       <Link to="/command/ibpe-operating-workspace" className="text-sm font-semibold text-accent hover:text-fg">IBPE Workspace <ArrowRight className="ml-1 inline size-4" /></Link>
     </header>

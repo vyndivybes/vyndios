@@ -19,8 +19,8 @@ test("global Command search is a governed universal entry point without runtime 
   assert.match(shell, /vyndi:traceability-search/);
   assert.match(shell, /new CustomEvent/);
   assert.match(shell, /detail: \{ query: trimmed \}/);
-  assert.match(shell, /RBAC-filtered governed records and traceability/);
-  assert.match(shell, /Matching pages remain quick navigation shortcuts/);
+  assert.match(shell, /Press Enter to search records you can access/);
+  assert.match(shell, /Choose a matching page to open it directly/);
   assert.match(shell, /<CommandSearch role=\{role\} \/>/);
   assert.doesNotMatch(shell, /Filter search by workspace/);
   assert.doesNotMatch(shell, /Filter search by type/);

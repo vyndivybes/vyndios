@@ -204,10 +204,7 @@ function Engineering() {
           Engineering · canonical baseline & ECR authority
         </p>
         <h1 className="mt-1 font-display text-4xl text-accent">Engineering</h1>
-        <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">
-          Engineering baselines and changes are loaded from the governed records.
-          The legacy system-migration release labels do not constitute approved production configurations.
-        </p>
+        <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">Review engineering baselines and change requests from the recorded engineering data. Historical release labels added during migration do not authorize physical production.</p>
         <div className="mt-3 flex flex-wrap gap-3 text-sm font-semibold">
           <Link to="/command/product" className="text-accent">Product register →</Link>
           <Link to="/command/bom-control" className="text-accent">BOM control →</Link>

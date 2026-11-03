@@ -44,7 +44,7 @@ function QAVerificationPage() {
       <header className="space-y-2">
         <p className="text-xs font-medium uppercase tracking-[0.2em] text-subtle">Stage 11 · QA / Verification</p>
         <h1 className="text-3xl font-semibold tracking-tight">Editable verification gates.</h1>
-        <p className="max-w-3xl text-sm leading-6 text-muted">Evidence status and gate enforcement are separate. All gates default OPEN for workflow testing; authorised users can close or reopen each gate without falsifying the underlying evidence record.</p>
+        <p className="max-w-3xl text-sm leading-6 text-muted">Review evidence separately from gate settings. Gates default OPEN for workflow testing. Authorized users can close or reopen them without changing the supporting evidence.</p>
       </header>
 
       {message ? <div className="rounded-lg border border-border bg-surface px-4 py-3 text-sm text-muted">{message}</div> : null}

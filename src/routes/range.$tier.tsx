@@ -174,11 +174,7 @@ function TierPage() {
                 Build configurator
               </p>
               <h2 className="mt-1 text-3xl font-bold text-accent">Configure an eligible build</h2>
-              <p className="mt-2 max-w-2xl text-sm text-muted">
-                Every range-approved option remains selectable from the public catalogue.
-                Live physical stock and valuation stay protected inside VYNDI OS; availability is
-                confirmed only after demand is captured.
-              </p>
+              <p className="mt-2 max-w-2xl text-sm text-muted">Choose from the options approved for this range. Physical stock and valuation stay inside VYNDI OS. Availability is confirmed after demand is recorded.</p>
             </div>
             <div className="rounded-xl border border-accent/40 bg-bg/90 px-5 py-3 text-right">
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-green">

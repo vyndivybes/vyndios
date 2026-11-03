@@ -116,11 +116,7 @@ function IbpeOperatingWorkspace() {
           VYNDI IBPE · Phase 1 · governed operating workspace
         </p>
         <h1 className="mt-1 font-display text-4xl">IBPE Operating Workspace</h1>
-        <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">
-          Management intelligence derived only from canonical ERP report views. IBPE may calculate, warn,
-          recommend, preview and route authorised changes, but it cannot bypass the canonical transaction
-          authority for demand, BOM, inventory, procurement, production or finance.
-        </p>
+        <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">Review business reports and planning advice from the ERP records. IBPE can calculate, flag issues, recommend actions and prepare changes for review. Demand, BOM, inventory, purchasing, production and finance transactions still use their own approval processes.</p>
         <p className="mt-2 text-xs text-subtle">
           Evidence cut-off {new Date(data.generatedAt).toLocaleString("en-IN")} · schema {data.schemaVersion} · source {data.source}
         </p>

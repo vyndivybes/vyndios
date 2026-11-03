@@ -61,7 +61,7 @@ export function SupplierPerformancePanel({state}:{state:SupplierPerformanceState
           "Supplier performance snapshot captured."
         )} className="rounded border border-accent px-4 py-2 text-xs font-semibold text-accent disabled:opacity-40">Capture scorecard snapshot</button>
       </div>
-      <p className="mt-3 text-[10px] leading-4 text-subtle">No composite weighted supplier score is created. Each dimension keeps its own denominator and evidence boundary. Supplier Risk Intelligence remains the probabilistic/lane-risk layer.</p>
+      <p className="mt-3 text-[10px] leading-4 text-subtle">Review each supplier measure separately, with its own sample size and supporting records. Supplier Risk Intelligence reports lane risk and probability separately.</p>
       {state.latest?<p className="mt-2 text-[10px] text-subtle">Latest immutable snapshot: {state.latest.id} · {state.latest.sourceReference} · {state.latest.createdAt}</p>:null}
       {message?<div role="status" className="mt-3 rounded border border-border bg-surface px-3 py-2 text-xs text-muted">{message}</div>:null}
     </Panel>

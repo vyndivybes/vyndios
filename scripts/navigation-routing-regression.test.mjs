@@ -208,7 +208,7 @@ test("G4: lineage joins persisted order, production, procurement, receiving, gen
 
 test("G5: People & Office is first-class, compact and Finance is downstream", () => {
   assert.match(peopleOffice, /People & Office · operating administration/);
-  assert.match(peopleOffice, /Finance\s+consumes approved records only/);
+  assert.match(peopleOffice, /Finance uses approved records only/);
   assert.match(peopleOffice, /Downstream Finance/);
   assert.doesNotMatch(peopleOffice, /Finance · operating ledgers/);
   assert.match(peopleOffice, /Draft → submit → approve → supersede · expand only the register you need/);

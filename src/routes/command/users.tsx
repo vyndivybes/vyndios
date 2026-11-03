@@ -176,7 +176,7 @@ function UsersPage() {
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-green">Admin · access & security · H4 IAM / SoD</p>
           <h1 className="mt-2 font-display text-4xl text-accent">User Access Control</h1>
-          <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">Single-role least privilege · different-admin maker/checker for routine role changes · immutable privileged-access history · periodic certification.</p>
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">Each account has one role. Routine role changes need a different administrator's approval. Privileged changes stay in the audit history for periodic review.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={()=>void refresh()} className="rounded-lg border border-border px-4 py-2.5 text-sm font-semibold text-muted hover:border-accent hover:text-accent">Refresh</button>

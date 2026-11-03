@@ -39,7 +39,7 @@ function Actuals() {
   if (!hydrated) return (
     <section data-route-readiness="loading" className="space-y-3">
       <h1 className="font-display text-4xl">Actuals &amp; rolling forecast</h1>
-      <p className="text-sm text-muted">Loading canonical monthly actuals…</p>
+      <p className="text-sm text-muted">Loading monthly actuals…</p>
     </section>
   );
   return <ActualsClient />;
@@ -175,11 +175,7 @@ function ActualsClient() {
       <header>
         <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Finance · central actual books</p>
         <h1 className="font-display text-4xl">Actuals & rolling forecast</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
-          Revenue, units sold and receivables are transaction-controlled from issued shipment invoices and collections.
-          COGS, Opex, cash, inventory and payables remain evidence-referenced management actuals pending their own ledger
-          authorities.
-        </p>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">Revenue, units sold and receivables come from issued shipment invoices and collections. COGS, operating expenses, cash, inventory and payables use management actuals with source references until their own ledgers provide those values.</p>
         <p className="mt-2 text-xs text-subtle">{status}</p>
       </header>
 

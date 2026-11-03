@@ -135,7 +135,7 @@ function FounderCommand() {
         <div>
           <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Phase I · Live operating system</p>
           <h1 className="font-display text-4xl">Founder Command Centre</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">One operating view for the founder: live financial health, execution blockers, accountable actions, decision gates and the next intervention.</p>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">Review financial health, blocked work, assigned actions and decisions that need your attention.</p>
         </div>
         <div className="flex gap-3 text-sm">
           <Link to="/command/financial-cockpit" className="text-accent hover:text-fg">

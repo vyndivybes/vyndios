@@ -548,7 +548,7 @@ function LoginPage() {
         <div className="vy-login__intro-brand">VIBPE Co-Pilot 2.0</div>
         <div className="vy-login__intro-product">VYNDI</div>
         <div className="vy-login__intro-tag">Wind — Rendered in Carbon</div>
-        <button type="button" className="vy-login__skip" onClick={beginCinematic}>Skip Intro</button>
+        <button type="button" className="vy-login__skip" onClick={beginCinematic}>Skip intro</button>
       </section>
 
       <div className="vy-login__corner vy-login__corner--tl" aria-hidden="true" />
@@ -564,7 +564,7 @@ function LoginPage() {
             <small>VYNDI OS → VIBPE Co-Pilot 2.0 → VYNDI</small>
           </div>
         </div>
-        <div className="vy-login__status"><span className="vy-login__status-dot" />Governed System · Online</div>
+        <div className="vy-login__status"><span className="vy-login__status-dot" />VYNDI OS sign-in</div>
       </header>
 
       <div className="vy-login__main">
@@ -572,7 +572,7 @@ function LoginPage() {
           <div className="vy-login__eyebrow">Secure Access · VYNDI OS</div>
           <h1>WIND<span className="vy-login__tagline">— RENDERED IN CARBON —</span></h1>
           <p className="vy-login__desc">
-            Enter the governed VYNDI business operating system for engineering, planning, supply and production, commercial, finance, and governance.
+            Sign in to plan work, manage orders, follow builds and review your team's records.
           </p>
           <div className="vy-login__metrics" aria-label="System scope">
             <div className="vy-login__metric"><strong>36</strong><span>Month Master Plan</span></div>
@@ -590,9 +590,9 @@ function LoginPage() {
             className="vy-login__card"
             aria-label="VYNDI Command Centre sign in"
           >
-            <div className="vy-login__card-tag">Controlled Access</div>
+            <div className="vy-login__card-tag">Sign in</div>
             <h2>AUTHENTICATE</h2>
-            <p className="vy-login__card-sub">VYNDI Program Access</p>
+            <p className="vy-login__card-sub">Your VYNDI OS account</p>
 
             {search.created ? <p className="vy-login__success">Account created successfully. Sign in with the new credentials.</p> : null}
             {error ? <p role="alert" className="vy-login__error">{error}</p> : null}
@@ -608,7 +608,7 @@ function LoginPage() {
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
               />
-              <label htmlFor="vyndi-email">Authorised Email</label>
+              <label htmlFor="vyndi-email">Email address</label>
             </div>
 
             <div className="vy-login__field">
@@ -625,13 +625,13 @@ function LoginPage() {
               <label htmlFor="vyndi-password">Password</label>
             </div>
 
-            <div className="vy-login__access-note"><span>Individual authority</span><span>RBAC enforced</span></div>
+            <div className="vy-login__access-note"><span>Your individual account</span><span>Access follows your role</span></div>
 
             <button className="vy-login__launch" disabled={busy || warping} aria-busy={busy || warping}>
-              {granted ? "Clearance Granted" : busy ? "Authorizing" : "Authorize · Enter Command"}
+              {granted ? "Signed in" : busy ? "Signing in…" : "Sign in to VYNDI OS"}
             </button>
 
-            <div className="vy-login__secure"><ShieldCheck aria-hidden="true" />Session protected · governed access</div>
+            <div className="vy-login__secure"><ShieldCheck aria-hidden="true" />Secure sign-in</div>
             <Link to="/" className="vy-login__back">Return to VYNDI</Link>
           </form>
         </div>

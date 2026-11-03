@@ -44,7 +44,7 @@ function DeploymentReadinessPage() {
       <header className="space-y-2">
         <p className="text-xs font-medium uppercase tracking-[0.2em] text-subtle">Stage 12 · Final Deployment Readiness</p>
         <h1 className="text-3xl font-semibold tracking-tight">Editable deployment control.</h1>
-        <p className="max-w-3xl text-sm leading-6 text-muted">Deployment enforcement is now operator-controlled and separate from evidence maturity. All gates default OPEN for workflow testing and can later be closed individually with an audited toggle.</p>
+        <p className="max-w-3xl text-sm leading-6 text-muted">Review deployment controls separately from their supporting evidence. Gates default OPEN for workflow testing. Authorized users can close or reopen each gate, and every change is recorded in the audit trail.</p>
       </header>
 
       {message ? <div className="rounded-lg border border-border bg-surface px-4 py-3 text-sm text-muted">{message}</div> : null}

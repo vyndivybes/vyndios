@@ -327,11 +327,7 @@ function PeopleOffice() {
           People & Office · operating administration · canonical authority
         </p>
         <h1 className="mt-1 font-display text-4xl text-accent">People & Office</h1>
-        <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">
-          Edit draft source records here, submit them for approval, and approve only after evidence
-          review. Every save and lifecycle transition is appended to the shared audit trail. Finance
-          consumes approved records only.
-        </p>
+        <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">Edit draft records, submit them for approval and review the evidence before approving. Saves and status changes are recorded in the shared audit trail. Finance uses approved records only.</p>
         <div className="mt-3 flex gap-3 text-sm font-semibold">
           <Link to="/command/financial-cockpit" className="text-accent">Downstream Finance →</Link>
           <Link to="/command/governance" className="text-accent">Governance →</Link>

@@ -167,7 +167,7 @@ function AnalyticsStudio(){
      <div className="relative flex flex-wrap items-start justify-between gap-4">
        <div className="max-w-3xl"><div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.18em] text-green"><Activity size={16}/> Vāyū Shastr · Intelligence and analytics</div>
          <h1 className="mt-2 font-display text-3xl font-semibold text-accent sm:text-4xl">Enterprise Analytics Studio</h1>
-         <p className="mt-2 text-sm leading-6 text-muted">Live read-only source reports · selectable metrics · Kanban · Pareto · scenarios · interactive charts · audit-aware planning.</p>
+         <p className="mt-2 text-sm leading-6 text-muted">Explore read-only reports with charts, selected metrics, Kanban views, Pareto analysis and planning scenarios.</p>
        </div>
        <div className="flex flex-wrap gap-2">
          <button type="button" onClick={()=>{void router.invalidate()}} className="inline-flex items-center gap-2 rounded-xl border border-border bg-bg px-3 py-2 text-xs text-fg"><RefreshCw size={15}/> Refresh</button>

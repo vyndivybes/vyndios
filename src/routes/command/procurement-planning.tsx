@@ -60,7 +60,7 @@ function ProcurementPlanning(){
       <Panel title="Planning blocked" kicker="Governance prerequisite">
         <div className="space-y-3 text-sm leading-6 text-muted">
           <p>{data.blockedMessage}</p>
-          <p>This is a controlled readiness state, not a server failure. Approve an Integrated Operating Plan before procurement demand, valuation, RFQ or PO actions are enabled.</p>
+          <p>An approved Integrated Operating Plan is needed before you can use procurement demand, valuation, quotation requests or purchase-order actions.</p>
           <Link to="/command/planning" className="inline-flex rounded-lg bg-accent px-4 py-2.5 font-semibold text-bg">Open Integrated Planning</Link>
         </div>
       </Panel>

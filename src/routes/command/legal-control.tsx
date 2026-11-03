@@ -14,9 +14,7 @@ function LegalControl() {
       <div>
         <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Stage 6</p>
         <h1 className="font-display text-4xl">Legal / IP Control Reference</h1>
-        <p className="mt-2 max-w-3xl text-sm text-muted">
-          Evidence-controlled legal, intellectual-property, corporate, tax and commercial gates. Planning items are not legal conclusions and must be confirmed by the appropriate CA, CS or counsel before execution.
-        </p>
+        <p className="mt-2 max-w-3xl text-sm text-muted">Review legal, intellectual-property, corporate, tax and commercial requirements with their supporting evidence. Planning entries are not legal conclusions. Obtain the relevant CA, CS or legal review before acting.</p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">

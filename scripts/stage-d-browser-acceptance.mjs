@@ -213,9 +213,9 @@ try {
     observePage(page);
 
     await page.goto(`${baseURL}/login?returnTo=%2Fcommand`, { waitUntil: "networkidle" });
-    await page.getByLabel(/Authorised Email/i).fill(email);
+    await page.getByLabel(/Email address/i).fill(email);
     await page.getByLabel(/^Password$/i).fill(password);
-    const submit = page.getByRole("button", { name: /Authorize · Enter Command/i });
+    const submit = page.getByRole("button", { name: /Sign in to VYNDI OS/i });
     await submit.click();
 
     try {

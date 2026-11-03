@@ -43,7 +43,7 @@ export function ScheduleRevisionEditor({role}:{role:CommandRole|null}) {
   }
   return <section className="rounded-xl border border-border p-4 space-y-3">
     <div><h3 className="font-semibold">Controlled schedule changes</h3>
-      <p className="text-xs text-muted">Propose and review changes without overwriting approved Rev 9 or publishing to VAOS. Approval and baseline publication remain unavailable pending qualification.</p></div>
+      <p className="text-xs text-muted">Propose and review schedule changes here. Approved Rev 9 stays unchanged, and nothing is published to VAOS. Approval and baseline publication remain unavailable until qualification is complete.</p></div>
     {message?<p role="status" className="text-xs">{message}</p>:null}
     {editable?<div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
       {(["id","baseRevision","scenario","reason","sourceReference","taskId","before","after"] as const).map(k=><label key={k} className="text-xs">{k}<input className="control block w-full" value={form[k]} onChange={e=>set(k,e.target.value)}/></label>)}

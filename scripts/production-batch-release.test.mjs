@@ -206,7 +206,7 @@ test("Cash and Balance Sheet consume canonical posted authorities rather than pl
 
   assert.match(cash, /listCanonicalCashAuthority/);
   assert.match(cash, /vyndi_cash_authority/);
-  assert.match(cash, /transaction-derived and verified monthly actuals/);
+  assert.match(cash, /monthly cash from posted transactions and verified actuals/);
   assert.doesNotMatch(cash, /buildAccountingModel/);
   assert.doesNotMatch(cash, /Cash inflow modeled at sale/);
 

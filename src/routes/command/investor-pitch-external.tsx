@@ -15,11 +15,7 @@ function InvestorPitchExternal() {
           Investor relations · External pitch
         </p>
         <h1 className="mt-1 font-display text-4xl text-accent">Investor Pitch</h1>
-        <p className="mt-2 max-w-3xl text-sm text-muted">
-          The dedicated investor presentation is hosted at the approved pitch
-          destination below. This route keeps the pitch accessible from the
-          repository application without duplicating or altering its source.
-        </p>
+        <p className="mt-2 max-w-3xl text-sm text-muted">Open the approved investor presentation below. If the embedded view is unavailable, use its external link. The presentation stays at its original source.</p>
       </header>
 
       <Panel

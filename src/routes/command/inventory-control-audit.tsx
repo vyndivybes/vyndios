@@ -22,10 +22,7 @@ function InventoryControlAudit() {
             Inventory · control audit
           </p>
           <h1 className="mt-2 text-4xl font-bold text-accent">MSL & FIFO audit</h1>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">
-            A compact control report that tests the inventory procedures against the authoritative
-            ledger instead of duplicating stock calculations.
-          </p>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">Check inventory procedures against the stock ledger. This report uses the recorded balances rather than calculating a separate set.</p>
         </div>
         <Link
           to="/command/inventory"

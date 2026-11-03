@@ -31,7 +31,7 @@ const SECTIONS: readonly ManualSection[] = [
     id: "00",
     chapter: "A",
     title: "Cover & Document Control",
-    purpose: "Controlled operating manual for authorised VYNDI OS users. Document VYNDI-UM-001 · Revision 1.5 · baseline 7 October 2026 · VIBPE Co-Pilot 2.0.",
+    purpose: "Operating guide for VYNDI OS users. Document VYNDI-UM-001 · Revision 1.5 · baseline 7 October 2026 · VIBPE Co-Pilot 2.0.",
     controls: [
       "Classification: Controlled Internal Operating Document.",
       "Intended users: Management, Commercial, Operations, Engineering, QA, Finance, Compliance and Admin.",
@@ -46,7 +46,7 @@ const SECTIONS: readonly ManualSection[] = [
     id: "00.1",
     chapter: "A",
     title: "Production Platform & Deployment Lineage",
-    purpose: "Identify the authoritative production platform, repository source and deployment-lineage controls used to prove which VYNDI OS source is actually running.",
+    purpose: "Check which repository commit and deployment are running in production.",
     controls: [
       "Authoritative Git repository: private repository shyamsundhar1982/vyndios; production branch: main.",
       "Authoritative production runtime: Cloudflare Worker tiger-field-flora-finch. The legacy Worker name is infrastructure identity only and does not change the VYNDI OS product name.",
@@ -68,7 +68,7 @@ const SECTIONS: readonly ManualSection[] = [
     id: "01",
     chapter: "A",
     title: "Purpose & Operating Philosophy",
-    purpose: "VYNDI is one governed chain of business truth, not a collection of unrelated pages.",
+    purpose: "Understand how VYNDI's workspaces share records across the business.",
     steps: [
       "Plan → Demand → Engineering/BOM → Inventory → Procurement → Receiving → Production → Traveller → Quality → Dispatch → Invoice → Collection.",
       "Source requirement → controlled transaction → evidence → approval where required → downstream consequence → audit trail.",
@@ -80,7 +80,7 @@ const SECTIONS: readonly ManualSection[] = [
     chapter: "A",
     title: "First 30 Minutes with VYNDI",
     route: "/command",
-    purpose: "Minimum orientation sequence for a new authorised user.",
+    purpose: "Get started with VYNDI OS using your assigned account.",
     steps: [
       "Sign in with your individual VYNDI account.",
       "Open Command Centre and review current business condition.",
@@ -95,7 +95,7 @@ const SECTIONS: readonly ManualSection[] = [
     id: "03",
     chapter: "A",
     title: "Navigation & Workspace Map",
-    purpose: "Canonical VYNDI workspaces and the responsibility of each operating area.",
+    purpose: "Find the workspace responsible for each type of work.",
     controls: [
       "Command: Command Centre, Action Inbox, Control Tower, VIBPE and User Manual.",
       "Plan & Commercial: Integrated Operating Plan, Demand & Orders, Scenarios, Go-to-Market, Market Survey.",
@@ -111,7 +111,7 @@ const SECTIONS: readonly ManualSection[] = [
     id: "03.1",
     chapter: "A",
     title: "Guided Work Mode",
-    purpose: "Optional in-context guidance for learning VYNDI and progressing work through the correct governed workspace without changing user authority.",
+    purpose: "Get help for the current page and follow the relevant workflow. Guidance does not change your permissions.",
     steps: [
       "Select Guide from the lower-left of the Command shell.",
       "Use Learn Mode to understand the current department purpose, why the control exists and the normal procedure.",
@@ -133,7 +133,7 @@ const SECTIONS: readonly ManualSection[] = [
     id: "04",
     chapter: "A",
     title: "Roles & Access Control",
-    purpose: "VYNDI separates system roles from organisational job functions.",
+    purpose: "Understand the difference between account permissions and your job responsibilities.",
     controls: [
       "admin — view, edit, approve, administer.",
       "management — broad view and edit.",
@@ -152,7 +152,7 @@ const SECTIONS: readonly ManualSection[] = [
     chapter: "B",
     title: "Commercial / Demand & Orders",
     route: "/command/sales",
-    purpose: "Create and revise controlled demand and commercial orders before downstream Production synchronization.",
+    purpose: "Create or revise a sales order before updating its production job card.",
     steps: [
       "Open Plan & Commercial → Demand & Orders.",
       "Enter month, model/variant, units, channel and status.",
@@ -169,7 +169,7 @@ const SECTIONS: readonly ManualSection[] = [
     chapter: "B",
     title: "Product & BOM Control",
     route: "/command/bom-control",
-    purpose: "Establish the controlled product identity and released material definition used by procurement and production.",
+    purpose: "Approve the product identity and BOM that purchasing and production will use.",
     steps: [
       "Create the new BOM revision as a controlled master and submit/approve it.",
       "Add every required component/SKU and quantity to that revision. New SKUs must already be approved in Inventory Master.",
@@ -193,7 +193,7 @@ const SECTIONS: readonly ManualSection[] = [
     chapter: "B",
     title: "Master Inventory / Stores",
     route: "/command/inventory",
-    purpose: "Maintain one auditable stock view covering quantity, MSL, demand coverage, health and forecast.",
+    purpose: "Review stock quantities, minimum levels, demand coverage and forecasts in one inventory workspace.",
     steps: [
       "Use Receive against PO for normal supplier deliveries.",
       "Normal flow: PO → Receiving → Inspection → GRN → FIFO Inventory.",
@@ -206,7 +206,7 @@ const SECTIONS: readonly ManualSection[] = [
     chapter: "B",
     title: "Procurement Requirements & Purchase Execution",
     route: "/command/purchase-execution",
-    purpose: "Convert governed shortages and authorised needs into controlled supplier commitments.",
+    purpose: "Create supplier commitments from approved requirements and shortages.",
     steps: [
       "Expand Production shortage drafts and select the required shortage line.",
       "Assign an approved supplier.",
@@ -223,7 +223,7 @@ const SECTIONS: readonly ManualSection[] = [
     chapter: "B",
     title: "Receiving & Inspection / GRN",
     route: "/command/receiving",
-    purpose: "Record physical receipt and incoming inspection at the inventory boundary.",
+    purpose: "Record goods received and their incoming inspection.",
     steps: [
       "Select the issued Purchase Order.",
       "Enter GRN number and received date.",
@@ -239,7 +239,7 @@ const SECTIONS: readonly ManualSection[] = [
     chapter: "B",
     title: "Production / Job Cards / Traveller",
     route: "/command/production",
-    purpose: "Synchronise Commercial commitment to controlled build execution, batch approval and serial genealogy.",
+    purpose: "Carry confirmed orders into job cards, batch approvals and serial records.",
     steps: [
       "Review confirmed Commercial orders and current Job Card revisions.",
       "Reconcile any order that is not synchronized before execution.",
@@ -254,7 +254,7 @@ const SECTIONS: readonly ManualSection[] = [
     chapter: "B",
     title: "Material Requisition & Issue",
     route: "/command/production",
-    purpose: "Issue controlled materials to the correct Job Card and Traveller with reservation and FIFO evidence.",
+    purpose: "Issue reserved materials to the correct job card and traveller using FIFO evidence.",
     steps: [
       "Open Material Requisition & Issue inside Production.",
       "Verify Job Card, order, SKU, required quantity, reservation status and Traveller/serial.",
@@ -268,7 +268,7 @@ const SECTIONS: readonly ManualSection[] = [
     chapter: "B",
     title: "Quality / NCR / CAPA / Release",
     route: "/command/quality",
-    purpose: "Control inspection evidence, non-conformance, corrective action and serialized release status.",
+    purpose: "Record inspections, non-conformances, corrective actions and serial release decisions.",
     controls: ["Inspection Register", "NCR Register", "CAPA", "Serialized Quality Release Register"],
     steps: [
       "Review incoming, in-process and final inspection lineage.",
@@ -282,7 +282,7 @@ const SECTIONS: readonly ManualSection[] = [
     chapter: "B",
     title: "Dispatch & Operations Overview",
     route: "/command/operations",
-    purpose: "View order-to-cash lineage and ensure shipment remains Operations-owned and Quality-gated.",
+    purpose: "Follow orders through dispatch and collection. Operations owns dispatch, which requires Quality clearance.",
     steps: [
       "Review committed lineage, shortages, inventory alerts, Quality releases, open NCR and posted dispatch.",
       "Verify Order → Job Card → Traveller → Quality Release → Shipment before dispatch.",
@@ -294,7 +294,7 @@ const SECTIONS: readonly ManualSection[] = [
     chapter: "B",
     title: "Finance / Receivables / Collections",
     route: "/command/receivables",
-    purpose: "Maintain governed order-to-cash accounting from posted shipment through invoice and bank-backed collection.",
+    purpose: "Follow posted shipments through invoicing and collections with bank evidence.",
     steps: [
       "Issue invoice: select posted shipment, enter Invoice ID and evidence, then Issue invoice.",
       "Post collection: select open invoice, enter Collection ID, month, amount and bank reference, then Post collection.",
@@ -305,7 +305,7 @@ const SECTIONS: readonly ManualSection[] = [
     id: "15",
     chapter: "C",
     title: "Role-Based Daily Procedures",
-    purpose: "Recommended daily sequence by business function.",
+    purpose: "Follow a daily checklist for your business function.",
     controls: [
       "Management: Command → Action Inbox → Control Tower → Exceptions → Operations → Finance → VIBPE.",
       "Commercial: Demand & Orders → new demand/revision → persistence receipt → Production synchronization.",
@@ -322,7 +322,7 @@ const SECTIONS: readonly ManualSection[] = [
     chapter: "C",
     title: "How to Operate VIBPE — Workflow Overview",
     route: "/command/ibpe-operating-workspace",
-    purpose: "Operate VIBPE as a controlled six-stage decision-support sequence rather than treating the pages as independent dashboards.",
+    purpose: "Use the six VIBPE stages as one planning and review workflow.",
     steps: [
       "1. Operating Workspace — understand the current business condition, exceptions and unverified areas; capture or route governed updates when needed.",
       "2. Planning Authority — establish evidence-backed capacity, routing and supplier-lane authority.",
@@ -344,7 +344,7 @@ const SECTIONS: readonly ManualSection[] = [
     chapter: "C",
     title: "VIBPE 01 — Operating Workspace",
     route: "/command/ibpe-operating-workspace",
-    purpose: "Use the Operating Workspace as the management starting point: identify exceptions, inspect evidence ownership and safely route a business update without silently rewriting canonical business truth.",
+    purpose: "Start in the Operating Workspace to review issues and evidence, then open the responsible workspace to make an authorized change.",
     steps: [
       "Open Today's Control Room. Review Governed exceptions, Unverified areas, Open orders and Open job cards before making a planning decision.",
       "Review every ATTENTION or UNVERIFIED section shown below the KPIs. Use Open authority → to move to the canonical page that owns the underlying business record.",
@@ -377,7 +377,7 @@ const SECTIONS: readonly ManualSection[] = [
     chapter: "C",
     title: "VIBPE 02 — Planning Authority",
     route: "/command/ibpe-operating-workspace/authority",
-    purpose: "Close planning-authority gaps in the required order: Capacity → persisted Routing → Supplier lanes → rebuild the governed packet.",
+    purpose: "Review capacity, routing and supplier lanes in that order, then rebuild the planning packet.",
     steps: [
       "Check the three Authority sequence cards first. Do not start with the optimizer until Capacity, Routing and Supplier lanes show READY.",
       "Capacity: if REVIEW REQUIRED, inspect each active work-centre row, including available hours/month, efficiency, standard hours/unit and Source. Confirm that the controlled values are correct.",
@@ -410,7 +410,7 @@ const SECTIONS: readonly ManualSection[] = [
     chapter: "C",
     title: "VIBPE 03 — Governed Optimizer",
     route: "/command/ibpe-operating-workspace/optimizer",
-    purpose: "Freeze the current governed planning evidence into an immutable packet and run the HiGHS optimizer only when the execution gate is READY.",
+    purpose: "Save the current planning inputs and evidence as a fixed packet. Run HiGHS only when the execution gate is READY.",
     steps: [
       "Open Governed preparation gate. If no packet exists, select Build governed advanced-planning packet. This freezes lineage, model and authority evidence from the latest complete governed IBPE snapshot; it does not run the solver.",
       "If authority, supplier, demand, routing or other governed planning evidence changed since the current packet, select Refresh governed advanced-planning packet before optimizing.",
@@ -442,7 +442,7 @@ const SECTIONS: readonly ManualSection[] = [
     chapter: "C",
     title: "VIBPE 04 — Outputs & Evidence",
     route: "/command/ibpe-operating-workspace/outputs",
-    purpose: "Review the complete read-only planning evidence pack after optimization and produce a controlled management or audit report.",
+    purpose: "Review saved planning results and prepare a management or audit report.",
     steps: [
       "Start with Executive readiness. Read the four cards in order: Planning authority, Optimizer gate, Assurance exceptions and Release verdict.",
       "Review Governed planning lineage and record the exact Latest governed IBPE run, Advanced packet, Optimization run and Audit event identifiers. These IDs establish the evidence chain.",
@@ -468,7 +468,7 @@ const SECTIONS: readonly ManualSection[] = [
     chapter: "C",
     title: "VIBPE 05 — Assurance",
     route: "/command/ibpe-operating-workspace/assurance",
-    purpose: "Prove that governed backend authority, workflows, gates, exception detection and runtime UI capabilities are actually evidenced; unobserved evidence is not treated as a pass.",
+    purpose: "Review business-rule and browser-test evidence. Checks without recorded evidence remain unverified.",
     steps: [
       "Read Assurance Posture first: Critical exceptions, Warning exceptions, Backend surface gaps and UI proof outstanding.",
       "Open Live Exceptions. If the page is showing only the highest-priority subset, select Load complete register when you need the full exception population.",
@@ -499,7 +499,7 @@ const SECTIONS: readonly ManualSection[] = [
     chapter: "C",
     title: "VIBPE 06 — Release Readiness",
     route: "/command/ibpe-operating-workspace/release",
-    purpose: "Read the final evidence-based optimizer production-closure verdict. This page does not perform a release transaction; it tells you whether every required closure gate is proven.",
+    purpose: "Read the optimizer's release-readiness verdict and the evidence for each required gate. This page does not itself release production.",
     steps: [
       "Read Release verdict first. GREEN means every governed production-closure gate currently has evidence. A non-GREEN verdict means at least one gate is BLOCKED.",
       "Review Closure gates one by one. For every BLOCKED gate, read its Evidence text to identify the missing runtime, migration, packet, solver, cash-governance, actor or audit condition.",
@@ -524,7 +524,7 @@ const SECTIONS: readonly ManualSection[] = [
     id: "16.7",
     chapter: "C",
     title: "ERP Optimization Architecture — What the Engine Optimizes",
-    purpose: "Explain the complete VYNDI optimization stack before an operator uses any recommendation. ERP optimization is a governed decision-support chain that reconciles demand, materials, inventory, supplier lanes, capacity, routing, procurement economics and cash; it is not an automatic transaction engine.",
+    purpose: "Understand how demand, materials, inventory, suppliers, capacity, routing, costs and cash feed planning recommendations. Transactions still need their separate approvals.",
     steps: [
       "Start from governed source truth: approved plan, actual/committed demand, released BOM and exact Job Card requirements, inventory, reservations, committed/open receipts, approved capacity, approved routing, approved supplier lanes and governed finance/cash evidence.",
       "Run governed IBPE to reconcile the operating picture and persist the authoritative snapshot used by downstream planning.",
@@ -560,7 +560,7 @@ const SECTIONS: readonly ManualSection[] = [
     chapter: "C",
     title: "ERP Material & Procurement Optimization — UI and Operation",
     route: "/command/procurement-planning",
-    purpose: "Operate the Procurement Planning interface as the material-reconciliation and procurement-decision layer that feeds governed IBPE and advanced optimization.",
+    purpose: "Use Procurement Planning to reconcile material requirements and prepare purchasing decisions for IBPE and optimization.",
     steps: [
       "Open Supply & Operations → Material Requirements / Procurement Planning.",
       "Read the top KPI row first: Approved-plan procurement, Committed demand, Net SKU requirement, Control exceptions and Planning horizon.",
@@ -602,7 +602,7 @@ const SECTIONS: readonly ManualSection[] = [
     chapter: "C",
     title: "ERP Scenario Studio — What-If Optimization UI",
     route: "/command/scenarios",
-    purpose: "Use Scenario Studio to test controlled what-if assumptions against the latest governed IBPE snapshot without changing the approved plan, actuals, contractual commitments or operating ledgers.",
+    purpose: "Try what-if scenarios using saved IBPE inputs. The approved plan, actuals, contracts and operating ledgers stay unchanged.",
     steps: [
       "Open Plan & Commercial → Scenarios / IBPE Scenario Studio.",
       "Choose a Fast scenario preset or keep Custom scenario. Presets include Growth +25%, Supply shock, Capacity lift, Cash protect, Funding bridge and Severe stress.",
@@ -642,7 +642,7 @@ const SECTIONS: readonly ManualSection[] = [
     chapter: "C",
     title: "Advanced Planning Authority & HiGHS — Complete UI Interface",
     route: "/command/ibpe-operating-workspace/optimizer",
-    purpose: "Operate the authority workbench and governed HiGHS interface using the exact screen states, buttons and evidence fields presented by VYNDI.",
+    purpose: "Follow the planning-authority and HiGHS screens using their named buttons, statuses and evidence fields.",
     steps: [
       "Authority screen: open /command/ibpe-operating-workspace/authority. At Authority sequence, read 1 Capacity, 2 Routing and 3 Supplier lanes.",
       "Capacity card states are READY or REVIEW REQUIRED. Open Capacity authority and review Status, Work centre, Available h/mo, Efficiency, Std h/unit and Source. Use Approve current capacity standards only after validating the controlled source values.",
@@ -678,7 +678,7 @@ const SECTIONS: readonly ManualSection[] = [
     id: "16.11",
     chapter: "C",
     title: "Cash & Funding Governance — Reading Optimizer Results",
-    purpose: "Interpret the cash overlay that decides whether a mathematically feasible plan is execution-ready, funding-dependent or unsupported by complete cash evidence.",
+    purpose: "Read the cash checks alongside mathematical feasibility to identify reserve coverage, funding needs or missing evidence.",
     steps: [
       "After HiGHS returns an optimal/feasible accepted mathematical run, VYNDI evaluates the proposed procurement against governed cash guardrails and payment timing.",
       "Read Cash governance and Planning disposition together. Planning disposition can be execution-ready, funding-required, cash-evidence-incomplete or not-evaluated.",
@@ -711,7 +711,7 @@ const SECTIONS: readonly ManualSection[] = [
     id: "16.12",
     chapter: "C",
     title: "Optimizer Rerun Rules — What to Refresh and When",
-    purpose: "Prevent stale decisions by defining which upstream changes require a governed IBPE rerun, an advanced-packet refresh, a new HiGHS run or only an advisory scenario rerun.",
+    purpose: "Identify which upstream changes require a new IBPE run, planning packet, HiGHS run or advisory scenario.",
     controls: [
       "Run governed IBPE again when approved plan/demand, confirmed order revision, released Job Card requirement, released BOM/material mapping, inventory/receipts, governed procurement cost, finance/cash evidence or another IBPE source-truth input materially changes.",
       "Refresh the governed advanced-planning packet after a new governed IBPE run and whenever approved capacity, persisted routing or approved supplier-lane authority changes.",
@@ -738,7 +738,7 @@ const SECTIONS: readonly ManualSection[] = [
     id: "16.13",
     chapter: "C",
     title: "VIBPE Co-Pilot — Optimization Questions and Navigation",
-    purpose: "Use natural-language analysis to interrogate governed demand, materials, procurement, capacity, funding and scenario evidence while preserving transaction authority.",
+    purpose: "Ask VIBPE questions about demand, materials, purchasing, capacity, funding and scenarios. Make approved changes in the relevant operating workspace.",
     steps: [
       "Ask baseline questions such as: What is the current governed plan? or Summarize the latest governed IBPE condition.",
       "Ask planning-horizon questions such as: Plan the next 12 months or What changes over the next 6 months?",
@@ -768,7 +768,7 @@ const SECTIONS: readonly ManualSection[] = [
     chapter: "C",
     title: "VIBPE Cross-Repository Knowledge & Authority",
     route: "/command/knowledge",
-    purpose: "Use VIBPE knowledge from Vāyú engineering, ADV VIBPE and current VYNDI OS while preserving the authority boundary of each source.",
+    purpose: "Use Vāyú engineering, ADV VIBPE and VYNDI OS knowledge with each source's approval and evidence limits.",
     steps: [
       "Open Command → Knowledge and review Repository knowledge snapshots before relying on a cross-repository answer for an engineering, finance, governance or optimizer decision.",
       "Each repository record shows its authority class, domain, source repository, exact commit SHA and source path. Use Open source when you need to inspect the pinned evidence directly.",
@@ -794,7 +794,7 @@ const SECTIONS: readonly ManualSection[] = [
     id: "17",
     chapter: "D",
     title: "Traceability & Controlled Print",
-    purpose: "Reconstruct the controlled business and manufacturing chain from customer requirement through cash collection.",
+    purpose: "Trace a customer requirement through engineering, manufacturing, dispatch and collection.",
     steps: [
       "Trace Customer → Sales Order → Revision → Configuration → BOM → Inventory Requirement → Procurement → PO → GRN → Inventory → Job Card → Material Issue → Traveller → Quality Release → Dispatch → Invoice → Collection.",
       "Open the lineage/traceability record and verify expected upstream and downstream links.",
@@ -806,7 +806,7 @@ const SECTIONS: readonly ManualSection[] = [
     id: "18",
     chapter: "D",
     title: "Exceptions & Troubleshooting",
-    purpose: "Resolve the root operating condition instead of hiding the exception.",
+    purpose: "Resolve the source of an issue before closing the exception.",
     steps: ["Identify → understand cause → assign owner → decide action → obtain authority → execute → capture evidence → verify."],
     controls: ["Typical exceptions: unsynchronised order, missing Job Card, shortage, MSL alert, supplier missing, PO pending approval, PO awaiting receipt, quarantine, open NCR, Quality release missing, dispatch blocked, uninvoiced shipment, outstanding receivable, liquidity below reserve."],
     warnings: ["Never delete an exception merely to make a dashboard appear clean."],
@@ -815,7 +815,7 @@ const SECTIONS: readonly ManualSection[] = [
     id: "19",
     chapter: "D",
     title: "Golden Rules & Prohibited Actions",
-    purpose: "Operating disciplines that preserve VYNDI as a governed source of business truth.",
+    purpose: "Follow the record, evidence and approval practices used throughout VYNDI.",
     controls: [
       "Enter business truth once.",
       "Planning is not commitment.",
@@ -836,7 +836,7 @@ const SECTIONS: readonly ManualSection[] = [
     id: "20",
     chapter: "E",
     title: "Complete End-to-End Example",
-    purpose: "Example of one customer order moving through the complete governed lifecycle.",
+    purpose: "Follow one example order through the complete operating workflow.",
     steps: [
       "Commercial: create customer order.",
       "Configuration: select model/variant.",
@@ -857,7 +857,7 @@ const SECTIONS: readonly ManualSection[] = [
     id: "21",
     chapter: "E",
     title: "Training & Screenshot Register",
-    purpose: "Operator competency checklist and controlled illustration register for future manual revisions.",
+    purpose: "Review operator training checks and the illustration register for future manual revisions.",
     controls: [
       "Operator should demonstrate login, role awareness, workspace navigation, order search, Job Card search, shortage review, Master Inventory, PO draft completion, approval vs issuance, GRN, quarantine, FIFO, Traveller, Quality Release, dispatch lineage, invoice, collection, VIBPE workflow operation, ERP optimization architecture, Procurement Planning, Scenario Studio, Advanced Planning Authority, HiGHS execution, cash/funding interpretation, rerun rules, traceability and print.",
       "Controlled screenshot register S01–S17 covers Login, Command, Action Inbox, VIBPE, Demand & Orders, Inventory, Purchase, Receiving, Job Card, Material Requisition, Traveller, Quality, Operations lineage, Financial Cockpit, Receivables, Traceability/Print and Users & Roles.",
@@ -867,7 +867,7 @@ const SECTIONS: readonly ManualSection[] = [
     id: "22",
     chapter: "E",
     title: "Controlled Document Maintenance",
-    purpose: "Keep the manual synchronized with the controlled system rather than allowing documentation drift.",
+    purpose: "Update the manual when the system's screens or workflows change.",
     controls: ["Revise when navigation, page names, transaction buttons, approval flow, role permission, Job Card lifecycle, procurement, receiving, Quality release, dispatch, finance lineage, VIBPE, optimizer model/objective/constraint policy, Scenario Studio controls, cash-governance logic, traceability/printing, governance, repository ownership/name, production platform, database transport or deployment-lineage controls materially change."],
     notes: ["Final operator principle: What happened? Why? What proves it? What does it affect? What happens next? Who has authority? Was it completed? Can the chain be reconstructed?"],
   },

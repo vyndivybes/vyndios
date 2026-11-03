@@ -101,7 +101,7 @@ function Risk() {
   if (state.status === "loading") return (
     <section data-route-readiness="loading" className="space-y-3">
       <h1 className="font-display text-4xl">Risk Register</h1>
-      <p className="text-sm text-muted">Loading canonical risk, VEDM evidence and audit history…</p>
+      <p className="text-sm text-muted">Loading risks, VEDM evidence and change history…</p>
     </section>
   );
   if (state.status === "error") return (
@@ -203,7 +203,7 @@ function RiskReady({ loaded, onReload }: { loaded: RiskData; onReload: () => Pro
     <header className="border-b border-border pb-6">
       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">Governance · VYNDI Risk Engine</p>
       <h1 className="mt-1 font-display text-4xl text-accent">Risk Register</h1>
-      <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">One governed risk authority for business and engineering. Likelihood and impact remain explicit inputs; FMEA is calculated only from entered S/O/D values, while VEDM evidence/configuration issues are shown separately as derived signals with provenance and no invented probability.</p>
+      <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">Review business and engineering risks together. Enter likelihood and impact explicitly. FMEA uses the entered severity, occurrence and detection values; VEDM evidence and configuration issues remain separate source-linked signals.</p>
     </header>
 
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
