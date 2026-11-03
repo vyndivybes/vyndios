@@ -73,9 +73,9 @@ function CommandCentre() {
       <BusinessIntelligenceStudio />
       <header className="flex flex-col gap-4 border-b border-border pb-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.2em] text-green">Command · today’s operating control</p>
+          <p className="text-[11px] uppercase tracking-[0.2em] text-green">Your workspace · today</p>
           <h1 className="mt-1 font-display text-4xl text-accent">Command Centre</h1>
-          <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">Start here for what needs attention now, where the fulfillment chain stands, which decision is waiting, and where to act. Detailed transactions remain in their owning workspaces.</p>
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">See what needs attention, review your orders and open the workspace where you can take action.</p>
         </div>
         <div className="flex flex-wrap gap-3 text-sm font-semibold">
           {accessible("/command/intelligence") && <WorkLink to="/command/intelligence" className="text-accent hover:text-fg">Product Intelligence →</WorkLink>}
@@ -92,13 +92,13 @@ function CommandCentre() {
         <Kpi label="Canonical cash" value={lakh(currentCash)} hint={currentCashMonth ? `M${currentCashMonth} · verified cash authority` : "No verified cash actual"} tone={cashTone} />
       </div>
 
-      <Panel title="Today’s control room" kicker="Four canonical places to understand → decide → act">
+      <Panel title="Today’s control room" kicker="Review the queue, follow orders or open planning">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[
             ["Action Inbox", `${actionItems.length} governed action(s) waiting`, "/command/decision-inbox"],
             ["Operations", `${lineage.length} order lineage row(s) · ${shortageLines} shortages`, "/command/operations"],
-            ["ERP Reports", "Read-only cross-functional evidence pack", "/command/control-tower"],
-            ["VIBPE Workspace", "Briefing, report snapshots and advisory intelligence", "/command/ibpe-operating-workspace"],
+            ["ERP Reports", "Reports across sales, operations and finance", "/command/control-tower"],
+            ["VIBPE Workspace", "Planning briefings and saved reports", "/command/ibpe-operating-workspace"],
           ]
             .filter(([, , to]) => accessible(to))
             .map(([title, detail, to]) => (
@@ -111,7 +111,7 @@ function CommandCentre() {
         </div>
       </Panel>
 
-      <Panel title="Exceptions now" kicker="Action Inbox evidence · compact · highest priority remains in the source queue">
+      <Panel title="Exceptions now" kicker="Review up to eight items, then open the inbox for the full queue">
         {actionItems.length === 0 ? (
           <p className="text-sm text-muted">No governed action is waiting.</p>
         ) : (
@@ -137,7 +137,7 @@ function CommandCentre() {
         {actionItems.length > 8 && accessible("/command/decision-inbox") ? <WorkLink to="/command/decision-inbox" className="mt-3 inline-block text-xs font-semibold text-accent">Open all {actionItems.length} actions →</WorkLink> : null}
       </Panel>
 
-      <Panel title="Fulfillment workflow" kicker="One business object across owning controls">
+      <Panel title="Fulfillment workflow" kicker="Follow orders from demand through collection">
         <div className="overflow-x-auto">
           <table className="w-full table-auto text-left text-xs">
             <thead className="border-b border-border text-[10px] uppercase tracking-[0.14em] text-subtle"><tr><th className="px-3 py-2">Stage</th><th className="px-3 py-2">Current signal</th><th className="px-3 py-2 text-right">Open owner</th></tr></thead>
@@ -150,7 +150,7 @@ function CommandCentre() {
         </div>
       </Panel>
 
-      <Panel title="Go to the work" kicker="One canonical destination per operating owner">
+      <Panel title="Go to the work" kicker="Choose the team or task you need">
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {[
             ["Plan & Sales", "Operating plan, demand, orders, GTM, market and scenarios", "/command/planning"],
@@ -223,7 +223,7 @@ function CommandCentre() {
             .filter(([, to]) => accessible(to))
             .map(([label, to]) => <WorkLink key={to} to={to} className="rounded-md border border-border p-3 hover:border-accent hover:text-fg">{label}</WorkLink>)}
         </div>
-        <p className="mt-3 text-xs leading-5 text-subtle">Command summarizes evidence; it does not own detailed transactions. Action Inbox remains the governed queue, Operations reconciles fulfillment lineage, ERP Reports provide read-only evidence and VIBPE remains advisory.</p>
+        <p className="mt-3 text-xs leading-5 text-subtle">Use the Action Inbox to review work waiting for a decision, Operations to follow orders, and ERP Reports to inspect records. VIBPE provides planning advice; your team approves transactions in the relevant workspace.</p>
       </details>
     </div>
   );
