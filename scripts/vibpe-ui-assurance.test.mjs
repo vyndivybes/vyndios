@@ -83,7 +83,7 @@ test("final VIBPE Assurance page consumes canonical backend evidence and does no
   assert.match(page, /getVibpeUiCapabilityRegistry/);
   assert.doesNotMatch(page, /getVibpeAssuranceCoverage/);
   assert.match(page, /captureVibpeAssuranceSnapshot/);
-  assert.match(page, /unproved route remains a gap/i);
+  assert.match(page, /A page without recorded test evidence stays unverified/i);
   assert.match(page, /does not become a duplicate writer/i);
   assert.doesNotMatch(page, /(?:insert into|update|delete from)\s+(?:vyndi_sales_orders|epr_production_job_cards|vyndi_shipments|vyndi_invoices|vyndi_collections)/i);
 });

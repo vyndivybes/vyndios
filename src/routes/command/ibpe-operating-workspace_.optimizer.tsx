@@ -132,8 +132,8 @@ function GovernedOptimizerPage() {
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">VYNDI VIBPE · governed optimization</p>
         <h1 className="mt-1 font-display text-4xl">Advanced Planning Optimizer</h1>
         <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">
-          Executes HiGHS only against an exact immutable advanced-planning packet. Output is advisory evidence only;
-          it cannot create purchase orders, production orders, inventory movements, funding actions or sales commitments.
+          Use HiGHS to compare planning options from a saved, versioned set of inputs. The results are advisory evidence only.
+          Purchases, production releases, stock movements, funding and sales commitments still need their own approvals.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Link to="/command/ibpe-operating-workspace" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:border-accent hover:text-fg">VIBPE Workspace</Link>
@@ -168,8 +168,8 @@ function GovernedOptimizerPage() {
           <div className="rounded-lg border border-warn/30 bg-warn/5 p-4">
             <p className="text-sm font-semibold text-warn">No complete advanced-planning packet is available.</p>
             <p className="mt-1 text-xs leading-5 text-muted">
-              Build the packet from the latest complete governed IBPE snapshot first. Packet preparation freezes planning lineage,
-              model and authority evidence; it does not run the solver or create business transactions.
+              Prepare the inputs from the latest complete IBPE run first. This saves the model, source references and approval evidence together.
+              The solver runs only when you choose to start it. Preparing inputs creates no business transactions.
             </p>
           </div>
         )}

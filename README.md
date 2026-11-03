@@ -1,31 +1,49 @@
 # VYNDI OS
 
-VYNDI OS is the governed business operating system for Vāyú Shastr. It connects planning, commercial operations, engineering, procurement, inventory, production, quality, finance, governance and evidence without treating analytical output as authority.
+VYNDI OS helps the Vāyú Shastr team plan work, manage orders, track materials and builds, and review finances. Each transaction stays linked to its source records and approvals.
+
+## Find your workspace
+
+Open [VYNDI OS](https://vyndios.vayushastr.workers.dev/command) and sign in with your assigned account.
+
+| To work on | Open |
+| --- | --- |
+| Today's actions and order progress | Command Centre |
+| Forecasts and the 36-month plan | Plan & Commercial |
+| Product definitions and BOM revisions | Product & Engineering |
+| Inventory, purchasing, receiving and builds | Supply & Operations |
+| Staffing, office costs and assets | People & Office |
+| Cash, invoices and accounting | Finance |
+| Approvals, risk and audit records | Governance & Assurance |
+
+Use the shared search to find an order, item, supplier or page. Search results follow your account permissions.
+
+For the four demo orders, open the [simulation workspace](https://vyndios.vayushastr.workers.dev/command/ibpe-operating-workspace/simulation). Simulation results are for testing and planning. Physical production needs its own design and release approvals.
 
 ## Production-qualified baseline
 
-Known-good production baseline:
+Historical qualification reference:
 
 `c341f627df69882536a7a4d848f8d27c63af4462`
 
-That baseline passed:
+The recorded checks for that commit were:
 - Golden Enterprise: 10 governed stages
 - Exact-SHA production smoke: 19 protected routes
 - Responsive production UX: 56 route/viewport checks
 
-A newer commit must be re-qualified before it replaces the baseline.
+These results apply to that commit. Check the current deployment and its verification results before treating a newer version as qualified.
 
 ## Control model
 
-- Authentication and assigned RBAC protect business reads and writes.
-- Writes also enforce same-site request isolation.
-- Database constraints and governed SQL functions remain canonical authority.
-- Maker/checker and approval rules are enforced where the relevant business action occurs.
-- Advisory engines such as IBPE, forecasting, Monte Carlo and decision intelligence do not authorize business commitments.
+- Each person signs in with an assigned role that controls what they can view and change.
+- Changes must come from an allowed request origin.
+- Database constraints and controlled SQL functions enforce the business rules.
+- Actions that require a maker and a separate checker retain those approval steps.
+- IBPE, forecasts and other analytical tools provide advice. Your team still approves purchases, production releases, payments and other commitments.
 
 ## Release model
 
-Normal application build does **not** apply database migrations.
+Building the app does not change the database schema. Follow the separate migration step when a release needs schema changes.
 
 1. `npm ci`
 2. `npm test`
@@ -55,7 +73,7 @@ Historical status artifacts are retained under `docs/archive/` rather than prese
 
 ## Assurance boundary
 
-Internal automated qualification is evidence of tested behavior for a specific SHA. It is not a substitute for independent audit of financial, statutory, inventory or engineering-control logic.
+Automated checks show which behavior was tested at a specific commit. Financial, statutory, inventory and engineering controls still need their required independent reviews.
 
 ## Licensing
 
