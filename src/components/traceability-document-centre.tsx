@@ -194,7 +194,7 @@ export function TraceabilityDocumentCentre() {
             </header>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
-              {!query.trim() ? <div className="mx-auto mt-20 max-w-2xl rounded-xl border border-border bg-surface/30 p-6 text-center"><FileSearch className="mx-auto size-8 text-accent" /><p className="mt-3 font-medium text-fg">Search by any traceable fragment.</p><p className="mt-2 text-sm leading-6 text-muted">A partial Commercial Order, Job Card, Traveller, serial, Batch, MR, PO, GRN, SKU, supplier, Quality Release, Dispatch or Invoice reference can resolve the connected digital thread.</p></div> : null}
+              {!query.trim() ? <div className="mx-auto mt-20 max-w-2xl rounded-xl border border-border bg-surface/30 p-6 text-center"><FileSearch className="mx-auto size-8 text-accent" /><p className="mt-3 font-medium text-fg">Search by any traceable fragment.</p><p className="mt-2 text-sm leading-6 text-muted">Use part of an order, job card, traveller, serial, batch, material request, purchase order, goods receipt, item, supplier, quality release, dispatch or invoice reference to find related records.</p></div> : null}
               {query.trim() && !busy && response && !hits.length ? <div className="mx-auto mt-16 max-w-xl rounded-xl border border-border p-5 text-center text-sm text-muted">No governed lineage matched this search and filter combination.</div> : null}
 
               {hits.length ? (

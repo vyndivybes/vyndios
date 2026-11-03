@@ -54,7 +54,7 @@ function RangePage() {
         <div className="max-w-3xl">
           <p className="vyndi-public-eyebrow text-[11px] font-semibold uppercase tracking-[0.2em]">Controlled comparison</p>
           <h2 className="mt-3 text-4xl font-bold leading-none tracking-tight text-accent sm:text-5xl">Compare the range.</h2>
-          <p className="mt-4 text-lg leading-7 text-muted">Choose any two VYNDI builds and compare specification, pricing and BOM side-by-side.</p>
+          <p className="mt-4 text-lg leading-7 text-muted">Choose two VYNDI builds to compare their specifications, prices and bills of materials.</p>
         </div>
 
         <div className="mt-10 grid gap-6 lg:grid-cols-[1fr_1fr_320px]">

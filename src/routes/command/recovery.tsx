@@ -213,10 +213,7 @@ function RecoveryCentre() {
       <header>
         <p className="text-xs font-bold uppercase tracking-[0.25em] text-orange-600">VYNDI OS · Administration · Recovery</p>
         <h1 className="mt-2 text-3xl font-semibold">Backup & Recovery Centre</h1>
-        <p className="mt-2 max-w-5xl text-sm font-medium leading-6 text-slate-700">
-          Governed backup evidence, disaster-restore control and selective recovery. Production rows are never blindly overwritten:
-          supported selective recovery replays the approved snapshot through the owning canonical writer and creates a new revision.
-        </p>
+        <p className="mt-2 max-w-5xl text-sm font-medium leading-6 text-slate-700">Review backup evidence, restore requests and selective recovery. Supported selective recovery uses the approved snapshot and the record's existing writer to create a new revision. Live production rows are not overwritten directly.</p>
       </header>
 
       {message&&<p role="status" className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm font-semibold text-emerald-900">{message}</p>}

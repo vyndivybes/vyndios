@@ -99,6 +99,12 @@ button[aria-label="Open Traceability and Print"] {
   letter-spacing: 0.18em;
 }
 
+.vyndi-tansam-kicker.vyndi-ui-caption {
+  color: var(--color-muted);
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+
 /* Controls feel like the presentation pills while remaining native and fast. */
 .control,
 select,

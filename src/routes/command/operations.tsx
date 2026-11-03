@@ -203,7 +203,7 @@ function Operations() {
   if (!hydrated) return (
     <section data-route-readiness="loading" className="space-y-3">
       <h1 className="font-display text-4xl">Operations</h1>
-      <p className="text-sm text-muted">Loading governed Operations availability…</p>
+      <p className="text-sm text-muted">Loading orders and material availability…</p>
     </section>
   );
   return <OperationsReady />;
@@ -300,9 +300,7 @@ function OperationsReady() {
           Operations · demand to quality execution · canonical authority
         </p>
         <h1 className="mt-1 font-display text-4xl text-accent">Operations</h1>
-        <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">
-          Order lineage, material readiness, Quality release evidence and Dispatch visibility are rendered from canonical operating authorities. Finance remains downstream of posted Operations dispatch.
-        </p>
+        <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">Follow orders, material availability, quality-release evidence and dispatch records from the operating ledgers. Posted dispatches feed the downstream finance records.</p>
         <div className="mt-3 flex flex-wrap gap-3 text-sm font-semibold">
           <Link to="/command/procurement-planning" className="text-accent">Procurement →</Link>
           <Link to="/command/production" className="text-accent">Production →</Link>

@@ -230,7 +230,7 @@ export function GuidedWorkPanel({ role }: { role: CommandRole | null }) {
             </p>
             <h2 className="mt-0.5 truncate text-base font-semibold text-fg">{guide.department}</h2>
             <p className="mt-1 text-xs leading-5 text-muted">
-              Optional operating guidance · current route aware · RBAC filtered
+              Help for this page · options follow your permissions
             </p>
             <p className="mt-1 hidden items-center gap-1 text-[10px] text-subtle sm:flex">
               <GripHorizontal className="size-3" /> Drag this header to move the Guide
@@ -304,7 +304,7 @@ export function GuidedWorkPanel({ role }: { role: CommandRole | null }) {
                 </div>
               </article>
             ))}
-            {!filteredFeatures.length && <p role="status" className="text-sm text-muted">No authorised features match this search.</p>}
+            {!filteredFeatures.length && <p role="status" className="text-sm text-muted">No available features match your search.</p>}
           </div>
         ) : (
           <>

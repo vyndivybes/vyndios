@@ -197,9 +197,7 @@ function Payables() {
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-green">Finance · procure to pay</p>
           <h1 className="mt-2 font-display text-4xl text-accent">Accounts Payable</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
-            Supplier invoices pass a deterministic three-way match before approval. Evidenced payments now post Trade Payables → Bank 1000 → verified canonical cash/VIBPE in one transaction with an explicit M1–M36 cash month.
-          </p>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">Match each supplier invoice to its purchase order and goods receipt before approval. A supported payment posts Trade Payables and Bank 1000 together, updates verified cash for VIBPE and records the selected M1–M36 cash month.</p>
         </div>
         <Link to="/command/purchase-execution" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted hover:border-accent hover:text-accent">
           Purchase orders <ArrowRight className="size-4" />

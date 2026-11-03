@@ -1,0 +1,935 @@
+{
+  "reviewDate": "2026-11-03",
+  "baseSha": "f05eff3ecb6ca44bf7d36a83ee8f2d5c845e2819",
+  "scope": "108 route files and 46 shared UI components; English copy review, not translation or independent live visual qualification",
+  "routesReviewed": 108,
+  "componentsReviewed": 46,
+  "routesChanged": 83,
+  "componentsChanged": 18,
+  "files": [
+    {
+      "path": "src/routes/__root.tsx",
+      "sourceBlobSha": "85cf57d88982b9ba160d24106485d66df1eaed4b",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/routes/command-login.tsx",
+      "sourceBlobSha": "9c5be8850c9ab19dcbbc383881cb03ebfe24e748",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/accounting-statements.tsx",
+      "sourceBlobSha": "8fc93b4cb794581a759fb840f0009bd9acbcdb15",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/accounting.tsx",
+      "sourceBlobSha": "003879fb8b7ac3353be38e6549bb1268ef380805",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/accounting/input-tax.tsx",
+      "sourceBlobSha": "ec91828389ce2250a103d3e4d13babf2a0214e45",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/accounting/statutory.tsx",
+      "sourceBlobSha": "f226fc0d2c85bc345676c5c05ad88d67ff6e93da",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/accounting_.people-office-payments.tsx",
+      "sourceBlobSha": "087925ab41eed97a3ae6c61afc5a9b6dbb430a11",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/actions.tsx",
+      "sourceBlobSha": "94f4d946d4a05b7a853d97741fcdea54d1f98c87",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/actuals.tsx",
+      "sourceBlobSha": "7900ad9c3608e7354368e21ec878cf32a7165933",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/ai-knowledge.tsx",
+      "sourceBlobSha": "6f9fcd6164faa8a653938984659b4f5fba9c1deb",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/aluminium-finance.tsx",
+      "sourceBlobSha": "b233f4faa9fa292b3d6ebf88e75bcac5093fd6ed",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/analytics-studio.tsx",
+      "sourceBlobSha": "85835fd6113d6f57582dfa0035cf5b8490a7b337",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/balance-sheet.tsx",
+      "sourceBlobSha": "d728c826dde19a9efcb23ddf9b1d335f1b601927",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/bom-control.tsx",
+      "sourceBlobSha": "b0cc494cbf3f0107b4aa5eeb0a2377e650ad1768",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/bom-inventory-mapping.tsx",
+      "sourceBlobSha": "79c5f3b6711c2bd683a14d9e5ea73b909837fa19",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/bom.tsx",
+      "sourceBlobSha": "fc5af594fe7346509f9705226ba5fcf60fe4303b",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/ca-audit.tsx",
+      "sourceBlobSha": "13ef10428fc495c9dd78ad97ca1bd89afe2ade9e",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/ca-certificate-register.tsx",
+      "sourceBlobSha": "1acc0242096491cbe9deac068b79c17d304d7e48",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/cash.tsx",
+      "sourceBlobSha": "0a6cad4a3b0979030fec3b552388ed29a26517b2",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/classification.tsx",
+      "sourceBlobSha": "cb51f488bfdec0a547652959eb4a627386ed506c",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/component-control.tsx",
+      "sourceBlobSha": "e6ef2d648f08d4781516a13fe006e7a04ee50812",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/control-tower.tsx",
+      "sourceBlobSha": "b97bab05ba189777c02f29cb346bc92d10c1709a",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/decision-engine.tsx",
+      "sourceBlobSha": "b701e220ece14a2dae88e4f04686935cbe9a3b61",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/decision-inbox.tsx",
+      "sourceBlobSha": "0916f40144080b3c43ced38ad627cdb124f129ce",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/demand.tsx",
+      "sourceBlobSha": "ddd6afde80735239957912693fd373ff24b88785",
+      "status": "reviewed-retained",
+      "note": "Compatibility redirect; no standalone page copy."
+    },
+    {
+      "path": "src/routes/command/deployment-readiness.tsx",
+      "sourceBlobSha": "e7f3f8df931d95f113e11bd0fe5938b54c4e839c",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/design-philosophy.tsx",
+      "sourceBlobSha": "a963b717b3d94e76aec4b40ebaea495f2836d313",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/engineering.tsx",
+      "sourceBlobSha": "b159915d7444bbbffc724139b799ac822dc0b056",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/epr-execution.tsx",
+      "sourceBlobSha": "fc1a0795a600e738281e1655c7cde0bbc49f87be",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/epr-live.tsx",
+      "sourceBlobSha": "57472a2b7d13b92810b4c00cdd7c3984c425cef9",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/epr-workflow.tsx",
+      "sourceBlobSha": "ff203d87ae72da9e48c59f3276a19f6d57190a1f",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/finance-assumptions.tsx",
+      "sourceBlobSha": "a946bee7745b9819c96baae4969e56f2b120fa97",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/finance-control.tsx",
+      "sourceBlobSha": "0da8a31c149a9011ab2308dd5f4cd16946a6683b",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/finance.tsx",
+      "sourceBlobSha": "d42def18f6cc4bb8a9b7cde9516fa1cb4b2d1a1d",
+      "status": "reviewed-retained",
+      "note": "Compatibility redirect; no standalone page copy."
+    },
+    {
+      "path": "src/routes/command/financial-cockpit.tsx",
+      "sourceBlobSha": "ea123c4b1c8d6a883ec8600d783cd03a31b2ca6b",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/founder-command.tsx",
+      "sourceBlobSha": "c9d1548705daebb474ce55728e8672de8d18e43c",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/founder-control.tsx",
+      "sourceBlobSha": "7ae5fbc3556d46ee404fed5a790c3557c66920f2",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/funding.tsx",
+      "sourceBlobSha": "ce8153a7bc1f25057a1d679d249019fd9d5e5955",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/governance.tsx",
+      "sourceBlobSha": "a34edffaad857d144bc3d34cd581fee194a8a682",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/gtm.tsx",
+      "sourceBlobSha": "51e3482f7a327eaf6f3e628c68025e7813e00145",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/routes/command/ibpe-operating-workspace.tsx",
+      "sourceBlobSha": "d15fa5e07fc38de3c7de82d5e61b5d045e112741",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/ibpe-operating-workspace_.assurance.tsx",
+      "sourceBlobSha": "768483b2e7b9985b9beed4a99eceff3dec15dcd8",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/routes/command/ibpe-operating-workspace_.authority.tsx",
+      "sourceBlobSha": "23277026b2df3ce908d02c9aea3992888ef10c83",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/ibpe-operating-workspace_.optimizer.tsx",
+      "sourceBlobSha": "9d60563f7172da4b5efe858e578e2dcd5669e3f1",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/routes/command/ibpe-operating-workspace_.outputs.tsx",
+      "sourceBlobSha": "3b3dcf446b65d580db5d0ba52a4db13ab2a00a77",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/ibpe-operating-workspace_.release.tsx",
+      "sourceBlobSha": "751e5bcff708245cb40171e41df8ea6f6106372c",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/ibpe-operating-workspace_.simulation.tsx",
+      "sourceBlobSha": "ce2e07211a54480438c4499e0ca32a751e2251e3",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/routes/command/index.tsx",
+      "sourceBlobSha": "f6e24011fa5545f885cdfeb98d53231cc09baf82",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/routes/command/intelligence.tsx",
+      "sourceBlobSha": "ea3adea010be6d86b4b00e1aae39fc1077930598",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/inventory-control-audit.tsx",
+      "sourceBlobSha": "0c749d7124bac35f306eefad2e7c403886aef24f",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/inventory-ledgers.tsx",
+      "sourceBlobSha": "52dc6536a8855e8b48dde40c9a868ba886b66968",
+      "status": "reviewed-retained",
+      "note": "Shared shell, bridge or component with no standalone prose; contract retained."
+    },
+    {
+      "path": "src/routes/command/inventory-ledgers/$ledger.tsx",
+      "sourceBlobSha": "af5c175d9089bf14cbe2e4e6f5b41de5b566cf4c",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/routes/command/inventory-ledgers/index.tsx",
+      "sourceBlobSha": "9acf170181c79c3df35d2816b76fdafbf1c91bb8",
+      "status": "reviewed-retained",
+      "note": "Compatibility redirect; no standalone page copy."
+    },
+    {
+      "path": "src/routes/command/inventory-legacy.tsx",
+      "sourceBlobSha": "051026f087941a6bad58a12043f19cd71223b24d",
+      "status": "reviewed-retained",
+      "note": "Compatibility redirect; no standalone page copy."
+    },
+    {
+      "path": "src/routes/command/inventory-master.tsx",
+      "sourceBlobSha": "343b077c14e0fa76688496d44296290f7722b8f8",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/inventory-openings.tsx",
+      "sourceBlobSha": "0ecacdb30fe0517a2979428aa93523d21c472e1f",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/inventory-stocktake.tsx",
+      "sourceBlobSha": "ee1027d8f6ccf042a435622b768cb5036f366ebe",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/inventory-truth.tsx",
+      "sourceBlobSha": "17eb4af7ed72a51efbfeee3a19406288f14af6e3",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/inventory.tsx",
+      "sourceBlobSha": "d6eea0044b45efad2dd7e8cfb77af3bd343d32c4",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/investor-board.tsx",
+      "sourceBlobSha": "7f4d95f660621faf947ba5c3268ffee5ac52eac6",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/investor-pitch-external.tsx",
+      "sourceBlobSha": "4c73716933793f474180f7f7faf125ea263c593a",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/investor-pitch.tsx",
+      "sourceBlobSha": "ac12a933c9014084942ec5a7cd384e85deb01475",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/knowledge.tsx",
+      "sourceBlobSha": "ce7a597cbb69e0579927d4872dd863ab38c1fa41",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/legal-control.tsx",
+      "sourceBlobSha": "a7ee10d4eb12fa22409d63ac827de3bc1f41f357",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/legal.tsx",
+      "sourceBlobSha": "64c04528edfbcd9314d25a9e97a671527f01c71b",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/management-intelligence.tsx",
+      "sourceBlobSha": "f0dff5b0809ebbb8b2523e31bd1d2c76c938bfe6",
+      "status": "reviewed-retained",
+      "note": "Compatibility redirect; no standalone page copy."
+    },
+    {
+      "path": "src/routes/command/manufacturing.tsx",
+      "sourceBlobSha": "1e1c0ffe04fba1e128f8f7c2f0e278543980fb51",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/market-survey.tsx",
+      "sourceBlobSha": "4a1cb8967f35e47e44d05d936fb96018f7a9cf97",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/routes/command/master-data.tsx",
+      "sourceBlobSha": "8b81462f3165f8adceaafd14590d4686daac8530",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/master-finance.tsx",
+      "sourceBlobSha": "0705ca093961ff34f0f55208020acd509841c4c4",
+      "status": "reviewed-retained",
+      "note": "Compatibility redirect; no standalone page copy."
+    },
+    {
+      "path": "src/routes/command/operations.tsx",
+      "sourceBlobSha": "7cb8a3975240e66ac1ab911fbbb6421a1ddb0398",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/ops.tsx",
+      "sourceBlobSha": "0a5121e500f419207dd68d0e62fb98558892380a",
+      "status": "reviewed-retained",
+      "note": "Compatibility redirect; no standalone page copy."
+    },
+    {
+      "path": "src/routes/command/payables.tsx",
+      "sourceBlobSha": "a35d51bde79edfbda5b25948cfc9b07057fb502c",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/people-office.tsx",
+      "sourceBlobSha": "c0d80be53634864313289ebc97bc9921c491288a",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/phase-4.tsx",
+      "sourceBlobSha": "83bea65d2ff35d4be35173586461f6c431de8015",
+      "status": "reviewed-retained",
+      "note": "Compatibility redirect; no standalone page copy."
+    },
+    {
+      "path": "src/routes/command/phase-5.tsx",
+      "sourceBlobSha": "d4ce45b43184c2e21d05714a3b4dacc6decdc0ce",
+      "status": "reviewed-retained",
+      "note": "Compatibility redirect; no standalone page copy."
+    },
+    {
+      "path": "src/routes/command/phase-6.tsx",
+      "sourceBlobSha": "2bbe904d86874d843927e8bdcf8f381496511281",
+      "status": "reviewed-retained",
+      "note": "Compatibility redirect; no standalone page copy."
+    },
+    {
+      "path": "src/routes/command/phase-6a.tsx",
+      "sourceBlobSha": "7ae2cdfc4bdfc054a240db68d0e70fda1e3d4d18",
+      "status": "reviewed-retained",
+      "note": "Compatibility redirect; no standalone page copy."
+    },
+    {
+      "path": "src/routes/command/planning.tsx",
+      "sourceBlobSha": "cd22d62bf37d6774d8b1ac0ff3f94010ba5d9a5c",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/procurement-planning.tsx",
+      "sourceBlobSha": "0fb6ebbe709fb21706974cd7c1aaa1d380f2d76a",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/procurement.tsx",
+      "sourceBlobSha": "c1b66059d7942301c9e9e5ae38cef3d1836e44f1",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/product.tsx",
+      "sourceBlobSha": "acc780cba89c4e671d1d72108656464c147d2b2c",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/production-jobcards.tsx",
+      "sourceBlobSha": "d78cce98539c2556402cc86cc56068dfb882d82a",
+      "status": "reviewed-retained",
+      "note": "Compatibility redirect; no standalone page copy."
+    },
+    {
+      "path": "src/routes/command/production.tsx",
+      "sourceBlobSha": "f76dac2dd91016fe5b5450bfa439a752a92cf0f4",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/routes/command/purchase-execution.tsx",
+      "sourceBlobSha": "1c8891d4516f1df5786aec281276a44b04b7a1b3",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/qa-verification.tsx",
+      "sourceBlobSha": "4eeeb166573eefa67b29520f3ced322f15f93867",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/quality.tsx",
+      "sourceBlobSha": "c0efc752e811097dedf07f0a6036d545dbbc7204",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/receivables.tsx",
+      "sourceBlobSha": "ba555dde310ae67d440d9ad7223af99c2e1b1755",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/receiving.tsx",
+      "sourceBlobSha": "5c1f806209988ba9030b1e4df2bdff2edf17fc86",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/recovery.tsx",
+      "sourceBlobSha": "24816dca42fa5f1fe1d26f9476ae178eda4dbaab",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/risk.tsx",
+      "sourceBlobSha": "91c1aae96ef01f17ce7357d28374928d3ec0f298",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/route.tsx",
+      "sourceBlobSha": "33b3432d6b34ef417266b6868077c2b484fc7c7a",
+      "status": "reviewed-retained",
+      "note": "Compatibility redirect; no standalone page copy."
+    },
+    {
+      "path": "src/routes/command/sales-ledger.tsx",
+      "sourceBlobSha": "268c4bf65a619947bb2c0018279a320db8d2b89a",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/sales.tsx",
+      "sourceBlobSha": "414ecadec3b5d7ca9a4e1a39bf58e0dd6c5a2f47",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/scenarios.tsx",
+      "sourceBlobSha": "1e4df3d116b880ba7b3c0dd55990273076f8ae0e",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/stakeholder-portal.tsx",
+      "sourceBlobSha": "96886573a561bb38564fe50ab3d35a99922a36fa",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/technical.tsx",
+      "sourceBlobSha": "1e6bfe8d980c7ad19cfedd3acb15904db4cca963",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/uat-certification.tsx",
+      "sourceBlobSha": "e474e8edac7060f1039e54fb6527843ecdf7c598",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/routes/command/user-manual.tsx",
+      "sourceBlobSha": "5a1a63f7fbb18f265ec19517634d209057ba3997",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/command/users.tsx",
+      "sourceBlobSha": "fd6de5cd403c4f8f9ce842d333d7f16cd8a30e78",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/fit-calculator.tsx",
+      "sourceBlobSha": "840b7aecb0f8ae1d64a4e039e274f629daf53c85",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/index.tsx",
+      "sourceBlobSha": "bb025b9f02f39865e45102389db9b991814b3d04",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/inventory.tsx",
+      "sourceBlobSha": "14667d61534a77477b0c5650d359ffc34c78eace",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/login.tsx",
+      "sourceBlobSha": "93faf0e17c77c58da455a7805c33d460b8250725",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/range.$tier.tsx",
+      "sourceBlobSha": "cce2046358167e0cabd01a698b502ca332cb155f",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/range.tsx",
+      "sourceBlobSha": "e3587334d7a5a4e4053d7b1a203de71380892871",
+      "status": "reviewed-retained",
+      "note": "Shared shell, bridge or component with no standalone prose; contract retained."
+    },
+    {
+      "path": "src/routes/range/index.tsx",
+      "sourceBlobSha": "f7ffd78421bf6dac78dd09aa6992979381afa2eb",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/routes/signup.tsx",
+      "sourceBlobSha": "98f742e8d5da528a26bfa72855a65aca9eb58117",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/components/asset-maintenance-panel.tsx",
+      "sourceBlobSha": "bfc6f63392a91b3f8ba17812b1d1b6a2f10291ab",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/components/brand-lockup.tsx",
+      "sourceBlobSha": "32bb5c9d817e53b09b847bc018d5264f5153797e",
+      "status": "reviewed-retained",
+      "note": "Shared shell, bridge or component with no standalone prose; contract retained."
+    },
+    {
+      "path": "src/components/business-intelligence-studio.tsx",
+      "sourceBlobSha": "9164885b0d19f4a9adc8571e0ad8bb7a1059f7ea",
+      "status": "reviewed-retained",
+      "note": "Shared shell, bridge or component with no standalone prose; contract retained."
+    },
+    {
+      "path": "src/components/command-shell-v2.tsx",
+      "sourceBlobSha": "f8459f444601610e1ebc25ae84ebe0ba00e4f4d0",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/components/command-shell.tsx",
+      "sourceBlobSha": "7e813bf37437721a2a919d64cc33ec83fdea6f76",
+      "status": "reviewed-retained",
+      "note": "Shared shell, bridge or component with no standalone prose; contract retained."
+    },
+    {
+      "path": "src/components/command/group-portfolio.tsx",
+      "sourceBlobSha": "5b4b146db64c47ddc43170ea0a368330931f46f2",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/components/commercial/crm-workspace.tsx",
+      "sourceBlobSha": "bcecebc9844a545d9eb93d522bac0f451c627935",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/components/controlled-document-toolbar.tsx",
+      "sourceBlobSha": "84d8262c4c9ce0ccd4a8bf5f7c76cf4232411d85",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/components/earned-value-panel.tsx",
+      "sourceBlobSha": "fcf320be4089b599b075f8d38603dbc1371f86ba",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/components/engineering-change-control-panel.tsx",
+      "sourceBlobSha": "46b90533c80f7fd3489c6287f7904d200190d85c",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/components/engineering-impact-panel.tsx",
+      "sourceBlobSha": "cb1ec91b56a914f9bf108cdbd41db36105638db8",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/components/engineering-pdm-panel.tsx",
+      "sourceBlobSha": "55eef55d9a57eeaec906e0d4a7444f4d18d90b04",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/components/engineering-scenario-panel.tsx",
+      "sourceBlobSha": "4a2e18648c04a0c45e922e338ee67ec412a799d6",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/components/enterprise-digital-thread-panel.tsx",
+      "sourceBlobSha": "077fa9d53da11abeb0f1627c769cf3d06f24c50b",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/components/explainable-value.tsx",
+      "sourceBlobSha": "48fdd283a47a235676f7e84096101550db249148",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/components/finance-visual.tsx",
+      "sourceBlobSha": "b6d8edd4670e248291a8da73cb4c92980b7e027b",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/components/forecast-learning-panel.tsx",
+      "sourceBlobSha": "628564a1c2bef8d09f497af9a9140c2fab40d0c7",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/components/governed-lifecycle.tsx",
+      "sourceBlobSha": "3e0af08a87d8caa84c2bb6d8aa3d636d2d699a8a",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/components/guided-work-panel.tsx",
+      "sourceBlobSha": "713f4c441aea14b24499fc9fe7134a883971e38d",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/components/ibpe-copilot.tsx",
+      "sourceBlobSha": "b38a11207bea5cc8fee640c31a75d82fcd413685",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/components/ibpe-workspace-projection.tsx",
+      "sourceBlobSha": "1a057daf46c072b4f6509d65004d2847c519da69",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/components/intelligence-advisory-deck.tsx",
+      "sourceBlobSha": "25777e0bb33b58951524c4479da41bc8cdc9bd34",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/components/inventory-workspace-nav.tsx",
+      "sourceBlobSha": "7501ef5a96aae1e3df4dc65183a34de9a491180f",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/components/kpi.tsx",
+      "sourceBlobSha": "336c559bad067180b48de89746e54d006fa26d28",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/components/manufacturing-quality-intelligence-panel.tsx",
+      "sourceBlobSha": "bebe328d4dae019613da152263cfff4f45750db3",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/components/monte-carlo-panel.tsx",
+      "sourceBlobSha": "54e2f16cd9d482a0cd0ad7546ec2a40ccd5274fc",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/components/planning-intelligence-deck.tsx",
+      "sourceBlobSha": "e344209c3678acc510c9669dd87445b8251abd90",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/components/planning-studio.tsx",
+      "sourceBlobSha": "102efe6fae6d9c378bfd2c3313506a7502cf9a15",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/components/preview-host-bridge.tsx",
+      "sourceBlobSha": "98cb15d443328b2fdb5d9ae9e3bdab0eff453612",
+      "status": "reviewed-retained",
+      "note": "Shared shell, bridge or component with no standalone prose; contract retained."
+    },
+    {
+      "path": "src/components/program-forecast-panel.tsx",
+      "sourceBlobSha": "99e21443d0161bc46b402be53a6495330c18cfd2",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/components/program-gate-plan.tsx",
+      "sourceBlobSha": "0b1eba9283613ca4790e53f7619b9c977db11efb",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/components/protected-navigation-bridge.tsx",
+      "sourceBlobSha": "a2b8fd48562a1efb6faf0def9117ac33da13137c",
+      "status": "reviewed-retained",
+      "note": "Shared shell, bridge or component with no standalone prose; contract retained."
+    },
+    {
+      "path": "src/components/purchase-history-ledger.tsx",
+      "sourceBlobSha": "008e86439e3252e0784102afed073436348f873c",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/components/quality-assurance-deck.tsx",
+      "sourceBlobSha": "7e8814f4b0c587053d7daf97869f98244c741197",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/components/schedule-revision-editor.tsx",
+      "sourceBlobSha": "ea51da981467c24096ccab8f2be7138b2c712576",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/components/site-header.tsx",
+      "sourceBlobSha": "3a4100cf43dbefe32799c6568b2bcba8de000140",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/components/store01-supplier-intake.tsx",
+      "sourceBlobSha": "fcea0d81758555d7b5a596dcde9b175d109e9382",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/components/supplier-performance-panel.tsx",
+      "sourceBlobSha": "134a86d8feb01bf6e79cb641841a2c573e16419e",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/components/supplier-risk-panel.tsx",
+      "sourceBlobSha": "b2afbab6befae76f9f271f84ebed0bddd5275fc7",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/components/tally-ca-reconciliation.tsx",
+      "sourceBlobSha": "e0e8818b8f8b00d10e23967f845b9dbb680457d0",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    },
+    {
+      "path": "src/components/traceability-document-centre-v2.tsx",
+      "sourceBlobSha": "1316c48078845aa67a2d06425fd8b3f9e1f08acb",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/components/traceability-document-centre.tsx",
+      "sourceBlobSha": "a01b5df94eea19b9c40de26a1057874c957a354c",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/components/ui/button.tsx",
+      "sourceBlobSha": "ccb8b19983564a63a57391a51d0b50cb999272c6",
+      "status": "reviewed-retained",
+      "note": "Shared shell, bridge or component with no standalone prose; contract retained."
+    },
+    {
+      "path": "src/components/universal-scan-centre.tsx",
+      "sourceBlobSha": "6574624dbfeddd15143c3fe25ba470423ad53974",
+      "status": "changed",
+      "note": "Copy or shared presentation updated."
+    },
+    {
+      "path": "src/components/vibpe-runtime-observer.tsx",
+      "sourceBlobSha": "8d7f907506cd6687109ee9947fbc9bd592b13e14",
+      "status": "reviewed-retained",
+      "note": "Shared shell, bridge or component with no standalone prose; contract retained."
+    },
+    {
+      "path": "src/components/vibpe-section-nav.tsx",
+      "sourceBlobSha": "0eb905f12057f41dc1c937c027da77e63843459f",
+      "status": "reviewed-retained",
+      "note": "Existing labels, source-linked reference content or previously simplified copy reviewed and retained; shared presentation updates apply."
+    }
+  ]
+}

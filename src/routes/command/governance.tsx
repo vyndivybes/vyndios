@@ -103,9 +103,7 @@ function Governance() {
       <header className="border-b border-border pb-6">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">Governance · controlled decisions</p>
         <h1 className="mt-1 font-display text-4xl text-accent">Governance</h1>
-        <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">
-          One control plane for approval gates, accountable owners, required evidence and audit visibility. Gate enforcement state is persisted separately from evidence status, so OPEN/CLOSED controls never masquerade as evidence approval.
-        </p>
+        <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">Review approval gates, owners, required evidence and audit records. A gate's OPEN or CLOSED setting is separate from evidence approval.</p>
       </header>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

@@ -56,10 +56,10 @@ function Home() {
 
       <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
         <div className="max-w-3xl">
-          <p className="vyndi-public-eyebrow text-[11px] font-semibold uppercase tracking-[0.2em]">Engineering doctrine</p>
-          <h2 className="mt-3 text-4xl font-bold leading-tight text-accent sm:text-5xl">The Engineering Behind the Ride</h2>
-          <p className="mt-3 text-xl font-semibold text-fg">Not just a frame. A flight plan for the road.</p>
-          <p className="mt-4 text-base leading-7 text-muted sm:text-lg">We don't build bicycles. We engineer symphonies of carbon and geometry.</p>
+          <p className="vyndi-public-eyebrow text-[11px] font-semibold uppercase tracking-[0.2em]">Design approach</p>
+          <h2 className="mt-3 text-4xl font-bold leading-tight text-accent sm:text-5xl">The engineering behind the ride</h2>
+          <p className="mt-3 text-xl font-semibold text-fg">Geometry, materials and fit, considered together.</p>
+          <p className="mt-4 text-base leading-7 text-muted sm:text-lg">Explore the frame geometry, carbon construction and component choices behind each VYNDI build.</p>
         </div>
       </section>
 
@@ -90,7 +90,7 @@ function Home() {
               </span>
               <p className="vyndi-public-cyan text-[11px] font-semibold uppercase tracking-[0.2em]">Vāyú Shastr Pvt Ltd</p>
             </div>
-            <h2 className="mt-2 text-4xl font-bold text-accent">Designed and manufactured in India.</h2>
+            <h2 className="mt-2 text-4xl font-bold text-accent">Developed in India.</h2>
             <p className="mt-4 max-w-md text-muted">Indian design intent, Indian brand ownership and manufacturing for Indian riders.</p>
           </div>
           <ul className="grid gap-4 text-sm">
@@ -110,8 +110,8 @@ function Home() {
 
       <section className="mx-auto max-w-6xl px-4 py-24 text-center sm:px-6">
         <p className="vyndi-public-eyebrow justify-center text-[11px] font-semibold uppercase tracking-[0.24em]">VYNDI</p>
-        <h2 className="mt-4 text-4xl font-bold tracking-tight text-accent sm:text-6xl">Are You Ready to <span className="vyndi-public-cyan">Fly?</span></h2>
-        <p className="mx-auto mt-5 max-w-3xl text-base leading-7 text-muted sm:text-lg">VYNDI is not just another brand. It is a system — an engineering philosophy that respects the rider, the material, and the road.</p>
+        <h2 className="mt-4 text-4xl font-bold tracking-tight text-accent sm:text-6xl">Find your <span className="vyndi-public-cyan">VYNDI.</span></h2>
+        <p className="mx-auto mt-5 max-w-3xl text-base leading-7 text-muted sm:text-lg">Compare the VYNDI range and check which frame and component configuration suits your riding.</p>
       </section>
 
       <SiteFooter />

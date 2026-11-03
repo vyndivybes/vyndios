@@ -193,12 +193,12 @@ try {
   assert.ok(loginResponse?.ok(), `Login page returned HTTP ${loginResponse?.status() ?? "none"}`);
   // The SSR form is visible before React installs onSubmit; wait for mounted readiness.
   await login.locator(".vy-login.is-cinematic").waitFor({ state: "visible", timeout: 30_000 });
-  await login.getByLabel(/Authorised Email/i).fill(email);
+  await login.getByLabel(/Email address/i).fill(email);
   await login.getByLabel(/^Password$/i).fill(password);
   // Better Auth can transiently return ?created=false while an existing session
   // is rotated/settled. Retry the normal credential flow once; never bypass auth.
   for (let attempt = 1; attempt <= 2; attempt += 1) {
-    await login.getByRole("button", { name: /Authorize · Enter Command/i }).click();
+    await login.getByRole("button", { name: /Sign in to VYNDI OS/i }).click();
     try {
       await login.waitForURL(/\/command(?:\/|$)/, { timeout: 45_000, waitUntil: "domcontentloaded" });
       break;
@@ -206,7 +206,7 @@ try {
       if (attempt < 2) {
         await login.goto(`${baseUrl}/login?returnTo=%2Fcommand`, { waitUntil: "domcontentloaded", timeout: 60_000 });
         await login.locator(".vy-login.is-cinematic").waitFor({ state: "visible", timeout: 30_000 });
-        await login.getByLabel(/Authorised Email/i).fill(email);
+        await login.getByLabel(/Email address/i).fill(email);
         await login.getByLabel(/^Password$/i).fill(password);
         continue;
       }

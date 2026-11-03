@@ -62,9 +62,7 @@ function VibpeOutputsPage() {
       <header className="print:border-b print:border-border print:pb-4">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">VYNDI VIBPE · governed outputs</p>
         <h1 className="mt-1 font-display text-4xl">Outputs & Evidence</h1>
-        <p className="mt-2 max-w-5xl text-sm leading-6 text-muted">
-          Consolidated read-only output from planning authority, immutable packet lineage, optimizer execution, assurance and release closure. No transaction authority is created here.
-        </p>
+        <p className="mt-2 max-w-5xl text-sm leading-6 text-muted">Review saved planning inputs, optimizer results, assurance checks and release-readiness evidence together. No transaction authority is created here.</p>
         <p className="mt-2 text-xs text-subtle">Evidence generated {new Date(data.generatedAt).toLocaleString("en-IN")}</p>
         <button type="button" onClick={() => window.print()} className="mt-4 rounded-md border border-border px-3 py-2 text-xs text-muted hover:border-accent hover:text-fg print:hidden">Print governed report</button>
       </header>

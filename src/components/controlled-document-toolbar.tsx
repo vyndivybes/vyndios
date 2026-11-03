@@ -618,7 +618,7 @@ export function ControlledDocumentToolbar() {
             </div>
             <button type="button" aria-label="Close controlled documents" onClick={() => setOpen(false)} className="rounded-md border border-border p-1.5 text-muted hover:text-fg"><X className="size-4" /></button>
           </div>
-          {loading ? <p className="py-4 text-center text-xs text-muted">Loading canonical records…</p> : null}
+          {loading ? <p className="py-4 text-center text-xs text-muted">Loading records…</p> : null}
           {error ? <p className="rounded-lg border border-danger/40 p-2 text-xs text-danger">{error}</p> : null}
           {!loading && !error ? panel : null}
         </div>

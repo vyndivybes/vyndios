@@ -57,7 +57,7 @@ function InputTaxControl() {
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-green">Finance · input GST control</p>
           <h1 className="mt-2 font-display text-4xl text-accent">Input GST / ITC Review</h1>
-          <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">Supplier GST is not treated as eligible credit from document presence alone. Finance classifies each GST-bearing supplier invoice before approval; unverified or ineligible tax remains in inventory/cost instead of Input GST.</p>
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">Review each supplier invoice before treating its GST as eligible input credit. Finance must classify the tax before approval. Unverified or ineligible tax stays in inventory or cost.</p>
         </div>
         <div className="flex gap-2"><Link to="/command/accounting/statutory" className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted hover:border-accent hover:text-accent">Statutory Controls</Link><Link to="/command/payables" className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted hover:border-accent hover:text-accent">Payables</Link></div>
       </header>

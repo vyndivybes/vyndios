@@ -33,7 +33,7 @@ function InvestorBoardPage() {
     </section>
 
     <section>
-      <div className="mb-3 flex items-end justify-between"><div><h2 className="text-sm font-semibold text-accent">Capital ladder</h2><p className="text-xs text-muted">Each tranche is conditional on the stated evidence gate.</p></div></div>
+      <div className="mb-3 flex items-end justify-between"><div><h2 className="text-sm font-semibold text-accent">Capital ladder</h2><p className="text-xs text-muted">Each funding tranche requires the evidence listed for its gate.</p></div></div>
       <div className="overflow-x-auto rounded-lg border border-border"><table className="w-full min-w-[900px] text-left text-sm"><thead className="border-b border-border bg-surface text-[10px] uppercase tracking-wider text-subtle"><tr><th className="px-4 py-3">Tranche</th><th className="px-4 py-3">Ask</th><th className="px-4 py-3">Purpose</th><th className="px-4 py-3">Evidence</th><th className="px-4 py-3">Gate</th><th className="px-4 py-3">Status</th></tr></thead><tbody>{INVESTOR_MILESTONES.map((item) => <tr key={item.id} className="border-b border-border last:border-0"><td className="px-4 py-3 font-medium">{item.tranche}<div className="text-xs text-subtle">{item.timing}</div></td><td className="px-4 py-3">₹{item.quantumLakh}L</td><td className="px-4 py-3 text-muted">{item.purpose}</td><td className="max-w-sm px-4 py-3 text-muted">{item.requiredEvidence}</td><td className="px-4 py-3 text-muted">{item.decisionGate}</td><td className={`px-4 py-3 ${statusClass(item.status)}`}>{item.status}</td></tr>)}</tbody></table></div>
     </section>
 

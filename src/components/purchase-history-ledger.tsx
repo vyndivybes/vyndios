@@ -256,9 +256,7 @@ export function PurchaseHistoryLedger({ rows }: { rows: LedgerRow[] }) {
           </table>
         </div>
       )}
-      <p className="mt-3 text-xs leading-5 text-subtle">
-        This ledger is derived only from governed supplier, PO, GRN, inventory-movement, supplier-invoice and payment records. Editing remains in the owning transaction screens.
-      </p>
+      <p className="mt-3 text-xs leading-5 text-subtle">Follow each purchase through its supplier, purchase order, goods receipt, stock movement, invoice and payment records. Open the relevant transaction screen to make changes.</p>
     </Panel>
   );
 }

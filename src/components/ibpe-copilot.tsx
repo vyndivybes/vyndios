@@ -382,7 +382,7 @@ export function IbpeCopilot() {
               {messages.length === 0 ? (
                 <div className="space-y-5">
                   <div className="rounded-xl border border-border bg-surface/35 p-4">
-                    <p className="font-medium text-fg">Explore the operating model and trace governed records.</p>
+                    <p className="font-medium text-fg">Ask about the business or find a related record.</p>
                     <p className="mt-2 text-sm leading-6 text-muted">Ask about cash, demand, procurement, capacity, ERP optimization, finance controls or the current VEDM engineering configuration. VIBPE can also use commit-pinned Vāyú repository evidence and ordinary shorthand / mixed Tamil-English wording to trace an Order, Job Card, Traveller/serial, MR, PO, GRN, Quality Release, Dispatch or Invoice. Partial identifiers are accepted.</p>
                   </div>
                   <div>

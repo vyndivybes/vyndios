@@ -47,10 +47,8 @@ function AdvisorySection({
       </summary>
       {error ? <p role="alert" className="mt-3 text-xs text-warn">{error}</p> : null}
       {loaded ? <div className="mt-4">{children}</div> : !loading ? (
-        <p className="mt-3 text-xs leading-5 text-muted">
-          Governed advisory evidence is loaded only when reviewed. It does not block Product Intelligence entry.
-        </p>
-      ) : <p className="mt-3 text-xs text-muted">Loading governed evidence…</p>}
+        <p className="mt-3 text-xs leading-5 text-muted">Open this section to load the supporting records. Product Intelligence stays available while this optional advice is unloaded.</p>
+      ) : <p className="mt-3 text-xs text-muted">Loading supporting records…</p>}
     </details>
   );
 }

@@ -308,7 +308,7 @@ export function UniversalScanCentre() {
                   <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-green">MES-SCAN-01 · governed input</p>
                   <h2 className="mt-1 font-display text-xl font-semibold text-fg sm:text-2xl">Universal Scanner</h2>
                   <p className="mt-1 text-xs leading-5 text-muted">
-                    USB/Bluetooth scanners, camera QR/barcode capture, and controlled PDF/JPG/PNG evidence intake.
+                    Scan a QR code or barcode, use a USB/Bluetooth scanner, or attach a PDF, JPG or PNG as evidence.
                   </p>
                 </div>
                 <button type="button" onClick={close} className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border text-muted hover:border-accent/50 hover:text-fg" aria-label="Close scanner">

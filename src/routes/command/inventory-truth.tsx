@@ -24,7 +24,7 @@ function InventoryTruth() {
     <div>
       <p className="text-[10px] uppercase tracking-[0.22em] text-green">Operate · authoritative data</p>
       <h1 className="mt-2 text-4xl font-bold text-accent">Inventory truth</h1>
-      <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">This control view reads only the server-side EPR inventory ledger. Browser seed inventory and localStorage are deliberately excluded from these balances.</p>
+      <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">Review balances from the server-side EPR inventory ledger. Browser seed data and locally saved values are excluded.</p>
     </div>
     <InventoryWorkspaceNav active="truth" />
     <div className="flex flex-wrap gap-2 text-xs">

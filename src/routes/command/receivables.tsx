@@ -84,10 +84,7 @@ function Receivables() {
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-green">Finance · order to cash</p>
           <h1 className="mt-2 font-display text-4xl text-accent">Accounts Receivable</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
-            A confirmed order does not create revenue or cash. Dispatch releases inventory/COGS; the controlled tax invoice creates the gross customer receivable;
-            only an evidenced collection moves Bank and verified canonical cash for VIBPE.
-          </p>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">A confirmed order does not record revenue or cash. Dispatch posts inventory and COGS; the tax invoice records the customer receivable. A collection with supporting evidence updates Bank and verified cash for VIBPE.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link to="/command/accounting/statutory" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted hover:border-accent hover:text-accent">

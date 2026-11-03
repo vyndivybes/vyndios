@@ -199,9 +199,7 @@ function ErpControlTower() {
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">Command Centre · read-only ERP intelligence</p>
           <h1 className="mt-1 font-display text-4xl">ERP Control Tower</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
-            Exception-first operating view across Commercial, Engineering, Production, Inventory, Procurement, Finance and Governance. Every metric is sourced from canonical report views; this surface cannot post or mutate business truth.
-          </p>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">Review issues across Commercial, Engineering, Production, Inventory, Procurement, Finance and Governance. Figures come from the shared reports. Open the relevant workspace when you need to change a record.</p>
           <p className="mt-2 text-xs text-subtle">Generated {new Date(data.generatedAt).toLocaleString("en-IN")}</p>
         </div>
         <div className="flex flex-wrap gap-2">

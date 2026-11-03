@@ -219,7 +219,7 @@ function SalesLedgerWorkspace() {
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-green">Finance · actual invoiced sales authority</p>
           <h1 className="mt-2 font-display text-4xl text-accent">Sales Ledger</h1>
-          <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">Actual invoices only. Bicycle and spare/component revenue remain separately visible while consolidating into total revenue, AR, Bank and canonical cash. Spare sales reuse Master Inventory FIFO and existing controlled identities; OEM identities are never replaced.</p>
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">Review issued invoices, with bicycle and spare-part sales shown separately and consolidated into revenue, receivables, Bank and cash. Spare sales use Inventory Master FIFO and retain the original OEM identities.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link to="/command/sales" className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted hover:border-accent hover:text-accent">Demand & Orders</Link>

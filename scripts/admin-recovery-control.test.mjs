@@ -356,7 +356,7 @@ test("recovery evidence is append-only and UI preserves the canonical authority 
   assert.match(migration,/vyndi_recovery_compare_snapshot/);
   assert.match(migration,/production_job_card/);
   assert.match(migration,/inventory_identity/);
-  assert.match(route,/Production rows are never blindly overwritten/);
+  assert.match(route,/Live production rows are not overwritten directly/);
   assert.match(route,/Load \/ compare evidence/);
   assert.match(route,/never exposes an Execute Restore button/);
   assert.match(route,/COMPARE \/ CORRECTIVE/);

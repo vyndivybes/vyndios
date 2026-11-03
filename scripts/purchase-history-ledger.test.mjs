@@ -30,5 +30,5 @@ test("purchase execution is the single entry point and exposes the derived audit
   assert.match(component, /Purchase History Ledger/);
   assert.match(component, /PO → GRN → Inventory → Invoice \/ GST → Payment/);
   assert.match(component, /Export CSV/);
-  assert.match(component, /Editing remains in the owning transaction screens/);
+  assert.match(component, /Open the relevant transaction screen to make changes/);
 });

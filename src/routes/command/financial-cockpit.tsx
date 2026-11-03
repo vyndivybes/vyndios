@@ -35,7 +35,7 @@ function FinancialCockpit() {
   if (state.status === "loading") return (
     <section data-route-readiness="loading" className="space-y-3">
       <h1 className="font-display text-4xl">Consolidated Finance</h1>
-      <p className="text-sm text-muted">Loading approved operating-plan evidence…</p>
+      <p className="text-sm text-muted">Loading the approved plan…</p>
     </section>
   );
   if (state.status === "error") return (
@@ -103,7 +103,7 @@ function FinancialCockpitReady({ approvedPlan }: { approvedPlan: OperatingPlanSn
       <header className="border-b border-border pb-6">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">Finance · executive financial control · 36M</p>
         <h1 className="mt-1 font-display text-4xl text-accent">Consolidated Finance Overview</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">Executive portfolio view of liquidity, funding, break-even, runway and operating drivers across the business. Use Transactions for ledger activity, Accounting & Statements for books, and Planning & Control for the approved Integrated Operating Plan and variance review.</p>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">Review cash, funding, break-even, runway and the assumptions driving them. Open Transactions for ledger activity, Accounting & Statements for the books, or Planning & Control for the approved plan and variances.</p>
       </header>
 
       <div className="rounded-xl border border-border bg-surface/40 p-3">

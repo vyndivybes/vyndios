@@ -35,11 +35,7 @@ function Procurement() {
             Operate · procurement control
           </p>
           <h1 className="mt-2 text-4xl font-bold text-accent">Procurement</h1>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">
-            MSL warnings from authoritative inventory become the replenishment queue. This page
-            consumes posted ERP balances; it does not own stock or create a purchase order
-            automatically.
-          </p>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">Review items below their minimum stock level and the recorded balances behind each warning. This queue does not change stock or create purchase orders automatically.</p>
         </div>
         <Link to="/command/purchase-execution" className="text-sm font-semibold text-accent">
           Purchase execution →
