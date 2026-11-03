@@ -296,27 +296,27 @@ function ProductionWorkspace() {
     <div className="space-y-6">
       <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Supply & Production · order to serial genealogy</p>
+          <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Supply & Production · builds and materials</p>
           <h1 className="mt-1 font-display text-4xl text-accent">Production</h1>
           <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">
-            Select the bicycle once in Commercial. VYNDI automatically carries its controlled configuration into one job card, expands the BOM, reserves available stock, registers one traveller per physical unit and raises draft procurement for shortages. The production decision is approved once per bike / batch.
+            Review confirmed orders, check materials and follow each build through approval. VYNDI carries the bicycle configuration from Commercial into its job card.
           </p>
         </div>
         <Link to="/command/purchase-execution" className="rounded-lg border border-border px-4 py-2.5 text-sm font-semibold text-muted hover:border-accent hover:text-accent">
-          Open shortage-generated POs
+          Review purchase drafts
         </Link>
       </header>
 
       {demoCards>0?<section aria-label="Pre-production release boundary" className="rounded-xl border border-warn/40 bg-warn/5 p-4">
         <h2 className="font-semibold text-warn">NOT RELEASED · Design confirmation required</h2>
-        <p className="mt-2 text-sm text-muted">The design is not confirmed for physical production. These four legacy/demo orders, stored release labels and historic approval fields are reference history. They do not represent approved real job cards. Existing stock, cost and PO history is preserved.</p>
+        <p className="mt-2 text-sm text-muted">These four demo orders are for testing VYNDI OS. Their historical release and approval fields do not authorize physical production. Use the simulation to try planning while design and production approvals are completed. Stock, cost and purchase history remain available.</p>
         <Link to="/command/ibpe-operating-workspace/simulation" className="mt-3 inline-block text-sm text-accent underline">Use the four-order simulation →</Link>
       </section>:null}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
         <Kpi label="Confirmed orders" value={String(orders.length)} hint={`${confirmedOrderUnits} committed unit(s) from Commercial`} tone={orders.length ? "ok" : "warn"} />
         <Kpi label="Job cards" value={String(cards.length)} hint={`${approvedCards} real approvals recorded · ${demoCards} demo / legacy`} />
         <Kpi label="Missing / stale" value={String(ordersNeedingJobCard.length)} hint={`${synchronizedOrders.length}/${orders.length} confirmed orders on current job-card revision`} tone={ordersNeedingJobCard.length ? "danger" : "ok"} />
-        <Kpi label="Travellers" value={String(travellers.length)} hint="Auto-registered genealogy" />
+        <Kpi label="Travellers" value={String(travellers.length)} hint="Build and serial records" />
         <Kpi label="Shortage lines" value={String(shortages)} hint="Stock required" tone={shortages ? "danger" : "ok"} />
         <Kpi label="Draft POs" value={String(draftPos)} hint="Not supplier commitments" tone={draftPos ? "warn" : "ok"} />
         <Kpi label="36-mo plan" value={String(totalPlannedUnits)} hint={`${scenario} · trough ${lakh(trough.closingCash)}`} />
@@ -324,7 +324,7 @@ function ProductionWorkspace() {
 
       {message ? <div role="status" className="rounded-lg border border-border bg-surface px-4 py-3 text-sm text-muted">{message}</div> : null}
 
-      <Panel title="Order → Job Card reconciliation" kicker="Confirmed Commercial truth must reconcile 1:1 to current Production revisions">
+      <Panel title="Orders to review" kicker="Each confirmed order needs a job card at the same revision">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Metric label="Confirmed orders" value={String(orders.length)} />
           <Metric label="Confirmed units" value={String(confirmedOrderUnits)} />
@@ -333,8 +333,8 @@ function ProductionWorkspace() {
         </div>
         {orders.length === 0 ? (
           <div className="mt-4 rounded-lg border border-warn/40 bg-warn/5 p-4">
-            <p className="text-sm font-semibold text-warn">Production cannot see any confirmed Commercial order.</p>
-            <p className="mt-1 text-xs leading-5 text-muted">If Commercial shows confirmed orders, this proves a persistence/environment mismatch rather than a hidden Production card.</p>
+            <p className="text-sm font-semibold text-warn">No confirmed orders yet.</p>
+            <p className="mt-1 text-xs leading-5 text-muted">Start with the Commercial order register. If an order is already confirmed there, check that it saved successfully before continuing.</p>
             <Link to="/command/sales" className="mt-3 inline-block text-xs font-semibold text-accent hover:underline">Open Commercial order register →</Link>
           </div>
         ) : ordersNeedingJobCard.length ? (
@@ -418,9 +418,9 @@ function ProductionWorkspace() {
         </div>
       </Panel> : null}
 
-      <Panel title="Bike / batch release" kicker="One approval creates the dependent production records">
+      <Panel title="Bike / batch release" kicker="Review the build before releasing it">
         {cards.length === 0 ? (
-          <p className="text-sm leading-6 text-muted">No controlled job card exists. Create a confirmed bicycle order in Commercial; its model configuration is carried here automatically.</p>
+          <p className="text-sm leading-6 text-muted">No job cards yet. Confirm a bicycle order in Commercial to bring its configuration here.</p>
         ) : (
           <div className="space-y-4">
             {cards.map((card: any) => {
@@ -452,7 +452,7 @@ function ProductionWorkspace() {
                         </>
                       ) : (
                         <>
-                          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-warn">Awaiting one production approval</p>
+                          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-warn">Production approval needed</p>
                           <Button className="mt-2 w-full" disabled={busyAction !== null || card.status !== "released"} onClick={() => void approve(card)}>
                             {busyAction === `approve:${card.id}` ? "Approving…" : "Approve bike / batch"}
                           </Button>
@@ -560,7 +560,7 @@ function ProductionWorkspace() {
         </div>
       </Panel>
 
-      <Panel title="Control boundary" kicker="Automation without uncontrolled commitments">
+      <Panel title="How approvals work" kicker="What VYNDI prepares and what your team approves">
         <div className="grid gap-3 md:grid-cols-3">
           <LineageStep label="Automatic" text="Model defaults, BOM expansion, job-card lines, stock reservations, traveller registration and shortage draft POs." />
           <LineageStep label="One production approval" text="One bike / batch approval releases its genealogy and confirms the controlled build decision." />
