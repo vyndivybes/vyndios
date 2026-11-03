@@ -124,10 +124,7 @@ function CaCertificateRegister() {
       </Panel>
       <Panel title="Independent UDIN portal observation" kicker="Separate checker · manual ICAI verification only">
         <form onSubmit={check} className="grid gap-3">
-          <p className="text-xs text-muted">
-            A second authorized reviewer must independently inspect the certificate and verify its UDIN through the official
-            ICAI portal. Record the outcome and retained evidence. This system does not access the ICAI portal.
-          </p>
+          <p className="text-xs text-muted">A second authorized reviewer must inspect the certificate and check its UDIN on the official ICAI portal. Record the result and retain the supporting evidence. VYNDI does not perform that portal check.</p>
           <a className="text-sm font-semibold text-accent" href="https://udin.icai.org/" target="_blank" rel="noopener noreferrer">
             Open official ICAI UDIN portal ↗
           </a>

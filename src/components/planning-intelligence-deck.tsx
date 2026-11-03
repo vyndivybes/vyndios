@@ -48,11 +48,8 @@ function IntelligenceSection({
       </summary>
       {error ? <p role="alert" className="mt-3 text-xs text-warn">{error}</p> : null}
       {loaded ? <div className="mt-4">{children}</div> : !loading ? (
-        <p className="mt-3 text-xs leading-5 text-muted">
-          This governed intelligence is advisory and does not block entry to the Integrated Operating Plan.
-          Open this section to load the current evidence.
-        </p>
-      ) : <p className="mt-3 text-xs text-muted">Loading governed evidence…</p>}
+        <p className="mt-3 text-xs leading-5 text-muted">Open this section to load planning advice and its supporting records. It does not approve or change the Integrated Operating Plan.</p>
+      ) : <p className="mt-3 text-xs text-muted">Loading supporting records…</p>}
     </details>
   );
 }

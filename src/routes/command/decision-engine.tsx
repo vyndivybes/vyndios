@@ -25,7 +25,7 @@ function DecisionEngine() {
         <div>
           <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Phase K · Integrated execution</p>
           <h1 className="font-display text-4xl">Decision Engine</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">The bridge from signal to action: Founder Command → alert → decision packet → evidence → governance → approval → financial and operational impact → stakeholder reporting.</p>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">Follow a signal from the Founder Command screen into a decision, supporting evidence and approval. Then review its financial and operating impact before sharing the outcome with stakeholders.</p>
         </div>
         <div className="flex gap-3 text-sm"><Link to="/command/founder-command" className="text-accent hover:text-fg">Founder Command →</Link><Link to="/command/governance" className="text-accent hover:text-fg">Governance →</Link></div>
       </div>

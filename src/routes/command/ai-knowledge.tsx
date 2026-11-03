@@ -9,7 +9,7 @@ function AIKnowledgePage() {
   const ready = AI_KNOWLEDGE_RULES.filter((item) => item.status === "ready").length;
   const restricted = AI_KNOWLEDGE_RULES.filter((item) => item.mode === "founder-only").length;
   return <div className="space-y-8">
-    <header><p className="text-[10px] uppercase tracking-[0.2em] text-subtle">Stage 10 · AI / Knowledge</p><h1 className="mt-2 text-2xl font-semibold tracking-tight">Controlled knowledge interface</h1><p className="mt-2 max-w-3xl text-sm text-muted">A governed interface for asking questions against the workspace knowledge system without turning assumptions, pending work or sensitive records into facts.</p></header>
+    <header><p className="text-[10px] uppercase tracking-[0.2em] text-subtle">Stage 10 · AI / Knowledge</p><h1 className="mt-2 text-2xl font-semibold tracking-tight">Controlled knowledge interface</h1><p className="mt-2 max-w-3xl text-sm text-muted">Ask questions using the workspace knowledge system. Check the sources before using an answer: assumptions and pending work are not confirmed facts, and sensitive records remain restricted.</p></header>
 
     <section className="grid gap-3 sm:grid-cols-4">{[["Mode", "Controlled"],["Rules ready", `${ready}/${AI_KNOWLEDGE_RULES.length}`],["Founder-only rules", `${restricted}`],["Source of truth", "Knowledge + controls"]].map(([label, value]) => <div key={label} className="rounded-lg border border-border bg-surface p-4"><p className="text-[10px] uppercase tracking-widest text-subtle">{label}</p><p className="mt-2 text-lg font-semibold">{value}</p></div>)}</section>
 
@@ -21,6 +21,6 @@ function AIKnowledgePage() {
 
     <section><h2 className="mb-3 text-sm font-semibold">Suggested queries</h2><div className="flex flex-wrap gap-2">{AI_QUERY_SUGGESTIONS.map((query) => <div key={query} className="rounded-full border border-border px-3 py-2 text-xs text-muted">{query}</div>)}</div></section>
 
-    <section className="rounded-lg border border-border p-5"><h2 className="text-sm font-semibold">Important boundary</h2><p className="mt-3 text-sm leading-6 text-muted">This stage establishes the governed knowledge contract and reusable prompt/query surface. It does not pretend that a live LLM retrieval backend, authentication boundary or vector database exists. Those are implementation stages that require actual infrastructure before they can be called active.</p></section>
+    <section className="rounded-lg border border-border p-5"><h2 className="text-sm font-semibold">Important boundary</h2><p className="mt-3 text-sm leading-6 text-muted">This page describes the knowledge workflow and provides reusable prompts. It does not confirm that live retrieval, authentication or a vector database has been connected. Those services need separate setup and verification.</p></section>
   </div>;
 }

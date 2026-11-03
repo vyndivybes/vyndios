@@ -164,10 +164,7 @@ function InventoryStocktake() {
       <header className="border-b border-border pb-6">
         <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-green">Operate · controlled physical inventory</p>
         <h1 className="mt-2 font-display text-4xl text-accent">Inventory Stocktake</h1>
-        <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">
-          Freeze the count window, snapshot the authoritative ledger, record physical evidence, submit, obtain independent maker/checker approval,
-          then post any variance through the same FIFO, cost-ledger and finance authorities used by normal inventory transactions.
-        </p>
+        <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">Pause stock movements and take a snapshot of the ledger. Record the physical count and evidence, submit it, then obtain approval from a separate checker. Post any variance through the existing FIFO, cost-ledger and accounting controls.</p>
       </header>
 
       <section className="grid gap-3 md:grid-cols-4">

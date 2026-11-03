@@ -62,11 +62,7 @@ export function Store01SupplierIntake({
 
   return (
     <Panel title="Store 01 · Supplier delivery & invoice preflight" kicker="Advisory intake · no automatic stock or finance posting">
-      <p className="mb-4 text-sm text-muted">
-        Compare the counted supplier parts, issued PO and invoice before preparing a quarantined GRN.
-        Barcode scanners acting as keyboards may enter IDs and document references. Invoice fields are
-        manually verified at this stage; OCR and robot actions are not connected.
-      </p>
+      <p className="mb-4 text-sm text-muted">Compare the parts received with the issued purchase order and supplier invoice before preparing a quarantined goods receipt. Keyboard-style barcode scanners can enter IDs and document references. Verify invoice fields manually; OCR and robot actions are not connected at this stage.</p>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <label className="text-xs font-semibold text-muted">
           Issued purchase order

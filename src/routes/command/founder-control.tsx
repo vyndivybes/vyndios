@@ -23,7 +23,7 @@ function FounderControl() {
       <header>
         <p className="text-[10px] uppercase tracking-[0.2em] text-subtle">Phase I · Deep Control</p>
         <h1 className="mt-2 font-display text-4xl">Founder Control Upgrade</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">A tighter operating layer above the Founder Command Centre: guardrails, intervention lanes, action urgency and release rules. It surfaces risk; it never fabricates completion.</p>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">Review operating limits, urgent actions and release rules alongside the Founder Command Centre. Risks stay visible, and completion still requires recorded evidence.</p>
       </header>
 
       <div className="grid gap-3 sm:grid-cols-4">

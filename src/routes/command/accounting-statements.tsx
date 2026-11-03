@@ -129,9 +129,7 @@ function AccountingStatements() {
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-green">Finance · canonical posted actuals</p>
           <h1 className="mt-2 font-display text-4xl text-accent">Financial Statements</h1>
-          <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">
-            Trading Account, Profit & Loss, Cost Account, Balance Sheet, Cash Flow, Fund Flow and Trial Balance are compiled from the same posted General Ledger and governed job-cost snapshots. Cash-basis views are timing reconciliations, not a second ledger.
-          </p>
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">Review financial statements built from the same posted General Ledger and approved job-cost snapshots. Cash-basis views explain timing differences; they do not create a separate ledger.</p>
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
           <Link to="/command/accounting" className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted hover:border-accent hover:text-accent">Accounting Workbench</Link>

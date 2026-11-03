@@ -111,7 +111,7 @@ function ScenarioStudio() {
           <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/30 px-2.5 py-1 text-[10px] uppercase tracking-wider text-muted"><ShieldCheck className="size-3 text-green" /> Advisory · no transactions</span>
         </div>
         <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight text-fg">Model the decision before committing it.</h1>
-        <p className="mt-3 max-w-4xl text-sm leading-6 text-muted">Flex demand, capacity, supplier lead time, procurement cost, receipt timing and funding against the latest governed IBPE snapshot. Approved plan, actuals and contractual commitments remain untouched.</p>
+        <p className="mt-3 max-w-4xl text-sm leading-6 text-muted">Try changes to demand, capacity, supplier lead time, purchasing costs, receipt dates and funding using the latest saved IBPE inputs. The approved plan, actuals and contractual commitments stay unchanged.</p>
       </div>
       <div className="flex flex-wrap gap-2">
         <Link to="/command/planning" className="rounded-lg border border-border px-3 py-2 text-sm text-muted transition hover:border-accent/45 hover:text-fg">Integrated Operating Plan</Link>

@@ -231,9 +231,7 @@ function Commercial() {
       <header>
         <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Commercial · single bicycle selection to controlled build</p>
         <h1 className="mt-1 font-display text-4xl text-accent">Commercial</h1>
-        <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">
-          Select the bicycle model/variant and quantity. Its standard component configuration is loaded automatically. A confirmed order is first persisted to the central order ledger, then synchronized to one controlled Production job card.
-        </p>
+        <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">Choose a bicycle model, variant and quantity. VYNDI loads its standard components. Confirming an order saves it to the central sales register before synchronizing its production job card.</p>
       </header>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

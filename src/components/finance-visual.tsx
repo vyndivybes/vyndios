@@ -187,7 +187,7 @@ export function FinanceVisual({ rows, title = "Model visualisation" }: { rows: M
                 <p className="mt-2 text-2xl text-fg">M1 → M36</p>
               </div>
             </div>
-            <p className="mt-4 text-xs leading-5 text-muted">Hover over the graph to inspect the value for each month. The axes are labelled with units so the relationship between time and the selected financial measure is explicit. This graphic is driven by the same live assumptions as the tables.</p>
+            <p className="mt-4 text-xs leading-5 text-muted">Hover over the chart to see each month's value. Axis labels show the units. The chart uses the same assumptions as the tables.</p>
           </div>
         </div>
       ) : null}

@@ -144,9 +144,7 @@ function CAAudit() {
       <header>
         <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Finance / governance · live launch gate</p>
         <h1 className="mt-1 font-display text-4xl">CA Verification / Launch Readiness</h1>
-        <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">
-          This page evaluates the live management-accounting model; it does not own a second finance model. It is a software and management-control gate, not a statutory audit, tax opinion, certificate or filing.
-        </p>
+        <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">Review checks on the management-accounting model. This page uses the same finance model as the rest of VYNDI. Its results are software and management checks, not a statutory audit, tax opinion, certificate or filing.</p>
         <div className="mt-3 flex flex-wrap gap-3 text-sm font-semibold">
           <Link to="/command/ca-certificate-register" className="text-accent">CA-Signed Accounts Register →</Link>
           <Link to="/command/accounting" className="text-accent">Accounting Workbench →</Link>

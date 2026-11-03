@@ -40,11 +40,7 @@ function InventoryReferenceCatalogue() {
               Reference only · configurator catalogue
             </p>
             <h1 className="mt-2 text-4xl font-bold text-accent">Component catalogue</h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">
-              This compatibility catalogue is read-only reference data for product configuration.
-              It is not an ERP writer. Authoritative SKU approval, stock quantity, valuation,
-              movements, MSL and FIFO belong only to the governed Inventory authority.
-            </p>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">Use this read-only catalogue for product configuration. Approved item identities, stock, valuation, movements, minimum stock levels and FIFO are managed in the Inventory workspace.</p>
             <div className="mt-3 flex flex-wrap gap-2 text-xs">
               <Link
                 to="/command/inventory"

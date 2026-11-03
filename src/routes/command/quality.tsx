@@ -38,7 +38,7 @@ function Quality() {
   if (state.status === "loading") return (
     <section data-route-readiness="loading" className="space-y-3">
       <h1 className="font-display text-4xl">Quality &amp; Product Compliance</h1>
-      <p className="text-sm text-muted">Loading canonical inspection, NCR, CAPA and release registers…</p>
+      <p className="text-sm text-muted">Loading inspections, NCR, CAPA and release records…</p>
     </section>
   );
   if (state.status === "error") return (

@@ -79,10 +79,7 @@ function Knowledge() {
       <div>
         <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Master control · Stage 2</p>
         <h1 className="font-display text-4xl">Knowledge base</h1>
-        <p className="mt-2 max-w-3xl text-sm text-muted">
-          One controlled view of the business baseline. Planning assumptions and unresolved engineering
-          decisions are deliberately separated from confirmed evidence.
-        </p>
+        <p className="mt-2 max-w-3xl text-sm text-muted">Review the business baseline and its sources. Planning assumptions and unresolved engineering decisions are listed separately from confirmed evidence.</p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">

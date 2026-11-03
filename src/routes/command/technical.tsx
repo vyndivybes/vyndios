@@ -18,9 +18,7 @@ function Technical() {
       <div>
         <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Stage 3 · Engineering control</p>
         <h1 className="font-display text-4xl">Technical & Product</h1>
-        <p className="mt-2 max-w-3xl text-sm text-muted">
-          Controlled engineering path from VEDM baseline through geometry, clearance, materials, FEA, NDT, ISO 4210 and design freeze.
-        </p>
+        <p className="mt-2 max-w-3xl text-sm text-muted">Review the engineering steps from the VEDM baseline through geometry, clearance, materials, FEA, NDT, ISO 4210 testing and design freeze.</p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-4">

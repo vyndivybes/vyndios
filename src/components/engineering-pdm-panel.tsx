@@ -45,7 +45,7 @@ export function EngineeringPdmPanel({state}:{state:EngineeringPdmState}){
         <Kpi label="Superseded" value={String(state.summary.supersededRevisionCount)} hint="Historical controlled revisions"/>
         <Kpi label="Manifests" value={String(state.summary.manifestCount)} hint="Frozen released configurations"/>
       </div>
-      <p className="mt-3 text-[10px] leading-4 text-subtle">Binary files remain in their canonical repository/Drive/controlled storage. VYNDI controls identity, revision, SHA-256, release state and where-used relationships; changing a released configuration requires a new baseline/change, not silent file replacement.</p>
+      <p className="mt-3 text-[10px] leading-4 text-subtle">Keep files in their existing repository, Drive folder or controlled storage. VYNDI records each file's identity, revision, SHA-256 hash, release status and usage. Change a released configuration through a new baseline or change request; do not replace its files silently.</p>
       {message?<div role="status" className="mt-3 rounded border border-border bg-surface px-3 py-2 text-xs text-muted">{message}</div>:null}
     </Panel>
 

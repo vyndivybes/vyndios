@@ -48,7 +48,7 @@ export function ForecastLearningPanel({
     <div className={`mt-4 rounded-xl border p-4 ${learning.available?"border-green/30 bg-green/5":"border-warn/35 bg-warn/5"}`}>
       <p className="text-xs font-semibold uppercase tracking-wider">{learning.available?"Learning evidence active":"Learning WITHHELD"}</p>
       <p className="mt-2 text-xs leading-5 text-muted">{learning.reason}</p>
-      <p className="mt-2 text-[10px] leading-4 text-subtle">No hindsight: only a vintage captured before a target calendar period starts can score that period. Close corrections create a new revision; prior close evidence remains immutable.</p>
+      <p className="mt-2 text-[10px] leading-4 text-subtle">A forecast can be scored only if it was captured before the target period began. Corrections to a closed period create a new revision and retain the earlier evidence.</p>
     </div>
 
     {allowActions?<div className="mt-5 rounded-xl border border-border p-4">

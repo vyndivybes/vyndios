@@ -55,11 +55,7 @@ function DecisionInbox() {
       <header className="border-b border-border pb-6">
         <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-green">Command Centre · exception first</p>
         <h1 className="mt-2 font-display text-4xl text-accent">Business Action Inbox</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
-          Compact governed register across planning, procurement, receiving, finance and IBPE actions.
-          Related queues stay collapsed by default; expand only the evidence you need. Protected transactions
-          remain owned by their canonical workspaces.
-        </p>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">Review actions waiting across planning, purchasing, receiving, finance and IBPE. Expand a queue to inspect its evidence, then open the relevant workspace to complete the transaction.</p>
       </header>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

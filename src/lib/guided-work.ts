@@ -43,7 +43,7 @@ const PLAYBOOKS: readonly GuidedWorkPlaybook[] = [
     id: "management",
     department: "Management",
     routes: ["/command", "/command/decision-inbox", "/command/control-tower", "/command/ibpe-operating-workspace"],
-    purpose: "Turn current governed business state into an ordered management review and action sequence.",
+    purpose: "Review today's business issues and decide what to do next.",
     why: "Management should work from current exceptions and evidence rather than page-by-page inspection or memory.",
     procedure: [
       "Review Command Centre condition and unresolved exception counts.",
@@ -62,7 +62,7 @@ const PLAYBOOKS: readonly GuidedWorkPlaybook[] = [
     id: "commercial",
     department: "Commercial",
     routes: ["/command/sales", "/command/gtm", "/command/market-survey"],
-    purpose: "Move demand from market evidence to a controlled commercial commitment.",
+    purpose: "Turn customer demand into a reviewed sales order.",
     why: "Commercial demand becomes authoritative only through governed order state and downstream synchronization.",
     procedure: [
       "Review market/GTM evidence before creating or revising demand.",
@@ -81,7 +81,7 @@ const PLAYBOOKS: readonly GuidedWorkPlaybook[] = [
     id: "planning",
     department: "Planning",
     routes: ["/command/planning", "/command/scenarios"],
-    purpose: "Maintain one approved operating horizon linking demand, engineering, material and cash feasibility.",
+    purpose: "Maintain one approved plan that connects demand, engineering, materials and cash.",
     why: "Planning coordinates consequences across departments; it must not bypass released engineering, procurement or finance authority.",
     procedure: [
       "Review the current Integrated Operating Plan revision and approval state.",
@@ -100,7 +100,7 @@ const PLAYBOOKS: readonly GuidedWorkPlaybook[] = [
     id: "engineering",
     department: "Engineering",
     routes: ["/command/product", "/command/engineering", "/command/bom-control", "/command/bom"],
-    purpose: "Control product identity, engineering authority and BOM release before downstream execution.",
+    purpose: "Review product definitions and release the engineering and BOM records needed for downstream work.",
     why: "Procurement and production must consume released engineering truth rather than informal compatibility assumptions.",
     procedure: [
       "Confirm the current product/configuration authority and open engineering changes.",
@@ -119,7 +119,7 @@ const PLAYBOOKS: readonly GuidedWorkPlaybook[] = [
     id: "procurement",
     department: "Procurement",
     routes: ["/command/procurement-planning", "/command/purchase-execution", "/command/procurement", "/command/receiving"],
-    purpose: "Convert governed shortages and authorised needs into controlled supplier commitments and receipts.",
+    purpose: "Turn approved requirements into supplier orders and recorded receipts.",
     why: "Supplier commitment must follow approved requirement, supplier, price/evidence and approval state.",
     procedure: [
       "Review material requirements and shortage lineage against the approved plan.",
@@ -138,7 +138,7 @@ const PLAYBOOKS: readonly GuidedWorkPlaybook[] = [
     id: "inventory",
     department: "Inventory",
     routes: ["/command/inventory", "/command/inventory-truth", "/command/inventory-ledgers", "/command/inventory-master", "/command/inventory-openings", "/command/inventory-control-audit", "/command/component-control"],
-    purpose: "Maintain auditable quantity, availability, FIFO and material-master truth.",
+    purpose: "Track item identities, stock, availability and FIFO history.",
     why: "Production and procurement decisions depend on inventory truth; manual corrections must not conceal receiving or issue errors.",
     procedure: [
       "Review current stock, reservations, shortages and health.",
@@ -157,7 +157,7 @@ const PLAYBOOKS: readonly GuidedWorkPlaybook[] = [
     id: "production",
     department: "Production",
     routes: ["/command/production", "/command/manufacturing", "/command/actuals"],
-    purpose: "Execute released demand and engineering state through controlled Job Card, Traveller and material issue.",
+    purpose: "Build from released orders and engineering records, using job cards, travellers and recorded material issues.",
     why: "Build execution must preserve frozen configuration, serialized genealogy and material evidence.",
     procedure: [
       "Verify the Job Card is synchronized to confirmed demand and a released BOM/configuration.",
@@ -176,7 +176,7 @@ const PLAYBOOKS: readonly GuidedWorkPlaybook[] = [
     id: "quality",
     department: "Quality",
     routes: ["/command/quality", "/command/qa-verification"],
-    purpose: "Control inspection, NCR/CAPA and serialized release evidence.",
+    purpose: "Review inspections, non-conformances, corrective actions and serial-level release evidence.",
     why: "Production completion does not equal Quality Release; unresolved NCR/CAPA and EPR holds must remain visible.",
     procedure: [
       "Review incoming, in-process and final inspection lineage.",
@@ -195,7 +195,7 @@ const PLAYBOOKS: readonly GuidedWorkPlaybook[] = [
     id: "finance",
     department: "Finance",
     routes: ["/command/financial-cockpit", "/command/cash", "/command/payables", "/command/receivables", "/command/sales-ledger", "/command/accounting", "/command/accounting-statements", "/command/finance-control", "/command/aluminium-finance"],
-    purpose: "Reconcile governed transaction evidence to cash, ledgers, statements and planning control.",
+    purpose: "Reconcile operating transactions with cash, ledgers, statements and the approved plan.",
     why: "Finance should reflect operational truth and approved accounting treatment rather than repair upstream process gaps with manual postings.",
     procedure: [
       "Review the consolidated Finance condition and unreconciled exceptions.",
@@ -214,7 +214,7 @@ const PLAYBOOKS: readonly GuidedWorkPlaybook[] = [
     id: "administration",
     department: "Administration",
     routes: ["/command/people-office", "/command/users", "/command/master-data", "/command/classification", "/command/recovery"],
-    purpose: "Maintain people/office records, access, master data and resilience through controlled administrative surfaces.",
+    purpose: "Manage people, office records, access, master data and recovery through the relevant admin screens.",
     why: "Administrative convenience must not weaken identity, RBAC, master-data or recovery controls.",
     procedure: [
       "Use People & Office for operating administration and cost/evidence records.",
@@ -233,7 +233,7 @@ const PLAYBOOKS: readonly GuidedWorkPlaybook[] = [
     id: "governance",
     department: "Governance",
     routes: ["/command/governance", "/command/risk", "/command/legal", "/command/epr-workflow", "/command/epr-execution", "/command/epr-live", "/command/legal-control", "/command/actions", "/command/ca-audit"],
-    purpose: "Control approvals, risk, legal/EPR obligations and audit evidence without substituting advisory guidance for authority.",
+    purpose: "Review approvals, risks, legal obligations, EPR requirements and audit evidence.",
     why: "Governance exists to make authority, exceptions and evidence explicit and independently reviewable.",
     procedure: [
       "Identify the governing obligation, approval or exception.",

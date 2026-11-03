@@ -64,7 +64,7 @@ function StatutoryFinanceControl() {
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-green">Finance · statutory hardening</p>
           <h1 className="mt-2 font-display text-4xl text-accent">Statutory Control Center</h1>
-          <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">Govern GST identity, output-tax evidence, input ITC classification, bank reconciliation, accounting-period close and CA evidence packs. VYNDI exposes blockers rather than silently certifying statutory readiness.</p>
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">Review GST registration, output tax, input credit, bank reconciliation and period close. Open issues are listed for review before you prepare the CA evidence pack.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link to="/command/accounting" className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted hover:border-accent hover:text-accent">Accounting</Link>

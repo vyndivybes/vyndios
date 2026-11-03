@@ -31,7 +31,7 @@ function Funding() {
       <div>
         <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Stage 5 · Funding intelligence</p>
         <h1 className="font-display text-4xl">Grants & Funding</h1>
-        <p className="mt-2 max-w-3xl text-sm text-muted">One register for non-dilutive funding, debt-support routes and the eventual equity decision—without treating unverified programme terms as facts.</p>
+        <p className="mt-2 max-w-3xl text-sm text-muted">Track non-dilutive funding, debt-support options and future equity decisions. Verify each programme's terms before relying on them.</p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

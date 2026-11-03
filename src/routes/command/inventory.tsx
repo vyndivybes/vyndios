@@ -248,10 +248,7 @@ function MasterInventoryReady({ data, onReload }: { data: InventoryReadback; onR
             Operate · one inventory workspace
           </p>
           <h1 className="mt-2 font-display text-4xl text-accent">Master Inventory</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
-            Stock health, MSL and 36-month demand coverage in one place. Every item is stored under
-            one category and one auditable ledger.
-          </p>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">Review stock, minimum stock levels and coverage against 36-month demand. Each item belongs to one category and one stock ledger.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link to="/command/inventory-stocktake" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-semibold text-fg hover:border-accent">

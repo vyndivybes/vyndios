@@ -363,7 +363,7 @@ test("actual Sales Ledger is a standalone Finance view and excludes forecasts an
   assert.match(salesLedgerMigration, /Actual invoiced Sales Ledger across bicycles and spare\/components/);
   assert.match(salesLedgerRoute, /createFileRoute\("\/command\/sales-ledger"\)/);
   assert.match(salesLedgerRoute, /Actual Sales Ledger/);
-  assert.match(salesLedgerRoute, /Actual invoices only/);
+  assert.match(salesLedgerRoute, /Review issued invoices/);
   assert.match(workflow, /to: "\/command\/sales-ledger", label: "Sales Ledger"/);
   assert.match(salesLedgerAuthority, /vyndi_report_sales_ledger/);
 });

@@ -16,9 +16,9 @@ try {
   page.on("pageerror",e=>{errors.push(e.message);console.error("VYNDI_BROWSER_PAGEERROR",e.message);});
   await page.goto(base+"/login?returnTo=%2Fcommand%2Fproduction",{waitUntil:"domcontentloaded"});
   await page.locator(".vy-login.is-cinematic").waitFor({state:"visible",timeout:30000});
-  await page.getByLabel(/Authorised Email/i).fill(process.env.VYNDI_TEST_EMAIL);
+  await page.getByLabel(/Email address/i).fill(process.env.VYNDI_TEST_EMAIL);
   await page.getByLabel(/^Password$/i).fill(process.env.VYNDI_TEST_PASSWORD);
-  await page.getByRole("button",{name:/Authorize · Enter Command/i}).click();
+  await page.getByRole("button",{name:/Sign in to VYNDI OS/i}).click();
   await page.waitForURL(/\/command(?:\/|$)/,{timeout:45000});
   if(!page.url().endsWith("/production"))await page.goto(base+"/command/production",{waitUntil:"domcontentloaded"});
   const entry=page.getByRole("link",{name:"Run four-order simulation IBPE",exact:true});

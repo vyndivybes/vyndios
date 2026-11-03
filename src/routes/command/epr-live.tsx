@@ -163,7 +163,7 @@ function LiveEpr() {
           <div>
             <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">VĀYÚ SHASTR PVT. LTD. · VYNDI OS · Production control</p>
             <h1 className="mt-1 font-display text-4xl text-accent">Live EPR Transaction Core</h1>
-            <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">Traveller → material → process → inspection → NCR/CAPA → inventory → evidence → gate → audit.</p>
+            <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">Follow each traveller through materials, process steps, inspection and corrective action, then review stock, evidence, release gates and audit history.</p>
           </div>
           <ShieldCheck className="size-12 text-accent" />
         </div>

@@ -43,10 +43,7 @@ function AdvancedPlanningAuthorityPage() {
       <header>
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">VYNDI VIBPE · governed planning authority</p>
         <h1 className="mt-1 font-display text-4xl">Advanced Planning Authority</h1>
-        <p className="mt-2 max-w-5xl text-sm leading-6 text-muted">
-          Close optimizer authority gaps without bypassing governance. Capacity approval preserves the controlled values already in the system.
-          Routing drafts are deterministically derived from approved capacity standards and require a separate human approval. Supplier-lane facts are never inferred.
-        </p>
+        <p className="mt-2 max-w-5xl text-sm leading-6 text-muted">Review the records needed before optimization. Capacity approval keeps the controlled values already entered. Routing drafts use those approved standards and need a separate human approval. Enter supplier-lane facts from evidence; they are not inferred.</p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Link to="/command/ibpe-operating-workspace/optimizer" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:border-accent hover:text-fg">Optimizer</Link>
           <Link to="/command/ibpe-operating-workspace/assurance" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:border-accent hover:text-fg">VIBPE Assurance</Link>

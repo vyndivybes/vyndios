@@ -156,7 +156,7 @@ function BomControl() {
         <div>
           <p className="text-[10px] uppercase tracking-[0.22em] text-green">Engineering · controlled BOM</p>
           <h1 className="mt-2 text-4xl font-bold text-accent">BOM Control</h1>
-          <p className="mt-2 max-w-3xl text-sm text-muted">BOM identity and requirements are controlled here. Costing remains a planning companion; approved Inventory Master mappings are the only execution relationship.</p>
+          <p className="mt-2 max-w-3xl text-sm text-muted">Manage BOM identity and material requirements here. Cost estimates support planning. Production uses only approved mappings to Inventory Master items.</p>
         </div>
         <Link to="/command/inventory" className="rounded-lg border border-border px-4 py-2.5 text-sm">
           ← Inventory

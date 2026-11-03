@@ -151,11 +151,7 @@ function Receiving() {
             Supply & Production · inventory boundary
           </p>
           <h1 className="mt-2 font-display text-4xl text-accent">Receiving & Inspection</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
-            Record one GRN against an issued PO. Preserve manufacturer/OEM identity exactly as
-            received; VYNDI adds a separate internal reference only when required for ledger and
-            stock traceability.
-          </p>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">Record a goods receipt against an issued purchase order. Keep the manufacturer's or OEM's identity as received. Add a separate VYNDI reference only when it is needed to track stock and ledger records.</p>
         </div>
         <Link
           to="/command/inventory"

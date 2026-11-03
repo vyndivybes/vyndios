@@ -52,7 +52,7 @@ function SignupPage() {
       <div className="mx-auto max-w-md rounded-3xl border border-white/10 bg-white/[0.06] p-8 shadow-2xl">
         <p className="text-xs font-bold uppercase tracking-[0.28em] text-orange-400">VYNDI</p>
         <h1 className="mt-3 text-3xl font-semibold">Create account</h1>
-        <p className="mt-2 text-sm text-white/60">New accounts start as Viewer until an administrator assigns a role.</p>
+        <p className="mt-2 text-sm text-white/60">Your account starts with Viewer access. An administrator assigns the role you need.</p>
         <form onSubmit={submit} className="mt-8 space-y-4">
           <label className="block text-sm text-white/70">Name<input required value={name} onChange={(e) => setName(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-white" /></label>
           <label className="block text-sm text-white/70">Email<input required type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-white" /></label>

@@ -132,7 +132,7 @@ function MasterPlan() {
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">Integrated planning · engineering → demand → supply → operations → finance</p>
         <h1 className="mt-1 font-display text-4xl text-accent">Integrated Operating Plan</h1>
-        <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">One governed 36-month company plan constrained by released engineering, controlled BOM/material availability, confirmed demand, production readiness and finance. Forecast parameters may fill genuine data gaps, but they are provisional inputs—not planning truth.</p>
+        <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">Review the 36-month plan against released engineering, BOM and material availability, confirmed demand, production readiness and finance. Provisional assumptions may fill data gaps, but they do not replace approved sources.</p>
       </div>
       <Link to="/command" className="w-fit rounded-lg border border-border px-4 py-2.5 text-sm font-semibold text-muted hover:border-accent">Command Centre →</Link>
     </header>

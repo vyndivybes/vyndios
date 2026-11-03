@@ -24,10 +24,7 @@ function Manufacturing() {
       <div>
         <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Schedule 7</p>
         <h1 className="font-display text-4xl">Manufacturing & supply chain</h1>
-        <p className="mt-2 max-w-3xl text-sm text-muted">
-          Supplier qualification, tooling custody, pilot production, traceability, quality release
-          and logistics controls for the asset-light OEM model.
-        </p>
+        <p className="mt-2 max-w-3xl text-sm text-muted">Review supplier qualification, tooling custody, pilot builds, traceability, quality release and logistics for the OEM manufacturing model.</p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">

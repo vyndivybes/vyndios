@@ -113,7 +113,7 @@ function CommandLogin() {
           </div>
 
           <div className="mb-6 rounded-xl border border-accent/30 bg-accent/5 p-4 text-sm leading-6 text-muted">
-            <p><span className="font-semibold text-fg">Individual VYNDI users:</span> use the secure email login. This legacy screen is only for explicitly configured shared Command credentials.</p>
+            <p><span className="font-semibold text-fg">Individual VYNDI users:</span> sign in with your email account. Use this legacy screen only if shared Command credentials have been explicitly configured.</p>
             <Link to="/login" className="mt-2 inline-block font-semibold text-accent hover:underline">Go to individual sign in →</Link>
           </div>
 

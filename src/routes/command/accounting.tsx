@@ -94,10 +94,7 @@ function AccountingWorkbench() {
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-green">Finance · transaction-derived accounting</p>
           <h1 className="mt-2 font-display text-4xl text-accent">Accounting Workbench</h1>
-          <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">
-            Operational transactions post into governed double-entry journals. This surface exposes the resulting General Ledger,
-            Trial Balance, job cost/WIP/FG valuation and statutory-evidence controls without creating a second finance truth.
-          </p>
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">Review the double-entry journals created by operating transactions. Use the General Ledger, Trial Balance and job-cost records to check balances, work in progress and finished goods.</p>
         </div>
         <p className="max-w-sm text-xs leading-5 text-muted">Use Finance → Accounting & Statements for formal statements; this workbench remains the journal, reconciliation and accounting-control surface.</p>
       </header>
