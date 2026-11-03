@@ -154,7 +154,7 @@ export const WORKSPACE_NAVIGATION: Record<CanonicalWorkspaceId, readonly Workspa
     {
       label: "Commercial",
       items: [
-        { to: SALES_HOME, label: "Demand & Orders" },
+        { to: SALES_HOME, label: "CRM · Demand & Orders" },
         { to: "/command/gtm", label: "Go-to-Market" },
         { to: "/command/market-survey", label: "Market Survey" },
       ],
@@ -199,7 +199,7 @@ export const WORKSPACE_NAVIGATION: Record<CanonicalWorkspaceId, readonly Workspa
     {
       label: "Manufacturing",
       items: [
-        { to: "/command/production", label: "Production / Build" },
+        { to: "/command/production", label: "MES · Production / Build" },
         { to: "/command/manufacturing", label: "Manufacturing Controls" },
         { to: "/command/actuals", label: "Operational Actuals" },
       ],
@@ -212,7 +212,7 @@ export const WORKSPACE_NAVIGATION: Record<CanonicalWorkspaceId, readonly Workspa
   "people-office": [
     {
       label: "People & administration",
-      items: [{ to: PEOPLE_HOME, label: "People & Office" }],
+      items: [{ to: PEOPLE_HOME, label: "HR · People & Office" }],
     },
   ],
   finance: [
@@ -234,7 +234,7 @@ export const WORKSPACE_NAVIGATION: Record<CanonicalWorkspaceId, readonly Workspa
       items: [
         { to: "/command/accounting", label: "Accounting Workbench" },
         { to: "/command/accounting/people-office-payments", label: "Expense & Reimbursement Register" },
-        { to: "/command/accounting-statements", label: "Financial Statements" },
+        { to: "/command/accounting-statements", label: "Financial Statements · Tally / CA Reconciliation" },
       ],
     },
     {
