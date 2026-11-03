@@ -1,0 +1,26 @@
+name: VYNDI signed VEDM graph read qualification
+on:
+  pull_request:
+    paths:
+      - "src/lib/vedm-authority-graph.ts"
+      - "src/lib/vaos-knowledge-graph-export.ts"
+      - "src/lib/vaos-knowledge-graph-export.test.ts"
+      - "src/routes/api/vaos/bridge.ts"
+      - "scripts/vaos-read-bridge-contract.test.mjs"
+      - ".github/workflows/vedm-graph-read-qualification.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  vedm-read-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify real pinned VEDM graph projection without any external service
+        run: node --experimental-strip-types --test src/lib/vaos-knowledge-graph-export.test.ts
+      - name: Verify signed bridge read allowlist and no business write activation
+        run: node --test scripts/vaos-read-bridge-contract.test.mjs
