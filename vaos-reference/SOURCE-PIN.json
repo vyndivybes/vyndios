@@ -1,0 +1,13 @@
+{
+  "repository": "vyndivybes/vaos",
+  "commit": "f8fa8ec2bcfb64e876d503d7a3a5a4d7c4353e2c",
+  "qualificationOnly": true,
+  "source": "GitHub contents API fetched at exact commit and cross-checked against immutable git blob identifiers",
+  "mode": "offline-pinned-test-fixture",
+  "scope": "Stage 9 synthetic local PGlite signed HTTP loopback; NOT a production bridge",
+  "files": {
+    "packages/contracts/vyndi-write-bridge.mjs": "706b069bbf485b86d3f374d1d56c7d84a072b671",
+    "platform/execution/vyndi-write-bridge.mjs": "25101350520ff395808ee16f5ee7bd437e4ef122",
+    "platform/execution/vyndi-read-bridge-client.mjs": "571d95b7aaea118504a90aa342a001cf350053e9"
+  }
+}
