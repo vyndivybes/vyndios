@@ -27,3 +27,18 @@ test("qualification runs explicit business-domain and recovery contracts", () =>
     assert.ok(workflow.includes(item), "Missing independent contract check: " + item);
   }
 });
+
+test("cancelled historical four-order demand is not a live-browser production gate", () => {
+  assert.doesNotMatch(workflow, /^\s*- name: Four-order simulation HiGHS desktop and mobile acceptance\s*$/m);
+  assert.doesNotMatch(workflow, /^\s*run: node scripts\/four-order-simulation-browser-acceptance\.mjs\s*$/m);
+  const chromium = workflow.indexOf("Verify or install Chromium");
+  const departments = workflow.indexOf("Independent four-department browser acceptance");
+  assert.ok(chromium >= 0 && departments > chromium, "Authenticated departmental browser acceptance must remain active");
+  for (const required of [
+    "Wait for exact Cloudflare deployment and schema readiness",
+    "Seven-domain governed transaction contract tests",
+    "Authenticated protected-route smoke",
+    "Production SLO observation",
+    "Operator UX viewport qualification",
+  ]) assert.ok(workflow.includes(required), "Do not remove independent acceptance: " + required);
+});
