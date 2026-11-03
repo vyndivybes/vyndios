@@ -100,8 +100,9 @@ jobs:
           timeout --signal=TERM --kill-after=15s 180s npx playwright install chromium
           node --input-type=module -e "$probe"
 
-      - name: Four-order simulation HiGHS desktop and mobile acceptance
-        run: node scripts/four-order-simulation-browser-acceptance.mjs
+      # The historical four-order demo demand was cancelled on 2026-11-03.
+      # Isolated simulation/solver regression stays in Development CI; live
+      # assurance must not require cancelled business orders or physical release.
 
       - name: Independent four-department browser acceptance
         run: npm run test:browser:departments
