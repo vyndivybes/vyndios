@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Kpi, Panel } from "@/components/kpi";
 import { getIbpeOperatingWorkspaceReport } from "@/lib/ibpe-operating-workspace-report";
+import type { buildIbpeOperatingWorkspace } from "@/lib/ibpe-operating-workspace";
 import {
   applyConfirmedIbpeBusinessUpdate,
   confirmIbpeBusinessUpdate,
@@ -23,7 +24,7 @@ function number(value: unknown) {
   return Number(value ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
 }
 
-type IbpeWorkspaceData = Awaited<ReturnType<typeof getIbpeOperatingWorkspaceReport>>;
+type IbpeWorkspaceData = ReturnType<typeof buildIbpeOperatingWorkspace>;
 
 /** The authenticated report can be slow or fail without blocking the page shell. */
 function IbpeOperatingWorkspace() {
@@ -36,7 +37,22 @@ function IbpeOperatingWorkspace() {
     setReport(null);
     setFailed(false);
     void getIbpeOperatingWorkspaceReport().then(
-      (result) => { if (active) setReport(result); },
+      (payload) => {
+        if (!active) return;
+        try {
+          const result = JSON.parse(payload) as IbpeWorkspaceData;
+          if (
+            result?.schemaVersion !== "VYNDI-IBPE-OPERATING-WORKSPACE-1.0" ||
+            result?.source !== "canonical-erp-report-pack" ||
+            !Array.isArray(result.sections) ||
+            !result.sopSnapshot ||
+            typeof result.generatedAt !== "string"
+          ) throw new Error("Unqualified IBPE evidence envelope");
+          setReport(result);
+        } catch {
+          setFailed(true);
+        }
+      },
       () => { if (active) setFailed(true); },
     );
     return () => { active = false; };
