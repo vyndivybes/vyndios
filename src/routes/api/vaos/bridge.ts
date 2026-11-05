@@ -1,3 +1,4 @@
+import { createOntologyReadReceipt } from "@/lib/vaos-ontology-read-receipt";
 import { createFileRoute } from "@tanstack/react-router";
 import { getSql } from "@/lib/db";
 import {readEnterpriseBi} from "@/lib/vaos-enterprise-bi-read";
@@ -109,30 +110,46 @@ async function executeRead(
   }
 
   if (actionType === "PROCUREMENT.OBSERVE_SHORTAGE") {
-    const rows = await sql.query<{ record: unknown }>(
-      `select to_jsonb(s) as record from (
-         select sales_order_id,product_label,variant_id,units,due_month,sku,category,item,
-                required_quantity,physical_quantity as available_quantity,reserved_quantity,
+    // One statement gives the bounded page and source count the same SQL snapshot.
+    const [snapshot] = await sql.query<{source_count: number; records: unknown[]; extracted_at: string}>(
+      `WITH eligible AS MATERIALIZED (
+         SELECT job_card_id,job_card_line_id,sales_order_id,product_label,variant_id,
+                units,due_month,sku,category,item,required_quantity,
+                physical_quantity AS available_quantity,reserved_quantity,
                 shortage_quantity,available_to_promise,unit,bom_revision,sales_order_revision
            from vyndi_live_job_card_requirements
           where job_card_status in ('released','in_progress')
             and sku is not null and shortage_quantity > 0
-          order by due_month,shortage_quantity desc,sku,job_card_line_id
-          limit $1
-       ) s`,
+       ), page AS (
+         SELECT * FROM eligible ORDER BY due_month,shortage_quantity DESC,sku,job_card_line_id limit $1
+       )
+       SELECT (SELECT count(*)::integer FROM eligible) AS source_count,
+              (SELECT coalesce(jsonb_agg(to_jsonb(p) ORDER BY p.due_month,p.shortage_quantity DESC,p.sku,p.job_card_line_id),'[]'::jsonb) FROM page p) AS records,
+              transaction_timestamp() AS extracted_at`,
       [limit],
     );
-    return { records: rows.map((row) => row.record) };
+    if (!snapshot || !Array.isArray(snapshot.records)) throw Error("VYNDI_ONTOLOGY_SHORTAGE_SOURCE_INVALID");
+    return createOntologyReadReceipt({sourceKind:"shortages",records:snapshot.records,
+      sourceCount:Number(snapshot.source_count),limit,asOf:new Date(snapshot.extracted_at).toISOString()});
   }
 
   if (actionType === "INVENTORY.OBSERVE_STOCK") {
-    const rows = await sql.query<{ record: unknown }>(
-      "select to_jsonb(v) as record from vyndi_inventory_balance v limit $1",
+    const [snapshot] = await sql.query<{source_count: number; records: unknown[]; extracted_at: string}>(
+      `WITH eligible AS MATERIALIZED (
+         SELECT sku,unit,quantity_balance,inventory_value_inr,weighted_average_cost_inr,
+                first_movement_at,last_movement_at FROM vyndi_inventory_balance
+       ), page AS (
+         SELECT * FROM eligible ORDER BY sku,unit limit $1
+       )
+       SELECT (SELECT count(*)::integer FROM eligible) AS source_count,
+              (SELECT coalesce(jsonb_agg(to_jsonb(p) ORDER BY p.sku,p.unit),'[]'::jsonb) FROM page p) AS records,
+              transaction_timestamp() AS extracted_at`,
       [limit],
     );
-    return { records: rows.map((row) => row.record) };
+    if (!snapshot || !Array.isArray(snapshot.records)) throw Error("VYNDI_ONTOLOGY_INVENTORY_SOURCE_INVALID");
+    return createOntologyReadReceipt({sourceKind:"inventory",records:snapshot.records,
+      sourceCount:Number(snapshot.source_count),limit,asOf:new Date(snapshot.extracted_at).toISOString()});
   }
-
   if (actionType === "PRODUCTION.OBSERVE_WIP") {
     const rows = await sql.query<{ record: unknown }>(
       "select to_jsonb(j) as record from epr_production_job_cards j order by j.created_at desc limit $1",
