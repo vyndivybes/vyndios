@@ -196,6 +196,14 @@ export async function readExecutiveBiSignals(sql:Sql){
 /** Fail a single missing or uncommissioned department independently, never invent zeros. */
 export async function readEnterpriseBi(sql:Sql,input:Record<string,unknown>){
  const scope=validateBiScope(input);
+ if(input.executiveOnly===true){
+  if(scope.employeeId!=='all'||scope.sourceTable)throw Error('INVALID_BI_SCOPE');
+  return {schemaVersion:'VYNDI_ENTERPRISE_BI_V1',readOnly:true,
+   period:{from:scope.from,to:scope.to},scope:'all',observedAt:new Date().toISOString(),
+   departments:[],executiveSignals:await readExecutiveBiSignals(sql),
+   businessPlanComparison:{status:'UNAVAILABLE',reason:'Executive aggregate-only mode excludes demand baseline joins.'},
+   interpretation:['Current canonical CRM, HR and dispatch counts are aggregate records, not future forecasts or employee/customer performance certificates.']};
+ }
  const selected=(scope.employeeId==="all"?Object.keys(VYNDI_BI_DEPARTMENTS):[scope.employeeId]) as Employee[];
  const results=[];
  // Bound database work on the existing free infrastructure. Each source fails
@@ -231,11 +239,9 @@ export async function readEnterpriseBi(sql:Sql,input:Record<string,unknown>){
     futureDeliveryForecast:'UNAVAILABLE_NOT_INDEPENDENTLY_QUALIFIED'},
    note:'Whole closed periods contained in selected dates; later close revisions are excluded. This measures product-demand plan vs actual, not employee productivity or manufacturing yield.'};
  }catch{businessPlanComparison={status:'UNAVAILABLE',reason:'Governed vintage or period-close evidence unavailable; plan, actual and forecast unknown.'};}
- const executiveSignals=scope.employeeId==='all'?await readExecutiveBiSignals(sql):null;
  return {schemaVersion:"VYNDI_ENTERPRISE_BI_V1",readOnly:true,
   period:{from:scope.from,to:scope.to},scope:scope.employeeId,
   observedAt:new Date().toISOString(),departments:results,businessPlanComparison,
-  ...(executiveSignals?{executiveSignals}:{}),
   interpretation:[
    "Counts cover each OBSERVED source independently; related sources overlap and must not be added as departmental output. Explicit training/fixture records are excluded and counted separately; unknown origin is disclosed.",
    "The reporting date reflects the first available recorded source-date field, not necessarily a verified finish date.",
