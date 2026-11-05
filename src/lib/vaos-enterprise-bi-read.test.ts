@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {validateBiScope,classifyBiSample,readEnterpriseBi,VYNDI_BI_DEPARTMENTS} from "./vaos-enterprise-bi-read.ts";
+import {validateBiScope,classifyBiSample,readEnterpriseBi,readExecutiveBiSignals,VYNDI_BI_DEPARTMENTS} from "./vaos-enterprise-bi-read.ts";
 test("all 16 departmental ledgers are explicitly mapped",()=>{
  assert.equal(Object.keys(VYNDI_BI_DEPARTMENTS).length,16);
  assert.equal(new Set(Object.values(VYNDI_BI_DEPARTMENTS).map(x=>x.table)).size,16);
@@ -83,4 +83,62 @@ test("missing authoritative schema is unavailable, never zero",async()=>{
 test("specialist source scope cannot escape its employee's governed sources",()=>{
  assert.equal(validateBiScope({employeeId:'qa',sourceTable:'vyndi_quality_capas',from:'2026-10-01',to:'2026-10-15'}).sourceTable,'vyndi_quality_capas');
  for(const employeeId of ['all','commercial'])assert.throws(()=>validateBiScope({employeeId,sourceTable:'vyndi_quality_capas',from:'2026-10-01',to:'2026-10-15'}),/BI_SOURCE/);
+});
+
+test("executive BI exposes full CRM, HR and dispatch aggregates without personal rows",async()=>{
+ const queries:string[]=[];
+ const query=async(statement:string)=>{
+  queries.push(statement);
+  const dataset=statement.includes('vyndi_crm_customers')?'crmCustomers':
+   statement.includes('vyndi_crm_activities')?'crmFollowups':
+   statement.includes('vyndi_people_records')?'hrWorkforce':
+   statement.includes('vyndi_people_attendance_current')?'hrAttendance':
+   statement.includes('vyndi_people_payroll_readiness_current')?'hrPayrollReadiness':
+   statement.includes('vyndi_dispatch_register')?'dispatch':null;
+  if(!dataset)throw Error('unexpected query');
+  return [{category:dataset,status:'observed',record_count:3}];
+ };
+ const report=await readExecutiveBiSignals({query} as never);
+ assert.equal(report.schemaVersion,'VYNDI_EXECUTIVE_SIGNALS_V1');
+ assert.equal(report.readOnly,true);
+ assert.equal(report.groupFinanceQualified,false);
+ assert.equal(report.forecastQualified,false);
+ assert.deepEqual(Object.keys(report.datasets),['crmCustomers','crmFollowups','hrWorkforce','hrAttendance','hrPayrollReadiness','dispatch']);
+ assert.equal(queries.length,6);
+ for(const value of Object.values(report.datasets)){
+  assert.equal(value.status,'OBSERVED');
+  assert.equal(value.total,3);
+  assert.deepEqual(Object.keys(value.rows[0]).sort(),['category','record_count','status']);
+ }
+ assert.match(queries[5],/count\s*\(distinct\s+shipment_id\)/i);
+});
+test("malformed personal data or missing source fails only its own dataset closed",async()=>{
+ const read=await readExecutiveBiSignals({query:async(statement:string)=>{
+  if(statement.includes('vyndi_crm_customers'))return [{category:'dealer',status:'active',record_count:2,email:'leak@example.com'}];
+  if(statement.includes('vyndi_dispatch_register'))throw Error('view unavailable');
+  return [{category:'employee',status:'approved',record_count:0}];
+ }} as never);
+ assert.equal(read.datasets.crmCustomers.status,'HOLD');
+ assert.equal(read.datasets.crmCustomers.total,null);
+ assert.deepEqual(read.datasets.crmCustomers.rows,[]);
+ assert.equal(read.datasets.dispatch.status,'HOLD');
+ assert.equal(read.datasets.hrWorkforce.status,'OBSERVED');
+ assert.equal(read.datasets.hrWorkforce.total,0);
+ assert.ok(!JSON.stringify(read).includes('leak@example.com'));
+});
+
+test("executiveOnly signed aggregate mode does not scan 53 detailed ledgers",async()=>{
+ const requests:string[]=[];
+ const sql={query:async(statement:string)=>{
+  requests.push(statement);
+  if(!/\b(count|group by)\b/i.test(statement))throw Error('Full departmental ledger queried');
+  return [{category:'test',status:'observed',record_count:1}];
+ }};
+ const data=await readEnterpriseBi(sql as never,{employeeId:'all',from:'2026-11-01',to:'2026-11-05',executiveOnly:true});
+ assert.equal(data.schemaVersion,'VYNDI_ENTERPRISE_BI_V1');
+ assert.equal(data.scope,'all');
+ assert.equal(data.executiveSignals?.schemaVersion,'VYNDI_EXECUTIVE_SIGNALS_V1');
+ assert.equal(data.departments.length,0);
+ assert.equal(requests.length,6);
+ await assert.rejects(async()=>readEnterpriseBi(sql as never,{employeeId:'finance',from:'2026-11-01',to:'2026-11-05',executiveOnly:true}),/INVALID_BI_SCOPE/);
 });

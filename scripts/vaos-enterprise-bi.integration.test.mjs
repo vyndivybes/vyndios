@@ -14,6 +14,13 @@ test('BI executes against the complete historical schema and queries old periods
  assert.equal(all.departments.length,16);
  const unavailable=all.departments.flatMap(d=>d.sources.filter(s=>s.status!=='OBSERVED').map(s=>s.sourceTable));
  assert.deepEqual(unavailable,[],'all governed source queries must execute against actual migrations');
+ const executive=await readEnterpriseBi(sql,{employeeId:'all',
+  from:'2026-09-01',to:'2026-10-15',executiveOnly:true});
+ assert.equal(executive.departments.length,0);
+ assert.equal(executive.executiveSignals?.schemaVersion,'VYNDI_EXECUTIVE_SIGNALS_V1');
+ for(const [dataset,result] of Object.entries(executive.executiveSignals.datasets))
+  assert.equal(result.status,'OBSERVED',dataset+' must query real canonical migration schema');
+
  await db.query(`insert into vyndi_risk_register(id,risk,likelihood,impact,mitigation,source_reference,updated_by,updated_at)
   select 'BI-'||g,'Business risk','Low','Low','Recorded mitigation','business:board-review','operator',
    case when g=1 then '2026-09-01'::timestamptz else '2026-10-10'::timestamptz end
