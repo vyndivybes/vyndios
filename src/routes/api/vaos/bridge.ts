@@ -117,11 +117,11 @@ async function executeRead(
                 units,due_month,sku,category,item,required_quantity,
                 physical_quantity AS available_quantity,reserved_quantity,
                 shortage_quantity,available_to_promise,unit,bom_revision,sales_order_revision
-           FROM vyndi_live_job_card_requirements
-          WHERE job_card_status IN ('released','in_progress')
-            AND sku IS NOT NULL AND shortage_quantity > 0
+           from vyndi_live_job_card_requirements
+          where job_card_status in ('released','in_progress')
+            and sku is not null and shortage_quantity > 0
        ), page AS (
-         SELECT * FROM eligible ORDER BY due_month,shortage_quantity DESC,sku,job_card_line_id LIMIT $1
+         SELECT * FROM eligible ORDER BY due_month,shortage_quantity DESC,sku,job_card_line_id limit $1
        )
        SELECT (SELECT count(*)::integer FROM eligible) AS source_count,
               (SELECT coalesce(jsonb_agg(to_jsonb(p) ORDER BY p.due_month,p.shortage_quantity DESC,p.sku,p.job_card_line_id),'[]'::jsonb) FROM page p) AS records,
@@ -139,7 +139,7 @@ async function executeRead(
          SELECT sku,unit,quantity_balance,inventory_value_inr,weighted_average_cost_inr,
                 first_movement_at,last_movement_at FROM vyndi_inventory_balance
        ), page AS (
-         SELECT * FROM eligible ORDER BY sku,unit LIMIT $1
+         SELECT * FROM eligible ORDER BY sku,unit limit $1
        )
        SELECT (SELECT count(*)::integer FROM eligible) AS source_count,
               (SELECT coalesce(jsonb_agg(to_jsonb(p) ORDER BY p.sku,p.unit),'[]'::jsonb) FROM page p) AS records,
