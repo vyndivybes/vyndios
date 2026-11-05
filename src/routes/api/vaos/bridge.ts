@@ -20,6 +20,7 @@ const READ_ACTIONS = new Set([
   "KNOWLEDGE.OBSERVE_VEDM_GRAPH",
   "COMMERCIAL.OBSERVE_PIPELINE",
   "PROCUREMENT.OBSERVE_SHORTAGE",
+  "PROCUREMENT.OBSERVE_OPEN_POS",
   "INVENTORY.OBSERVE_STOCK",
   "PRODUCTION.OBSERVE_WIP",
   "MAINTENANCE.OBSERVE_ASSET",
@@ -35,6 +36,7 @@ const EXPECTED_EMPLOYEE: Record<string, string> = {
   "KNOWLEDGE.OBSERVE_VEDM_GRAPH": "engineering-configuration",
   "COMMERCIAL.OBSERVE_PIPELINE": "commercial",
   "PROCUREMENT.OBSERVE_SHORTAGE": "procurement",
+  "PROCUREMENT.OBSERVE_OPEN_POS": "procurement",
   "INVENTORY.OBSERVE_STOCK": "inventory",
   "PRODUCTION.OBSERVE_WIP": "production",
   "MAINTENANCE.OBSERVE_ASSET": "maintenance",
@@ -50,6 +52,7 @@ const SOURCE_AUTHORITY: Record<string, string> = {
   "KNOWLEDGE.OBSERVE_VEDM_GRAPH": "compileVedmAuthorityGraph",
   "COMMERCIAL.OBSERVE_PIPELINE": "listSalesOrders",
   "PROCUREMENT.OBSERVE_SHORTAGE": "getConfiguredDemandShortages",
+  "PROCUREMENT.OBSERVE_OPEN_POS": "listOpenPurchaseOrders",
   "INVENTORY.OBSERVE_STOCK": "getAuthoritativeInventory",
   "PRODUCTION.OBSERVE_WIP": "getProductionJobCards",
   "MAINTENANCE.OBSERVE_ASSET": "getAssetMaintenanceState",
@@ -133,6 +136,28 @@ async function executeRead(
       sourceCount:Number(snapshot.source_count),limit,asOf:new Date(snapshot.extracted_at).toISOString()});
   }
 
+  if (actionType === "PROCUREMENT.OBSERVE_OPEN_POS") {
+    // One SQL snapshot: deterministic bounded page and exact scoped row count.
+    const [snapshot] = await sql.query<{source_count:number;records:unknown[];extracted_at:string}>(
+      `WITH eligible AS MATERIALIZED (
+         SELECT id,supplier_id,source_action_id,requirement_month,sku,unit,
+                quantity,unit_price_inr,order_date,expected_receipt_on,
+                payment_terms_days,status,source_reference,job_card_id,
+                record_revision,created_at,updated_at
+           FROM vyndi_purchase_orders
+          WHERE status IN ('draft','pending_approval','approved','issued','partially_received')
+       ), page AS (
+         SELECT * FROM eligible ORDER BY updated_at DESC,id LIMIT $1
+       )
+       SELECT (SELECT count(*)::integer FROM eligible) AS source_count,
+              (SELECT coalesce(jsonb_agg(to_jsonb(p) ORDER BY p.updated_at DESC,p.id),'[]'::jsonb) FROM page p) AS records,
+              transaction_timestamp() AS extracted_at`,
+      [limit],
+    );
+    if (!snapshot || !Array.isArray(snapshot.records)) throw Error("VYNDI_ONTOLOGY_PO_SOURCE_INVALID");
+    return createOntologyReadReceipt({sourceKind:"purchaseOrders",records:snapshot.records,
+      sourceCount:Number(snapshot.source_count),limit,asOf:new Date(snapshot.extracted_at).toISOString()});
+  }
   if (actionType === "INVENTORY.OBSERVE_STOCK") {
     const [snapshot] = await sql.query<{source_count: number; records: unknown[]; extracted_at: string}>(
       `WITH eligible AS MATERIALIZED (
