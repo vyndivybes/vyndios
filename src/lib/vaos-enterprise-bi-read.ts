@@ -1,4 +1,5 @@
 import {buildForecastLearningFromSql} from './forecast-learning-read.ts';
+import {GROUP_AGGREGATE_QUERIES,validateAggregateRows} from './analytics-crm-hr.ts';
 import type {getSql} from "./db";
 
 /** Signed VAOS founder BI: canonical, read-only, date-scoped database aggregates.
@@ -163,6 +164,35 @@ async function readOne(sql:Sql,employeeId:Employee,from:string,to:string,offset:
   timestampMeaning:'FIRST_AVAILABLE_SOURCE_DATE_CURRENT_ROW_NOT_EVENT_HISTORY',
   forecast:{status:'UNAVAILABLE',reason:'No independently qualified dated workforce forecast in this source.'}};
 }
+/** Executive signals are aggregate-only; never send employee or customer identities.
+ * All rows are full SQL aggregates, not pages of source rows. Every failed family
+ * stays HOLD independently and cannot be mistaken for an empty/zero business.
+ */
+const EXECUTIVE_SIGNAL_QUERIES={
+ ...GROUP_AGGREGATE_QUERIES,
+ dispatch:{
+  query:"select 'dispatch' as category, concat(coalesce(status,'unknown'),' / invoice ',coalesce(invoice_status,'none')) as status, count(distinct shipment_id)::int as record_count from vyndi_dispatch_register group by status,invoice_status order by status,invoice_status",
+  keys:['category','status','record_count'],
+ },
+};
+type ExecutiveSignal={status:'OBSERVED'|'HOLD';total:number|null;rows:{category:string;status:string;record_count:number}[];source:string};
+export async function readExecutiveBiSignals(sql:Sql){
+ const datasets:Record<string,ExecutiveSignal>={};
+ for(const [id,definition] of Object.entries(EXECUTIVE_SIGNAL_QUERIES)){
+  try{
+   const rows=validateAggregateRows(await sql.query(definition.query));
+   datasets[id]={status:'OBSERVED',total:rows.reduce((sum,row)=>sum+row.record_count,0),
+    rows,source:'VYNDI_OS_COMPLETE_CANONICAL_AGGREGATE'};
+  }catch{
+   datasets[id]={status:'HOLD',total:null,rows:[],source:'VYNDI_OS_SOURCE_UNAVAILABLE'};
+  }
+ }
+ return {schemaVersion:'VYNDI_EXECUTIVE_SIGNALS_V1',readOnly:true,
+  observedAt:new Date().toISOString(),datasets,
+  forecastQualified:false,groupFinanceQualified:false,shipmentRouteOptimizationQualified:false,
+  note:'Complete status aggregates only. CRM counts do not forecast customer orders; personnel rows and wages never cross the bridge. Dispatch statuses do not prove carrier delivery. Management divisions have no reconciled intercompany elimination.'};
+}
+
 /** Fail a single missing or uncommissioned department independently, never invent zeros. */
 export async function readEnterpriseBi(sql:Sql,input:Record<string,unknown>){
  const scope=validateBiScope(input);
@@ -201,9 +231,11 @@ export async function readEnterpriseBi(sql:Sql,input:Record<string,unknown>){
     futureDeliveryForecast:'UNAVAILABLE_NOT_INDEPENDENTLY_QUALIFIED'},
    note:'Whole closed periods contained in selected dates; later close revisions are excluded. This measures product-demand plan vs actual, not employee productivity or manufacturing yield.'};
  }catch{businessPlanComparison={status:'UNAVAILABLE',reason:'Governed vintage or period-close evidence unavailable; plan, actual and forecast unknown.'};}
+ const executiveSignals=scope.employeeId==='all'?await readExecutiveBiSignals(sql):null;
  return {schemaVersion:"VYNDI_ENTERPRISE_BI_V1",readOnly:true,
   period:{from:scope.from,to:scope.to},scope:scope.employeeId,
   observedAt:new Date().toISOString(),departments:results,businessPlanComparison,
+  ...(executiveSignals?{executiveSignals}:{}),
   interpretation:[
    "Counts cover each OBSERVED source independently; related sources overlap and must not be added as departmental output. Explicit training/fixture records are excluded and counted separately; unknown origin is disclosed.",
    "The reporting date reflects the first available recorded source-date field, not necessarily a verified finish date.",
