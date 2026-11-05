@@ -40,3 +40,25 @@ test('signed VYNDI bridge uses single-statement inventory and shortage source co
  assert.match(code,/sourceKind:"shortages"/);
  assert.match(code,/write_execution_not_commissioned/);
 });
+
+test("open purchase orders use signed, bounded, status-scoped content receipts",async()=>{
+ const scope="vyndi_purchase_orders:open_status_v1";
+ const a=await createOntologyReadReceipt({sourceKind:"purchaseOrders",
+  records:[{id:"PO-1",status:"draft",record_revision:2,sku:"A"}],sourceCount:1,
+  limit:100,asOf:"2026-11-05T04:00:00.000Z"});
+ assert.equal(a.sourceScope,scope);assert.equal(a.complete,true);
+ assert.equal(a.sourceCompletenessVerified,false);
+ assert.equal(a.readOnly,true);assert.equal(a.actionAuthorized,false);
+ assert.equal(a.productionWriteAuthorized,false);
+});
+test("purchase-order bridge is GET-equivalent signed read only, with bounded exact SQL count",async()=>{
+ const source=await readFile(resolve(root,"src/routes/api/vaos/bridge.ts"),"utf8");
+ const block=source.split('if (actionType === "PROCUREMENT.OBSERVE_OPEN_POS") {')[1].split('if (actionType === "INVENTORY.OBSERVE_STOCK")')[0];
+ assert.match(block,/FROM vyndi_purchase_orders/);
+ assert.match(block,/WHERE status IN/);
+ assert.match(block,/LIMIT \$1/);
+ assert.match(block,/count\(\*\)::integer FROM eligible/);
+ assert.match(block,/sourceKind:"purchaseOrders"/);
+ assert.match(source,/"PROCUREMENT.OBSERVE_OPEN_POS": "procurement"/);
+ assert.match(source,/write_execution_not_commissioned/);
+});

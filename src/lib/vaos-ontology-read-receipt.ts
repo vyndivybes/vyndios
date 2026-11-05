@@ -3,6 +3,7 @@
 const SCOPES = Object.freeze({
   inventory:'vyndi_inventory_balance:all',
   shortages:'vyndi_live_job_card_requirements:released_in_progress_positive_shortage',
+  purchaseOrders:'vyndi_purchase_orders:open_status_v1',
 });
 function canonicalUtc(value:unknown):value is string {
   if(typeof value!=="string"||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,3})?Z$/.test(value))return false;
@@ -17,7 +18,7 @@ function stable(value:unknown):unknown{
 }
 function fail():never{throw Error("VYNDI_ONTOLOGY_SOURCE_RECEIPT_INVALID");}
 export async function createOntologyReadReceipt({sourceKind,records,sourceCount,limit,asOf}:{
-  sourceKind:"inventory"|"shortages";records:unknown[];sourceCount:number;limit:number;asOf:string;
+  sourceKind:"inventory"|"shortages"|"purchaseOrders";records:unknown[];sourceCount:number;limit:number;asOf:string;
 }){
   const sourceScope=SCOPES[sourceKind];
   if(!sourceScope||!Array.isArray(records)||!Number.isSafeInteger(sourceCount)||
