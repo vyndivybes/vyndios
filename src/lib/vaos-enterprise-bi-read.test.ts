@@ -126,3 +126,19 @@ test("malformed personal data or missing source fails only its own dataset close
  assert.equal(read.datasets.hrWorkforce.total,0);
  assert.ok(!JSON.stringify(read).includes('leak@example.com'));
 });
+
+test("executiveOnly signed aggregate mode does not scan 53 detailed ledgers",async()=>{
+ const requests:string[]=[];
+ const sql={query:async(statement:string)=>{
+  requests.push(statement);
+  if(!/\b(count|group by)\b/i.test(statement))throw Error('Full departmental ledger queried');
+  return [{category:'test',status:'observed',record_count:1}];
+ }};
+ const data=await readEnterpriseBi(sql as never,{employeeId:'all',from:'2026-11-01',to:'2026-11-05',executiveOnly:true});
+ assert.equal(data.schemaVersion,'VYNDI_ENTERPRISE_BI_V1');
+ assert.equal(data.scope,'all');
+ assert.equal(data.executiveSignals?.schemaVersion,'VYNDI_EXECUTIVE_SIGNALS_V1');
+ assert.equal(data.departments.length,0);
+ assert.equal(requests.length,6);
+ await assert.rejects(async()=>readEnterpriseBi(sql as never,{employeeId:'finance',from:'2026-11-01',to:'2026-11-05',executiveOnly:true}),/INVALID_BI_SCOPE/);
+});
