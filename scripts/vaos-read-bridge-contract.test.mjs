@@ -79,3 +79,19 @@ test("existing Cloudflare branch previews explicitly omit production database bi
  assert.deepEqual(config.previews,{});
  assert.ok(config.hyperdrive.some(binding=>binding.binding==='HYPERDRIVE'));
 });
+
+test("signed PO observations retain cancelled-origin procurement drafts with explicit demand lineage",async()=>{
+ const source=await readFile(join(root,"src/routes/api/vaos/bridge.ts"),"utf8");
+ const block=source.split('if (actionType === "PROCUREMENT.OBSERVE_OPEN_POS") {')[1]
+   ?.split('if (actionType === "INVENTORY.OBSERVE_STOCK")')[0]??"";
+ assert.match(block,/LEFT JOIN epr_production_job_cards j ON j.id=p.job_card_id/i);
+ assert.match(block,/LEFT JOIN vyndi_sales_orders s ON s.id=j.sales_order_id/i);
+ assert.match(block,/j.status AS job_card_status/i);
+ assert.match(block,/s.status AS sales_order_status/i);
+ assert.match(block,/CANCELLED_UPSTREAM_DEMAND/);
+ assert.match(block,/UPSTREAM_DEMAND_UNVERIFIED/);
+ assert.match(block,/createOntologyReadReceipt/);
+ assert.match(block,/status IN \\('draft','pending_approval','approved','issued','partially_received'\\)/);
+ // Cancelled-origin drafts remain in auditable read data, not silently deleted/hidden.
+ assert.doesNotMatch(block,/where\\s+j.status\\s*<>\\s*'cancelled'/i);
+});
