@@ -91,7 +91,7 @@ test("signed PO observations retain cancelled-origin procurement drafts with exp
  assert.match(block,/CANCELLED_UPSTREAM_DEMAND/);
  assert.match(block,/UPSTREAM_DEMAND_UNVERIFIED/);
  assert.match(block,/createOntologyReadReceipt/);
- assert.match(block,/status IN \\('draft','pending_approval','approved','issued','partially_received'\\)/);
+ assert.ok(block.includes("p.status IN ('draft','pending_approval','approved','issued','partially_received')"));
  // Cancelled-origin drafts remain in auditable read data, not silently deleted/hidden.
- assert.doesNotMatch(block,/where\\s+j.status\\s*<>\\s*'cancelled'/i);
+ assert.equal(block.includes("WHERE j.status <> 'cancelled'"),false);
 });
