@@ -140,12 +140,18 @@ async function executeRead(
     // One SQL snapshot: deterministic bounded page and exact scoped row count.
     const [snapshot] = await sql.query<{source_count:number;records:unknown[];extracted_at:string}>(
       `WITH eligible AS MATERIALIZED (
-         SELECT id,supplier_id,source_action_id,requirement_month,sku,unit,
-                quantity,unit_price_inr,order_date,expected_receipt_on,
-                payment_terms_days,status,source_reference,job_card_id,
-                record_revision,created_at,updated_at
-           FROM vyndi_purchase_orders
-          WHERE status IN ('draft','pending_approval','approved','issued','partially_received')
+         SELECT p.id,p.supplier_id,p.source_action_id,p.requirement_month,p.sku,p.unit,
+                p.quantity,p.unit_price_inr,p.order_date,p.expected_receipt_on,
+                p.payment_terms_days,p.status,p.source_reference,p.job_card_id,
+                p.record_revision,p.created_at,p.updated_at,
+                j.status AS job_card_status,s.status AS sales_order_status,
+                CASE WHEN j.status='cancelled' OR s.status='cancelled'
+                  THEN 'CANCELLED_UPSTREAM_DEMAND'
+                  ELSE 'UPSTREAM_DEMAND_UNVERIFIED' END AS demand_lineage_state
+           FROM vyndi_purchase_orders p
+           LEFT JOIN epr_production_job_cards j ON j.id=p.job_card_id
+           LEFT JOIN vyndi_sales_orders s ON s.id=j.sales_order_id
+          WHERE p.status IN ('draft','pending_approval','approved','issued','partially_received')
        ), page AS (
          SELECT * FROM eligible ORDER BY updated_at DESC,id LIMIT $1
        )
