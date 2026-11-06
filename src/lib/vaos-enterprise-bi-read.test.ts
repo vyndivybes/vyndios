@@ -142,3 +142,29 @@ test("executiveOnly signed aggregate mode does not scan 53 detailed ledgers",asy
  assert.equal(requests.length,6);
  await assert.rejects(async()=>readEnterpriseBi(sql as never,{employeeId:'finance',from:'2026-11-01',to:'2026-11-05',executiveOnly:true}),/INVALID_BI_SCOPE/);
 });
+
+test("executive BI source includes privacy-safe canonical CRM order linkage without personal data",async()=>{
+ const statements:string[]=[];
+ const report=await readExecutiveBiSignals({query:async(statement:string)=>{
+  statements.push(statement);
+  return [{category:'dealer',status:'confirmed',record_count:2}];
+ }} as never);
+ assert.equal(report.datasets.crmOrderLinks.status,'OBSERVED');
+ assert.equal(report.datasets.crmOrderLinks.total,2);
+ assert.equal(statements.length,7);
+ const sql=statements.find(s=>s.includes('vyndi_crm_order_links'));
+ assert.ok(sql);
+ assert.match(sql!,/vyndi_sales_orders/);
+ assert.match(sql!,/count\s*\(\s*distinct/i);
+ assert.doesNotMatch(sql!,/select\s+\*|customer_id\s+as|email|phone|primary_contact/i);
+});
+test("dispatch BI groups once per shipment and treats void-only invoices as not issued",async()=>{
+ let dispatchSql='';
+ await readExecutiveBiSignals({query:async(statement:string)=>{
+  if(statement.includes('vyndi_dispatch_register'))dispatchSql=statement;
+  return [{category:'dispatch',status:'posted / invoice issued',record_count:1}];
+ }} as never);
+ assert.match(dispatchSql,/group\s+by\s+shipment_id/i);
+ assert.match(dispatchSql,/invoice_status\s*=\s*'issued'/i);
+ assert.doesNotMatch(dispatchSql,/group\s+by\s+status\s*,\s*invoice_status/i);
+});
