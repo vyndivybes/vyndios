@@ -17,6 +17,27 @@ test('BI executes against the complete historical schema and queries old periods
  const executive=await readEnterpriseBi(sql,{employeeId:'all',
   from:'2026-09-01',to:'2026-10-15',executiveOnly:true});
  assert.equal(executive.departments.length,0);
+ // Reproduce invoice fanout without modifying canonical tables.
+ // A shipment linked to issued + void invoices must count once as issued.
+ // A void-only invoice is not a currently issued invoice.
+ await db.exec(`create temporary view vyndi_dispatch_register as
+  select * from (values
+   ('BI-SHIP-1','posted','INV-1','issued'),
+   ('BI-SHIP-1','posted','INV-2','void'),
+   ('BI-SHIP-2','posted',null::text,null::text),
+   ('BI-SHIP-3','posted','INV-3','void'),
+   ('BI-SHIP-4','reversed','INV-4','void')
+  ) as d(shipment_id,status,invoice_id,invoice_status)`);
+ const qualified=await readEnterpriseBi(sql,{employeeId:'all',
+  from:'2026-09-01',to:'2026-10-15',executiveOnly:true});
+ const dispatch=qualified.executiveSignals.datasets.dispatch;
+ assert.equal(dispatch.status,'OBSERVED');
+ assert.equal(dispatch.total,4,'invoice history must not duplicate dispatch totals');
+ assert.deepEqual(dispatch.rows.filter(r=>r.category==='dispatch').map(r=>[r.status,r.record_count]).sort(),[
+  ['posted / invoice issued',1],['posted / invoice none',2],['reversed / invoice none',1],
+ ].sort());
+ await db.exec('drop view pg_temp.vyndi_dispatch_register');
+
  assert.equal(executive.executiveSignals?.schemaVersion,'VYNDI_EXECUTIVE_SIGNALS_V1');
  for(const [dataset,result] of Object.entries(executive.executiveSignals.datasets))
   assert.equal(result.status,'OBSERVED',dataset+' must query real canonical migration schema');
