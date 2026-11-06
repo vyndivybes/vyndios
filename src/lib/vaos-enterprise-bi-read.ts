@@ -170,8 +170,14 @@ async function readOne(sql:Sql,employeeId:Employee,from:string,to:string,offset:
  */
 const EXECUTIVE_SIGNAL_QUERIES={
  ...GROUP_AGGREGATE_QUERIES,
+ crmOrderLinks:{
+  query:"select c.segment as category,o.status as status,count(distinct l.sales_order_id)::int as record_count from vyndi_crm_order_links l join vyndi_crm_customers c on c.id=l.customer_id join vyndi_sales_orders o on o.id=l.sales_order_id group by c.segment,o.status order by c.segment,o.status",
+  keys:['category','status','record_count'],
+ },
  dispatch:{
-  query:"select 'dispatch' as category, concat(coalesce(status,'unknown'),' / invoice ',coalesce(invoice_status,'none')) as status, count(distinct shipment_id)::int as record_count from vyndi_dispatch_register group by status,invoice_status order by status,invoice_status",
+  // The canonical register expands shipments by joined invoices. Collapse to
+  // shipment grain before counting; only currently issued invoices qualify.
+  query:"with shipments as (select shipment_id,max(status) as shipment_status,bool_or(invoice_status='issued') as issued from vyndi_dispatch_register group by shipment_id) select 'dispatch' as category,concat(coalesce(shipment_status,'unknown'),' / invoice ',case when issued then 'issued' else 'none' end) as status,count(*)::int as record_count from shipments group by shipment_status,issued order by shipment_status,issued",
   keys:['category','status','record_count'],
  },
 };
