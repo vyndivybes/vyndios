@@ -177,7 +177,7 @@ const EXECUTIVE_SIGNAL_QUERIES={
  dispatch:{
   // The canonical register expands shipments by joined invoices. Collapse to
   // shipment grain before counting; only currently issued invoices qualify.
-  query:"with shipments as (select shipment_id,max(status) as shipment_status,bool_or(invoice_status='issued') as issued from vyndi_dispatch_register group by shipment_id) select 'dispatch' as category,concat(coalesce(shipment_status,'unknown'),' / invoice ',case when issued then 'issued' else 'none' end) as status,count(*)::int as record_count from shipments group by shipment_status,issued order by shipment_status,issued",
+  query:"with shipments as (select shipment_id,max(status) as shipment_status,coalesce(bool_or(invoice_status='issued'),false) as issued from vyndi_dispatch_register group by shipment_id) select 'dispatch' as category,concat(coalesce(shipment_status,'unknown'),' / invoice ',case when issued then 'issued' else 'none' end) as status,count(*)::int as record_count from shipments group by shipment_status,issued order by shipment_status,issued",
   keys:['category','status','record_count'],
  },
 };
