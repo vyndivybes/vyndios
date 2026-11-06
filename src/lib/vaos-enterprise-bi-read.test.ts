@@ -94,7 +94,8 @@ test("executive BI exposes full CRM, HR and dispatch aggregates without personal
    statement.includes('vyndi_people_records')?'hrWorkforce':
    statement.includes('vyndi_people_attendance_current')?'hrAttendance':
    statement.includes('vyndi_people_payroll_readiness_current')?'hrPayrollReadiness':
-   statement.includes('vyndi_dispatch_register')?'dispatch':null;
+   statement.includes('vyndi_dispatch_register')?'dispatch':
+   statement.includes('vyndi_crm_order_links')?'crmOrderLinks':null;
   if(!dataset)throw Error('unexpected query');
   return [{category:dataset,status:'observed',record_count:3}];
  };
@@ -103,14 +104,14 @@ test("executive BI exposes full CRM, HR and dispatch aggregates without personal
  assert.equal(report.readOnly,true);
  assert.equal(report.groupFinanceQualified,false);
  assert.equal(report.forecastQualified,false);
- assert.deepEqual(Object.keys(report.datasets),['crmCustomers','crmFollowups','hrWorkforce','hrAttendance','hrPayrollReadiness','dispatch']);
- assert.equal(queries.length,6);
+ assert.deepEqual(Object.keys(report.datasets),['crmCustomers','crmFollowups','hrWorkforce','hrAttendance','hrPayrollReadiness','crmOrderLinks','dispatch']);
+ assert.equal(queries.length,7);
  for(const value of Object.values(report.datasets)){
   assert.equal(value.status,'OBSERVED');
   assert.equal(value.total,3);
   assert.deepEqual(Object.keys(value.rows[0]).sort(),['category','record_count','status']);
  }
- assert.match(queries[5],/count\s*\(distinct\s+shipment_id\)/i);
+ assert.match(queries[6],/group\s+by\s+shipment_id/i);
 });
 test("malformed personal data or missing source fails only its own dataset closed",async()=>{
  const read=await readExecutiveBiSignals({query:async(statement:string)=>{
@@ -139,6 +140,32 @@ test("executiveOnly signed aggregate mode does not scan 53 detailed ledgers",asy
  assert.equal(data.scope,'all');
  assert.equal(data.executiveSignals?.schemaVersion,'VYNDI_EXECUTIVE_SIGNALS_V1');
  assert.equal(data.departments.length,0);
- assert.equal(requests.length,6);
+ assert.equal(requests.length,7);
  await assert.rejects(async()=>readEnterpriseBi(sql as never,{employeeId:'finance',from:'2026-11-01',to:'2026-11-05',executiveOnly:true}),/INVALID_BI_SCOPE/);
+});
+
+test("executive BI source includes privacy-safe canonical CRM order linkage without personal data",async()=>{
+ const statements:string[]=[];
+ const report=await readExecutiveBiSignals({query:async(statement:string)=>{
+  statements.push(statement);
+  return [{category:'dealer',status:'confirmed',record_count:2}];
+ }} as never);
+ assert.equal(report.datasets.crmOrderLinks.status,'OBSERVED');
+ assert.equal(report.datasets.crmOrderLinks.total,2);
+ assert.equal(statements.length,7);
+ const sql=statements.find(s=>s.includes('vyndi_crm_order_links'));
+ assert.ok(sql);
+ assert.match(sql!,/vyndi_sales_orders/);
+ assert.match(sql!,/count\s*\(\s*distinct/i);
+ assert.doesNotMatch(sql!,/select\s+\*|customer_id\s+as|email|phone|primary_contact/i);
+});
+test("dispatch BI groups once per shipment and treats void-only invoices as not issued",async()=>{
+ let dispatchSql='';
+ await readExecutiveBiSignals({query:async(statement:string)=>{
+  if(statement.includes('vyndi_dispatch_register'))dispatchSql=statement;
+  return [{category:'dispatch',status:'posted / invoice issued',record_count:1}];
+ }} as never);
+ assert.match(dispatchSql,/group\s+by\s+shipment_id/i);
+ assert.match(dispatchSql,/invoice_status\s*=\s*'issued'/i);
+ assert.doesNotMatch(dispatchSql,/group\s+by\s+status\s*,\s*invoice_status/i);
 });
