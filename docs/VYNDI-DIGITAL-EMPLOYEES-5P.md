@@ -48,7 +48,7 @@ Bike fitting and cycling performance remain specialist analytical modules, not a
 ### P4 — Perform: event-driven analysts
 - Use existing Cloudflare Workers/scheduler and storage only within **confirmed free quotas**, no new paid APIs, LLM keys or services.
 - Poll or react to actual source changes; perform bounded analyses of material shortages, orders, production, finance, quality and HR.
-- Permit preparation of proposed operator actions only via approved owning flows. Do not automatically issue purchase orders, spend funds, accept risk, post accounts or release production.
+- After separate per-role write qualification and explicit owner authorisation, allow **scoped, reversible writes** only through existing authenticated owning workflows: e.g. CRM follow-up notes, planning task updates, draft RFQs, draft NCRs and office checklists. Validate role, input evidence, idempotency and append-only audit on the server; never accept an advisory gate as a permission check. Financial commitments, purchase-order issue, accounting posting, engineering approval and production release remain under their distinct maker/checker or statutory authorities.
 - Show `last observed | source | finding | HOLD | next owner action` in one human-readable command center.
 
 **Gate:** repeatable signed work receipts, permission-isolation tests, no unauthorised writes, monitoring and recovery evidence.
