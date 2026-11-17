@@ -44,7 +44,6 @@ export const COMMAND_SHORTCUTS: readonly WorkspaceLink[] = [
   { to: "/command/ibpe-operating-workspace", label: "VIBPE Workspace" },
   { to: "/command/ibpe-operating-workspace/authority", label: "VIBPE Planning Authority" },
   { to: "/command/ibpe-operating-workspace/optimizer", label: "VIBPE Optimizer" },
-  { to: "/command/ibpe-operating-workspace/simulation", label: "Four-order Simulation" },
   { to: "/command/ibpe-operating-workspace/outputs", label: "VIBPE Outputs & Evidence" },
   { to: "/command/ibpe-operating-workspace/assurance", label: "VIBPE Assurance" },
   { to: "/command/ibpe-operating-workspace/release", label: "VIBPE Release Readiness" },
@@ -135,7 +134,6 @@ export const WORKSPACE_NAVIGATION: Record<CanonicalWorkspaceId, readonly Workspa
         { to: "/command/ibpe-operating-workspace/assurance", label: "05 · VIBPE Assurance" },
         { to: "/command/ibpe-operating-workspace/release", label: "06 · Release Readiness" },
         { to: "/command/intelligence", label: "07 · Product Intelligence" },
-        { to: "/command/ibpe-operating-workspace/simulation", label: "Simulation · IBPE + HiGHS" },
       ],
     },
     {

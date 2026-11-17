@@ -139,7 +139,6 @@ function GovernedOptimizerPage() {
           <Link to="/command/ibpe-operating-workspace" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:border-accent hover:text-fg">VIBPE Workspace</Link>
           <Link to="/command/ibpe-operating-workspace/assurance" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:border-accent hover:text-fg">VIBPE Assurance</Link>
           <Link to="/command/ibpe-operating-workspace/release" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:border-accent hover:text-fg">Release Readiness</Link>
-          <Link to="/command/ibpe-operating-workspace/simulation" className="rounded-md border border-warn/60 px-3 py-2 text-xs font-semibold text-warn hover:bg-warn/10">Run 4-order demo simulation</Link>
         </div>
       </header>
 
@@ -148,12 +147,9 @@ function GovernedOptimizerPage() {
         <p className="mt-1 text-xs leading-5 text-muted">
           The governed optimizer requires a fresh IBPE run and advanced packet from the exact deployed software.
           A completed historic packet may pass the mathematical preparation test while failing release provenance.
-          Demo orders with an R2/R3 card mismatch must use the independent simulation workflow;
-          do not approve physical job cards, change supplier receipts or consume inventory to bypass this gate.
+          Demo orders with an R2/R3 card mismatch remain on HOLD until genuine design confirmation and production release evidence exist.
+          Do not approve physical job cards, change supplier receipts or consume inventory to bypass this gate.
         </p>
-        <Link to="/command/ibpe-operating-workspace/simulation" className="mt-3 inline-block text-xs font-semibold text-accent underline">
-          Open simulation-only IBPE for the four demo orders
-        </Link>
       </section>
 
       <Panel title="Governed preparation gate" kicker="Exact packet → authority → cash guardrails → solver">

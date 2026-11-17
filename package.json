@@ -101,7 +101,7 @@
     "test:risk:ssr": "node --test scripts/risk-route-ssr.test.mjs",
     "test:operations:hydration": "node --test scripts/operations-hydrated-reliability.test.mjs",
     "test:auth:bounded-postgres": "node --experimental-strip-types --test scripts/bounded-auth-postgres-connect.test.mjs",
-    "test:simulation-highs": "node --experimental-strip-types --test scripts/four-order-highs.test.mjs",
+    "test:simulation-highs": "node --experimental-strip-types --test scripts/four-order-highs.test.mjs scripts/four-order-simulation-page-retirement.test.mjs",
     "test:production-prelaunch": "node --experimental-strip-types --test scripts/production-release-presentation.test.mjs",
     "test:lint-security": "node --test scripts/lint-security-compatibility.test.mjs",
     "test:auth-1-7": "node --experimental-strip-types --test scripts/auth-1-7-compatibility.test.mjs",

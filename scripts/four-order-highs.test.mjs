@@ -67,10 +67,6 @@ test("simulation authority remains authenticated, consented, fresh and write-fre
  assert.match(authority,/current.modelHash!==data.modelHash/);
  assert.match(authority,/verifyFourOrderHighs\(current.model,data.raw\)/);
  assert.doesNotMatch(authority,/\b(?:insert into|delete from|update\s+vyndi_|approve_vyndi_production_batch)\b/i);
- const page=await readFile(new URL("../src/routes/command/ibpe-operating-workspace_.simulation.tsx",import.meta.url),"utf8");
- assert.match(page,/!consent\|\|!solverConsent\|\|running/);
- assert.match(page,/setConsent\(false\)/);
- assert.match(page,/REAL readiness remains HOLD/);
 });
 
 test("historic optimizer acceptance cannot be mistaken for current REAL readiness",async()=>{
@@ -81,20 +77,3 @@ test("historic optimizer acceptance cannot be mistaken for current REAL readines
  assert.doesNotMatch(page,/>Accepted for execution<\/p>/);
 });
 
-test("simulation requires mounted client readiness before consent is interactive",async()=>{
- const {readFile}=await import("node:fs/promises");
- const page=await readFile(new URL("../src/routes/command/ibpe-operating-workspace_.simulation.tsx",import.meta.url),"utf8");
- assert.match(page,/useEffect\(\(\)=>\{setHydrated\(true\)\},\[\]\)/);
- assert.match(page,/data-simulation-interactive=\{hydrated\?"ready":"loading"\}/);
- assert.match(page,/type="checkbox" disabled=\{!hydrated\|\|running\} checked=\{consent\}/);
- const browser=await readFile(new URL("../scripts/four-order-simulation-browser-acceptance.mjs",import.meta.url),"utf8");
- assert.match(browser,/data-simulation-interactive="ready"/);
-});
-
-test("every governed status bar exposes the separate simulation entry",async()=>{
- const {readFile}=await import("node:fs/promises");
- const projection=await readFile(new URL("../src/components/ibpe-workspace-projection.tsx",import.meta.url),"utf8");
- assert.match(projection,/<Link[^>]*to="\/command\/ibpe-operating-workspace\/simulation"[^>]*aria-label="Run four-order simulation IBPE"/);
- assert.match(projection,/REAL baseline only/);
- assert.match(projection,/Simulation does not require a physical production release/);
-});
