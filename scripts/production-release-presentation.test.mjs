@@ -21,15 +21,15 @@ test("known demo release fields never count as real physical approval",async()=>
  assert.equal(real.approvalRecorded,true);
  assert.equal(real.physicalReleaseQualified,false,"presentation cannot confer engineering/physical authority");
 });
-test("simulation and Production explain the pre-production state without rewriting history",async()=>{
+test("Production preserves pre-production HOLD while legacy demo console redirects",async()=>{
  const page=await readFile(new URL("../src/routes/command/production.tsx",import.meta.url),"utf8");
  assert.match(page,/jobCardReleasePresentation/);
  assert.match(page,/NOT RELEASED/);
  assert.match(page,/Design confirmation/);
  assert.doesNotMatch(page,/const approvedCards = cards.filter\(\(card: any\) => Boolean\(card.approved_at\)\)/);
  const sim=await readFile(new URL("../src/routes/command/ibpe-operating-workspace_.simulation.tsx",import.meta.url),"utf8");
- assert.match(sim,/legacy\/demo/);
- assert.match(sim,/design confirmation/i);
+ assert.match(sim,/throw redirect\(\{ to: "\/command\/ibpe-operating-workspace\/optimizer" \}\)/);
+ assert.doesNotMatch(page,/to="\/command\/ibpe-operating-workspace\/simulation"/);
 });
 
 test("exact demo IDs cannot enter physical approval or inventory side effects",async()=>{
