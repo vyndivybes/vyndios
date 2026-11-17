@@ -3,7 +3,6 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
-const retired = "/command/ibpe-operating-workspace/simulation";
 
 test("retired four-order simulation page redirects to the governed optimizer", () => {
   const page = read("src/routes/command/ibpe-operating-workspace_.simulation.tsx");
