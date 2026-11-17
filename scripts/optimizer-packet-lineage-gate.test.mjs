@@ -30,12 +30,12 @@ test("missing latest governed IBPE or source SHA fails closed",()=>{
  assert.equal(assessAdvancedOptimizerLineage({...packet,source_sha:""},ibpe,"source-abc").ready,false);
 });
 
-test("control page uses computed packet provenance and points demo users to separate simulation mode",async()=>{
+test("control page preserves computed packet provenance while retiring the demo simulation link",async()=>{
  const control=await readFile(new URL("../src/lib/advanced-optimizer-control.ts",import.meta.url),"utf8");
  const page=await readFile(new URL("../src/routes/command/ibpe-operating-workspace_.optimizer.tsx",import.meta.url),"utf8");
  assert.match(control,/assessAdvancedOptimizerLineage\(/);
  assert.match(control,/source_sha/);
  assert.doesNotMatch(control,/readyForGovernedOptimization:\s*true/);
- assert.match(page,/\/command\/ibpe-operating-workspace\/simulation/);
- assert.match(page,/SIMULATION ONLY|simulation-only/i);
+ assert.doesNotMatch(page,/\/command\/ibpe-operating-workspace\/simulation/);
+ assert.match(page,/Demo orders with an R2\/R3 card mismatch remain on HOLD/);
 });
