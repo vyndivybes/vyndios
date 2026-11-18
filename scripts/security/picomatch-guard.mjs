@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const PACKAGE_VERSION = '4.0.7';
 const UPSTREAM_GIT_BLOB = '29207512c60183b4bb9bf5112be3b9b5f4a9a9fd';
@@ -126,7 +127,7 @@ export function qualifyInstalled(options = {}) {
   return { sourcePath, ...qualifyAndPatch(source) };
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === resolve(new URL(import.meta.url).pathname)) {
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const action = process.argv[2];
   if (action !== '--apply' && action !== '--check') {
     throw new Error('Usage: picomatch-guard.mjs --apply | --check');
