@@ -7,7 +7,7 @@ const worker = await readFile(new URL("../src/lib/postgres-worker-env.server.ts"
 
 test("Cloudflare Hyperdrive is obtained through static server-only importable env", () => {
   assert.match(worker, /import\s*\{\s*env\s+as\s+workerEnv\s*\}\s*from\s*["']cloudflare:workers["']/);
-  assert.match(worker, /workerEnv\.HYPERDRIVE/);
+  assert.match(worker, /HYPERDRIVE\?\.connectionString/);
   assert.match(transport, /await\s+import\(["']\.\/postgres-worker-env\.server\.ts["']\)/);
   assert.doesNotMatch(transport, /vite-ignore/);
 });
