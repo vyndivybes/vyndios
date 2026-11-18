@@ -57,7 +57,7 @@ jobs:
           npm run test:h2:recovery:expanded
 
       - name: Wait for exact Cloudflare deployment and schema readiness
-        timeout-minutes: 10
+        timeout-minutes: 22
         run: node scripts/production-deployment-readiness.mjs
 
       - name: Verify assurance configuration

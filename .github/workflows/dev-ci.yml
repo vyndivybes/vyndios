@@ -29,6 +29,13 @@ jobs:
       - name: Install
         run: npm ci
 
+      # This check is part of focused-validation, which is required by the main
+      # ruleset; the separate path-filtered security workflow is not sufficient.
+      - name: Full dependency security release gate
+        run: |
+          npm audit --omit=dev --audit-level=moderate
+          npm audit --audit-level=low
+
       - name: SLO production login selector contract
         run: node --test scripts/slo-login-contract.test.mjs
 
