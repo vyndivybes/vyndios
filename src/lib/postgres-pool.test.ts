@@ -21,7 +21,8 @@ test("deployed PostgreSQL keeps request sharing without retaining a pg.Pool", as
   assert.match(databaseSource, /await timeStage\("db.close", \(\) => client\.end\(\)\)/);
   assert.doesNotMatch(databaseSource, /new Pool\(/);
   assert.doesNotMatch(databaseSource, /__vyndiLocalPostgresPool__/);
-  assert.match(authSource, /requestSafePostgresDialect\(postgresTransport\.connectionString\)/);
+  assert.match(authSource, /requestSafePostgresDialect\(async\s*\(\)\s*=>/);
+  assert.match(authSource, /const liveTransport = await resolvePostgresTransport\(\)/);
   assert.doesNotMatch(authSource, /new Pool\(/);
 });
 
@@ -79,8 +80,10 @@ test("Better Auth uses the same Hyperdrive-aware deployed Postgres transport", a
   assert.match(authSource, /const postgresTransport = await resolvePostgresTransport\(\)/);
   assert.match(
     authSource,
-    /requestSafePostgresDialect\(postgresTransport\.connectionString\)/,
+    /requestSafePostgresDialect\(async\s*\(\)\s*=>/,
   );
+  assert.match(authSource, /if \(!liveTransport\) throw new Error\("AUTH_POSTGRES_TRANSPORT_UNAVAILABLE"\)/);
+  assert.doesNotMatch(authSource, /requestSafePostgresDialect\(postgresTransport\.connectionString\)/);
   assert.doesNotMatch(
     authSource,
     /const database = databaseUrl\s*\?\s*new Pool/,
