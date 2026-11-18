@@ -25,5 +25,13 @@ jobs:
           cache: npm
       - name: Install exact locked dependencies without lifecycle scripts
         run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Apply pinned local picomatch patch
+        run: node scripts/security/picomatch-guard.mjs --apply
       - name: Prove malicious repeated extglobs are rejected
         run: node --test scripts/security/picomatch-guard.test.mjs
+      - name: Qualify Cloudflare production bundle with enforced patch
+        run: npm run build:bundle
+      - name: Verify patched source remains in build toolchain
+        run: node scripts/security/picomatch-guard.mjs --check
+      - name: Require emitted Cloudflare Worker
+        run: node --input-type=module -e "import { statSync } from 'node:fs'; if (!statSync('dist/server/index.js').isFile()) process.exit(1)"
