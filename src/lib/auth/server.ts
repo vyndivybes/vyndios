@@ -90,8 +90,15 @@ const grokTokenUrl = `${issuerBase}/api/auth/oauth2/token`;
 const grokUserInfoUrl = `${issuerBase}/api/auth/oauth2/userinfo`;
 
 const postgresTransport = await resolvePostgresTransport();
+// Better Auth is module-scoped, but its PostgreSQL transport must be selected
+// after an individual Cloudflare request has started. Do not pin the module's
+// initial DATABASE_URL fallback when Hyperdrive bindings become available.
 const postgresAuthDialect = postgresTransport
-  ? requestSafePostgresDialect(postgresTransport.connectionString)
+  ? requestSafePostgresDialect(async () => {
+      const liveTransport = await resolvePostgresTransport();
+      if (!liveTransport) throw new Error("AUTH_POSTGRES_TRANSPORT_UNAVAILABLE");
+      return liveTransport.connectionString;
+    })
   : null;
 const database = postgresAuthDialect
   ? { dialect: postgresAuthDialect, type: "postgres" as const }

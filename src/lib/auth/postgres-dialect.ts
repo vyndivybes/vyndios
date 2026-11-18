@@ -17,7 +17,8 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { timeStage } from "../request-timing.server.ts";
 
 type PostgresClient = Pick<Client, "connect" | "end" | "query">;
-type PostgresClientFactory = () => PostgresClient;
+type PostgresConnectionResolver = string | (() => Promise<string>);
+type PostgresClientFactory = (connectionString: string) => PostgresClient | Promise<PostgresClient>;
 
 /**
  * Retrying is allowed ONLY for a failed connection attempt, never for
@@ -48,16 +49,16 @@ const requestState = new AsyncLocalStorage<RequestState>();
  * a session lookup after the cookie-cache boundary safe in a later request.
  */
 export function requestSafePostgresDialect(
-  connectionString: string,
-  createClient: PostgresClientFactory = () => new Client({
-    connectionString,
+  connectionString: PostgresConnectionResolver,
+  createClient: PostgresClientFactory = (currentConnectionString) => new Client({
+    connectionString: currentConnectionString,
     connectionTimeoutMillis: 3_500,
     query_timeout: 10_000,
   }),
 ): Dialect & { runInRequest<T>(work: () => Promise<T>): Promise<T> } {
   const dialect: Dialect = {
     createAdapter: () => new PostgresAdapter(),
-    createDriver: () => new RequestSafePostgresDriver(createClient),
+    createDriver: () => new RequestSafePostgresDriver(connectionString, createClient),
     createQueryCompiler: (): QueryCompiler => new PostgresQueryCompiler(),
     createIntrospector: (db: Kysely<unknown>): DatabaseIntrospector => new PostgresIntrospector(db),
   };
@@ -73,9 +74,11 @@ export function requestSafePostgresDialect(
 }
 
 class RequestSafePostgresDriver implements Driver {
+  private readonly connectionString: PostgresConnectionResolver;
   private readonly createClient: PostgresClientFactory;
 
-  constructor(createClient: PostgresClientFactory) {
+  constructor(connectionString: PostgresConnectionResolver, createClient: PostgresClientFactory) {
+    this.connectionString = connectionString;
     this.createClient = createClient;
   }
 
@@ -84,8 +87,15 @@ class RequestSafePostgresDriver implements Driver {
   async acquireConnection(): Promise<DatabaseConnection> {
     const state = requestState.getStore();
     if (state?.client) return new RequestSafePostgresConnection(state.client, false);
+    // Resolve only within the active Worker request. Module-scoped Better Auth
+    // must not capture a connection URL before Cloudflare runtime bindings exist.
+    // A failed resolver never opens a connection or falls back to an identity.
+    const currentConnectionString = typeof this.connectionString === "function"
+      ? await this.connectionString()
+      : this.connectionString;
+    if (!currentConnectionString?.trim()) throw new Error("AUTH_POSTGRES_TRANSPORT_UNAVAILABLE");
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      const client = this.createClient();
+      const client = await this.createClient(currentConnectionString);
       try {
         await timeStage("auth.connect", () => client.connect());
         if (state) state.client = client;
