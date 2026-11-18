@@ -8,6 +8,15 @@
     "minimatch": "11.0.1"
   },
   "scripts": {
+    "postinstall": "node scripts/security/picomatch-guard.mjs --apply",
+    "prebuild:bundle": "node scripts/security/picomatch-guard.mjs --check",
+    "prebuild:dev": "node scripts/security/picomatch-guard.mjs --check",
+    "predev": "node scripts/security/picomatch-guard.mjs --check",
+    "prepreview": "node scripts/security/picomatch-guard.mjs --check",
+    "pretest": "node scripts/security/picomatch-guard.mjs --check",
+    "security:picomatch:apply": "node scripts/security/picomatch-guard.mjs --apply",
+    "security:picomatch:check": "node scripts/security/picomatch-guard.mjs --check",
+    "test:security:picomatch": "node --test scripts/security/picomatch-guard.test.mjs",
     "dev": "node scripts/with-app-env.mjs vite dev --host 0.0.0.0 --port 8080",
     "build": "npm run build:bundle",
     "build:bundle": "npm run db:validate && node scripts/with-app-env.mjs vite build",
