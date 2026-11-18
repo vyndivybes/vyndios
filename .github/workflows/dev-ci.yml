@@ -36,6 +36,9 @@ jobs:
           npm audit --omit=dev --audit-level=moderate
           npm audit --audit-level=low
 
+      - name: Auth per-request PostgreSQL transport contract
+        run: node --experimental-strip-types --test scripts/auth-request-time-transport.test.mjs
+
       - name: Cloudflare importable Hyperdrive auth transport regression
         run: node --test scripts/cloudflare-auth-hyperdrive-binding.test.mjs
 
