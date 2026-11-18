@@ -7,6 +7,8 @@ import { resolve } from "node:path";
 export const PRODUCTION_READINESS_RETRY = Object.freeze({
   maxAttempts: 81,
   intervalMs: 15_000,
+  maxWaitMs: 20 * 60_000,
+  requestTimeoutMs: 10_000,
 });
 
 export function assessProductionHealth(status, value, expectedSha) {
@@ -34,14 +36,17 @@ async function main() {
   if (!/^[a-f0-9]{40}$/.test(expected)) throw new Error("Production SHA must be an exact 40-character commit SHA.");
 
   const maxAttempts = PRODUCTION_READINESS_RETRY.maxAttempts;
+  const startedAt = Date.now();
   let last = { ready: false, reason: "NOT_CHECKED" };
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const remainingMs = PRODUCTION_READINESS_RETRY.maxWaitMs - (Date.now() - startedAt);
+    if (remainingMs <= 0) break;
     let observedSha = null;
     let status = null;
     try {
       const result = await fetch(target + "/api/runtime/health", {
         headers: { "cache-control": "no-cache" },
-        signal: AbortSignal.timeout(10_000),
+        signal: AbortSignal.timeout(Math.min(PRODUCTION_READINESS_RETRY.requestTimeoutMs, remainingMs)),
       });
       status = result.status;
       const payload = await result.json();
@@ -56,7 +61,9 @@ async function main() {
       return;
     }
     console.log("Production deployment not yet qualified", "attempt", attempt, "reason", last.reason);
-    if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, PRODUCTION_READINESS_RETRY.intervalMs));
+    const waitMs = Math.min(PRODUCTION_READINESS_RETRY.intervalMs,
+      Math.max(0, PRODUCTION_READINESS_RETRY.maxWaitMs - (Date.now() - startedAt)));
+    if (attempt < maxAttempts && waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
   }
 
   await writeEvidence({ verdict: "UNVERIFIED", expectedSha: expected, reason: last.reason, checkedAt: new Date().toISOString() });
