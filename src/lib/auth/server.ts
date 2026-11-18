@@ -350,6 +350,23 @@ export async function handleAuthRequest(request: Request): Promise<Response> {
   }
 }
 
+/**
+ * Apply the same request-owned PostgreSQL lifecycle to SSR/server-function
+ * session verification as to /api/auth handlers.
+ *
+ * The Better Auth instance is module-scoped; the database *connection* must
+ * never escape an individual Cloudflare Worker request. The auth handler
+ * already uses runInRequest(), but auth.api.getSession() from SSR previously
+ * bypassed that boundary and created separate ephemeral connections.
+ *
+ * This helper does not alter cookie verification or user authorization.
+ */
+export async function withAuthPostgresRequest<T>(work: () => Promise<T>): Promise<T> {
+  return postgresAuthDialect
+    ? postgresAuthDialect.runInRequest(work)
+    : work();
+}
+
 /** Record a server-side session lookup failure without logging cookie/token values. */
 export function logSessionLookupFailure(request: Request, error: unknown): void {
   const details = authFailureDetails(request, error);
