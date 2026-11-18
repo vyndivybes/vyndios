@@ -10,12 +10,6 @@ type TransportCandidates = {
   databaseUrl?: string;
 };
 
-type CloudflareRuntimeEnv = {
-  HYPERDRIVE?: {
-    connectionString?: string;
-  };
-};
-
 function nonBlank(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
@@ -42,13 +36,11 @@ export function selectPostgresTransport(candidates: TransportCandidates): Postgr
 
 async function cloudflareHyperdriveConnectionString(): Promise<string | undefined> {
   try {
-    // Keep the Cloudflare built-in module runtime-resolved. A literal dynamic
-    // import is eagerly resolved by the portable Vite client/typecheck build,
-    // where cloudflare:workers intentionally does not exist.
-    const cloudflareWorkersModule = "cloudflare:workers";
-    const workers = await import(/* @vite-ignore */ cloudflareWorkersModule);
-    const runtimeEnv = workers.env as CloudflareRuntimeEnv | undefined;
-    return nonBlank(runtimeEnv?.HYPERDRIVE?.connectionString);
+    // The literal Cloudflare import lives in a server-only file, allowing Vite
+    // to resolve the platform binding in the Worker without pulling it into
+    // portable client or Node builds.
+    const workers = await import("./postgres-worker-env.server.ts");
+    return nonBlank(workers.workerHyperdriveConnectionString());
   } catch {
     // Outside Cloudflare Workers the platform module is intentionally absent.
     return undefined;
