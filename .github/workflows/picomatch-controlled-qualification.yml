@@ -1,0 +1,29 @@
+name: Picomatch controlled mitigation qualification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - package.json
+      - scripts/security/picomatch-guard.mjs
+      - scripts/security/picomatch-guard.test.mjs
+      - .github/workflows/picomatch-controlled-qualification.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mitigation-qualification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install exact locked dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Prove malicious repeated extglobs are rejected
+        run: node --test scripts/security/picomatch-guard.test.mjs
