@@ -55,7 +55,7 @@ test("purchase-order bridge is GET-equivalent signed read only, with bounded exa
  const source=await readFile(resolve(root,"src/routes/api/vaos/bridge.ts"),"utf8");
  const block=source.split('if (actionType === "PROCUREMENT.OBSERVE_OPEN_POS") {')[1].split('if (actionType === "INVENTORY.OBSERVE_STOCK")')[0];
  assert.match(block,/FROM vyndi_purchase_orders/);
- assert.match(block,/WHERE status IN/);
+ assert.match(block,/WHERE p\.status IN/);
  assert.match(block,/LIMIT \$1/);
  assert.match(block,/count\(\*\)::integer FROM eligible/);
  assert.match(block,/sourceKind:"purchaseOrders"/);
