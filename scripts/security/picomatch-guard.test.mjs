@@ -37,7 +37,10 @@ test('safe literal, glob and extglob behavior remains intact', () => {
     ['js', '@(js|ts)', true],
     ['jpg', '@(js|ts)', false],
     ['abab', '+(ab)', true],
-    ['ab', '+(ab)', false],
+    ['a', '+(ab)', false],
+    ['ab', '+(ab)', true],
+    ['*', '+([*])', true],
+    ['***', '+(\\\\*)', true],
     ['a*b', 'a\\*b', true]
   ];
   for (const [value, glob, expected] of cases) {
