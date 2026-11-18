@@ -36,6 +36,9 @@ jobs:
           npm audit --omit=dev --audit-level=moderate
           npm audit --audit-level=low
 
+      - name: Cloudflare importable Hyperdrive auth transport regression
+        run: node --test scripts/cloudflare-auth-hyperdrive-binding.test.mjs
+
       - name: SLO production login selector contract
         run: node --test scripts/slo-login-contract.test.mjs
 
