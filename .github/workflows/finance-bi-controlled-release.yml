@@ -34,6 +34,8 @@ jobs:
           cache: npm
       - name: Install reviewed dependency lockfile
         run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Apply reviewed picomatch mitigation for exact-lockfile build
+        run: node scripts/security/picomatch-guard.mjs --apply
       - name: Verify source-governed financial accounting and BI regressions
         run: node --experimental-strip-types --test src/lib/finance/financial-statements.test.ts src/lib/finance/financial-intelligence.test.ts
       - name: Verify migration numbering and build bundle

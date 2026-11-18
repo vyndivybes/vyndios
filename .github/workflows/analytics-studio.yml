@@ -32,6 +32,8 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Apply reviewed picomatch mitigation for exact-lockfile build
+        run: node scripts/security/picomatch-guard.mjs --apply
       - name: Focused evidence/aggregation tests
         run: node --experimental-strip-types --test src/lib/analytics-studio.test.ts src/lib/analytics-explainability.test.ts src/lib/analytics-crm-hr.test.ts src/lib/group-consolidation.test.ts
       - name: Generate route tree and bundle VYNDI app
