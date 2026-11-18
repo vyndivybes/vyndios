@@ -151,7 +151,7 @@ async function executeRead(
            FROM vyndi_purchase_orders p
            LEFT JOIN epr_production_job_cards j ON j.id=p.job_card_id
            LEFT JOIN vyndi_sales_orders s ON s.id=j.sales_order_id
-          WHERE p.status IN ('draft','pending_approval','approved','issued','partially_received')
+          WHERE p.status IN ('draft','pending_approval','approved','issued','part_received')
        ), page AS (
          SELECT * FROM eligible ORDER BY updated_at DESC,id LIMIT $1
        )

@@ -9,3 +9,13 @@ Zero shortages is a legitimate empty scoped observation; it is not authorization
 Run: `node --experimental-strip-types --test scripts/vaos-ontology-source-receipt.test.mjs`.
 
 Open gaps: independently verified DB revision/watermark, tenant-safe canonical IDs, durable VAOS storage, PO source read route, independently reconciled count/chain, signed production canary. None is automatically commissioned by this change.
+
+## A01 independent read-path witness and status correction (18 November 2026)
+
+VYNDI's `vyndi_purchase_orders_status_check` permits `part_received` but NOT `partially_received`. The signed PO source predicate is aligned to the canonical database-constrained status. The open-status receipt scope remains `vyndi_purchase_orders:open_status_v1`, preserving VAOS schema compatibility: the intended meaning is open operational POs, excluding fully received and cancelled orders. No mutation route is affected.
+
+The script `scripts/vaos-a01-external-count-witness.sql` is a direct read-only aggregate witness for an **independently authorized database connection**. Use an independent source channel and compare its three counts against the bounded signed VYNDI bridge plus VAOS durable projection. Preserve the witness timestamp and source identifier in restricted founder evidence; never commit live values or rows into this public repository.
+
+Count equality is a check on the scoped source population at separately observed times; it cannot establish a CDC watermark, signed authoritative change version, historical immutability, transaction-level coordination between systems or completeness of all enterprise business data. `sourceRevisionAuthority: CONTENT_DIGEST_ONLY` and `sourceCompletenessVerified: false` remain unchanged. A mismatch is a HOLD and must not authorize a purchase, invoice, production release or business write.
+
+Focused regression: `node --experimental-strip-types --test scripts/vaos-ontology-source-receipt.test.mjs`.
