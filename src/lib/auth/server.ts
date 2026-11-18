@@ -21,6 +21,7 @@ import { AUTH_TRUSTED_ORIGINS, resolveAuthBaseURL, resolveAuthSecret } from "./r
 import { excessActiveSessionTokens } from "./session-concurrency";
 import { VYNDI_SESSION_POLICY } from "./session-policy";
 import { emitOperationalEvent } from "../observability/server";
+import { classifyAuthFailure } from "./safe-error-diagnostic";
 
 void ensureDbReady();
 
@@ -244,6 +245,19 @@ export const auth = betterAuth({
 
   session: VYNDI_SESSION_POLICY,
 
+  // Better Auth's internal error logger often receives the underlying adapter
+  // cause, while getSession exposes only a generic Error. Never log the raw
+  // message, stack, arguments, SQL, session token, or connection string.
+  logger: {
+    level: "warn",
+    log: (level, message, ...args) => {
+      if (level !== "warn" && level !== "error") return;
+      const safe = classifyAuthFailure([message, ...args]);
+      if (level === "error") console.error("[auth] internal classified", { level, ...safe });
+      else console.warn("[auth] internal classified", { level, ...safe });
+    },
+  },
+
   hooks: {
     after: createAuthMiddleware(async (ctx) => {
       const newSession = ctx.context.newSession;
@@ -375,9 +389,18 @@ export async function withAuthPostgresRequest<T>(work: () => Promise<T>): Promis
 }
 
 /** Record a server-side session lookup failure without logging cookie/token values. */
-export function logSessionLookupFailure(request: Request, error: unknown): void {
+export async function logSessionLookupFailure(request: Request, error: unknown): Promise<void> {
   const details = authFailureDetails(request, error);
-  console.error("[auth] Better Auth getSession failed", details);
+  // The module bootstrap transport may differ from the Worker request's actual
+  // binding selection. This second label is computed inside the failing request.
+  const requestTransportSource = await resolvePostgresTransport()
+    .then((transport) => transport?.source ?? "pglite")
+    .catch(() => "unavailable");
+  console.error("[auth] Better Auth getSession failed", {
+    ...details,
+    requestTransportSource,
+    safeFailure: classifyAuthFailure(error),
+  });
   emitOperationalEvent({
     component: "auth",
     operation: "session-lookup",
