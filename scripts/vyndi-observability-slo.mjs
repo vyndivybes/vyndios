@@ -108,14 +108,14 @@ try {
   // The server-rendered form is visible before React installs onSubmit.
   // Cinematic readiness is set by a mounted effect; wait before entering credentials.
   await login.locator(".vy-login.is-cinematic").waitFor({ state: "visible", timeout: 30_000 });
-  await login.getByLabel(/Authorised Email/i).fill(email);
+  await login.getByLabel(/Email address/i).fill(email);
   await login.getByLabel(/^Password$/i).fill(password);
   // The H2 recovery workflow restores a database that already contains the
   // disposable validation identity. Better Auth may therefore report
   // ?created=false while rotating/settling the session. Retry the normal login
   // flow once before declaring auth failure; do not bypass the protected route.
   for (let attempt = 1; attempt <= 2; attempt += 1) {
-    await login.getByRole("button", { name: /Authorize · Enter Command/i }).click();
+    await login.getByRole("button", { name: /Sign in to VYNDI OS/i }).click();
     try {
       await login.waitForURL(/\/command(?:\/|$)/, { timeout: 45_000, waitUntil: "domcontentloaded" });
       break;
@@ -125,7 +125,7 @@ try {
       // The server-rendered form is visible before React installs onSubmit.
   // Cinematic readiness is set by a mounted effect; wait before entering credentials.
   await login.locator(".vy-login.is-cinematic").waitFor({ state: "visible", timeout: 30_000 });
-  await login.getByLabel(/Authorised Email/i).fill(email);
+  await login.getByLabel(/Email address/i).fill(email);
       await login.getByLabel(/^Password$/i).fill(password);
     }
   }
