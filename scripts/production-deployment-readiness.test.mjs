@@ -40,8 +40,9 @@ test("application ok=false overrides any matching SHA", () => {
 
 test("deployment retry budget accommodates an independently deployed Cloudflare worker", () => {
   // The previous main assurance timed out about 60 seconds before Cloudflare deployed its exact SHA.
-  assert.ok(PRODUCTION_READINESS_RETRY.intervalMs * (PRODUCTION_READINESS_RETRY.maxAttempts - 1) >= 20 * 60_000);
-  assert.ok(PRODUCTION_READINESS_RETRY.intervalMs * (PRODUCTION_READINESS_RETRY.maxAttempts - 1) <= 25 * 60_000);
+  assert.equal(PRODUCTION_READINESS_RETRY.maxWaitMs, 20 * 60_000);
+  assert.ok(PRODUCTION_READINESS_RETRY.maxAttempts * PRODUCTION_READINESS_RETRY.intervalMs >= PRODUCTION_READINESS_RETRY.maxWaitMs);
+  assert.ok(PRODUCTION_READINESS_RETRY.requestTimeoutMs <= PRODUCTION_READINESS_RETRY.intervalMs);
 });
 
 test("production assurance job permits the full fail-closed deployment retry budget", async () => {
@@ -49,5 +50,5 @@ test("production assurance job permits the full fail-closed deployment retry bud
   const yaml = await readFile(new URL("../.github/workflows/production-assurance.yml", import.meta.url), "utf8");
   const match = yaml.match(/- name: Wait for exact Cloudflare deployment and schema readiness\s+timeout-minutes:\s*(\d+)/);
   assert.ok(match, "exact production deployment gate has an explicit timeout");
-  assert.ok(Number(match[1]) * 60_000 >= PRODUCTION_READINESS_RETRY.intervalMs * (PRODUCTION_READINESS_RETRY.maxAttempts - 1) + 60_000);
+  assert.ok(Number(match[1]) * 60_000 >= PRODUCTION_READINESS_RETRY.maxWaitMs + 60_000);
 });
