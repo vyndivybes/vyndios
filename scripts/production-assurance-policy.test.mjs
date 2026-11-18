@@ -42,3 +42,13 @@ test("cancelled historical four-order demand is not a live-browser production ga
     "Operator UX viewport qualification",
   ]) assert.ok(workflow.includes(required), "Do not remove independent acceptance: " + required);
 });
+
+test("required focused-validation blocks known dependency advisories on every PR", async () => {
+  const devCi = await readFile(new URL("../.github/workflows/dev-ci.yml", import.meta.url), "utf8");
+  const gate = devCi.indexOf("Full dependency security release gate");
+  const install = devCi.indexOf("- name: Install");
+  const functional = devCi.indexOf("- name: SLO production login selector contract");
+  assert.ok(gate > install && gate < functional, "dependency gate must execute inside required CI before functional validation");
+  assert.match(devCi, /npm audit --omit=dev --audit-level=moderate/);
+  assert.match(devCi, /npm audit --audit-level=low/);
+});
