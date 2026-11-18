@@ -62,3 +62,28 @@ test("purchase-order bridge is GET-equivalent signed read only, with bounded exa
  assert.match(source,/"PROCUREMENT.OBSERVE_OPEN_POS": "procurement"/);
  assert.match(source,/write_execution_not_commissioned/);
 });
+
+
+test("A01 open PO query uses canonical database-constrained status part_received, never unknown partially_received",async()=>{
+ const source=await readFile(resolve(root,"src/routes/api/vaos/bridge.ts"),"utf8");
+ const part=source.split('if (actionType === "PROCUREMENT.OBSERVE_OPEN_POS") {')[1]
+  ?.split('if (actionType === "INVENTORY.OBSERVE_STOCK")')[0];
+ assert.ok(part,"signed open-PO read route missing");
+ const match=/WHERE p\.status IN \(([^)]+)\)/i.exec(part);
+ assert.ok(match,"explicit scoped PO status predicate required");
+ const statuses=match[1].match(/'[^']+'/g)?.map(s=>s.slice(1,-1))??[];
+ assert.deepEqual(statuses,["draft","pending_approval","approved","issued","part_received"],
+  "must match public.vyndi_purchase_orders_status_check; no cancelled/received orders");
+ assert.ok(!part.includes("'partially_received'"),"this value is not a legal DB status");
+});
+
+test("A01 external count witness SQL is read-only, scoped, and uses exact same canonical PO statuses",async()=>{
+ const sql=await readFile(resolve(root,"scripts/vaos-a01-external-count-witness.sql"),"utf8");
+ assert.match(sql,/vyndi_inventory_balance/);
+ assert.match(sql,/vyndi_live_job_card_requirements/);
+ assert.match(sql,/vyndi_purchase_orders/);
+ assert.match(sql,/p\.status IN \('draft','pending_approval','approved','issued','part_received'\)/);
+ assert.doesNotMatch(sql,/\b(?:INSERT|UPDATE|DELETE|CREATE|DROP|ALTER|TRUNCATE|GRANT|EXECUTE)\b/i);
+ assert.match(sql,/witness_observed_at/);
+ assert.match(sql,/COUNT\(\*\)/i);
+});
