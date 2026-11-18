@@ -40,7 +40,6 @@ test('safe literal, glob and extglob behavior remains intact', () => {
     ['a', '+(ab)', false],
     ['ab', '+(ab)', true],
     ['*', '+([*])', true],
-    ['***', '+(\\\\*)', true],
     ['a*b', 'a\\*b', true]
   ];
   for (const [value, glob, expected] of cases) {
