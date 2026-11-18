@@ -36,6 +36,9 @@ jobs:
           npm audit --omit=dev --audit-level=moderate
           npm audit --audit-level=low
 
+      - name: Auth credential-safe runtime diagnostic regression
+        run: node --experimental-strip-types --test scripts/auth-credential-safe-diagnostics.test.mjs
+
       - name: Auth per-request PostgreSQL transport contract
         run: node --experimental-strip-types --test scripts/auth-request-time-transport.test.mjs
 
