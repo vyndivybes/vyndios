@@ -1,52 +1,40 @@
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
-const base=(process.env.VYNDI_TEST_BASE_URL||"https://vyndios.vayushastr.workers.dev").replace(/\/$/,"");
-const expected=process.env.VYNDI_TEST_EXPECTED_SHA||"";
-assert.match(expected,/^[a-f0-9]{40}$/);
-assert.ok(process.env.VYNDI_TEST_EMAIL&&process.env.VYNDI_TEST_PASSWORD,"Hosted acceptance credentials required");
-const browser=await chromium.launch({headless:true});
+
+// Compatibility browser smoke: the historical demo console is retired.
+// Its modelling library remains covered by four-order-highs.test.mjs.
+const base = (process.env.VYNDI_TEST_BASE_URL || "https://vyndios.vayushastr.workers.dev").replace(/\/$/, "");
+const expected = process.env.VYNDI_TEST_EXPECTED_SHA || "";
+assert.match(expected, /^[a-f0-9]{40}$/);
+assert.ok(process.env.VYNDI_TEST_EMAIL && process.env.VYNDI_TEST_PASSWORD, "Hosted acceptance credentials required");
+
+const retiredPath = "/command/ibpe-operating-workspace/simulation";
+const canonicalPath = "/command/ibpe-operating-workspace/optimizer";
+const browser = await chromium.launch({ headless: true });
 try {
- for(const viewport of [{width:1440,height:900},{width:390,height:844}]){
-  const context=await browser.newContext({viewport,reducedMotion:"reduce"});
-  const health=await context.request.get(base+"/api/runtime/health");
-  assert.equal(health.status(),200);
-  assert.equal((await health.json()).sourceSha,expected);
-  const page=await context.newPage();
-  const errors=[];
-  page.on("pageerror",e=>{errors.push(e.message);console.error("VYNDI_BROWSER_PAGEERROR",e.message);});
-  await page.goto(base+"/login?returnTo=%2Fcommand%2Fproduction",{waitUntil:"domcontentloaded"});
-  await page.locator(".vy-login.is-cinematic").waitFor({state:"visible",timeout:30000});
-  await page.getByLabel(/Email address/i).fill(process.env.VYNDI_TEST_EMAIL);
-  await page.getByLabel(/^Password$/i).fill(process.env.VYNDI_TEST_PASSWORD);
-  await page.getByRole("button",{name:/Sign in to VYNDI OS/i}).click();
-  await page.waitForURL(/\/command(?:\/|$)/,{timeout:45000});
-  if(!page.url().endsWith("/production"))await page.goto(base+"/command/production",{waitUntil:"domcontentloaded"});
-  const entry=page.getByRole("link",{name:"Run four-order simulation IBPE",exact:true});
-  await entry.waitFor({state:"visible",timeout:30000});
-  assert.equal(await entry.getAttribute("href"),"/command/ibpe-operating-workspace/simulation");
-  await entry.click();
-  await page.getByRole("heading",{name:"Four-order simulation: IBPE + HiGHS",exact:true}).waitFor({timeout:30000});
-  assert.equal(await page.getByRole("button",{name:"Run governed IBPE",exact:true}).count(),0);
-  await page.locator('[data-simulation-interactive="ready"]').waitFor({state:"visible",timeout:30000});
-  const ibpe=page.getByRole("button",{name:"Accept and run simulation IBPE",exact:true});
-  assert.equal(await ibpe.isDisabled(),true);
-  await page.getByRole("checkbox",{name:/I accept these four specific demo orders/}).check();
-  await ibpe.click();
-  await page.getByRole("heading",{name:/SIMULATION readiness: IBPE complete/}).waitFor({timeout:30000});
-  const solve=page.getByRole("button",{name:"Run simulation-only HiGHS",exact:true});
-  assert.equal(await solve.isDisabled(),true);
-  await page.getByRole("checkbox",{name:/I consent to a memory-only/}).check();
-  await solve.click();
-  const receipt=page.getByRole("region",{name:"Validated simulation optimizer receipt",exact:true});
-  await receipt.waitFor({state:"visible",timeout:45000});
-  assert.match(await receipt.innerText(),/SIMULATION PASS: HiGHS Optimal/);
-  assert.match(await receipt.innerText(),/Objective 0 weighted unit-month lateness/);
-  assert.match(await receipt.innerText(),new RegExp(expected));
-  assert.equal(await receipt.locator("table").first().locator("tbody tr").count(),4);
-  assert.match(await receipt.innerText(),/REAL readiness remains HOLD/);
-  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),true,"Page must fit viewport");
-  assert.deepEqual(errors,[],"No uncaught browser errors");
-  console.log(JSON.stringify({check:"four-order-simulation-live",sourceSha:expected,viewport,orders:4,solver:"HiGHS",primalValidation:"PASS",realReadiness:"HOLD"}));
-  await context.close();
- }
-} finally {await browser.close();}
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+    const context = await browser.newContext({ viewport, reducedMotion: "reduce" });
+    const health = await context.request.get(base + "/api/runtime/health");
+    assert.equal(health.status(), 200);
+    assert.equal((await health.json()).sourceSha, expected);
+    const page = await context.newPage();
+    const errors = [];
+    page.on("pageerror", (e) => { errors.push(e.message); console.error("VYNDI_BROWSER_PAGEERROR", e.message); });
+    await page.goto(base + "/login?returnTo=%2Fcommand%2Fproduction", { waitUntil: "domcontentloaded" });
+    await page.locator(".vy-login.is-cinematic").waitFor({ state: "visible", timeout: 30000 });
+    await page.getByLabel(/Email address/i).fill(process.env.VYNDI_TEST_EMAIL);
+    await page.getByLabel(/^Password$/i).fill(process.env.VYNDI_TEST_PASSWORD);
+    await page.getByRole("button", { name: /Sign in to VYNDI OS/i }).click();
+    await page.waitForURL(/\/command(?:\/|$)/, { timeout: 45000 });
+    await page.goto(base + "/command/production", { waitUntil: "domcontentloaded" });
+    assert.equal(await page.locator(`a[href="${retiredPath}"]`).count(), 0, "Production must not link to retired simulation");
+    await page.goto(base + retiredPath, { waitUntil: "domcontentloaded" });
+    await page.waitForURL((url) => url.pathname === canonicalPath, { timeout: 45000 });
+    await page.getByRole("heading", { name: "Advanced Planning Optimizer", exact: true }).waitFor({ timeout: 30000 });
+    assert.equal(await page.locator(`a[href="${retiredPath}"]`).count(), 0, "Optimizer must not link back to retired simulation");
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true, "Page must fit viewport");
+    assert.deepEqual(errors, [], "No uncaught browser errors");
+    console.log(JSON.stringify({ check: "retired-four-order-simulation-route", sourceSha: expected, viewport, redirect: canonicalPath, result: "PASS" }));
+    await context.close();
+  }
+} finally { await browser.close(); }

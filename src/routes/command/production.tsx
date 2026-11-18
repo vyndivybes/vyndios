@@ -309,8 +309,8 @@ function ProductionWorkspace() {
 
       {demoCards>0?<section aria-label="Pre-production release boundary" className="rounded-xl border border-warn/40 bg-warn/5 p-4">
         <h2 className="font-semibold text-warn">NOT RELEASED · Design confirmation required</h2>
-        <p className="mt-2 text-sm text-muted">These four demo orders are for testing VYNDI OS. Their historical release and approval fields do not authorize physical production. Use the simulation to try planning while design and production approvals are completed. Stock, cost and purchase history remain available.</p>
-        <Link to="/command/ibpe-operating-workspace/simulation" className="mt-3 inline-block text-sm text-accent underline">Use the four-order simulation →</Link>
+        <p className="mt-2 text-sm text-muted">These four historical demo orders do not authorize physical production. Design confirmation and formal release are still required. Stock, cost and purchase history remain available for audit.</p>
+        <Link to="/command/ibpe-operating-workspace/authority" className="mt-3 inline-block text-sm text-accent underline">Review planning authority →</Link>
       </section>:null}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
         <Kpi label="Confirmed orders" value={String(orders.length)} hint={`${confirmedOrderUnits} committed unit(s) from Commercial`} tone={orders.length ? "ok" : "warn"} />
@@ -349,7 +349,7 @@ function ProductionWorkspace() {
                   <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold text-fg">{order.variant_name ?? order.variant_id ?? order.id}</p><p className="mt-1 font-mono text-[10px] text-subtle">{order.id}</p></div><span className="text-[10px] font-bold uppercase text-warn">{order.job_card_id ? "STALE" : "MISSING"}</span></div>
                   <p className="mt-3 text-xs text-muted">Order R{order.revision} · {order.units} unit(s) · M{order.plan_month}</p>
                   <p className="mt-1 text-[10px] text-subtle">Job card: {order.job_card_id ? `${order.job_card_id} R${order.job_card_revision ?? "—"}` : "not created"}</p>
-                  {isFourOrderDemoOrder(String(order.id)) ? <p className="mt-3 text-xs text-warn">Legacy/demo revision history retained. Use the simulation; design confirmation and genuine release evidence precede any real production action.</p> : order.job_card_approved_at ? (() => {
+                  {isFourOrderDemoOrder(String(order.id)) ? <p className="mt-3 text-xs text-warn">Legacy/demo revision history retained. Design confirmation and genuine release evidence precede any real production action.</p> : order.job_card_approved_at ? (() => {
                     const change = (changes as any[]).find((row) =>
                       row.previous_job_card_id === order.job_card_id &&
                       Number(row.requested_sales_revision) === Number(order.revision) &&
@@ -444,7 +444,7 @@ function ProductionWorkspace() {
                       <Metric label="Material state" value={shortageCount ? `${shortageCount} shortage line(s)` : "Ready"} />
                     </div>
                     <div className="min-w-56 rounded-lg border border-border bg-bg p-3">
-                      {releaseState.isDemo ? <><p className="text-xs font-semibold text-warn">{releaseState.label}</p><p className="mt-2 text-xs text-muted">Stored status: {releaseState.storedStatus} · historical fields retained</p><Link to="/command/ibpe-operating-workspace/simulation" className="mt-2 inline-block text-xs text-accent underline">Open simulation</Link></> : approved ? (
+                      {releaseState.isDemo ? <><p className="text-xs font-semibold text-warn">{releaseState.label}</p><p className="mt-2 text-xs text-muted">Stored status: {releaseState.storedStatus} · historical fields retained</p><Link to="/command/engineering" className="mt-2 inline-block text-xs text-accent underline">Review engineering authority</Link></> : approved ? (
                         <>
                           <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-green">Approved build</p>
                           <p className="mt-1 font-mono text-xs text-fg">{card.batch_code}</p>
