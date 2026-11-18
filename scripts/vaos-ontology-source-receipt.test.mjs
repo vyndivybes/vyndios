@@ -27,7 +27,7 @@ test('canonical digest detects stock changes, ignores object property ordering',
 });
 test('rejects impossible dates, counts and source claims',async()=>{
  for(const x of [{...sample,sourceCount:0},{...sample,sourceCount:-1},{...sample,sourceCount:1.5},
- {...sample,limit:101},{...sample,records:null},{...sample,sourceKind:'purchaseOrders'},
+ {...sample,limit:101},{...sample,records:null},{...sample,sourceKind:'unsupported'},
  {...sample,asOf:'2026-02-30T04:00:00.000Z'}])await assert.rejects(()=>createOntologyReadReceipt(x));
 });
 test('signed VYNDI bridge uses single-statement inventory and shortage source coverage',async()=>{
