@@ -58,7 +58,7 @@ ALTER TABLE vyndi_a01_tenant_candidate.a01_membership_events FORCE ROW LEVEL SEC
 ALTER TABLE vyndi_a01_tenant_candidate.a01_object_owner_candidates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vyndi_a01_tenant_candidate.a01_object_owner_candidates FORCE ROW LEVEL SECURITY;
 
--- Critical: the legacy 0200 candidate RLS policy reads a mutable approval.
+-- Critical: the legacy 0210 candidate RLS policy reads a mutable approval.
 -- A later immutable REVOKE event MUST also revoke the observed-source SELECT,
 -- even when actor_memberships still says approved. Missing event means HOLD.
 -- The event stream still has NO runtime grants. The fixture grants SELECT only
