@@ -123,7 +123,7 @@ test('A01 private tenant membership and object ownership never promote unverifie
  });
  await t.test('no PUBLIC read grants; direct untrusted reader gets permission denied',async()=>{
   const {rows:[scope]}=await db.query(`SELECT
-   has_schema_privilege('public','vyndi_vaos_authority','USAGE') AS schema_grant,
+   has_schema_privilege('public','vyndi_a01_tenant_candidate','USAGE') AS schema_grant,
    has_table_privilege('public','vyndi_a01_tenant_candidate.a01_object_owner_candidates','SELECT') AS binding_grant,
    has_table_privilege('public','vyndi_a01_tenant_candidate.a01_member_state_candidate','SELECT') AS member_grant`);
   assert.deepEqual(scope,{schema_grant:false,binding_grant:false,member_grant:false});
