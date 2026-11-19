@@ -1,0 +1,44 @@
+name: A01 Private Tenant Ownership and Negative Isolation
+on:
+  pull_request:
+    paths:
+      - 'migrations/0200_a01_private_tenant_ownership_candidate.sql'
+      - 'scripts/a01-tenant-ownership-postgres.test.mjs'
+      - '.github/workflows/a01-tenant-ownership.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'migrations/0200_a01_private_tenant_ownership_candidate.sql'
+      - 'scripts/a01-tenant-ownership-postgres.test.mjs'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolated-tenant-rls:
+    name: PostgreSQL 18 two-company membership, revocation and unauthorized cross-tenant denial
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: a01_tenant_test
+          POSTGRES_PASSWORD: disposable_fixture
+          POSTGRES_DB: a01_tenant_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U a01_tenant_test -d a01_tenant_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependency fixtures without lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Prove signed candidate membership boundary using real non-bypass PostgreSQL roles
+        env:
+          A01_TENANT_TEST_DATABASE_URL: postgres://a01_tenant_test:disposable_fixture@127.0.0.1:5432/a01_tenant_test
+        run: node --test scripts/a01-tenant-ownership-postgres.test.mjs
