@@ -115,7 +115,7 @@ async function executeRead(
 
   if (actionType === "PROCUREMENT.OBSERVE_SHORTAGE") {
     // One statement gives the bounded page and source count the same SQL snapshot.
-    const [snapshot] = await sql.query<{source_count: number; records: unknown[]; extracted_at: string; venture_count:number}>(
+    const [snapshot] = await sql.query<{source_count: number; records: unknown[]; extracted_at: string;scope_fingerprint:string;source_mvcc_snapshot:string; venture_count:number}>(
       `WITH ${A01_SINGLE_VENTURE_GUARD_CTE}, eligible AS MATERIALIZED (
          SELECT job_card_id,job_card_line_id,sales_order_id,product_label,variant_id,
                 units,due_month,sku,category,item,required_quantity,
@@ -130,18 +130,25 @@ async function executeRead(
        SELECT (SELECT count(*)::integer FROM eligible) AS source_count,
               (SELECT coalesce(jsonb_agg(to_jsonb(p) ORDER BY p.due_month,p.shortage_quantity DESC,p.sku,p.job_card_line_id),'[]'::jsonb) FROM page p) AS records,
               (SELECT venture_count FROM venture_guard) AS venture_count,
+              (SELECT encode(sha256(convert_to(
+                   coalesce(jsonb_agg(to_jsonb(e) ORDER BY e.due_month,e.shortage_quantity DESC,e.sku,e.job_card_line_id),
+                     '[]'::jsonb)::text,'UTF8')),'hex')
+                 FROM eligible e) AS scope_fingerprint,
+              pg_current_snapshot()::text AS source_mvcc_snapshot,
               transaction_timestamp() AS extracted_at`,
       [limit],
     );
     assertSingleVentureSource(snapshot?.venture_count);
     if (!snapshot || !Array.isArray(snapshot.records)) throw Error("VYNDI_ONTOLOGY_SHORTAGE_SOURCE_INVALID");
     return createOntologyReadReceipt({sourceKind:"shortages",records:snapshot.records,
-      sourceCount:Number(snapshot.source_count),limit,asOf:new Date(snapshot.extracted_at).toISOString()});
+      sourceCount:Number(snapshot.source_count),limit,asOf:new Date(snapshot.extracted_at).toISOString(),
+      sourceScopeFingerprint:snapshot.scope_fingerprint,
+      sourceMvccSnapshot:snapshot.source_mvcc_snapshot});
   }
 
   if (actionType === "PROCUREMENT.OBSERVE_OPEN_POS") {
     // One SQL snapshot: deterministic bounded page and exact scoped row count.
-    const [snapshot] = await sql.query<{source_count:number;records:unknown[];extracted_at:string}>(
+    const [snapshot] = await sql.query<{source_count:number;records:unknown[];extracted_at:string;scope_fingerprint:string;source_mvcc_snapshot:string}>(
       `WITH eligible AS MATERIALIZED (
          SELECT p.id,p.supplier_id,p.source_action_id,p.requirement_month,p.sku,p.unit,
                 p.quantity,p.unit_price_inr,p.order_date,p.expected_receipt_on,
@@ -160,15 +167,22 @@ async function executeRead(
        )
        SELECT (SELECT count(*)::integer FROM eligible) AS source_count,
               (SELECT coalesce(jsonb_agg(to_jsonb(p) ORDER BY p.updated_at DESC,p.id),'[]'::jsonb) FROM page p) AS records,
+              (SELECT encode(sha256(convert_to(
+                   coalesce(jsonb_agg(to_jsonb(e) ORDER BY e.updated_at DESC,e.id),
+                     '[]'::jsonb)::text,'UTF8')),'hex')
+                 FROM eligible e) AS scope_fingerprint,
+              pg_current_snapshot()::text AS source_mvcc_snapshot,
               transaction_timestamp() AS extracted_at`,
       [limit],
     );
     if (!snapshot || !Array.isArray(snapshot.records)) throw Error("VYNDI_ONTOLOGY_PO_SOURCE_INVALID");
     return createOntologyReadReceipt({sourceKind:"purchaseOrders",records:snapshot.records,
-      sourceCount:Number(snapshot.source_count),limit,asOf:new Date(snapshot.extracted_at).toISOString()});
+      sourceCount:Number(snapshot.source_count),limit,asOf:new Date(snapshot.extracted_at).toISOString(),
+      sourceScopeFingerprint:snapshot.scope_fingerprint,
+      sourceMvccSnapshot:snapshot.source_mvcc_snapshot});
   }
   if (actionType === "INVENTORY.OBSERVE_STOCK") {
-    const [snapshot] = await sql.query<{source_count: number; records: unknown[]; extracted_at: string; venture_count:number}>(
+    const [snapshot] = await sql.query<{source_count: number; records: unknown[]; extracted_at: string;scope_fingerprint:string;source_mvcc_snapshot:string; venture_count:number}>(
       `WITH ${A01_SINGLE_VENTURE_GUARD_CTE}, eligible AS MATERIALIZED (
          SELECT sku,unit,quantity_balance,inventory_value_inr,weighted_average_cost_inr,
                 first_movement_at,last_movement_at FROM vyndi_inventory_balance
@@ -178,13 +192,20 @@ async function executeRead(
        SELECT (SELECT count(*)::integer FROM eligible) AS source_count,
               (SELECT coalesce(jsonb_agg(to_jsonb(p) ORDER BY p.sku,p.unit),'[]'::jsonb) FROM page p) AS records,
               (SELECT venture_count FROM venture_guard) AS venture_count,
+              (SELECT encode(sha256(convert_to(
+                   coalesce(jsonb_agg(to_jsonb(e) ORDER BY e.sku,e.unit),
+                     '[]'::jsonb)::text,'UTF8')),'hex')
+                 FROM eligible e) AS scope_fingerprint,
+              pg_current_snapshot()::text AS source_mvcc_snapshot,
               transaction_timestamp() AS extracted_at`,
       [limit],
     );
     assertSingleVentureSource(snapshot?.venture_count);
     if (!snapshot || !Array.isArray(snapshot.records)) throw Error("VYNDI_ONTOLOGY_INVENTORY_SOURCE_INVALID");
     return createOntologyReadReceipt({sourceKind:"inventory",records:snapshot.records,
-      sourceCount:Number(snapshot.source_count),limit,asOf:new Date(snapshot.extracted_at).toISOString()});
+      sourceCount:Number(snapshot.source_count),limit,asOf:new Date(snapshot.extracted_at).toISOString(),
+      sourceScopeFingerprint:snapshot.scope_fingerprint,
+      sourceMvccSnapshot:snapshot.source_mvcc_snapshot});
   }
   if (actionType === "PRODUCTION.OBSERVE_WIP") {
     const rows = await sql.query<{ record: unknown }>(
