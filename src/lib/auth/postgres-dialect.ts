@@ -15,6 +15,7 @@ import {
 import { Client } from "pg";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { timeStage } from "../request-timing.server.ts";
+import { reportAuthDriverFailure } from "./db-stage-diagnostic.ts";
 
 type PostgresClient = Pick<Client, "connect" | "end" | "query">;
 type PostgresConnectionResolver = string | (() => Promise<string>);
@@ -90,10 +91,16 @@ class RequestSafePostgresDriver implements Driver {
     // Resolve only within the active Worker request. Module-scoped Better Auth
     // must not capture a connection URL before Cloudflare runtime bindings exist.
     // A failed resolver never opens a connection or falls back to an identity.
-    const currentConnectionString = typeof this.connectionString === "function"
-      ? await this.connectionString()
-      : this.connectionString;
-    if (!currentConnectionString?.trim()) throw new Error("AUTH_POSTGRES_TRANSPORT_UNAVAILABLE");
+    let currentConnectionString: string;
+    try {
+      currentConnectionString = typeof this.connectionString === "function"
+        ? await this.connectionString()
+        : this.connectionString;
+      if (!currentConnectionString?.trim()) throw new Error("AUTH_POSTGRES_TRANSPORT_UNAVAILABLE");
+    } catch (error) {
+      reportAuthDriverFailure("resolve", error);
+      throw error;
+    }
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const client = await this.createClient(currentConnectionString);
       try {
@@ -101,6 +108,7 @@ class RequestSafePostgresDriver implements Driver {
         if (state) state.client = client;
         return new RequestSafePostgresConnection(client, !state);
       } catch (error) {
+        reportAuthDriverFailure("connect", error);
         await client.end().catch(() => undefined);
         if (attempt === 1 || !retriableConnectFailure(error)) throw error;
       }
@@ -143,7 +151,8 @@ class RequestSafePostgresConnection implements DatabaseConnection {
   }
 
   async executeQuery<O>(compiledQuery: CompiledQuery): Promise<QueryResult<O>> {
-    const result = await timeStage("auth.query", () => this.client.query(compiledQuery.sql, [...compiledQuery.parameters]));
+    const result = await timeStage("auth.query", () => this.client.query(compiledQuery.sql, [...compiledQuery.parameters]))
+      .catch((error) => { reportAuthDriverFailure("query", error); throw error; });
     return {
       ...(typeof result.rowCount === "number" ? { numAffectedRows: BigInt(result.rowCount) } : {}),
       rows: result.rows as O[],
@@ -164,6 +173,7 @@ class RequestSafePostgresConnection implements DatabaseConnection {
   }
 
   async close(): Promise<void> {
-    if (this.closeOnRelease) await timeStage("auth.close", () => this.client.end());
+    if (this.closeOnRelease) await timeStage("auth.close", () => this.client.end())
+      .catch((error) => { reportAuthDriverFailure("close", error); throw error; });
   }
 }
