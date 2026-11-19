@@ -7,6 +7,8 @@ on:
       - 'scripts/vaos-a01-external-count-witness.sql'
       - 'scripts/vaos-ontology-source-receipt.test.mjs'
       - 'scripts/vaos-read-bridge-contract.test.mjs'
+      - 'migrations/0196_vaos_source_revision_witness.sql'
+      - 'scripts/vaos-source-revision-witness.test.mjs'
       - '.github/workflows/a01-source-proof.yml'
   push:
     branches: [main]
@@ -16,17 +18,21 @@ on:
       - 'scripts/vaos-a01-external-count-witness.sql'
       - 'scripts/vaos-ontology-source-receipt.test.mjs'
       - 'scripts/vaos-read-bridge-contract.test.mjs'
+      - 'migrations/0196_vaos_source_revision_witness.sql'
+      - 'scripts/vaos-source-revision-witness.test.mjs'
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   read-only-contract:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Signed source, canonical PO status, and direct witness tests (no secrets or DB)
-        run: node --experimental-strip-types --test scripts/vaos-ontology-source-receipt.test.mjs scripts/vaos-read-bridge-contract.test.mjs
+      - name: Install isolated PGlite fixture dependency (no scripts, no credentials)
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Signed source, source-revision and direct-witness tests (isolated PGlite only)
+        run: node --experimental-strip-types --test scripts/vaos-ontology-source-receipt.test.mjs scripts/vaos-read-bridge-contract.test.mjs scripts/vaos-source-revision-witness.test.mjs
