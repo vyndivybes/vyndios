@@ -34,7 +34,8 @@ test('forward-only migration replaces timestamp-derived recovery IDs with unique
  const patch=await readFile(patchPath,'utf8');
  assert.match(patch,/create or replace function append_vyndi_recovery_event\s*\(/i);
  assert.match(patch,/gen_random_uuid\s*\(\)/);
- assert.doesNotMatch(patch,/clock_timestamp\s*\(\)/);
+ const executable=patch.split('\n').filter(line=>!line.trimStart().startsWith('--')).join('\n');
+ assert.doesNotMatch(executable,/clock_timestamp\s*\(\)/);
  assert.doesNotMatch(patch,/drop\s+table|truncate\s+|delete\s+from\s+vyndi_recovery_events/i);
  const db=new PGlite();await db.waitReady;t.after(()=>db.close());
  await setup(db);
