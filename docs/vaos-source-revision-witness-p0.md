@@ -106,6 +106,42 @@ They do **not** certify external writer coverage, realistic high-throughput
 latency, business tenant scope, signed provenance, historic transactions, or
 end-to-end VAOS source-of-record authority. Source promotion remains HOLD.
 
+## 19 November — observed cross-venture aggregation collision and isolated candidate
+
+An **independent read-only production PostgreSQL audit** found two distinct
+`venture` values in both inventory physical and cost ledgers, with one
+overlapping SKU+canonical-unit. The existing legacy
+`public.vyndi_inventory_balance` view groups by `sku,unit` alone (not
+`venture`), while available-to-promise and job-card shortage views use
+that global balance. This establishes cross-venture **calculation mixing**,
+not proof that another customer accessed a tenant's data. It forbids
+current A01 per-company inventory or shortage certification.
+
+[Issue #153](https://github.com/vyndivybes/vyndios/issues/153) tracks the
+full tenant-bound inventory, ATP, reservation, job-card and PO redesign.
+Separate [PR #152](https://github.com/vyndivybes/vyndios/pull/152)
+proposes an immediate fail-closed bridge guard: inventory and shortage
+signed reads are held if the same source snapshot observes zero or more
+than one ledger venture. It does not fix the underlying legacy view.
+
+This draft adds `migrations/0197_vaos_venture_isolated_inventory_candidate.sql`:
+a private, `security_invoker` view, grouping quantity and cost by
+**(venture, SKU, canonical unit)** and joining on *all three keys*. It
+does not modify any existing ERP view, introduce runtime grants, authorize
+source reads, or certify shortage ATP or tenant membership. The
+`hyperdrive-user` production role has `BYPASSRLS` and `REPLICATION`
+privileges and watched source tables currently lack RLS policies; **do not
+mistake security_invoker for an independent tenant protection layer**.
+
+The isolated [PostgreSQL 18 per-venture qualification](https://github.com/vyndivybes/vyndios/actions/runs/44493496055/job/135454755903)
+passed 4/4 tests: two ventures sharing the same SKU retained separate
+quantity and cost, cost-only records in another venture could not
+cross-join, and the private view withheld direct untrusted access. This
+test uses only a disposable test DB, not enterprise data. Production
+migration and A01 promotion are still HOLD pending app-role tenant scope,
+full multi-page pagination, signed source revision validation and
+reviewed rollout, without paid services or business writes.
+
 ## Tests and rollout
 
 Isolated deterministic test:
