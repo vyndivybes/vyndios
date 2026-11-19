@@ -1,4 +1,5 @@
 import { createOntologyReadReceipt } from "@/lib/vaos-ontology-read-receipt";
+import { readManagingDirectorIdentityEvidence } from "@/lib/vaos-md-identity-read.mjs";
 import { readVaosIsolationDiagnostics } from "@/lib/vaos-isolation-diagnostics.mjs";
 import {A01_SINGLE_VENTURE_GUARD_CTE,assertSingleVentureSource} from "@/lib/vaos-single-venture-source-guard";
 import { createFileRoute } from "@tanstack/react-router";
@@ -25,6 +26,7 @@ const READ_ACTIONS = new Set([
   "PROCUREMENT.OBSERVE_OPEN_POS",
   "INVENTORY.OBSERVE_STOCK",
   "INVENTORY.OBSERVE_ISOLATION_DIAGNOSTICS",
+  "GOVERNANCE.OBSERVE_MD_IDENTITY",
   "PRODUCTION.OBSERVE_WIP",
   "MAINTENANCE.OBSERVE_ASSET",
   "FINANCE.OBSERVE_LEDGER",
@@ -42,6 +44,7 @@ const EXPECTED_EMPLOYEE: Record<string, string> = {
   "PROCUREMENT.OBSERVE_OPEN_POS": "procurement",
   "INVENTORY.OBSERVE_STOCK": "inventory",
   "INVENTORY.OBSERVE_ISOLATION_DIAGNOSTICS": "inventory",
+  "GOVERNANCE.OBSERVE_MD_IDENTITY": "people",
   "PRODUCTION.OBSERVE_WIP": "production",
   "MAINTENANCE.OBSERVE_ASSET": "maintenance",
   "FINANCE.OBSERVE_LEDGER": "finance",
@@ -59,6 +62,7 @@ const SOURCE_AUTHORITY: Record<string, string> = {
   "PROCUREMENT.OBSERVE_OPEN_POS": "listOpenPurchaseOrders",
   "INVENTORY.OBSERVE_STOCK": "getAuthoritativeInventory",
   "INVENTORY.OBSERVE_ISOLATION_DIAGNOSTICS": "getInventoryIsolationDiagnostics",
+  "GOVERNANCE.OBSERVE_MD_IDENTITY": "readManagingDirectorIdentityEvidence",
   "PRODUCTION.OBSERVE_WIP": "getProductionJobCards",
   "MAINTENANCE.OBSERVE_ASSET": "getAssetMaintenanceState",
   "FINANCE.OBSERVE_LEDGER": "getAccountingWorkbench",
@@ -210,6 +214,13 @@ async function executeRead(
       sourceCount:Number(snapshot.source_count),limit,asOf:new Date(snapshot.extracted_at).toISOString(),
       sourceScopeFingerprint:snapshot.scope_fingerprint,
       sourceMvccSnapshot:snapshot.source_mvcc_snapshot});
+  }
+  if (actionType === "GOVERNANCE.OBSERVE_MD_IDENTITY") {
+    // Existing service-signed P-256 and DB replay nonce are verified at route
+    // boundary; no caller-selected email or tenant or interactive login.
+    if(Object.keys(input).some(key=>key!=="limit"))
+      throw Error("VYNDI_MD_IDENTITY_SCOPE_FORBIDDEN");
+    return readManagingDirectorIdentityEvidence({sql});
   }
   if (actionType === "INVENTORY.OBSERVE_ISOLATION_DIAGNOSTICS") {
     // Signed, nonce-claimed, employee-bound, read-only aggregate HOLD only.
