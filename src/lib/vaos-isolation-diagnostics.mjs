@@ -72,7 +72,7 @@ function count(value) {
  * reservations_total:number|string,reservations_with_broken_lineage:number|string,
  * purchase_orders_total:number|string,purchase_orders_with_broken_lineage:number|string
  * }} LineageSqlRow */
-/** @typedef {{query:(sql:string,params?:number[])=>Promise<LineageSqlRow[]>}} LineageSql */
+/** @typedef {import('./db').Sql} LineageSql */
 /**
  * Diagnostic only: no tenant selectors, no user-supplied scope, no DB mutation.
  * The two SQL statements do not share a committed snapshot or a revision.
