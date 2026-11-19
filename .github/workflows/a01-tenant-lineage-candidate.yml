@@ -3,13 +3,13 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'migrations/0201_a01_private_business_lineage_candidate.sql'
+      - 'migrations/0211_a01_private_business_lineage_candidate.sql'
       - 'scripts/a01-private-tenant-lineage-postgres.test.mjs'
       - '.github/workflows/a01-tenant-lineage-candidate.yml'
   push:
     branches: [main]
     paths:
-      - 'migrations/0201_a01_private_business_lineage_candidate.sql'
+      - 'migrations/0211_a01_private_business_lineage_candidate.sql'
       - 'scripts/a01-private-tenant-lineage-postgres.test.mjs'
   workflow_dispatch:
 permissions:
