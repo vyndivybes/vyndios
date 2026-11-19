@@ -4,6 +4,7 @@
  * Neither this diagnostic nor its counts establish PO, ATP or source authority.
  */
 import {readVentureInventoryShadow} from './vaos-venture-inventory-shadow.mjs';
+import {VYNDI_MD_SOURCE_POLICY,assessSimulationDeclarationBoundary} from './vaos-founder-business-policy.mjs';
 
 export const VYNDI_SOURCE_LINEAGE_DIAGNOSTIC_SQL = `
 WITH venture_keys AS MATERIALIZED (
@@ -57,6 +58,20 @@ SELECT (SELECT count(*)::integer FROM collisions) AS overlapping_key_groups,
        (SELECT count(*)::integer FROM purchase_orders WHERE NOT valid_parent_chain)
          AS purchase_orders_with_broken_lineage`;
 
+/**
+ * Eight bounded source TABLE counts, not unique immutable IDs or a CDC
+ * version. A count match cannot certify historical or future real business.
+ */
+export const VYNDI_SIMULATION_BASELINE_READ_SQL = `
+SELECT (SELECT count(*)::integer FROM public.vyndi_sales_orders) AS sales_orders,
+       (SELECT count(*)::integer FROM public.vyndi_purchase_orders) AS purchase_orders,
+       (SELECT count(*)::integer FROM public.epr_production_job_cards) AS job_cards,
+       (SELECT count(*)::integer FROM public.epr_production_job_card_lines) AS job_card_lines,
+       (SELECT count(*)::integer FROM public.epr_inventory_reservations) AS reservations,
+       (SELECT count(*)::integer FROM public.epr_inventory_ledger) AS inventory_ledger,
+       (SELECT count(*)::integer FROM public.epr_inventory_cost_ledger) AS inventory_cost_ledger,
+       (SELECT count(*)::integer FROM public.epr_travellers) AS travellers`;
+
 /** @param {unknown} value */
 function count(value) {
  if(typeof value!=='number' && !(typeof value==='string' && /^[0-9]+$/.test(value)))
@@ -88,6 +103,22 @@ export async function readVaosIsolationDiagnostics(options={}) {
  if(!Array.isArray(rows)||rows.length!==1||!rows[0])
    throw new Error('ISOLATION_AGGREGATE_INVALID');
  const row=rows[0];
+ // Keep the MD simulation declaration separate from independently observed
+ // database identity/revisions and from any authenticated principal claim.
+ const baselineRows=await sql.query(VYNDI_SIMULATION_BASELINE_READ_SQL);
+ if(!Array.isArray(baselineRows)||baselineRows.length!==1||!baselineRows[0])
+   throw new Error('ISOLATION_BASELINE_UNAVAILABLE');
+ const b=baselineRows[0];
+ const baselineBoundary=assessSimulationDeclarationBoundary({
+   salesOrders:count(b.sales_orders),
+   purchaseOrders:count(b.purchase_orders),
+   jobCards:count(b.job_cards),
+   jobCardLines:count(b.job_card_lines),
+   reservations:count(b.reservations),
+   inventoryLedger:count(b.inventory_ledger),
+   inventoryCostLedger:count(b.inventory_cost_ledger),
+   travellers:count(b.travellers),
+ });
  const overlappingKeyGroups=count(row.overlapping_key_groups);
  const jobCardsTotal=count(row.job_cards_total);
  const jobCardsWithoutTravellerVenture=count(row.jobs_without_traveller_venture);
@@ -105,6 +136,7 @@ export async function readVaosIsolationDiagnostics(options={}) {
   'BUSINESS_OWNER_ATTRIBUTION_UNVERIFIED',
   'SOURCE_REVISION_AND_ATTESTATION_UNVERIFIED',
   'MULTI_STATEMENT_SNAPSHOT_NOT_ATOMIC',
+  ...baselineBoundary.holds,
  ]);
  if(overlappingKeyGroups)holds.add('CROSS_VENTURE_SKU_COLLISION');
  if(shadow.negativeCount)holds.add('NEGATIVE_PHYSICAL_STOCK');
@@ -124,6 +156,26 @@ export async function readVaosIsolationDiagnostics(options={}) {
   businessWritesAuthorized:false,
   productionWriteAuthorized:false,
   sourceRevisionAuthority:'UNVERIFIED_MULTISTATEMENT_AUDIT',
+  businessGovernance:Object.freeze({
+   declaredLegalEntity:VYNDI_MD_SOURCE_POLICY.declaredLegalEntity,
+   product:VYNDI_MD_SOURCE_POLICY.product,
+   businessOwnershipDecision:'MD_DECLARED',
+   sourceAuthorityDecision:'MD_APPROVED',
+   declaredSystemOfRecord:'VYNDI_OS',
+   agentOrchestrationSystem:'VAOS_JARVIS',
+   historicalDataClassification:'SIMULATION_ONLY_DECLARED',
+   authenticatedOwnerBindingVerified:false,
+   recordLevelClassificationVerified:false,
+   realSourceCertified:false,
+  }),
+  simulationBoundary:Object.freeze({
+   status:'HOLD',countsEqual:baselineBoundary.countsEqual,
+   baselineScope:baselineBoundary.baselineScope,
+   sourceRevisionCertified:false,
+   productionBusinessDataCertified:false,
+   productionWriteAuthorized:false,
+   observedCounts:baselineBoundary.counts,
+  }),
   inventory:Object.freeze({
    ventureCount:shadow.ventureCount,
    sourceCount:shadow.sourceCount,
