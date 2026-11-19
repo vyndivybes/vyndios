@@ -57,10 +57,11 @@ production database until these checks independently PASS:
    writer paths, including trigger side effects and functions; prove that
    no alternate write path, import, replication role, or trigger-disable
    pathway can bypass any required revision increment.
-2. **Isolated rollback and concurrency:** exercise two separately connected
-   Postgres writers, conflicting transaction commit order, rollback,
-   changes during keyset pagination, and direct-tenant denial. A PGlite
-   unit test alone is insufficient for multi-session certification.
+2. **Isolated rollback and concurrency:** real multi-session PostgreSQL 18
+   source lock ordering, transaction rollback, lock timeout, consistent
+   repeatable-read snapshot and forbidden-witness-role access now **PASS** in
+   an isolated CI fixture. **Still HOLD** real source workload contention/SLO,
+   tenant-scoped access, all-page keyset pagination and DB restore/replay.
 3. **Performance and recovery:** test expected and burst DML concurrency,
    row-lock wait times, deadlock/timeout behavior, restoration and replay
    fence, database backup consistency, and system health under realistic
@@ -83,6 +84,27 @@ production database until these checks independently PASS:
 `sourceCompletenessVerified=false`, action authorization denied.
 This migration alone must never change these flags, approve purchasing,
 move stock, post finance entries, release engineering or promote an agent.
+
+
+## 19 November 2026 isolated PostgreSQL qualification
+
+The *public-repository* A01 workflow now includes an isolated PostgreSQL 18
+service with a dedicated `a01_test` database and test-only credentials.
+The script refuses non-loopback hosts and every database name except
+`a01_test`. No Neon branch, production business record, or company credential
+is involved.
+
+- **GREEN (11/11 tests)**: [PostgreSQL job 135427801137](https://github.com/vyndivybes/vyndios/actions/runs/44485495134/job/135427801137).
+- **Prior RED (reproduced)**: [PostgreSQL job 135425852573](https://github.com/vyndivybes/vyndios/actions/runs/44484914345/job/135425852573) identified two false acceptances: same-name wrong-function trigger and inherited child source table.
+- **Additional RED (reproduced)**: [PostgreSQL job 135427277351](https://github.com/vyndivybes/vyndios/actions/runs/44485339363/job/135427277351) identified an empty partitioned root that was incorrectly accepted.
+- Real database coverage: statement-level ALWAYS DML/TRUNCATE hooks on seven tables, competing writers serialized until first writer commit/rollback, no orphaned aborted revision, fail-closed lock timeout, stable read-only REPEATABLE READ snapshot, and denial of private witness SELECT/UPDATE to a non-owner role.
+- Hardened migration rejects inherited parents/children, partitioned roots even before the first child exists, and same-name trigger definitions whose handler or event bitmask is incorrect.
+- Direct independent Neon catalog read **confirmed** all seven watched tables in production and stage9 were regular (`relkind='r'`), with zero inheritance parents or children. **No migration has been applied to either database**.
+
+These checks establish a bounded local PostgreSQL behavioral foundation.
+They do **not** certify external writer coverage, realistic high-throughput
+latency, business tenant scope, signed provenance, historic transactions, or
+end-to-end VAOS source-of-record authority. Source promotion remains HOLD.
 
 ## Tests and rollout
 
