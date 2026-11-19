@@ -1,4 +1,5 @@
 import { betterAuth } from "better-auth";
+import { oauthProvider } from "@better-auth/oauth-provider";
 import { createAuthMiddleware } from "better-auth/api";
 import { bearer, genericOAuth } from "better-auth/plugins";
 import { getCookie } from "@tanstack/react-start/server";
@@ -21,6 +22,7 @@ import { resolvePostgresTransport } from "../postgres-runtime";
 import { AUTH_TRUSTED_ORIGINS, resolveAuthBaseURL, resolveAuthSecret } from "./runtime-config";
 import { excessActiveSessionTokens } from "./session-concurrency";
 import { VYNDI_SESSION_POLICY } from "./session-policy";
+import { founderOidcProviderOptions } from "./founder-oidc-provider.mjs";
 import { emitOperationalEvent } from "../observability/server";
 import { classifyAuthFailure } from "./safe-error-diagnostic";
 
@@ -229,6 +231,8 @@ const grokOAuthPlugin = authConfigured
     })
   : null;
 
+const founderOidcOptions = founderOidcProviderOptions(process.env);
+
 export const auth = betterAuth({
   baseURL,
   secret: authSecret,
@@ -245,6 +249,9 @@ export const auth = betterAuth({
   },
 
   session: VYNDI_SESSION_POLICY,
+  // The OAuth provider includes a JWT plugin. Never expose raw browser JWT
+  // issuance at /token when OAuth2.1 /oauth2/token is the only valid path.
+  ...(founderOidcOptions ? { disabledPaths: ["/token"] } : {}),
 
   // Founder-only zero-cost Cloudflare Email Service sender. Never mark email
   // verified from an administrator flag, chat approval or successful sign-in.
@@ -321,6 +328,7 @@ export const auth = betterAuth({
 
   plugins: [
     gateIdentitySessions(),
+    ...(founderOidcOptions ? [oauthProvider(founderOidcOptions)] : []),
     ...(grokOAuthPlugin ? [grokOAuthPlugin] : []),
     bearer(),
   ],
