@@ -19,7 +19,8 @@ test('A01 real SQL shadow preserves venture-separate quantity and cost without t
       ('v1','SAME','ea',500),('v2','SAME','ea',-90),
       ('v2','COST_ONLY','ea',80);
   `);
-  const result=await readVentureInventoryShadow({sql:db,limit:100});
+  const sql={query:async(query,params)=>(await db.query(query,params)).rows};
+  const result=await readVentureInventoryShadow({sql,limit:100});
   assert.equal(result.sourceCount,4);
   assert.equal(result.ventureCount,2);
   assert.equal(result.unpairedCount,2);
@@ -35,14 +36,14 @@ test('A01 real SQL shadow preserves venture-separate quantity and cost without t
   assert.equal(result.availableToPromiseAuthorized,false);
   assert.equal(result.tenantIdentityVerified,false);
   assert.equal(result.status,'HOLD');
-  const page=await readVentureInventoryShadow({sql:db,limit:2});
+  const page=await readVentureInventoryShadow({sql,limit:2});
   assert.equal(page.records.length,2);
   assert.equal(page.hasMore,true);
   assert.equal(page.sourceCompletenessVerified,false);
   assert.ok(page.holdReasons.includes('PAGINATION_REVISION_UNVERIFIED'));
   await db.query(`INSERT INTO public.epr_inventory_ledger(venture,sku,unit,quantity_delta)
                   VALUES('', 'UNKNOWN', 'ea', 1)`);
-  const tainted=await readVentureInventoryShadow({sql:db,limit:100});
+  const tainted=await readVentureInventoryShadow({sql,limit:100});
   assert.equal(tainted.invalidIdentityCount,1);
   assert.ok(tainted.holdReasons.includes('INVALID_SOURCE_IDENTITY'));
 });
