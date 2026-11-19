@@ -58,6 +58,36 @@ ALTER TABLE vyndi_a01_tenant_candidate.a01_membership_events FORCE ROW LEVEL SEC
 ALTER TABLE vyndi_a01_tenant_candidate.a01_object_owner_candidates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vyndi_a01_tenant_candidate.a01_object_owner_candidates FORCE ROW LEVEL SECURITY;
 
+-- Critical: the legacy 0200 candidate RLS policy reads a mutable approval.
+-- A later immutable REVOKE event MUST also revoke the observed-source SELECT,
+-- even when actor_memberships still says approved. Missing event means HOLD.
+-- The event stream still has NO runtime grants. The fixture grants SELECT only
+-- to its synthetic non-BYPASSRLS roles in disposable PostgreSQL.
+CREATE POLICY a01_member_event_self_only
+ ON vyndi_a01_tenant_candidate.a01_membership_events FOR SELECT
+ USING (principal_id=current_user::text);
+
+DROP POLICY a01_attribution_member_only
+ ON vyndi_a01_tenant_candidate.source_ownership_candidates;
+CREATE POLICY a01_attribution_member_only
+ ON vyndi_a01_tenant_candidate.source_ownership_candidates FOR SELECT
+ USING (
+   attribution_state='observed'
+   AND EXISTS (
+     SELECT 1 FROM vyndi_a01_tenant_candidate.actor_memberships m
+     WHERE m.tenant_id=source_ownership_candidates.tenant_id
+       AND m.db_role::text=current_user::text
+       AND m.membership_state='approved'
+   )
+   AND (
+     SELECT e.event_type
+     FROM vyndi_a01_tenant_candidate.a01_membership_events e
+     WHERE e.tenant_id=source_ownership_candidates.tenant_id
+       AND e.principal_id=current_user::text
+     ORDER BY e.event_id DESC LIMIT 1
+   )='GRANT'
+ );
+
 CREATE VIEW vyndi_a01_tenant_candidate.a01_member_state_candidate
 WITH (security_barrier=true,security_invoker=true)
 AS
