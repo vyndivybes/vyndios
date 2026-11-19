@@ -178,6 +178,21 @@ test("PostgreSQL A01 transaction-order, lock, rollback and RLS acceptance", { ti
     }
   });
 
+
+  await t.test("source coverage rejects an empty partitioned root before any partitions are added", async () => {
+    await control.query("BEGIN");
+    try {
+      await control.query("ALTER TABLE public.epr_inventory_ledger RENAME TO epr_inventory_ledger_original");
+      await control.query("CREATE TABLE public.epr_inventory_ledger (id text) PARTITION BY HASH (id)");
+      await assert.rejects(
+        control.query(migration),
+        /VYNDI_A01_PARTITIONED_SOURCE_TABLE_UNSAFE/,
+      );
+    } finally {
+      await control.query("ROLLBACK");
+    }
+  });
+
   await t.test("source coverage rejects a same-name trigger with the wrong handler", async () => {
     await control.query("BEGIN");
     try {
