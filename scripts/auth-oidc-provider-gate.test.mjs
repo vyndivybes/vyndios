@@ -29,7 +29,8 @@ test('only the existing verified Better Auth founder can manage OAuth clients',a
  ]){
   assert.equal(await founderCanManageOidcClient({user}),false);
  }
- assert.equal(await founderCanManageOidcClient({user:{email:'shyamsundhar1982@gmail.com',emailVerified:true}}),true);
+ assert.equal(await founderCanManageOidcClient({user:{id:'verified-owner-id',email:'shyamsundhar1982@gmail.com',emailVerified:true},session:{userId:'verified-owner-id'}}),true);
+ assert.equal(await founderCanManageOidcClient({user:{id:'verified-owner-id',email:'shyamsundhar1982@gmail.com',emailVerified:true},session:{userId:'another-user-id'}}),false);
 });
 test('trusted-client id cannot be attacker-controlled or wildcarded',()=>{
  for(const id of ['*','', 'https://evil.invalid','client id with spaces','../../evil', 'a'.repeat(150)]){
