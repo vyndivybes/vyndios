@@ -33,7 +33,7 @@ function safeCount(value){
 /** @typedef {{identity_count:number,verified_identity_count:number,
  * admin_assignment_count:number,linked_provider_count:number,
  * unexpired_session_count:number}} MdIdentitySqlRow */
-/** @typedef {{query:(statement:string,params:string[])=>Promise<MdIdentitySqlRow[]>}} MdIdentitySql */
+/** @typedef {import('./db').Sql} MdIdentitySql */
 /**
  * Read-only, bounded, fixed-principal credential evidence. This is NOT a
  * login action and cannot mint Better Auth sessions or business authority.
