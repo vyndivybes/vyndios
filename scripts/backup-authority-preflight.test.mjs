@@ -35,8 +35,8 @@ test("supplementary encrypted backup verifies role authority before pg_dump, wit
   const gate = workflow.indexOf("- name: Fail closed on backup role completeness and RLS authorization");
   const exportStep = workflow.indexOf("- name: Stream-read PostgreSQL custom archive directly into age encryption");
   assert.ok(gate > 0 && exportStep > gate, "role evidence must gate encrypted export");
-  assert.match(workflow, /backup-role-evidence\\.sql/);
-  assert.match(workflow, /backup-authority-preflight\\.mjs/);
+  assert.match(workflow, /backup-role-evidence\.sql/);
+  assert.match(workflow, /backup-authority-preflight\.mjs/);
   assert.doesNotMatch(workflow, /pg_dump\s+--enable-row-security/);
   assert.doesNotMatch(workflow, /ALTER\s+ROLE|DISABLE\s+ROW\s+LEVEL\s+SECURITY/i);
 });
