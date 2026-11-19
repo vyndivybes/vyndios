@@ -31,6 +31,9 @@ jobs:
 
       # This check is part of focused-validation, which is required by the main
       # ruleset; the separate path-filtered security workflow is not sufficient.
+      - name: Least-privilege database restore and recovery objective evidence
+        run: node --test scripts/backup-restore-governance.test.mjs
+
       - name: Isolated encrypted backup restore safety and completeness contract
         run: node --test scripts/isolated-backup-restore-qualification.test.mjs
 
