@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth";
 import { oauthProvider } from "@better-auth/oauth-provider";
 import { createAuthMiddleware } from "better-auth/api";
-import { bearer, genericOAuth } from "better-auth/plugins";
+import { bearer, genericOAuth, jwt } from "better-auth/plugins";
 import { getCookie } from "@tanstack/react-start/server";
 import { randomBytes } from "node:crypto";
 import { ensureDbReady, getPglite } from "../db";
@@ -328,7 +328,7 @@ export const auth = betterAuth({
 
   plugins: [
     gateIdentitySessions(),
-    ...(founderOidcOptions ? [oauthProvider(founderOidcOptions)] : []),
+    ...(founderOidcOptions ? [jwt({disableSettingJwtHeader:true}),oauthProvider(founderOidcOptions)] : []),
     ...(grokOAuthPlugin ? [grokOAuthPlugin] : []),
     bearer(),
   ],
