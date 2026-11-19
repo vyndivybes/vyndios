@@ -49,7 +49,7 @@ test('A01 private tenant membership and object ownership never promote unverifie
  await db.query(`INSERT INTO public.vyndi_purchase_orders
   VALUES ('PO-A','JOB-A'),('PO-B','JOB-B'),('PO-CROSS','JOB-B'),('PO-NOJOB',NULL)`);
 
- for(const m of ['0200_a01_private_tenant_ownership_candidate.sql','0201_a01_private_business_lineage_candidate.sql']){
+ for(const m of ['0210_a01_private_tenant_ownership_candidate.sql','0211_a01_private_business_lineage_candidate.sql']){
   await db.query(await readFile(join(root,'migrations',m),'utf8'));
  }
  const bind=async(type,id,tenant)=>
