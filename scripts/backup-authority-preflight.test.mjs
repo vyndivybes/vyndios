@@ -13,18 +13,30 @@ test("fails closed when a backup account is missing RLS authority", () => {
 });
 
 test("rejects an owner or unexpected role, even if it can bypass RLS", () => {
-  assert.throws(() => assessBackupRoleEvidence("neondb_owner|f|t|f|f|t|248|0|0|1"), /dedicated/);
+  assert.throws(() => assessBackupRoleEvidence("neondb_owner|f|t|f|f|t|248|0|0|1"), /DEDICATED/);
 });
 
 test("rejects role escalation and table mutation grants", () => {
-  assert.throws(() => assessBackupRoleEvidence("vyndi_books_backup_ro|t|t|f|f|t|248|0|0|1"), /privileged/);
-  assert.throws(() => assessBackupRoleEvidence("vyndi_books_backup_ro|f|t|f|f|t|248|0|1|1"), /mutation/);
-  assert.throws(() => assessBackupRoleEvidence("vyndi_books_backup_ro|f|t|f|t|t|248|0|0|1"), /privileged/);
+  assert.throws(() => assessBackupRoleEvidence("vyndi_books_backup_ro|t|t|f|f|t|248|0|0|1"), /PRIVILEGED/);
+  assert.throws(() => assessBackupRoleEvidence("vyndi_books_backup_ro|f|t|f|f|t|248|0|1|1"), /MUTATION/);
+  assert.throws(() => assessBackupRoleEvidence("vyndi_books_backup_ro|f|t|f|t|t|248|0|0|1"), /PRIVILEGED/);
 });
 
 test("rejects truncated and missing table coverage and unexpected textual fields", () => {
   assert.throws(() => assessBackupRoleEvidence("vyndi_books_backup_ro|f|t|f|f|t|248|1|0|1"), /SELECT/);
-  assert.throws(() => assessBackupRoleEvidence("vyndi_books_backup_ro|f|t|f|f|t|0|0|0|0"), /tables/);
-  assert.throws(() => assessBackupRoleEvidence(valid + "|password=secret"), /format/);
-  assert.throws(() => assessBackupRoleEvidence(valid + "\n" + valid), /format/);
+  assert.throws(() => assessBackupRoleEvidence("vyndi_books_backup_ro|f|t|f|f|t|0|0|0|0"), /TABLES/);
+  assert.throws(() => assessBackupRoleEvidence(valid + "|password=secret"), /FORMAT/);
+  assert.throws(() => assessBackupRoleEvidence(valid + "\n" + valid), /FORMAT/);
+});
+
+test("supplementary encrypted backup verifies role authority before pg_dump, without a row-security waiver", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const workflow = await readFile(new URL("../.github/workflows/google-drive-books-backup.yml", import.meta.url), "utf8");
+  const gate = workflow.indexOf("- name: Fail closed on backup role completeness and RLS authorization");
+  const exportStep = workflow.indexOf("- name: Stream-read PostgreSQL custom archive directly into age encryption");
+  assert.ok(gate > 0 && exportStep > gate, "role evidence must gate encrypted export");
+  assert.match(workflow, /backup-role-evidence\\.sql/);
+  assert.match(workflow, /backup-authority-preflight\\.mjs/);
+  assert.doesNotMatch(workflow, /pg_dump\s+--enable-row-security/);
+  assert.doesNotMatch(workflow, /ALTER\s+ROLE|DISABLE\s+ROW\s+LEVEL\s+SECURITY/i);
 });
