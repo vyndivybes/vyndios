@@ -31,6 +31,9 @@ jobs:
 
       # This check is part of focused-validation, which is required by the main
       # ruleset; the separate path-filtered security workflow is not sufficient.
+      - name: Encrypted backup role authority fail-closed preflight
+        run: node --test scripts/backup-authority-preflight.test.mjs
+
       - name: Full dependency security release gate
         run: |
           npm audit --omit=dev --audit-level=moderate
