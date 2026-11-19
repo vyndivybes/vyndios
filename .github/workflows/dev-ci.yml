@@ -48,6 +48,9 @@ jobs:
       - name: SLO production login selector contract
         run: node --test scripts/slo-login-contract.test.mjs
 
+      - name: Redacted PostgreSQL auth failure-stage diagnostic
+        run: node --experimental-strip-types --test scripts/auth-db-stage-diagnostic.test.mjs
+
       - name: Better Auth 1.7 compatibility
         run: npm run test:auth-1-7
 
