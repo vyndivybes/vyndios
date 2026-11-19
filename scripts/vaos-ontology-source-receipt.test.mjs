@@ -124,3 +124,54 @@ test("A01 valid PO observation stays content-digest-only and not autonomous",asy
  assert.equal(v.sourceCompletenessVerified,false);
  assert.equal(v.actionAuthorized,false);
 });
+
+
+test("A01 database content fingerprints are observations, never CDC or independent source certification",async()=>{
+ const enriched=await createOntologyReadReceipt({...sample,
+  sourceScopeFingerprint:"a".repeat(64),sourceMvccSnapshot:"3423242:3423242:"});
+ assert.equal(enriched.sourceScopeFingerprint,"a".repeat(64));
+ assert.equal(enriched.sourceMvccSnapshot,"3423242:3423242:");
+ assert.equal(enriched.sourceFingerprintAuthority,"SAME_STATEMENT_SQL_CONTENT_DIGEST");
+ assert.equal(enriched.sourceSnapshotAuthority,"PG_MVCC_SNAPSHOT_NOT_SOURCE_REVISION");
+ assert.equal(enriched.sourceRevisionAuthority,"CONTENT_DIGEST_ONLY");
+ assert.equal(enriched.sourceCompletenessVerified,false);
+ assert.equal(enriched.actionAuthorized,false);
+ for(const extra of [
+  {sourceScopeFingerprint:"a".repeat(64)},
+  {sourceMvccSnapshot:"3423242:3423242:"},
+  {sourceScopeFingerprint:"0".repeat(20),sourceMvccSnapshot:"3423242:3423242:"},
+  {sourceScopeFingerprint:"a".repeat(64),sourceMvccSnapshot:"not-a-snapshot"},
+  {sourceScopeFingerprint:"a".repeat(64),sourceMvccSnapshot:"7:3:"},
+ ])await assert.rejects(()=>createOntologyReadReceipt({...sample,...extra}),
+  /VYNDI_ONTOLOGY_SOURCE_RECEIPT_INVALID/);
+});
+test("A01 signed bridge builds per-scope fingerprints and MVCC token from same SQL statement",async()=>{
+ const bridge=await readFile(resolve(root,"src/routes/api/vaos/bridge.ts"),"utf8");
+ const segments=[
+  bridge.split('if (actionType === "PROCUREMENT.OBSERVE_SHORTAGE") {')[1]
+   .split('if (actionType === "PROCUREMENT.OBSERVE_OPEN_POS")')[0],
+  bridge.split('if (actionType === "PROCUREMENT.OBSERVE_OPEN_POS") {')[1]
+   .split('if (actionType === "INVENTORY.OBSERVE_STOCK")')[0],
+  bridge.split('if (actionType === "INVENTORY.OBSERVE_STOCK") {')[1]
+   .split('if (actionType === "PRODUCTION.OBSERVE_WIP")')[0]
+ ];
+ for(const part of segments){
+  assert.match(part,/sha256\(convert_to\(/);
+  assert.match(part,/pg_current_snapshot\(\)::text/i);
+  assert.match(part,/sourceScopeFingerprint:snapshot\.scope_fingerprint/);
+  assert.match(part,/sourceMvccSnapshot:snapshot\.source_mvcc_snapshot/);
+  assert.match(part,/sourceCount:Number\(snapshot\.source_count\)/);
+ }
+});
+test("A01 independent direct database witness has SAME statement scope digests, no mutation, no source-certification assertions",async()=>{
+ const sql=await readFile(resolve(root,"scripts/vaos-a01-external-count-witness.sql"),"utf8");
+ for(const term of ["inventory_scope","shortage_scope","purchase_order_scope",
+  "inventory_fingerprint","shortage_fingerprint","purchase_order_fingerprint",
+  "pg_current_snapshot()","sha256(convert_to("])
+  assert.ok(sql.includes(term),term);
+ assert.match(sql,/source_revision_certified/);
+ assert.match(sql,/source_revision_certified\s*[,\)]?/i);
+ assert.match(sql,/false AS source_revision_certified/i);
+ assert.match(sql,/WHERE p\.status IN \('draft','pending_approval','approved','issued','part_received'\)/);
+ assert.doesNotMatch(sql,/\b(?:INSERT|UPDATE|DELETE|CREATE|DROP|ALTER|TRUNCATE|GRANT|EXECUTE)\b/i);
+});
