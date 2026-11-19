@@ -79,12 +79,18 @@ jobs:
             sleep 2
           done
           test "$ready" -eq 1
+          # Measure the isolated data-recovery segment only; this is not whole-app RTO.
+          restore_start_epoch="$(date +%s)"
           # No plaintext archive is written to disk or uploaded as a CI artifact.
           rclone cat "$remote" | age --decrypt -i "$identity_file" | docker exec -i -u postgres "$cid" pg_restore --single-transaction --exit-on-error --no-owner --no-acl --dbname=vyndi_restore --format=custom
           manifest="$(docker exec -u postgres "$cid" psql --no-psqlrc --no-align --tuples-only --dbname=vyndi_restore --command="SELECT md5(string_agg(format('%I.%I',n.nspname,c.relname), E'\\n' ORDER BY n.nspname,c.relname)) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.relkind IN ('r','p') AND n.nspname NOT IN ('pg_catalog','information_schema') AND n.nspname NOT LIKE 'pg_toast%';")"
           test "$manifest" = 'eb2ba0c89dd4209992a6080c222759ac'
           private_rows="$(docker exec -u postgres "$cid" psql --no-psqlrc --no-align --tuples-only --dbname=vyndi_restore --command='SELECT COUNT(*) FROM vyndi_private.bi_dashboards;')"
           test "$private_rows" = '1'
+          # Positive and negative readback by an independent least-privilege
+          # identity in the disposable container. No production role is altered.
+          docker exec -i -u postgres "$cid" psql --no-psqlrc --set=ON_ERROR_STOP=1 --dbname=vyndi_restore < scripts/backup-restore-least-privilege.sql
+          measured_restore_seconds="$(($(date +%s) - restore_start_epoch))"
           {
             echo '## VYNDI isolated encrypted backup restore qualification PASS'
             echo 'Origin: supplementary encrypted Google Drive PostgreSQL backup'
@@ -92,4 +98,7 @@ jobs:
             echo 'Destination: network-isolated ephemeral PostgreSQL 18 (no production connection)'
             echo 'Manifest and protected private-BI table row count match the approved snapshot baseline'
             echo 'Plaintext archive: streamed only; no persistent backup file or artifact'
+            echo "Measured isolated database recovery segment: ${measured_restore_seconds} seconds (not whole-app RTO)"
+            echo 'Recovery-point and whole-application RTO/RPO objectives remain unverified separately'
+            echo 'Least-privilege restored-data readback (positive and negative) PASS'
           } >> "$GITHUB_STEP_SUMMARY"
