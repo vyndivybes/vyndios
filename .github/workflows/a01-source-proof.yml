@@ -12,6 +12,8 @@ on:
       - 'scripts/vaos-source-revision-postgres.test.mjs'
       - 'migrations/0197_vaos_venture_isolated_inventory_candidate.sql'
       - 'scripts/vaos-venture-isolated-inventory-postgres.test.mjs'
+      - 'migrations/0198_vaos_venture_atp_hold_candidate.sql'
+      - 'scripts/vaos-venture-atp-candidate-postgres.test.mjs'
       - '.github/workflows/a01-source-proof.yml'
   push:
     branches: [main]
@@ -26,6 +28,8 @@ on:
       - 'scripts/vaos-source-revision-postgres.test.mjs'
       - 'migrations/0197_vaos_venture_isolated_inventory_candidate.sql'
       - 'scripts/vaos-venture-isolated-inventory-postgres.test.mjs'
+      - 'migrations/0198_vaos_venture_atp_hold_candidate.sql'
+      - 'scripts/vaos-venture-atp-candidate-postgres.test.mjs'
   workflow_dispatch:
 permissions:
   contents: read
@@ -101,5 +105,34 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Prove same-SKU different-venture physical and cost separation
         run: node --test scripts/vaos-venture-isolated-inventory-postgres.test.mjs
+        env:
+          A01_TEST_DATABASE_URL: postgres://a01_test:a01_fixture_only@127.0.0.1:5432/a01_test
+
+  postgres-atp-venture-hold:
+    name: PostgreSQL 18 fail-closed ATP and unattributed reservation controls
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: a01_test
+          POSTGRES_PASSWORD: a01_fixture_only
+          POSTGRES_DB: a01_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U a01_test -d a01_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install test-only dependencies without scripts or secrets
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Block multi-venture stock and unattributed active reservations
+        run: node --test scripts/vaos-venture-atp-candidate-postgres.test.mjs
         env:
           A01_TEST_DATABASE_URL: postgres://a01_test:a01_fixture_only@127.0.0.1:5432/a01_test
