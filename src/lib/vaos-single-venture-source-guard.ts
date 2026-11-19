@@ -15,7 +15,7 @@ venture_guard AS MATERIALIZED (
     SELECT venture FROM public.epr_inventory_cost_ledger
     LIMIT 2
   ) distinct_ventures
-),
+)
 `;
 
 /** Accept only the one-venture case, never coerce unknown SQL payloads. */
