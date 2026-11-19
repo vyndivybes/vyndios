@@ -482,12 +482,12 @@ function LoginPage() {
         callbackURL: "/login",
       });
       if (result.error) {
-        setVerificationNotice("Verification email delivery is not yet available. The Cloudflare sender must be enabled first.");
+        setVerificationNotice("Email delivery is not yet configured. Ask the administrator to activate the free verification sender.");
       } else {
         setVerificationNotice("Verification requested. Check your registered inbox for a link. No account is verified until you open it.");
       }
     } catch {
-      setVerificationNotice("Verification email delivery is not yet available. The Cloudflare sender must be enabled first.");
+      setVerificationNotice("Email delivery is not yet configured. Ask the administrator to activate the free verification sender.");
     } finally {
       setBusy(false);
     }
