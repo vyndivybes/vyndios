@@ -77,6 +77,32 @@ BEGIN
     ) THEN
       RAISE EXCEPTION 'VYNDI_A01_REQUIRED_SOURCE_TABLE_MISSING: %', source_table;
     END IF;
+    -- Statement-level parent hooks do NOT cover direct child/partition writes.
+    -- Reject either inheritance direction instead of silently omitting events.
+    IF EXISTS (
+      SELECT 1 FROM pg_catalog.pg_inherits i
+      WHERE i.inhparent = pg_catalog.to_regclass('public.' || source_table)
+         OR i.inhrelid = pg_catalog.to_regclass('public.' || source_table)
+    ) THEN
+      RAISE EXCEPTION 'VYNDI_A01_INHERITED_SOURCE_TABLE_UNSAFE: %', source_table;
+    END IF;
+    -- A same-name trigger is not sufficient proof. The actual function and
+    -- PostgreSQL bitmask must implement AFTER STATEMENT on all four DML paths.
+    IF EXISTS (
+      SELECT 1 FROM pg_catalog.pg_trigger t
+      WHERE t.tgname = 'trg_vyndi_a01_source_revision'
+        AND t.tgrelid = pg_catalog.to_regclass('public.' || source_table)
+        AND (
+          t.tgisinternal OR
+          t.tgfoid <> pg_catalog.to_regprocedure('vyndi_vaos_authority.bump_source_revision()') OR
+          (t.tgtype::int & 1) <> 0 OR
+          (t.tgtype::int & 2) <> 0 OR
+          (t.tgtype::int & 64) <> 0 OR
+          (t.tgtype::int & 60) <> 60
+        )
+    ) THEN
+      RAISE EXCEPTION 'VYNDI_A01_SOURCE_TRIGGER_CONFLICT: %', source_table;
+    END IF;
     IF NOT EXISTS (
       SELECT 1 FROM pg_catalog.pg_trigger t
       WHERE t.tgname = 'trg_vyndi_a01_source_revision'
