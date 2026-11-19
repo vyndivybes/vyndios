@@ -147,6 +147,9 @@ jobs:
       - name: Managing Director simulation-only authority and live-source negative controls
         run: node --test scripts/vaos-md-business-policy.test.mjs
 
+      - name: Managing Director identity verification and cross-app no-SSO negative controls
+        run: node --test scripts/md-identity-binding-contract.test.mjs
+
       - name: VAOS signed read bridge
         run: npm run test:vaos-bridge:read
 
