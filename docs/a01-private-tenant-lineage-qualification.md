@@ -34,8 +34,13 @@ a verifiable company member. A01 and business writes must remain HOLD.
 
 Neither migration changes existing public inventory balances, ATP,
 procurement shortage views, sales orders, reservations, or permissions.
-The new mapping tables have **no runtime grants** and **FORCE RLS**
-without a permissive policy. All candidate source flags are `false`,
+The new mapping tables have **no runtime grants** and **FORCE RLS**.
+The private event history has a current-principal read policy but no
+runtime SELECT grant; owner bindings have no permissive SELECT policy.
+0201 tightens 0200's private source-attribution RLS: an approved base
+membership also needs the latest append-only member event to be GRANT.
+A REVOKE or absent member event denies visibility even if the older
+mutable membership row remains approved. All candidate source flags are `false`,
 including `source_authority_verified` and
 `production_write_authorized`. The binding labels are not authentic
 evidence of owner identity, even in a correctly linked parent chain.
@@ -47,7 +52,9 @@ roles** lacking BYPASSRLS. A second disposable PG18 workflow exercises
 a *different* two-company fixture with overlapping SKU/unit against
 reservation/job/line/sales-order and PO links. It rejects unbound,
 cross-tenant, wrong-revision, deleted or forged lineage, and verifies
-append-only history, grant→revoke state and no PUBLIC access. It refuses
+append-only history, grant→revoke state and no PUBLIC access. The
+additional RED→GREEN negative control proves latest-event REVOKE denies
+an otherwise still-approved source-ownership RLS read. It refuses
 a non-loopback host and any database other than `a01_test`.
 
 The earlier A01 [#145](https://github.com/vyndivybes/vyndios/pull/145)
