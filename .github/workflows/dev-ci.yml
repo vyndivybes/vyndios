@@ -108,6 +108,9 @@ jobs:
       - name: Expanded H2 recovery qualification
         run: npm run test:h2:recovery:expanded
 
+      - name: Cancelled-job-card traveller stage fail-closed isolation
+        run: node --test scripts/cancelled-parent-traveller-guard.test.mjs
+
       - name: Recovery append-only event ID uniqueness
         run: node --test scripts/recovery-event-id-uniqueness.test.mjs
 
