@@ -8,7 +8,7 @@ const verify = await readFile(new URL("../src/lib/auth/verify.server.ts", import
 test("SSR Better Auth getSession is wrapped in the same request-local Postgres lifecycle as the auth endpoint", () => {
   assert.match(authServer, /export async function withAuthPostgresRequest/);
   assert.match(authServer, /postgresAuthDialect\s*\?\s*postgresAuthDialect\.runInRequest\(work\)/);
-  assert.match(verify, /withAuthPostgresRequest\(\(\)\s*=>\s*auth\.api\.getSession\(\{\s*headers\s*\}\)\)/);
+  assert.match(verify, /withAuthPostgresRequest\(\(\)\s*=>\s*auth\.api\.getSession\(\{\s*headers,\s*query:\s*\{\s*disableCookieCache:\s*true\s*\}\s*\}\)\)/);
 });
 
 test("SSR getSession remains fail-closed on errors; no fabricated user identity", () => {
