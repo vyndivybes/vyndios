@@ -43,13 +43,12 @@ function FounderClientRegistration(){
     token_endpoint_auth_method:"client_secret_basic",
     grant_types:["authorization_code"],
     response_types:["code"],
-    require_pkce:true,
    });
    if(response.error){
     setStatus("Registration declined. Your existing login and permissions are unchanged.");
     return;
    }
-   const obj=(response.data??{}) as Record<string,unknown>;
+   const obj=(response.data??{}) as unknown as Record<string,unknown>;
    const id=typeof obj.client_id==="string"?obj.client_id:"";
    const secret=typeof obj.client_secret==="string"?obj.client_secret:"";
    if(!id||!secret){
