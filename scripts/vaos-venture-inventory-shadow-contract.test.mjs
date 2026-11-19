@@ -37,13 +37,13 @@ test('caller-selected venture cannot masquerade as tenant authorization',async()
 });
 test('SQL is bounded and segregates quantity and valuation by venture,sku,canonical unit',()=>{
   const s=VYNDI_VENTURE_INVENTORY_SHADOW_SQL;
-  assert.match(s,/FULL\\s+OUTER\\s+JOIN/);
-  assert.match(s,/q\\.venture\\s*=\\s*v\\.venture/);
-  assert.match(s,/q\\.sku\\s*=\\s*v\\.sku/);
-  assert.match(s,/q\\.unit\\s*=\\s*v\\.unit/);
-  assert.match(s,/public\\.vyndi_canonical_unit\\(l\\.unit\\)/);
-  assert.match(s,/public\\.vyndi_canonical_unit\\(c\\.unit\\)/);
-  assert.match(s,/ORDER\\s+BY\\s+venture,sku,unit/);
-  assert.match(s,/LIMIT\\s+\\$1/);
-  assert.doesNotMatch(s,/\\b(?:INSERT|DELETE|TRUNCATE|UPDATE|ALTER|DROP)\\b/i);
+  assert.match(s,/FULL\s+OUTER\s+JOIN/);
+  assert.match(s,/q\.venture\s*=\s*v\.venture/);
+  assert.match(s,/q\.sku\s*=\s*v\.sku/);
+  assert.match(s,/q\.unit\s*=\s*v\.unit/);
+  assert.match(s,/public\.vyndi_canonical_unit\(l\.unit\)/);
+  assert.match(s,/public\.vyndi_canonical_unit\(c\.unit\)/);
+  assert.match(s,/ORDER\s+BY\s+venture,sku,unit/);
+  assert.match(s,/LIMIT\s+\$1/);
+  assert.doesNotMatch(s,/\b(?:INSERT|DELETE|TRUNCATE|UPDATE|ALTER|DROP)\b/i);
 });
