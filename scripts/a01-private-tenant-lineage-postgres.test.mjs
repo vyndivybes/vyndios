@@ -112,6 +112,36 @@ test('A01 private tenant membership and object ownership never promote unverifie
   assert.deepEqual(rows,[{tenant_id:'tenant_alpha',principal_id:'principal-A',is_active:false},
    {tenant_id:'tenant_beta',principal_id:'principal-B',is_active:true}]);
  });
+ await t.test('a newer REVOKE event must deny pre-existing RLS visibility, not just mark a separate ledger',async()=>{
+  const role='a01_runtime_candidate';
+  await db.query('CREATE ROLE '+role+' NOLOGIN NOSUPERUSER NOBYPASSRLS');
+  await db.query(`INSERT INTO vyndi_a01_tenant_candidate.actor_memberships
+    (tenant_id,db_role,membership_state,approval_sha256)
+    VALUES ('tenant_alpha',$1,'approved',$2)`,[role,H]);
+  await db.query(`INSERT INTO vyndi_a01_tenant_candidate.source_ownership_candidates
+   (tenant_id,entity_type,entity_id,attribution_state,provenance_sha256)
+   VALUES ('tenant_alpha','inventory_ledger','FIXTURE-ID','observed',$1)`,[H]);
+  await db.query(`INSERT INTO vyndi_a01_tenant_candidate.a01_membership_events
+   (tenant_id,principal_id,event_type,evidence_digest,approved_by)
+   VALUES ('tenant_alpha',$1,'GRANT',$2,'checker')`,[role,H]);
+  await db.query(`GRANT USAGE ON SCHEMA vyndi_a01_tenant_candidate TO a01_runtime_candidate;
+   GRANT SELECT ON vyndi_a01_tenant_candidate.actor_memberships,
+   vyndi_a01_tenant_candidate.source_ownership_candidates,
+   vyndi_a01_tenant_candidate.visible_ownership_candidates,
+   vyndi_a01_tenant_candidate.a01_membership_events TO a01_runtime_candidate`);
+  const readAsRole=async()=>{
+   await db.query('SET ROLE '+role);
+   try{return (await db.query(`SELECT entity_id
+      FROM vyndi_a01_tenant_candidate.visible_ownership_candidates`)).rows;}
+   finally{await db.query('RESET ROLE');}
+  };
+  assert.deepEqual(await readAsRole(),[{entity_id:'FIXTURE-ID'}]);
+  await db.query(`INSERT INTO vyndi_a01_tenant_candidate.a01_membership_events
+   (tenant_id,principal_id,event_type,evidence_digest,approved_by)
+   VALUES ('tenant_alpha',$1,'REVOKE',$2,'checker')`,[role,H]);
+  assert.deepEqual(await readAsRole(),[],
+   'RLS must deny revoked principals despite old mutable membership showing approved');
+ });
  await t.test('history and owner bindings are immutable; maker cannot approve self',async()=>{
   await assert.rejects(db.query(`UPDATE vyndi_a01_tenant_candidate.a01_object_owner_candidates
     SET tenant_id='tenant_beta' WHERE object_type='reservation' AND object_id='RES-A'`),/append-only/i);
