@@ -69,3 +69,69 @@ test('Better Auth verification callback has explicit expiry, does not force-logi
  assert.match(login,/authClient\.sendVerificationEmail/);
  assert.match(login,/Send verification link/);
 });
+
+// Resend Free alternative: send only to the existing founder account. The
+// provider setup and credential remain outside source control.
+test('Resend Free mode uses a fixed HTTPS endpoint, narrow sender, idempotency, and no key leakage',async()=>{
+ const sends=[];
+ const fetcher=async (requestUrl,init)=>{
+  sends.push({url:requestUrl,init});
+  return {ok:true,status:200,json:async()=>({id:'email-receipt-1'})};
+ };
+ const secret='re_'+ 'T'.repeat(36);
+ const result=await sendFounderEmailVerification(
+  {user:{email:'shyamsundhar1982@gmail.com'},url},
+  {binding:null,resendApiKey:secret,fetcher}
+ );
+ assert.equal(result,'email-receipt-1');
+ assert.equal(sends.length,1);
+ assert.equal(sends[0].url,'https://api.resend.com/emails');
+ assert.equal(sends[0].init.method,'POST');
+ assert.equal(sends[0].init.headers.authorization,'Bearer '+secret);
+ assert.match(sends[0].init.headers['idempotency-key'],/^vyndi-md-verify-v1-[a-f0-9]{64}$/);
+ const payload=JSON.parse(sends[0].init.body);
+ assert.deepEqual(payload.to,['shyamsundhar1982@gmail.com']);
+ assert.equal(payload.from,'VYNDI OS <no-reply@vayushastr.com>');
+ assert.equal(payload.subject,'Verify your VYNDI OS email');
+ assert.ok(payload.text.includes(url));
+ assert.doesNotMatch(JSON.stringify(payload),/re_TTTTT|api_key|password_hash/);
+});
+test('Resend Free mode refuses arbitrary or missing API credentials and never attempts network',async()=>{
+ let calls=0;const fetcher=async()=>{calls++;return {ok:true,json:async()=>({id:'x'})}};
+ for(const secret of ['', 'not_a_resend_key','re_short','resend:secret\nX-Evil:1','re_'+'Z'.repeat(200)]){
+  await assert.rejects(()=>sendFounderEmailVerification(
+   {user:{email:'shyamsundhar1982@gmail.com'},url},
+   {binding:null,resendApiKey:secret,fetcher}
+  ),/VERIFICATION_EMAIL_DELIVERY_UNAVAILABLE/);
+ }
+ assert.equal(calls,0);
+});
+test('Resend Free mode rejects remote errors, empty receipts, and forged recipient without exposing provider secrets',async()=>{
+ const secret='re_'+'T'.repeat(36);
+ for(const response of [
+  {ok:false,status:429,json:async()=>({message:'rate-limit secret'})},
+  {ok:false,status:403,json:async()=>({message:'sender domain unverified'})},
+  {ok:true,status:200,json:async()=>({id:''})},
+  {ok:true,status:200,json:async()=>({foo:'unexpected'})}
+ ]){
+  await assert.rejects(()=>sendFounderEmailVerification(
+   {user:{email:'shyamsundhar1982@gmail.com'},url},
+   {binding:null,resendApiKey:secret,fetcher:async()=>response}
+  ),err=>err?.message==='VERIFICATION_EMAIL_SEND_FAILED');
+ }
+ let calls=0;
+ await assert.rejects(()=>sendFounderEmailVerification(
+  {user:{email:'attacker@example.test'},url},
+  {binding:null,resendApiKey:secret,fetcher:async()=>{calls++;}}
+ ),/VERIFICATION_EMAIL_DELIVERY_FORBIDDEN/);
+ assert.equal(calls,0);
+});
+test('same Better Auth token gets stable Resend idempotency key',async()=>{
+ const keys=[];const secret='re_'+'T'.repeat(36);
+ const fetcher=async (_url,init)=>{keys.push(init.headers['idempotency-key']);return {ok:true,json:async()=>({id:'id'})}};
+ for(let i=0;i<2;i++)await sendFounderEmailVerification(
+  {user:{email:'shyamsundhar1982@gmail.com'},url},{binding:null,resendApiKey:secret,fetcher}
+ );
+ assert.equal(keys.length,2);
+ assert.equal(keys[0],keys[1]);
+});
