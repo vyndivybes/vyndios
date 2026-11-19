@@ -52,7 +52,8 @@ test('Better Auth mounts official provider with consent-client plugin and no una
 test('dedicated consent UI does not silently approve scopes or cross-site redirects',async()=>{
  const page=await readFile(new URL('../src/routes/sso-consent.tsx',import.meta.url),'utf8');
  assert.match(page,/authClient\.oauth2\.consent/);
- assert.match(page,/accept:\s*false/);
- assert.match(page,/accept:\s*true/);
+ assert.match(page,/decision\(false\)/);
+ assert.match(page,/decision\(true\)/);
+ assert.match(page,/scope:accept\?"openid email":undefined/);
  assert.doesNotMatch(page,/window\.location\.href\s*=\s*.*searchParams/);
 });
