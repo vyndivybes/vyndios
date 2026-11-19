@@ -2,7 +2,9 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "vyndios",
   "compatibility_date": "2026-09-12",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "main": "src/server.ts",
   "keep_vars": true,
   "previews": {},
@@ -14,5 +16,8 @@
   ],
   "observability": {
     "enabled": true
+  },
+  "vars": {
+    "VYNDI_SSO_PROVIDER_ENABLED": "commissioned-v1"
   }
 }
