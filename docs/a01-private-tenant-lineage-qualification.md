@@ -14,14 +14,14 @@ a verifiable company member. A01 and business writes must remain HOLD.
 
 ## Private two-migration candidate
 
-- **0200** creates private `vyndi_a01_tenant_candidate` identities,
+- **0210** creates private `vyndi_a01_tenant_candidate` identities,
   candidate memberships and owner-attribution labels with real PostgreSQL
   RLS enforced against separate, non-BYPASSRLS fixture roles. The tests
   prove two-company read separation, revocation, forged
   `app.tenant_id` rejection, pending attribution exclusion and no
   PUBLIC/runtime grant. The synthetic `approval_sha256` and
   `provenance_sha256` fields are **not independently attested signatures**.
-- **0201** extends that same private schema with append-only membership
+- **0211** extends that same private schema with append-only membership
   event history, immutable maker/checker object-owner bindings and two
   `security_invoker` + `security_barrier` candidate views for existing
   business relational links. A reservation may obtain a
@@ -37,7 +37,7 @@ procurement shortage views, sales orders, reservations, or permissions.
 The new mapping tables have **no runtime grants** and **FORCE RLS**.
 The private event history has a current-principal read policy but no
 runtime SELECT grant; owner bindings have no permissive SELECT policy.
-0201 tightens 0200's private source-attribution RLS: an approved base
+0201 tightens 0210's private source-attribution RLS: an approved base
 membership also needs the latest append-only member event to be GRANT.
 A REVOKE or absent member event denies visibility even if the older
 mutable membership row remains approved. All candidate source flags are `false`,
