@@ -31,7 +31,7 @@ test('A01 signed stock and shortage read must guard in the same SQL snapshot as 
   const block=source.split(open)[1]?.split(close)[0]??'';
   assert.match(block,/WITH \$\{A01_SINGLE_VENTURE_GUARD_CTE\}/);
   assert.match(block,/venture_count/);
-  assert.match(block,/assertSingleVentureSource\(snapshot\.venture_count\)/);
+  assert.match(block,/assertSingleVentureSource\(snapshot\?\.venture_count\)/);
   assert.match(block,/createOntologyReadReceipt/);
  }
 });
