@@ -37,7 +37,7 @@ procurement shortage views, sales orders, reservations, or permissions.
 The new mapping tables have **no runtime grants** and **FORCE RLS**.
 The private event history has a current-principal read policy but no
 runtime SELECT grant; owner bindings have no permissive SELECT policy.
-0201 tightens 0210's private source-attribution RLS: an approved base
+0211 tightens 0210's private source-attribution RLS: an approved base
 membership also needs the latest append-only member event to be GRANT.
 A REVOKE or absent member event denies visibility even if the older
 mutable membership row remains approved. All candidate source flags are `false`,
