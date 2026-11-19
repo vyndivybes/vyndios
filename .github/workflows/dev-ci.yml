@@ -153,6 +153,9 @@ jobs:
       - name: Founder Better Auth verification and zero-cost email delivery negative controls
         run: node --test scripts/auth-founder-email-verification.test.mjs
 
+      - name: Official Better Auth founder issuer registration and consent negative gates
+        run: node --test scripts/auth-oidc-provider-gate.test.mjs scripts/auth-oidc-client-registration.test.mjs
+
       - name: VAOS signed read bridge
         run: npm run test:vaos-bridge:read
 
