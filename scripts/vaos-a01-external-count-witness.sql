@@ -1,5 +1,5 @@
 -- A01 independent direct-DB same-statement witness.
--- Execute ONLY through an independently authorized read-only VYNDI database connection.
+-- Run ONLY through an independently authorized read-only VYNDI database connection.
 -- Shares one MVCC observation across three EXACT signed-bridge SQL projections.
 -- Identical row counts plus content hashes are a point-in-time parity test,
 -- NOT change-data-capture, a durable revision, a cross-connection snapshot,
