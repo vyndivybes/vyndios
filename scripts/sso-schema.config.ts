@@ -6,6 +6,7 @@
  */
 import { betterAuth } from "better-auth";
 import { oauthProvider } from "@better-auth/oauth-provider";
+import { jwt } from "better-auth/plugins";
 import { PostgresDialect } from "kysely";
 import pg from "pg";
 import { randomBytes } from "node:crypto";
@@ -23,5 +24,5 @@ export const auth=betterAuth({
  baseURL:"http://localhost:8080",
  database:{dialect:new PostgresDialect({pool}),type:"postgres"},
  disabledPaths:["/token"],
- plugins:[oauthProvider(config)],
+ plugins:[jwt({disableSettingJwtHeader:true}),oauthProvider(config)],
 });
