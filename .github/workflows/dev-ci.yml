@@ -138,6 +138,9 @@ jobs:
       - name: A01 cross-venture source isolation unit and signed read contract
         run: node --experimental-strip-types --test scripts/vaos-a01-venture-scope-guard.test.mjs
 
+      - name: A01 venture-keyed inventory shadow and negative authorization tests
+        run: node --test scripts/vaos-venture-inventory-shadow-contract.test.mjs scripts/vaos-venture-inventory-shadow-postgres.test.mjs
+
       - name: VAOS signed read bridge
         run: npm run test:vaos-bridge:read
 
