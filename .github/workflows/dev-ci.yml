@@ -31,6 +31,9 @@ jobs:
 
       # This check is part of focused-validation, which is required by the main
       # ruleset; the separate path-filtered security workflow is not sufficient.
+      - name: Isolated encrypted backup restore safety and completeness contract
+        run: node --test scripts/isolated-backup-restore-qualification.test.mjs
+
       - name: Encrypted backup role authority fail-closed preflight
         run: node --test scripts/backup-authority-preflight.test.mjs
 
