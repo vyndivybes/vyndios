@@ -1,4 +1,5 @@
 import { createOntologyReadReceipt } from "@/lib/vaos-ontology-read-receipt";
+import { readVaosIsolationDiagnostics } from "@/lib/vaos-isolation-diagnostics.mjs";
 import {A01_SINGLE_VENTURE_GUARD_CTE,assertSingleVentureSource} from "@/lib/vaos-single-venture-source-guard";
 import { createFileRoute } from "@tanstack/react-router";
 import { getSql } from "@/lib/db";
@@ -23,6 +24,7 @@ const READ_ACTIONS = new Set([
   "PROCUREMENT.OBSERVE_SHORTAGE",
   "PROCUREMENT.OBSERVE_OPEN_POS",
   "INVENTORY.OBSERVE_STOCK",
+  "INVENTORY.OBSERVE_ISOLATION_DIAGNOSTICS",
   "PRODUCTION.OBSERVE_WIP",
   "MAINTENANCE.OBSERVE_ASSET",
   "FINANCE.OBSERVE_LEDGER",
@@ -39,6 +41,7 @@ const EXPECTED_EMPLOYEE: Record<string, string> = {
   "PROCUREMENT.OBSERVE_SHORTAGE": "procurement",
   "PROCUREMENT.OBSERVE_OPEN_POS": "procurement",
   "INVENTORY.OBSERVE_STOCK": "inventory",
+  "INVENTORY.OBSERVE_ISOLATION_DIAGNOSTICS": "inventory",
   "PRODUCTION.OBSERVE_WIP": "production",
   "MAINTENANCE.OBSERVE_ASSET": "maintenance",
   "FINANCE.OBSERVE_LEDGER": "finance",
@@ -55,6 +58,7 @@ const SOURCE_AUTHORITY: Record<string, string> = {
   "PROCUREMENT.OBSERVE_SHORTAGE": "getConfiguredDemandShortages",
   "PROCUREMENT.OBSERVE_OPEN_POS": "listOpenPurchaseOrders",
   "INVENTORY.OBSERVE_STOCK": "getAuthoritativeInventory",
+  "INVENTORY.OBSERVE_ISOLATION_DIAGNOSTICS": "getInventoryIsolationDiagnostics",
   "PRODUCTION.OBSERVE_WIP": "getProductionJobCards",
   "MAINTENANCE.OBSERVE_ASSET": "getAssetMaintenanceState",
   "FINANCE.OBSERVE_LEDGER": "getAccountingWorkbench",
@@ -207,6 +211,15 @@ async function executeRead(
       sourceScopeFingerprint:snapshot.scope_fingerprint,
       sourceMvccSnapshot:snapshot.source_mvcc_snapshot});
   }
+  if (actionType === "INVENTORY.OBSERVE_ISOLATION_DIAGNOSTICS") {
+    // Signed, nonce-claimed, employee-bound, read-only aggregate HOLD only.
+    // Never permit a client-selected venture, tenant, principal or source.
+    if (Object.keys(input).some(key => key !== "limit")) {
+      throw Error("VYNDI_ISOLATION_DIAGNOSTIC_SCOPE_FORBIDDEN");
+    }
+    return readVaosIsolationDiagnostics({sql});
+  }
+
   if (actionType === "PRODUCTION.OBSERVE_WIP") {
     const rows = await sql.query<{ record: unknown }>(
       "select to_jsonb(j) as record from epr_production_job_cards j order by j.created_at desc limit $1",
