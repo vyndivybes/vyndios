@@ -105,6 +105,9 @@ jobs:
       - name: Expanded H2 recovery qualification
         run: npm run test:h2:recovery:expanded
 
+      - name: Recovery append-only event ID uniqueness
+        run: node --test scripts/recovery-event-id-uniqueness.test.mjs
+
       - name: Funding lifecycle authority
         run: npm run test:funding-lifecycle
 
