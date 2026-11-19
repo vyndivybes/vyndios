@@ -77,6 +77,16 @@ BEGIN
     ) THEN
       RAISE EXCEPTION 'VYNDI_A01_REQUIRED_SOURCE_TABLE_MISSING: %', source_table;
     END IF;
+    -- Even an EMPTY partitioned parent is unsafe: future direct writes to a
+    -- newly attached child may not fire the parent's statement-level trigger.
+    IF EXISTS (
+      SELECT 1 FROM pg_catalog.pg_class c
+      JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public' AND c.relname = source_table
+        AND c.relkind = 'p'
+    ) THEN
+      RAISE EXCEPTION 'VYNDI_A01_PARTITIONED_SOURCE_TABLE_UNSAFE: %', source_table;
+    END IF;
     -- Statement-level parent hooks do NOT cover direct child/partition writes.
     -- Reject either inheritance direction instead of silently omitting events.
     IF EXISTS (
