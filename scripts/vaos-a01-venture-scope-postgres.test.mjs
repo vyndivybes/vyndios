@@ -23,7 +23,8 @@ test('A01 real PostgreSQL isolation rejects two ventures sharing stock SKUs',asy
  };
  await t.test('empty ledger is not a certified single-venture source',async()=>{
   assert.equal(await readCount(),0);
-  assert.throws(()=>assertSingleVentureSource(await readCount()),/VYNDI_ONTOLOGY_VENTURE_SCOPE_UNVERIFIED/);
+  const observed=await readCount();
+  assert.throws(()=>assertSingleVentureSource(observed),/VYNDI_ONTOLOGY_VENTURE_SCOPE_UNVERIFIED/);
  });
  await t.test('one venture with quantity and value ledgers can make bounded observation',async()=>{
   await db.query("INSERT INTO public.epr_inventory_ledger VALUES ('V1','SKU-1','pcs',10)");
@@ -34,7 +35,8 @@ test('A01 real PostgreSQL isolation rejects two ventures sharing stock SKUs',asy
  await t.test('separate venture with SAME SKU and unit fails closed',async()=>{
   await db.query("INSERT INTO public.epr_inventory_ledger VALUES ('V2','SKU-1','pcs',99)");
   assert.equal(await readCount(),2);
-  assert.throws(()=>assertSingleVentureSource(await readCount()),/VYNDI_ONTOLOGY_VENTURE_SCOPE_UNVERIFIED/);
+  const observed=await readCount();
+  assert.throws(()=>assertSingleVentureSource(observed),/VYNDI_ONTOLOGY_VENTURE_SCOPE_UNVERIFIED/);
  });
  await t.test('venture can appear in cost ledger alone and still be detected',async()=>{
   await db.query("DELETE FROM public.epr_inventory_ledger WHERE venture='V2'");
