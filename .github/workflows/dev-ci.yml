@@ -176,7 +176,7 @@ jobs:
         run: node --test scripts/auth-oidc-provider-gate.test.mjs scripts/auth-oidc-client-registration.test.mjs
 
       - name: Independently commissioned OIDC provider discovery on isolated PostgreSQL schema
-        run: node --experimental-strip-types --test scripts/auth-oidc-active-smoke.test.mjs
+        run: node --experimental-transform-types --test scripts/auth-oidc-active-smoke.test.mjs
 
       - name: Additive OAuth database migration and existing verified founder preservation
         run: node --test scripts/auth-oidc-schema-additive.test.mjs
