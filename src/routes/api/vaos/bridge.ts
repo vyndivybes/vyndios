@@ -1,4 +1,5 @@
 import { createOntologyReadReceipt } from "@/lib/vaos-ontology-read-receipt";
+import {A01_SINGLE_VENTURE_GUARD_CTE,assertSingleVentureSource} from "@/lib/vaos-single-venture-source-guard";
 import { createFileRoute } from "@tanstack/react-router";
 import { getSql } from "@/lib/db";
 import {readEnterpriseBi} from "@/lib/vaos-enterprise-bi-read";
@@ -114,8 +115,8 @@ async function executeRead(
 
   if (actionType === "PROCUREMENT.OBSERVE_SHORTAGE") {
     // One statement gives the bounded page and source count the same SQL snapshot.
-    const [snapshot] = await sql.query<{source_count: number; records: unknown[]; extracted_at: string}>(
-      `WITH eligible AS MATERIALIZED (
+    const [snapshot] = await sql.query<{source_count: number; records: unknown[]; extracted_at: string; venture_count:number}>(
+      `WITH ${A01_SINGLE_VENTURE_GUARD_CTE}, eligible AS MATERIALIZED (
          SELECT job_card_id,job_card_line_id,sales_order_id,product_label,variant_id,
                 units,due_month,sku,category,item,required_quantity,
                 physical_quantity AS available_quantity,reserved_quantity,
@@ -128,9 +129,11 @@ async function executeRead(
        )
        SELECT (SELECT count(*)::integer FROM eligible) AS source_count,
               (SELECT coalesce(jsonb_agg(to_jsonb(p) ORDER BY p.due_month,p.shortage_quantity DESC,p.sku,p.job_card_line_id),'[]'::jsonb) FROM page p) AS records,
+              (SELECT venture_count FROM venture_guard) AS venture_count,
               transaction_timestamp() AS extracted_at`,
       [limit],
     );
+    assertSingleVentureSource(snapshot?.venture_count);
     if (!snapshot || !Array.isArray(snapshot.records)) throw Error("VYNDI_ONTOLOGY_SHORTAGE_SOURCE_INVALID");
     return createOntologyReadReceipt({sourceKind:"shortages",records:snapshot.records,
       sourceCount:Number(snapshot.source_count),limit,asOf:new Date(snapshot.extracted_at).toISOString()});
@@ -165,8 +168,8 @@ async function executeRead(
       sourceCount:Number(snapshot.source_count),limit,asOf:new Date(snapshot.extracted_at).toISOString()});
   }
   if (actionType === "INVENTORY.OBSERVE_STOCK") {
-    const [snapshot] = await sql.query<{source_count: number; records: unknown[]; extracted_at: string}>(
-      `WITH eligible AS MATERIALIZED (
+    const [snapshot] = await sql.query<{source_count: number; records: unknown[]; extracted_at: string; venture_count:number}>(
+      `WITH ${A01_SINGLE_VENTURE_GUARD_CTE}, eligible AS MATERIALIZED (
          SELECT sku,unit,quantity_balance,inventory_value_inr,weighted_average_cost_inr,
                 first_movement_at,last_movement_at FROM vyndi_inventory_balance
        ), page AS (
@@ -174,9 +177,11 @@ async function executeRead(
        )
        SELECT (SELECT count(*)::integer FROM eligible) AS source_count,
               (SELECT coalesce(jsonb_agg(to_jsonb(p) ORDER BY p.sku,p.unit),'[]'::jsonb) FROM page p) AS records,
+              (SELECT venture_count FROM venture_guard) AS venture_count,
               transaction_timestamp() AS extracted_at`,
       [limit],
     );
+    assertSingleVentureSource(snapshot?.venture_count);
     if (!snapshot || !Array.isArray(snapshot.records)) throw Error("VYNDI_ONTOLOGY_INVENTORY_SOURCE_INVALID");
     return createOntologyReadReceipt({sourceKind:"inventory",records:snapshot.records,
       sourceCount:Number(snapshot.source_count),limit,asOf:new Date(snapshot.extracted_at).toISOString()});
@@ -427,7 +432,15 @@ export const Route = createFileRoute("/api/vaos/bridge")({
         const input = payload.input && typeof payload.input === "object" && !Array.isArray(payload.input)
           ? payload.input as Record<string, unknown>
           : {};
-        const data = await executeRead(sql, actionType, boundedLimit(input.limit), input);
+        let data: Awaited<ReturnType<typeof executeRead>>;
+        try{
+          data = await executeRead(sql, actionType, boundedLimit(input.limit), input);
+        }catch(error){
+          if(error instanceof Error && error.message === "VYNDI_ONTOLOGY_VENTURE_SCOPE_UNVERIFIED"){
+            return json({ok:false,error:"source_venture_scope_unverified"},409);
+          }
+          throw error;
+        }
 
         return json({
           ok: true,
