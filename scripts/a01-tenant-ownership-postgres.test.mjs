@@ -52,7 +52,7 @@ test('A01 private two-company tenant ownership is RLS-isolated, not a production
   const rowsAlpha=await asRole('a01_tenant_alpha',async()=> (await visible()).rows);
   const rowsBeta=await asRole('a01_tenant_beta',async()=> (await visible()).rows);
   assert.deepEqual(rowsAlpha.map(x=>x.entity_id),['same-sku-alpha']);
-  assert.deepEqual(rowsBeta.map(x=>x.entity_id),['same-sku-beta','po-beta'].sort());
+  assert.deepEqual(rowsBeta.map(x=>x.entity_id).sort(),['po-beta','same-sku-beta']);
   assert.ok(rowsAlpha.every(x=>x.tenant_id==='tenant_alpha'));
   assert.ok(rowsBeta.every(x=>x.tenant_id==='tenant_beta'));
   assert.ok([...rowsAlpha,...rowsBeta].every(x=>x.source_completeness_verified===false&&x.business_write_authorized===false));
