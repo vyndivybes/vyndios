@@ -71,7 +71,7 @@ export async function getSessionUser(
   }
   const cacheKey = bearerToken ? "bearer" : "cookie";
   return sessionRequestMemo(request, cacheKey, async () => {
-    const session = await timeStage("session.verify", () => withAuthPostgresRequest(() => auth.api.getSession({ headers }))).catch(async (error) => {
+    const session = await timeStage("session.verify", () => withAuthPostgresRequest(() => auth.api.getSession({ headers, query: { disableCookieCache: true } }))).catch(async (error) => {
       await logSessionLookupFailure(request, error);
       throw error;
     });
