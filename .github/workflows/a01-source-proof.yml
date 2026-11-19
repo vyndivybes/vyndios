@@ -9,6 +9,7 @@ on:
       - 'scripts/vaos-read-bridge-contract.test.mjs'
       - 'migrations/0196_vaos_source_revision_witness.sql'
       - 'scripts/vaos-source-revision-witness.test.mjs'
+      - 'scripts/vaos-source-revision-postgres.test.mjs'
       - '.github/workflows/a01-source-proof.yml'
   push:
     branches: [main]
@@ -20,6 +21,7 @@ on:
       - 'scripts/vaos-read-bridge-contract.test.mjs'
       - 'migrations/0196_vaos_source_revision_witness.sql'
       - 'scripts/vaos-source-revision-witness.test.mjs'
+      - 'scripts/vaos-source-revision-postgres.test.mjs'
   workflow_dispatch:
 permissions:
   contents: read
@@ -36,3 +38,34 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Signed source, source-revision and direct-witness tests (isolated PGlite only)
         run: node --experimental-strip-types --test scripts/vaos-ontology-source-receipt.test.mjs scripts/vaos-read-bridge-contract.test.mjs scripts/vaos-source-revision-witness.test.mjs
+
+  postgres-multisession:
+    name: PostgreSQL 18 concurrent writer source-revision witness
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Disposable, test-only database; never touches Neon or production.
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: a01_test
+          POSTGRES_PASSWORD: a01_fixture_only
+          POSTGRES_DB: a01_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U a01_test -d a01_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install offline-fixture code dependencies, without lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify concurrent commit order, rollback, lock timeout, RLS and snapshot
+        run: node --test scripts/vaos-source-revision-postgres.test.mjs
+        env:
+          A01_TEST_DATABASE_URL: postgres://a01_test:a01_fixture_only@127.0.0.1:5432/a01_test
