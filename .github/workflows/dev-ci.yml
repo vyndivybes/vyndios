@@ -54,6 +54,9 @@ jobs:
       - name: Database-authoritative SSR session contract
         run: node --test scripts/auth-db-authoritative-ssr.test.mjs
 
+      - name: Reviewed upstream Better Auth Worker and SSR contract
+        run: node --test scripts/auth-upstream-cloudflare-regression.test.mjs
+
       - name: Better Auth 1.7 compatibility
         run: npm run test:auth-1-7
 
