@@ -1,4 +1,4 @@
-import { classifyAuthFailure } from "./safe-error-diagnostic";
+import { classifyAuthFailure } from "./safe-error-diagnostic.ts";
 
 const STAGES = new Set(["resolve", "connect", "query", "close"]);
 
