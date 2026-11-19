@@ -5,6 +5,7 @@ import { getCookie } from "@tanstack/react-start/server";
 import { randomBytes } from "node:crypto";
 import { ensureDbReady, getPglite } from "../db";
 import { emailAndPasswordEnabled } from "./email-password";
+import { sendFounderEmailVerification } from "./verification-email.mjs";
 import { GATE_PROVIDER_ID, gateIdentitySessions } from "./gate-session.server";
 import { grokAccountSubject } from "./provider-subject";
 import { GROK_PROVIDERS } from "./providers";
@@ -244,6 +245,21 @@ export const auth = betterAuth({
   },
 
   session: VYNDI_SESSION_POLICY,
+
+  // Founder-only zero-cost Cloudflare Email Service sender. Never mark email
+  // verified from an administrator flag, chat approval or successful sign-in.
+  // Better Auth owns the one-time verification token and database transition.
+  // Delivery fails closed until an owner-approved Worker send_email binding
+  // is configured; do not lock out existing unverified users before it works.
+  emailVerification: {
+    sendVerificationEmail: async ({ user, url }) => {
+      await sendFounderEmailVerification({ user, url });
+    },
+    sendOnSignUp: false,
+    sendOnSignIn: false,
+    autoSignInAfterVerification: false,
+    expiresIn: 15 * 60,
+  },
 
   // Better Auth's internal error logger often receives the underlying adapter
   // cause, while getSession exposes only a generic Error. Never log the raw

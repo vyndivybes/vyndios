@@ -72,6 +72,7 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [verificationNotice, setVerificationNotice] = useState("");
   const [granted, setGranted] = useState(false);
   const [bootMessage, setBootMessage] = useState<string | null>(null);
   const [introVisible, setIntroVisible] = useState(true);
@@ -465,6 +466,33 @@ function LoginPage() {
     if (cardRef.current) cardRef.current.style.transform = "rotateY(0deg) rotateX(0deg)";
   }
 
+  async function requestEmailVerification() {
+    const selectedEmail = email.trim().toLowerCase();
+    if (selectedEmail !== "shyamsundhar1982@gmail.com") {
+      setVerificationNotice("This verification pilot is restricted to the registered founder account.");
+      return;
+    }
+    setBusy(true);
+    setVerificationNotice("");
+    setError("");
+    try {
+      const { authClient } = await import("@/lib/auth/client");
+      const result = await authClient.sendVerificationEmail({
+        email: selectedEmail,
+        callbackURL: "/login",
+      });
+      if (result.error) {
+        setVerificationNotice("Verification email delivery is not yet available. The Cloudflare sender must be enabled first.");
+      } else {
+        setVerificationNotice("Verification requested. Check your registered inbox for a link. No account is verified until you open it.");
+      }
+    } catch {
+      setVerificationNotice("Verification email delivery is not yet available. The Cloudflare sender must be enabled first.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
@@ -631,6 +659,15 @@ function LoginPage() {
               {granted ? "Signed in" : busy ? "Signing in…" : "Sign in to VYNDI OS"}
             </button>
 
+            <button
+              type="button"
+              onClick={() => void requestEmailVerification()}
+              disabled={busy || warping || !email.trim()}
+              className="w-full rounded-xl border border-white/20 bg-white/[0.06] px-4 py-2.5 text-sm font-semibold text-white/90 disabled:opacity-50"
+            >
+              Send verification link
+            </button>
+            {verificationNotice ? <p role="status" aria-live="polite" className="mt-2 text-xs text-white/75">{verificationNotice}</p> : null}
             <div className="vy-login__secure"><ShieldCheck aria-hidden="true" />Secure sign-in</div>
             <Link to="/" className="vy-login__back">Return to VYNDI</Link>
           </form>

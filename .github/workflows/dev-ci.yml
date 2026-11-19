@@ -150,6 +150,9 @@ jobs:
       - name: Managing Director identity verification and cross-app no-SSO negative controls
         run: node --test scripts/md-identity-binding-contract.test.mjs
 
+      - name: Founder Better Auth verification and zero-cost email delivery negative controls
+        run: node --test scripts/auth-founder-email-verification.test.mjs
+
       - name: VAOS signed read bridge
         run: npm run test:vaos-bridge:read
 
