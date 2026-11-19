@@ -120,9 +120,12 @@ current A01 per-company inventory or shortage certification.
 [Issue #153](https://github.com/vyndivybes/vyndios/issues/153) tracks the
 full tenant-bound inventory, ATP, reservation, job-card and PO redesign.
 Separate [PR #152](https://github.com/vyndivybes/vyndios/pull/152)
-proposes an immediate fail-closed bridge guard: inventory and shortage
+**merged** an immediate fail-closed bridge guard: inventory and shortage
 signed reads are held if the same source snapshot observes zero or more
-than one ledger venture. It does not fix the underlying legacy view.
+than one ledger venture. The fix was included in exact-SHA
+[Production Assurance PASS](https://github.com/vyndivybes/vyndios/actions/runs/44499242762)
+for commit `774c3502289ca8ea9c14c60777c09547a30da3a4`, now deployed
+through Cloudflare. It does **not** fix the underlying legacy view.
 
 This draft adds `migrations/0197_vaos_venture_isolated_inventory_candidate.sql`:
 a private, `security_invoker` view, grouping quantity and cost by
@@ -141,6 +144,47 @@ test uses only a disposable test DB, not enterprise data. Production
 migration and A01 promotion are still HOLD pending app-role tenant scope,
 full multi-page pagination, signed source revision validation and
 reviewed rollout, without paid services or business writes.
+
+### Conservative available-to-promise candidate — 19 November
+
+A read-only source catalog audit found **one historical reservation, zero
+active reservations**, 56 job-card lines, four job cards and 48 purchase
+orders. Existing reservation/job-card keys were consistent in that
+snapshot, but none provide a proven **venture membership** discriminator.
+In this schema, `venture` includes internal groups such as shared,
+carbon and aluminium; **it is not independently established as a legal
+customer-tenant identity**. Do not call this tenant isolation.
+
+Migration `0198_vaos_venture_atp_hold_candidate.sql` adds a **private,
+no-grant** `inventory_atp_hold_candidate` view dependent on 0197. It
+is entirely separate from public ERP/ATP/shortage views and no runtime
+path consumes it. It returns a candidate quantity only for an SKU/unit
+that appears in exactly one venture AND only when there are **zero
+globally active reservations**. In every other case it returns a
+`HOLD_MULTI_VENTURE_SKU` or
+`HOLD_UNATTRIBUTED_ACTIVE_RESERVATIONS` status and a NULL ATP value.
+A zero-stock row is not evidence that the enterprise has no demand;
+the view is NOT complete data extraction.
+
+TDD baseline RED:
+[run 44525648485](https://github.com/vyndivybes/vyndios/actions/runs/44525648485)
+failed on missing conservative candidate. PostgreSQL 18 GREEN:
+[run 44525909581](https://github.com/vyndivybes/vyndios/actions/runs/44525909581)
+passed **6/6 ATP tests**, including overlapping same SKU, active
+reservation on an unrelated SKU causing a global HOLD, released
+reservation, unauthorized SELECT and explicit unverified/write-denied
+flags. The older 4/4 balance, 11/11 commit-witness and read-only tests
+also remained GREEN. **Neither 0197 nor 0198 is installed in production or
+stage9, and no customer/business data were mutated.**
+
+This deliberately sacrifices availability for correctness. To convert
+the candidate to a usable, per-company ATP and source-of-record read,
+the remaining P0 work is authoritative **customer tenant** and
+**venture** identifiers, immutable lineage through
+reservations/job-card/PO, a scoped authorized database role without
+BYPASSRLS, signed commit-aware source revisions and stable complete
+pagination, negative cross-tenant acceptance and production SLO proof.
+No merge/deploy or A01 promotion while these gates remain HOLD.
 
 ## Tests and rollout
 
