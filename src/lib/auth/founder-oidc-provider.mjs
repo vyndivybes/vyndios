@@ -19,7 +19,7 @@ export function founderOidcProviderEnabled(env={}){
  * Strict account-level privilege control for OAuth client registration,
  * modification and deletion. Unverified principal or an unbound session is
  * NEVER sufficient, even if a source business policy says MD_APPROVED.
- * @param {{user?:unknown,session?:unknown}} actor
+ * @param {{user?:{id?:unknown,email?:unknown,emailVerified?:unknown}|null,session?:{userId?:unknown}|null}} actor
  */
 export async function founderCanManageOidcClient({user,session}={}){
  if(!user||typeof user!=='object'||!session||typeof session!=='object')return false;
@@ -34,8 +34,8 @@ export function founderOidcProviderOptions(env={}){
  if(!founderOidcProviderEnabled(env))return null;
  const hasId=Object.hasOwn(env,'VYNDI_SSO_TRUSTED_CLIENT_ID');
  const id=env.VYNDI_SSO_TRUSTED_CLIENT_ID;
- if(hasId&&(typeof id!=='string'||!TRUSTED_CLIENT.test(id)))
-  throw Error('OIDC_TRUSTED_CLIENT_INVALID');
+ const trustedId=hasId&&typeof id==='string'&&TRUSTED_CLIENT.test(id)?id:null;
+ if(hasId&&!trustedId)throw Error('OIDC_TRUSTED_CLIENT_INVALID');
  return {
   loginPage:'/login',
   consentPage:'/sso-consent',
@@ -44,7 +44,7 @@ export function founderOidcProviderOptions(env={}){
   allowDynamicClientRegistration:false,
   allowUnauthenticatedClientRegistration:false,
   clientPrivileges:founderCanManageOidcClient,
-  cachedTrustedClients:new Set(hasId?[id]:[]),
+  cachedTrustedClients:new Set(trustedId?[trustedId]:[]),
   scopes:['openid','email'],
   // No "offline_access", user profile or business permissions.
   codeExpiresIn:300,
