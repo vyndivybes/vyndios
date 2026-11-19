@@ -1,8 +1,8 @@
 /**
  * Founder-only Better Auth email verification transport for Cloudflare Workers.
  *
- * The provider can send only when a separately commissioned Cloudflare
- * send_email Worker binding is present. This module does NOT mark the user
+ * The sender uses a commissioned free-plan Resend API credential or
+ * a separately commissioned Cloudflare send_email Worker binding. This module does NOT mark the user
  * verified or mint a session. Better Auth owns token expiry, consumption and
  * emailVerified state transitions after the recipient follows the link.
  *
@@ -67,21 +67,88 @@ async function runtimeEmailBinding(){
 }
 
 /**
- * @param {{user?:{email?:unknown},url:unknown}} data
- * @param {{binding?:{send:(message:ReturnType<typeof buildFounderEmailVerificationMessage>)=>Promise<{messageId:string}>}|null}} options
+ * Only the founder's registered email may be used in this initial stage.
+ * Cloudflare Workers Free accounts can use Resend's separate free-tier HTTPS
+ * API; Cloudflare native Email Sending does NOT need to be purchased.
  */
-export async function sendFounderEmailVerification(data,options={}){
- // Construct and validate the email before consulting or calling any provider.
- const message=buildFounderEmailVerificationMessage({email:data?.user?.email,url:data?.url});
- const binding=Object.hasOwn(options,'binding')?options.binding:await runtimeEmailBinding();
- if(!binding||typeof binding.send!=='function')
+const RESEND_ENDPOINT='https://api.resend.com/emails';
+const RESEND_KEY_PATTERN=/^re_[A-Za-z0-9_-]{15,160}$/;
+
+/** @returns {Promise<string|null>} */
+async function runtimeResendKey(){
+ try{
+  const platformModule='cloudflare:workers';
+  const runtime=await import(/* @vite-ignore */ platformModule);
+  const candidate=runtime.env?.VYNDI_RESEND_API_KEY;
+  if(typeof candidate==='string')return candidate;
+ }catch{ /* Local Node runtime has no Cloudflare bindings. */ }
+ return typeof process!=='undefined'&&typeof process.env?.VYNDI_RESEND_API_KEY==='string'
+  ? process.env.VYNDI_RESEND_API_KEY:null;
+}
+/** @param {string} value */
+async function sha256Hex(value){
+ const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value));
+ return Array.from(new Uint8Array(bytes),b=>b.toString(16).padStart(2,'0')).join('');
+}
+/**
+ * @param {ReturnType<typeof buildFounderEmailVerificationMessage>} message
+ * @param {string} apiKey
+ * @param {typeof fetch} fetcher
+ */
+async function sendViaResend(message,apiKey,fetcher){
+ if(!RESEND_KEY_PATTERN.test(apiKey))
   throw Error('VERIFICATION_EMAIL_DELIVERY_UNAVAILABLE');
  try{
-  const result=await binding.send(message);
-  if(!result||typeof result.messageId!=='string'||result.messageId.length<1)
-   throw Error('VERIFICATION_EMAIL_PROVIDER_RECEIPT_INVALID');
-  return result.messageId;
+  const key='vyndi-md-verify-v1-'+await sha256Hex(message.to+'\n'+message.text);
+  const response=await fetcher(RESEND_ENDPOINT,{
+   method:'POST',
+   headers:{
+    'content-type':'application/json',
+    authorization:'Bearer '+apiKey,
+    'idempotency-key':key,
+   },
+   body:JSON.stringify({
+    from:message.from.name+' <'+message.from.email+'>',
+    to:[message.to],
+    subject:message.subject,
+    text:message.text,
+   }),
+   signal:AbortSignal.timeout(10000),
+  });
+  if(!response.ok)throw Error('RESEND_PROVIDER_REJECTED');
+  const data=await response.json();
+  if(typeof data?.id!=='string'||!data.id.trim()||data.id.length>160)
+   throw Error('RESEND_RECEIPT_INVALID');
+  return data.id;
  }catch{
+  // Never leak provider error, credential, target or token through the auth API.
   throw Error('VERIFICATION_EMAIL_SEND_FAILED');
  }
+}
+/**
+ * @param {{user?:{email?:unknown},url:unknown}} data
+ * @param {{
+ * binding?:{send:(message:ReturnType<typeof buildFounderEmailVerificationMessage>)=>Promise<{messageId:string}>}|null,
+ * resendApiKey?:string|null,
+ * fetcher?:typeof fetch
+ * }} options
+ */
+export async function sendFounderEmailVerification(data,options={}){
+ // Validate recipient and origin before the transport or any external call.
+ const message=buildFounderEmailVerificationMessage({email:data?.user?.email,url:data?.url});
+ const binding=Object.hasOwn(options,'binding')?options.binding:await runtimeEmailBinding();
+ if(binding&&typeof binding.send==='function'){
+  try{
+   const result=await binding.send(message);
+   if(!result||typeof result.messageId!=='string'||result.messageId.length<1)
+    throw Error('VERIFICATION_EMAIL_PROVIDER_RECEIPT_INVALID');
+   return result.messageId;
+  }catch{
+   throw Error('VERIFICATION_EMAIL_SEND_FAILED');
+  }
+ }
+ const apiKey=Object.hasOwn(options,'resendApiKey')?options.resendApiKey:await runtimeResendKey();
+ if(typeof apiKey!=='string'||!RESEND_KEY_PATTERN.test(apiKey))
+  throw Error('VERIFICATION_EMAIL_DELIVERY_UNAVAILABLE');
+ return sendViaResend(message,apiKey,options.fetcher??fetch);
 }
