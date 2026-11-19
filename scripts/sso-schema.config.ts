@@ -12,8 +12,11 @@ import pg from "pg";
 import { randomBytes } from "node:crypto";
 import { founderOidcProviderOptions } from "../src/lib/auth/founder-oidc-provider.mjs";
 
+if(process.env.SSO_FIXTURE_DATABASE_URL &&
+ !/^postgresql:\/\/schema_fixture:schema_fixture@127\.0\.0\.1:54329\/schema_fixture$/.test(process.env.SSO_FIXTURE_DATABASE_URL))
+ throw Error("SSO_FIXTURE_LOCAL_ONLY");
 const pool=new pg.Pool({
- connectionString:"postgresql://schema_fixture:schema_fixture@127.0.0.1:1/nonexistent",
+ connectionString:process.env.SSO_FIXTURE_DATABASE_URL??"postgresql://schema_fixture:schema_fixture@127.0.0.1:1/nonexistent",
  max:1,
  connectionTimeoutMillis:500,
 });
