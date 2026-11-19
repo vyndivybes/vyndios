@@ -49,13 +49,21 @@ SELECT (SELECT count(*)::integer FROM isolated) AS source_count,
   pg_current_snapshot()::text AS source_mvcc_snapshot,
   transaction_timestamp() AS extracted_at`;
 
+/** @param {unknown} value */
 function safeCount(value) {
   const n=Number(value);
   if (!Number.isSafeInteger(n) || n<0) throw new Error('SHADOW_SOURCE_COUNT_INVALID');
   return n;
 }
 
-/** Internal evidence only; a caller-supplied venture is NEVER tenant authority. */
+/** @typedef {{source_count:number,venture_count:number,unpaired_count:number,
+ * unpaired_count:number,negative_count:number,invalid_identity_count:number,
+ * records:Array<Record<string,unknown>>}} ShadowSqlRow */
+/** @typedef {{query:(sql:string,params:number[])=>Promise<ShadowSqlRow[]>}} ShadowSql */
+/**
+ * Internal evidence only; a caller-supplied venture is NEVER tenant authority.
+ * @param {{sql?:ShadowSql,limit?:number,venture?:string,tenantId?:string,principal?:string}} options
+ */
 export async function readVentureInventoryShadow(options={}) {
   if (Object.hasOwn(options,'venture') || Object.hasOwn(options,'tenantId') || Object.hasOwn(options,'principal')) {
     throw new Error('SHADOW_TENANT_SCOPE_FORBIDDEN');
