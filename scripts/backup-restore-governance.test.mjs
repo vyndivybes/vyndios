@@ -9,7 +9,7 @@ const dossier = await readFile(new URL("../docs/backup-dr-acceptance-2026-11-19.
 test("restored BI readback runs as separate isolated non-login, non-bypass and non-writer role", () => {
   assert.match(sql, /CREATE ROLE vyndi_restore_readback NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS/);
   assert.match(sql, /GRANT SELECT ON (?:TABLE )?vyndi_private\.bi_dashboards TO vyndi_restore_readback/);
-  assert.match(sql, /CREATE POLICY .* TO vyndi_restore_readback/);
+  assert.match(sql, /CREATE POLICY[\s\S]*? TO vyndi_restore_readback/);
   assert.match(sql, /SET ROLE vyndi_restore_readback/);
   assert.match(sql, /COUNT\(\*\).*vyndi_private\.bi_dashboards/s);
   assert.match(sql, /has_table_privilege\(current_user,.*INSERT/s);
