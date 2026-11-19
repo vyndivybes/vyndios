@@ -1,0 +1,45 @@
+name: A01 Private Tenant Lineage Candidate (Unreleased)
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'migrations/0200_a01_private_tenant_lineage_candidate.sql'
+      - 'scripts/a01-private-tenant-lineage-postgres.test.mjs'
+      - '.github/workflows/a01-tenant-lineage-candidate.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'migrations/0200_a01_private_tenant_lineage_candidate.sql'
+      - 'scripts/a01-private-tenant-lineage-postgres.test.mjs'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  private-two-tenant-negative-proof:
+    name: PG18 tenant owner membership & cross-parent failure tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: a01_test
+          POSTGRES_PASSWORD: a01_fixture_only
+          POSTGRES_DB: a01_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U a01_test -d a01_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install disposable test dependencies only
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Prove tenant mismatch, revocation and immutable attribution remain HOLD
+        env:
+          A01_TEST_DATABASE_URL: postgres://a01_test:a01_fixture_only@127.0.0.1:5432/a01_test
+        run: node --test scripts/a01-private-tenant-lineage-postgres.test.mjs
