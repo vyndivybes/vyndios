@@ -13,14 +13,25 @@ test('isolation diagnostic emits only aggregate HOLD, no venture names or busine
    invalid_identity_count:0,records:[
     {venture:'PRIVATE-ALPHA',sku:'PRIVATE-SKU',unit:'ea',quantity_balance:'5'},
     {venture:'PRIVATE-BETA',sku:'PRIVATE-SKU',unit:'ea',quantity_balance:'-4'}]}];
+  if(query.includes('AS sales_orders'))return [{sales_orders:5,purchase_orders:48,
+   job_cards:4,job_card_lines:56,reservations:1,inventory_ledger:2,
+   inventory_cost_ledger:2,travellers:1}];
   return [{overlapping_key_groups:1,job_cards_total:4,jobs_without_traveller_venture:3,
    ambiguous_job_venture_count:0,reservations_total:1,reservations_with_broken_lineage:1,
    purchase_orders_total:48,purchase_orders_with_broken_lineage:48}];
  }};
  const d=await readVaosIsolationDiagnostics({sql});
- assert.equal(queryLog.length,2);
+ assert.equal(queryLog.length,3);
  assert.equal(d.schemaVersion,'VYNDI_A01_ISOLATION_DIAGNOSTIC_V1');
  assert.equal(d.status,'HOLD');
+ assert.equal(d.businessGovernance.businessOwnershipDecision,'MD_DECLARED');
+ assert.equal(d.businessGovernance.sourceAuthorityDecision,'MD_APPROVED');
+ assert.equal(d.businessGovernance.historicalDataClassification,'SIMULATION_ONLY_DECLARED');
+ assert.equal(d.businessGovernance.authenticatedOwnerBindingVerified,false);
+ assert.equal(d.simulationBoundary.countsEqual,true);
+ assert.equal(d.simulationBoundary.productionBusinessDataCertified,false);
+ assert.ok(d.holds.includes('HISTORICAL_SIMULATION_ONLY'));
+ assert.ok(d.holds.includes('RECORD_LEVEL_CLASSIFICATION_PENDING'));
  assert.equal(d.tenantIdentityVerified,false);
  assert.equal(d.businessWritesAuthorized,false);
  assert.equal(d.sourceCompletenessVerified,false);
@@ -82,5 +93,8 @@ test('isolated SQL identifies two ventures sharing canonical SKU and orphan pare
  assert.equal(result.lineage.reservationsWithBrokenLineage,1);
  assert.equal(result.lineage.purchaseOrdersWithBrokenLineage,2);
  assert.equal(result.status,'HOLD');
+ assert.equal(result.simulationBoundary.countsEqual,false);
+ assert.ok(result.holds.includes('SIMULATION_DECLARATION_COHORT_DRIFT'));
+ assert.equal(result.businessGovernance.authenticatedOwnerBindingVerified,false);
  assert.equal((await db.query('SELECT count(*)::int AS c FROM epr_inventory_ledger')).rows[0].c,before);
 });
