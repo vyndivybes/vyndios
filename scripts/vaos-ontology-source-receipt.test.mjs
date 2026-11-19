@@ -87,3 +87,40 @@ test("A01 external count witness SQL is read-only, scoped, and uses exact same c
  assert.match(sql,/witness_observed_at/);
  assert.match(sql,/COUNT\(\*\)/i);
 });
+
+
+// A01 fail-closed canonical identity regression: duplicate or missing source IDs
+// must not be silently accepted as a complete bounded business observation.
+test("A01 rejects duplicate canonical stock identities",async()=>{
+ await assert.rejects(()=>createOntologyReadReceipt({...sample,records:[
+  {sku:"A",unit:"pcs",quantity_balance:2},{sku:"A",unit:"pcs",quantity_balance:3}
+ ],sourceCount:2}),/VYNDI_ONTOLOGY_SOURCE_RECEIPT_INVALID/);
+});
+test("A01 retains distinct stock units under the same SKU",async()=>{
+ const v=await createOntologyReadReceipt({...sample,records:[
+  {sku:"A",unit:"pcs",quantity_balance:2},{sku:"A",unit:"kg",quantity_balance:4}
+ ],sourceCount:2});
+ assert.equal(v.complete,true);assert.equal(v.sourceCompletenessVerified,false);
+});
+test("A01 rejects missing purchase order identity",async()=>{
+ await assert.rejects(()=>createOntologyReadReceipt({...sample,sourceKind:"purchaseOrders",
+  records:[{status:"draft",sku:"A"}],sourceCount:1}),/VYNDI_ONTOLOGY_SOURCE_RECEIPT_INVALID/);
+});
+test("A01 rejects repeated shortage job-card line even across parent job cards",async()=>{
+ await assert.rejects(()=>createOntologyReadReceipt({...sample,sourceKind:"shortages",
+  records:[
+   {job_card_id:"J1",job_card_line_id:"L1",sku:"A"},
+   {job_card_id:"J2",job_card_line_id:"L1",sku:"B"}
+  ],sourceCount:2}),/VYNDI_ONTOLOGY_SOURCE_RECEIPT_INVALID/);
+});
+test("A01 rejects zero-page response when source count is nonzero",async()=>{
+ await assert.rejects(()=>createOntologyReadReceipt({...sample,sourceKind:"purchaseOrders",
+  records:[],sourceCount:47}),/VYNDI_ONTOLOGY_SOURCE_RECEIPT_INVALID/);
+});
+test("A01 valid PO observation stays content-digest-only and not autonomous",async()=>{
+ const v=await createOntologyReadReceipt({...sample,sourceKind:"purchaseOrders",
+  records:[{id:"PO-1",status:"draft"}],sourceCount:1});
+ assert.equal(v.sourceRevisionAuthority,"CONTENT_DIGEST_ONLY");
+ assert.equal(v.sourceCompletenessVerified,false);
+ assert.equal(v.actionAuthorized,false);
+});
