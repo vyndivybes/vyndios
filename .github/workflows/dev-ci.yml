@@ -69,6 +69,25 @@ jobs:
       - name: Better Auth 1.7 compatibility
         run: npm run test:auth-1-7
 
+      - name: Generate exact Better Auth OAuth PostgreSQL schema WITHOUT connecting to production
+        run: |
+          mkdir -p migrations/auth
+          docker run --rm -d --name vyndi-oidc-schema-fixture \
+            -e POSTGRES_USER=schema_fixture -e POSTGRES_PASSWORD=schema_fixture \
+            -e POSTGRES_DB=schema_fixture -p 127.0.0.1:54329:5432 postgres:16-alpine
+          trap 'docker stop vyndi-oidc-schema-fixture >/dev/null 2>&1 || true' EXIT
+          for attempt in $(seq 1 25); do
+            docker exec vyndi-oidc-schema-fixture pg_isready -U schema_fixture -d schema_fixture && break
+            sleep 1
+          done
+          SSO_FIXTURE_DATABASE_URL='postgresql://schema_fixture:schema_fixture@127.0.0.1:54329/schema_fixture' \
+            npx --yes auth@1.7.26 generate --config ./scripts/sso-schema.config.ts --output ./migrations/auth/oidc_provider_schema_reference.sql --yes
+          test -s migrations/auth/oidc_provider_schema_reference.sql
+          echo 'OIDC_GENERATED_SCHEMA_START'
+          sed -n '1,260p' migrations/auth/oidc_provider_schema_reference.sql
+          echo 'OIDC_GENERATED_SCHEMA_END'
+
+
       - name: Pre-production release presentation regression
         run: node --experimental-strip-types --test scripts/production-release-presentation.test.mjs
 
@@ -152,6 +171,12 @@ jobs:
 
       - name: Founder Better Auth verification and zero-cost email delivery negative controls
         run: node --test scripts/auth-founder-email-verification.test.mjs
+
+      - name: Official Better Auth founder issuer registration and consent negative gates
+        run: node --test scripts/auth-oidc-provider-gate.test.mjs scripts/auth-oidc-client-registration.test.mjs
+
+      - name: Additive OAuth database migration and existing verified founder preservation
+        run: node --test scripts/auth-oidc-schema-additive.test.mjs
 
       - name: VAOS signed read bridge
         run: npm run test:vaos-bridge:read

@@ -118,6 +118,7 @@
     "test:vaos:brain": "node --experimental-strip-types --test src/lib/vaos-knowledge-graph-export.test.ts scripts/vaos-read-bridge-contract.test.mjs"
   },
   "dependencies": {
+    "@better-auth/oauth-provider": "1.7.26",
     "@electric-sql/pglite": "^0.5.4",
     "@hookform/resolvers": "^5.7.0",
     "@radix-ui/react-accordion": "^1.2.12",
