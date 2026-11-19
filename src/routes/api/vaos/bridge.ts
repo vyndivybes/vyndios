@@ -116,7 +116,7 @@ async function executeRead(
   if (actionType === "PROCUREMENT.OBSERVE_SHORTAGE") {
     // One statement gives the bounded page and source count the same SQL snapshot.
     const [snapshot] = await sql.query<{source_count: number; records: unknown[]; extracted_at: string; venture_count:number}>(
-      `WITH ${A01_SINGLE_VENTURE_GUARD_CTE} eligible AS MATERIALIZED (
+      `WITH ${A01_SINGLE_VENTURE_GUARD_CTE}, eligible AS MATERIALIZED (
          SELECT job_card_id,job_card_line_id,sales_order_id,product_label,variant_id,
                 units,due_month,sku,category,item,required_quantity,
                 physical_quantity AS available_quantity,reserved_quantity,
@@ -169,7 +169,7 @@ async function executeRead(
   }
   if (actionType === "INVENTORY.OBSERVE_STOCK") {
     const [snapshot] = await sql.query<{source_count: number; records: unknown[]; extracted_at: string; venture_count:number}>(
-      `WITH ${A01_SINGLE_VENTURE_GUARD_CTE} eligible AS MATERIALIZED (
+      `WITH ${A01_SINGLE_VENTURE_GUARD_CTE}, eligible AS MATERIALIZED (
          SELECT sku,unit,quantity_balance,inventory_value_inr,weighted_average_cost_inr,
                 first_movement_at,last_movement_at FROM vyndi_inventory_balance
        ), page AS (
