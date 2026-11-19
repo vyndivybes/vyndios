@@ -1,0 +1,38 @@
+name: Generate isolated Better Auth OIDC schema reference
+
+on:
+  push:
+    branches:
+      - security/official-better-auth-oidc-provider-20261120
+    paths:
+      - .github/workflows/oidc-provider-schema-draft.yml
+
+permissions:
+  contents: write
+
+jobs:
+  generate-schema-without-database-connection:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: security/official-better-auth-oidc-provider-20261120
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned dependencies without changing manifest
+        run: npm ci --no-fund
+      - name: Generate official PostgreSQL schema to NONDEPLOYABLE auth reference directory
+        run: |
+          mkdir -p migrations/auth
+          npx --yes @better-auth/cli@1.7.26 generate --config ./scripts/sso-schema.config.ts --output ./migrations/auth/oidc_provider_schema_reference.sql --yes
+          test -s migrations/auth/oidc_provider_schema_reference.sql
+          grep -E 'oauthClient|oauthAccessToken|oauthRefreshToken|oauthConsent' migrations/auth/oidc_provider_schema_reference.sql > /dev/null
+      - name: Commit only inspectable schema reference (NOT a production migration)
+        run: |
+          git add migrations/auth/oidc_provider_schema_reference.sql
+          if git diff --cached --quiet; then exit 0; fi
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'chore(sso): official nondeployable OAuth schema reference for independent audit'
+          git push origin HEAD:security/official-better-auth-oidc-provider-20261120
