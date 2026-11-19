@@ -43,13 +43,17 @@ function bad(){throw Error('SIMULATION_BASELINE_INVALID');}
  * @param {unknown} counts
  */
 export function assessSimulationDeclarationBoundary(counts){
+ /** @type {Record<string,number>} */
  const baseline=VYNDI_MD_SOURCE_POLICY.simulationBaselineCounts;
  if(!counts||typeof counts!=='object'||Array.isArray(counts))bad();
- if(Object.keys(counts).length!==Object.keys(baseline).length||
-    Object.keys(counts).some(k=>!Object.hasOwn(baseline,k)))bad();
+ /** @type {Record<string,unknown>} */
+ const input=/** @type {Record<string,unknown>} */(counts);
+ if(Object.keys(input).length!==Object.keys(baseline).length||
+    Object.keys(input).some(k=>!Object.hasOwn(baseline,k)))bad();
+ /** @type {Record<string,number>} */
  const sourceCounts={};
  for(const key of Object.keys(baseline)){
-  const n=counts[key];
+  const n=input[key];
   if(typeof n!=='number'||!Number.isSafeInteger(n)||n<0)bad();
   sourceCounts[key]=n;
  }
