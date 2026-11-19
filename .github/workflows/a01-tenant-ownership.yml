@@ -2,13 +2,13 @@ name: A01 Private Tenant Ownership and Negative Isolation
 on:
   pull_request:
     paths:
-      - 'migrations/0200_a01_private_tenant_ownership_candidate.sql'
+      - 'migrations/0210_a01_private_tenant_ownership_candidate.sql'
       - 'scripts/a01-tenant-ownership-postgres.test.mjs'
       - '.github/workflows/a01-tenant-ownership.yml'
   push:
     branches: [main]
     paths:
-      - 'migrations/0200_a01_private_tenant_ownership_candidate.sql'
+      - 'migrations/0210_a01_private_tenant_ownership_candidate.sql'
       - 'scripts/a01-tenant-ownership-postgres.test.mjs'
   workflow_dispatch:
 permissions:
