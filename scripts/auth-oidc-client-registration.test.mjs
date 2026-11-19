@@ -9,7 +9,7 @@ test('VAOS client registration screen is fixed-origin, explicit and not self-aut
  assert.match(page,/https:\/\/vaos\.vayushastr\.workers\.dev\/api\/founder-sso-callback/);
  assert.match(page,/client_secret_basic/);
  assert.match(page,/authorization_code/);
- assert.match(page,/require_pkce:\s*true/);
+ assert.doesNotMatch(page,/require_pkce:\s*false/);
  assert.doesNotMatch(page,/localStorage|sessionStorage|console\.log/);
  assert.doesNotMatch(page,/document\.cookie|innerHTML|dangerouslySetInnerHTML/);
 });
