@@ -42,6 +42,21 @@ jobs:
           test -n "$RCLONE_CONFIG_GDRIVE_TOKEN"
           [[ "$VYNDI_GOOGLE_BACKUP_AGE_RECIPIENT" =~ ^age1[a-z0-9]+$ ]]
           node -e 'const t=JSON.parse(process.env.RCLONE_CONFIG_GDRIVE_TOKEN||"{}"); if(!t.refresh_token)process.exit(1)'
+      - name: Fail closed on backup role completeness and RLS authorization
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Probe exactly the TLS-qualified credential that pg_dump will use.
+          # Never echo the credential, database rows, or the raw psql result.
+          role_evidence="$(
+            docker run --rm --network host \
+              -e BACKUP_READ_URL \
+              -v "$GITHUB_WORKSPACE/scripts/backup-role-evidence.sql:/preflight.sql:ro" \
+              postgres:18-alpine \
+              sh -ec 'exec psql --no-psqlrc --no-align --tuples-only --field-separator="|" --set=ON_ERROR_STOP=1 --dbname="$BACKUP_READ_URL" --file=/preflight.sql'
+          )"
+          printf '%s\n' "$role_evidence" | node scripts/backup-authority-preflight.mjs
+
       - name: Install age and rclone on ephemeral GitHub runner
         shell: bash
         run: |
