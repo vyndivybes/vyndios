@@ -56,7 +56,7 @@ function safeCount(value) {
   return n;
 }
 
-/** @typedef {{source_count:number,venture_count:number,unpaired_count:number,
+/** @typedef {{source_count:number,venture_count:number,
  * unpaired_count:number,negative_count:number,invalid_identity_count:number,
  * records:Array<Record<string,unknown>>}} ShadowSqlRow */
 /** @typedef {{query:(sql:string,params:number[])=>Promise<ShadowSqlRow[]>}} ShadowSql */
