@@ -1,4 +1,5 @@
 import { createAuthClient } from "better-auth/react";
+import { oauthProviderClient } from "@better-auth/oauth-provider/client";
 import { runPreSignInSignOut, runSignOut } from "../../../scripts/sign-out-plan.mjs";
 import { GROK_PROVIDERS } from "./providers";
 import { isBearerTransportHost } from "./bearer-transport";
@@ -18,6 +19,7 @@ import { isBearerTransportHost } from "./bearer-transport";
  * the visitor stays signed in.
  */
 export const authClient = createAuthClient({
+  plugins: [oauthProviderClient()],
   fetchOptions: {
     onRequest(ctx) {
       const token = getBearerToken();
