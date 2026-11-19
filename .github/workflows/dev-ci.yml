@@ -78,6 +78,9 @@ jobs:
       - name: Enterprise authority closure
         run: npm run test:authority-closure
 
+      - name: A01 transactional source revision witness in isolated database
+        run: node --test scripts/vaos-source-revision-witness.test.mjs
+
       - name: Execute migrations from empty database
         run: node --test scripts/migration-execution.test.mjs
 
