@@ -15,7 +15,7 @@ import {
 import { Client } from "pg";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { timeStage } from "../request-timing.server.ts";
-import { reportAuthDriverFailure } from "./db-stage-diagnostic";
+import { reportAuthDriverFailure } from "./db-stage-diagnostic.ts";
 
 type PostgresClient = Pick<Client, "connect" | "end" | "query">;
 type PostgresConnectionResolver = string | (() => Promise<string>);
