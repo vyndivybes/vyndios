@@ -1,0 +1,45 @@
+name: Recovery Append-Only Event Identity Contract
+on:
+  pull_request:
+    paths:
+      - 'migrations/0199_recovery_collision_resistant_events.sql'
+      - 'scripts/recovery-event-id-uniqueness.test.mjs'
+      - 'scripts/recovery-event-id-postgres.test.mjs'
+      - '.github/workflows/recovery-event-uniqueness.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'migrations/0199_recovery_collision_resistant_events.sql'
+      - 'scripts/recovery-event-id-uniqueness.test.mjs'
+      - 'scripts/recovery-event-id-postgres.test.mjs'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-postgresql-and-pglite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: recovery_test
+          POSTGRES_PASSWORD: fixture_only
+          POSTGRES_DB: recovery_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U recovery_test -d recovery_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install isolated dependency fixture
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify PGlite legacy migration and PG18 high-rate append-only IDs
+        env:
+          RECOVERY_TEST_DATABASE_URL: postgres://recovery_test:fixture_only@127.0.0.1:5432/recovery_test
+        run: node --test scripts/recovery-event-id-uniqueness.test.mjs scripts/recovery-event-id-postgres.test.mjs
