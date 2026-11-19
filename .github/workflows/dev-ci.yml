@@ -144,6 +144,9 @@ jobs:
       - name: Signed founder isolation diagnostics with negative lineage fixtures
         run: node --test scripts/vaos-signed-isolation-diagnostics.test.mjs
 
+      - name: Managing Director simulation-only authority and live-source negative controls
+        run: node --test scripts/vaos-md-business-policy.test.mjs
+
       - name: VAOS signed read bridge
         run: npm run test:vaos-bridge:read
 
