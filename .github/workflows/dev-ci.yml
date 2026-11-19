@@ -69,6 +69,16 @@ jobs:
       - name: Better Auth 1.7 compatibility
         run: npm run test:auth-1-7
 
+      - name: Generate exact Better Auth OAuth PostgreSQL schema WITHOUT connecting to production
+        run: |
+          mkdir -p migrations/auth
+          npx --yes @better-auth/cli@1.7.26 generate --config ./scripts/sso-schema.config.ts --output ./migrations/auth/oidc_provider_schema_reference.sql --yes
+          test -s migrations/auth/oidc_provider_schema_reference.sql
+          echo 'OIDC_GENERATED_SCHEMA_START'
+          sed -n '1,260p' migrations/auth/oidc_provider_schema_reference.sql
+          echo 'OIDC_GENERATED_SCHEMA_END'
+
+
       - name: Pre-production release presentation regression
         run: node --experimental-strip-types --test scripts/production-release-presentation.test.mjs
 
