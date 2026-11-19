@@ -141,6 +141,9 @@ jobs:
       - name: A01 venture-keyed inventory shadow and negative authorization tests
         run: node --test scripts/vaos-venture-inventory-shadow-contract.test.mjs scripts/vaos-venture-inventory-shadow-postgres.test.mjs
 
+      - name: Signed founder isolation diagnostics with negative lineage fixtures
+        run: node --test scripts/vaos-signed-isolation-diagnostics.test.mjs
+
       - name: VAOS signed read bridge
         run: npm run test:vaos-bridge:read
 
