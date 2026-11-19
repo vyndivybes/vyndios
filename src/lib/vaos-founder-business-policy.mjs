@@ -54,7 +54,7 @@ export function assessSimulationDeclarationBoundary(counts){
  const sourceCounts={};
  for(const key of Object.keys(baseline)){
   const n=input[key];
-  if(typeof n!=='number'||!Number.isSafeInteger(n)||n<0)bad();
+  if(typeof n!=='number'||!Number.isSafeInteger(n)||n<0)throw Error('SIMULATION_BASELINE_INVALID');
   sourceCounts[key]=n;
  }
  const countsEqual=Object.keys(baseline).every(k=>sourceCounts[k]===baseline[k]);
