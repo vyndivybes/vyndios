@@ -10,7 +10,7 @@ assert.ok(dsn,'Dedicated A01 tenant test database required');
 const u=new URL(dsn);
 assert.ok(['localhost','127.0.0.1','::1'].includes(u.hostname),'Refuse remote database');
 assert.equal(u.pathname,'/a01_tenant_test','Refuse any non-test database');
-const path=join(dirname(fileURLToPath(import.meta.url)),'../migrations/0200_a01_private_tenant_ownership_candidate.sql');
+const path=join(dirname(fileURLToPath(import.meta.url)),'../migrations/0210_a01_private_tenant_ownership_candidate.sql');
 const A='a'.repeat(64);
 const B='b'.repeat(64);
 
