@@ -47,8 +47,8 @@ export function founderOidcProviderOptions(env={}){
   cachedTrustedClients:new Set(hasId?[id]:[]),
   scopes:['openid','email'],
   // No "offline_access", user profile or business permissions.
-  codeExpiresIn:'5m',
-  idTokenExpiresIn:'5m',
-  accessTokenExpiresIn:'15m',
+  codeExpiresIn:300,
+  idTokenExpiresIn:300,
+  accessTokenExpiresIn:900,
  };
 }
