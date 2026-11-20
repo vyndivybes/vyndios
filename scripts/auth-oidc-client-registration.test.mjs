@@ -30,7 +30,7 @@ test('one-time client credentials can be explicitly copied without revealing sec
  assert.match(source,/type="password"/);
  assert.match(source,/autoComplete="off"/);
  assert.match(source,/clipboard\.writeText/);
- assert.match(source,/setStatus\("Secret copied/);
+ assert.match(source,/"Secret copied\\. Paste/);
  assert.doesNotMatch(source,/navigator\.clipboard\.readText|setTimeout|alert\(|console\.|dangerouslySetInnerHTML/);
 });
 test('clipboard helper uses only explicit user gesture, never returns or logs secret',async()=>{
