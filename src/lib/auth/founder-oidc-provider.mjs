@@ -43,6 +43,8 @@ export function founderOidcProviderOptions(env={}){
   // and verified Better Auth founder session. Never enable open registration.
   allowDynamicClientRegistration:false,
   allowUnauthenticatedClientRegistration:false,
+  // OAuth 2.1: every newly registered confidential VAOS client must use S256.
+  clientRegistrationRequirePKCE:true,
   clientPrivileges:founderCanManageOidcClient,
   cachedTrustedClients:new Set(trustedId?[trustedId]:[]),
   scopes:['openid','email'],
