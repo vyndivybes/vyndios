@@ -14,6 +14,7 @@ test('explicit issuer controls only narrow OIDC scopes, fixed origin and strict 
  assert.equal(options.consentPage,'/sso-consent');
  assert.equal(options.allowDynamicClientRegistration,false);
  assert.equal(options.allowUnauthenticatedClientRegistration,false);
+ assert.equal(options.clientRegistrationRequirePKCE,true);
  assert.deepEqual(options.scopes,['openid','email']);
  assert.deepEqual([...options.cachedTrustedClients],['founder-vaos-client']);
  assert.equal(typeof options.clientPrivileges,'function');
