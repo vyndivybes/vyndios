@@ -11,6 +11,10 @@ const fail=()=>{throw new Error('AUTH_JWKS_KEYRING_UNAVAILABLE');};
 const B64URL=/^[A-Za-z0-9_-]{43}$/;
 const ID=/^[A-Za-z0-9_-]{16,128}$/;
 
+/**
+ * Rows are untrusted database input and are validated field-by-field below.
+ * @param {(statement:string, params:unknown[])=>Promise<Array<Record<string,any>>>} query
+ */
 export async function readProductionJwks(query) {
   if(typeof query!=='function')fail();
   let rows;
