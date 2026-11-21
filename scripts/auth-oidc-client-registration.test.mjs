@@ -21,3 +21,24 @@ test('issuer has no bootstrap client secret or dynamic registration in source',a
  assert.match(p,/allowUnauthenticatedClientRegistration:false/);
  assert.doesNotMatch(p,/client_secret\s*:\s*["']/);
 });
+
+test('one-time client credentials can be explicitly copied without revealing secret or logging',async()=>{
+ const source=await readFile(new URL('../src/routes/sso-client.tsx',import.meta.url),'utf8');
+ assert.match(source,/Copy Client ID/);
+ assert.match(source,/Copy Secret/);
+ assert.match(source,/onClick=\{\(\)=>void copyCredential\("secret"\)\}/);
+ assert.match(source,/type="password"/);
+ assert.match(source,/autoComplete="off"/);
+ assert.match(source,/clipboard\.writeText/);
+ assert.match(source,/Secret copied/);
+ assert.doesNotMatch(source,/navigator\.clipboard\.readText|setTimeout|alert\(|console\.|dangerouslySetInnerHTML/);
+});
+test('clipboard helper uses only explicit user gesture, never returns or logs secret',async()=>{
+ const source=await readFile(new URL('../src/routes/sso-client.tsx',import.meta.url),'utf8');
+ const copyBlock=source.match(/async function copyCredential\([\s\S]*?\n \}/)?.[0]??'';
+ assert.ok(copyBlock,'must have a dedicated copy handler');
+ assert.match(copyBlock,/if\(!credential\)return/);
+ assert.match(copyBlock,/await navigator\.clipboard\.writeText\(value\)/);
+ assert.match(copyBlock,/catch/);
+ assert.doesNotMatch(copyBlock,/console\.|localStorage|sessionStorage|sendBeacon|fetch\(/);
+});

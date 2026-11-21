@@ -31,6 +31,22 @@ function FounderClientRegistration(){
   return ()=>{alive=false;};
  },[]);
 
+ async function copyCredential(kind:"id"|"secret"){
+  if(!credential)return;
+  // Clipboard access is triggered only by this explicit button click.
+  // Never log, persist, reveal, transmit, or interpolate the credential into status.
+  const value=kind==="secret"?credential.secret:credential.id;
+  try{
+   if(!navigator.clipboard?.writeText)throw Error("CLIPBOARD_UNAVAILABLE");
+   await navigator.clipboard.writeText(value);
+   setStatus(kind==="secret"
+    ?"Secret copied. Paste it directly into the Cloudflare encrypted secret field. Clear this screen afterward."
+    :"Client ID copied. Paste it into the Cloudflare VAOS client ID field.");
+  }catch{
+   setStatus("Browser clipboard access was blocked. Click the credential field and press Ctrl+A, then Ctrl+C. Paste only into Cloudflare.");
+  }
+ }
+
  async function register(){
   if(!authorized||busy||credential)return;
   setBusy(true);
@@ -89,9 +105,17 @@ function FounderClientRegistration(){
       <label className="block text-xs">Client ID
        <input readOnly value={credential.id} className="mt-2 block w-full rounded-lg border border-white/20 bg-slate-950 px-3 py-2"/>
       </label>
+      <button type="button" onClick={()=>void copyCredential("id")}
+       className="rounded-lg border border-white/20 px-4 py-2 text-sm font-semibold">
+       Copy Client ID
+      </button>
       <label className="block text-xs">Client secret
-       <input readOnly type="password" value={credential.secret} className="mt-2 block w-full rounded-lg border border-white/20 bg-slate-950 px-3 py-2"/>
+       <input readOnly type="password" autoComplete="off" value={credential.secret} className="mt-2 block w-full rounded-lg border border-white/20 bg-slate-950 px-3 py-2"/>
       </label>
+      <button type="button" onClick={()=>void copyCredential("secret")}
+       className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-black">
+       Copy Secret
+      </button>
       <button type="button" onClick={()=>setCredential(null)}
        className="rounded-xl border border-white/20 px-4 py-3 text-sm">Clear credentials</button>
      </div>
