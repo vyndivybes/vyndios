@@ -42,6 +42,6 @@ export async function readProductionJwks(query) {
     if(!Number.isFinite(createdAt.getTime())||
       (expiresAt&&!Number.isFinite(expiresAt.getTime())))fail();
     return {id:row.id,publicKey:row.publicKey,privateKey:row.privateKey,
-      createdAt,expiresAt,alg:'EdDSA',crv:'Ed25519'};
+      createdAt,expiresAt,alg:/** @type {'EdDSA'} */ ('EdDSA'),crv:/** @type {'Ed25519'} */ ('Ed25519')};
   });
 }
