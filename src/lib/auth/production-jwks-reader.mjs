@@ -7,6 +7,7 @@
 export const JWKS_READ_SQL =
   'select "id", "publicKey", "privateKey", "createdAt", "expiresAt", "alg", "crv" from "jwks" order by "createdAt" desc limit 65';
 
+/** @returns {never} */
 const fail=()=>{throw new Error('AUTH_JWKS_KEYRING_UNAVAILABLE');};
 const B64URL=/^[A-Za-z0-9_-]{43}$/;
 const ID=/^[A-Za-z0-9_-]{16,128}$/;
@@ -14,6 +15,7 @@ const ID=/^[A-Za-z0-9_-]{16,128}$/;
 /**
  * Rows are untrusted database input and are validated field-by-field below.
  * @param {(statement:string, params:unknown[])=>Promise<Array<Record<string,any>>>} query
+ * @returns {Promise<Array<{id:string, publicKey:string, privateKey:string, createdAt:Date, expiresAt:Date|undefined, alg:'EdDSA', crv:'Ed25519'}>>}
  */
 export async function readProductionJwks(query) {
   if(typeof query!=='function')fail();
