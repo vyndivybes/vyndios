@@ -23,6 +23,7 @@ import { AUTH_TRUSTED_ORIGINS, resolveAuthBaseURL, resolveAuthSecret } from "./r
 import { excessActiveSessionTokens } from "./session-concurrency";
 import { VYNDI_SESSION_POLICY } from "./session-policy";
 import { founderOidcProviderOptions } from "./founder-oidc-provider.mjs";
+import { readProductionJwks } from "./production-jwks-reader.mjs";
 import { emitOperationalEvent } from "../observability/server";
 import { classifyAuthFailure } from "./safe-error-diagnostic";
 
@@ -328,7 +329,21 @@ export const auth = betterAuth({
 
   plugins: [
     gateIdentitySessions(),
-    ...(founderOidcOptions ? [jwt({disableSettingJwtHeader:true}),oauthProvider(founderOidcOptions)] : []),
+    ...(founderOidcOptions ? [
+      jwt({
+        disableSettingJwtHeader:true,
+        adapter:{
+          getJwks:async()=>{
+            // Use the same read-only SQL transport as production auth schema checks.
+            // Avoid adapter findMany's misleading empty keyring under request-scoped Workers.
+            const {getSqlServer}=await import("../db.server.ts");
+            const sql=await getSqlServer();
+            return readProductionJwks((statement,params)=>sql.query(statement,params));
+          },
+        },
+      }),
+      oauthProvider(founderOidcOptions),
+    ] : []),
     ...(grokOAuthPlugin ? [grokOAuthPlugin] : []),
     bearer(),
   ],
