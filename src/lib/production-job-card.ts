@@ -313,6 +313,7 @@ export const issueProductionReservation = createServerFn({ method: "POST" })
 export const getProductionJobCards = createServerFn({ method: "GET" }).handler(async () => {
   await requireProductionView();
   const sql = await getSql();
+  await requireSingleVentureInventorySource(sql);
   const cards = await sql`
     select id,sales_order_id,sales_order_revision,product_id,product_label,units,bom_tier,due_month,status,
            production_owner,created_by,model_tier,variant_id,configuration,bom_revision,released_mapping_set,
@@ -329,6 +330,7 @@ export const getProductionJobCards = createServerFn({ method: "GET" }).handler(a
 export const getConfiguredDemandShortages = createServerFn({ method: "GET" }).handler(async () => {
   await requireProductionView();
   const sql = await getSql();
+  await requireSingleVentureInventorySource(sql);
   return sql`
     select sales_order_id,product_label,variant_id,units,due_month,sku,category,item,
            required_quantity,physical_quantity as available_quantity,reserved_quantity,
