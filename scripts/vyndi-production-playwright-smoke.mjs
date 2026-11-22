@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { chromium } from "playwright";
+import {assertProductionRouteReadiness} from "./production-route-readiness-policy.mjs";
 
 const baseUrl = (process.env.VYNDI_TEST_BASE_URL || "https://vyndios.vayushastr.workers.dev").replace(/\/$/, "");
 const email = process.env.VYNDI_TEST_EMAIL;
@@ -243,9 +244,25 @@ try {
       });
     }
     assert.ok(response?.ok(), `${route} returned HTTP ${response?.status() ?? "none"}`);
+    let readinessVerdict = "NOT_APPLICABLE";
     if (cpuBoundClientRoutes.has(route)) {
-      // SSR placeholders are never accepted as real departmental audit proof.
-      await page.locator('[data-route-readiness="ready"]').waitFor({ state: "attached", timeout: 30_000 });
+      // The only accepted non-ready route is a precise inventory source HOLD.
+      const settled = page.locator('[data-route-readiness="ready"], [data-route-readiness="error"]');
+      await settled.first().waitFor({ state: "attached", timeout: 30_000 });
+      readinessVerdict = assertProductionRouteReadiness({
+        route,
+        state: await settled.first().getAttribute("data-route-readiness"),
+        visibleText: await settled.first().innerText(),
+        expectInventoryHold: process.env.VYNDI_TEST_EXPECT_INVENTORY_SCOPE_HOLD === "1",
+      });
+    }
+    if (route === "/command/inventory-ledgers/components"
+        && process.env.VYNDI_TEST_EXPECT_INVENTORY_SCOPE_HOLD === "1") {
+      const sourceHold = page.locator('[data-ledger-readiness="source-scope-hold"]');
+      await sourceHold.waitFor({ state: "attached", timeout: 30_000 });
+      assert.match(await sourceHold.innerText(), /VYNDI_INVENTORY_VENTURE_SCOPE_HOLD/,
+        "Ledger must show the exact audited source HOLD rather than fake stock or a generic error");
+      readinessVerdict = "VERIFIED_INVENTORY_SOURCE_HOLD";
     }
     if (route === "/command/ibpe-operating-workspace") {
       // Route SSR must be responsive and its separate authenticated ERP read
@@ -335,6 +352,7 @@ try {
     await page.screenshot({ path: screenshotPath, fullPage: true });
     evidence.routes.push({
       route,
+      readinessVerdict,
       finalUrl: page.url(),
       status: response?.status() ?? null,
       bodyLength: body.length,

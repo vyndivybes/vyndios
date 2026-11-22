@@ -19,7 +19,19 @@ export const Route = createFileRoute("/command/inventory-ledgers/$ledger")({
   }),
   loader: async ({ params }) => {
     if (!isMasterInventoryLedger(params.ledger)) throw redirect({ to: "/command/inventory" });
-    return getMasterInventoryData();
+    try {
+      const data = await getMasterInventoryData();
+      return { ...data, inventoryScopeHold: false };
+    } catch (error) {
+      // A known cross-venture ATP conflict is a non-mutating source HOLD, not
+      // zero stock. Never issue, price, print or export an invented ledger.
+      if (!(error instanceof Error) || !error.message.includes("VYNDI_INVENTORY_VENTURE_SCOPE_HOLD")) throw error;
+      return {
+        items: [] as Awaited<ReturnType<typeof getMasterInventoryData>>["items"],
+        lots: [] as Awaited<ReturnType<typeof getMasterInventoryData>>["lots"],
+        inventoryScopeHold: true,
+      };
+    }
   },
   component: InventoryLedger,
 });
@@ -179,6 +191,25 @@ function InventoryLedger() {
   }
 
   const fifoSequence = new Map<string, number>();
+
+  if (data.inventoryScopeHold) {
+    return (
+      <section
+        data-ledger-readiness="source-scope-hold"
+        role="alert"
+        className="mx-auto max-w-4xl space-y-4 rounded-xl border border-border p-6"
+      >
+        <h1 className="font-display text-2xl">Item balance register · Source hold</h1>
+        <p className="text-sm text-muted">
+          VYNDI_INVENTORY_VENTURE_SCOPE_HOLD: Physical inventory and cost records span
+          multiple ventures with overlapping item identity. This ledger is suspended
+          until verified venture-specific source reconciliation. No zero stock, valuation,
+          issue or printable ledger has been asserted.
+        </p>
+        <Link to="/command/inventory">View Master Inventory source HOLD</Link>
+      </section>
+    );
+  }
 
   return (
     <main className="mx-auto max-w-7xl space-y-6">
