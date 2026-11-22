@@ -85,7 +85,7 @@ export function evaluateVibpeAuthorityContext(
   graph: CompiledVedmAuthorityGraph,
 ): VibpeAuthorityAssessment {
   const issues: VibpeAuthorityIssue[] = [];
-  const controllingAuthorityId = graph.authorityByDomain.frame_geometry?.id ?? null;
+  const controllingAuthorityId = graph.valid ? (graph.authorityByDomain.frame_geometry?.id ?? null) : null;
 
   if (!graph.valid || !controllingAuthorityId) {
     issues.push({
@@ -149,7 +149,9 @@ export function evaluateVibpeAuthorityContext(
     ? graph.nodeById.get(controllingAuthorityId)
     : undefined;
   const asksFk75 = /fk75/i.test(question);
-  const answerPrefix = asksFk75
+  const answerPrefix = !graph.valid || !controllingAuthorityId
+    ? "Current controlled engineering authority cannot be resolved."
+    : asksFk75
     ? "FK75 remains preferred front-end development and is not production released."
     : current
       ? `Current controlled frame-geometry authority: ${current.title}.`
