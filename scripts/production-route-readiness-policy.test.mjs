@@ -29,3 +29,15 @@ test('production assurance explicitly establishes mixed-venture baseline, not ge
  assert.match(browser,/VYNDI_TEST_EXPECT_INVENTORY_SCOPE_HOLD/);
  assert.match(browser,/\[data-route-readiness="ready"\],\s*\[data-route-readiness="error"\]/);
 });
+
+
+test('inventory-ledger loader returns an explicit source HOLD and cannot render fake zero-stock spreadsheets',async()=>{
+ const route=await readFile(new URL('../src/routes/command/inventory-ledgers/$ledger.tsx',import.meta.url),'utf8');
+ assert.match(route,/VYNDI_INVENTORY_VENTURE_SCOPE_HOLD/);
+ assert.match(route,/inventoryScopeHold:\s*true/);
+ assert.match(route,/data-ledger-readiness="source-scope-hold"/);
+ assert.match(route,/Item balance register/);
+ const browser=await readFile(new URL('./vyndi-production-playwright-smoke.mjs',import.meta.url),'utf8');
+ assert.match(browser,/data-ledger-readiness="source-scope-hold"/);
+ assert.match(browser,/VYNDI_INVENTORY_VENTURE_SCOPE_HOLD/);
+});
