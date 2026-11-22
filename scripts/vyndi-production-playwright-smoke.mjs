@@ -264,6 +264,16 @@ try {
         "Ledger must show the exact audited source HOLD rather than fake stock or a generic error");
       readinessVerdict = "VERIFIED_INVENTORY_SOURCE_HOLD";
     }
+    if (route === "/command/procurement"
+        && process.env.VYNDI_TEST_EXPECT_INVENTORY_SCOPE_HOLD === "1") {
+      const sourceHold=page.locator('[data-procurement-source-readiness="source-scope-hold"]');
+      await sourceHold.waitFor({state:"visible",timeout:30_000});
+      assert.match(await sourceHold.innerText(),/VYNDI_INVENTORY_VENTURE_SCOPE_HOLD/,
+        "Procurement may only load as an explicit source HOLD during cross-venture reconciliation");
+      assert.equal(await page.getByText("No active MSL warnings. Nothing is currently below minimum stock level.").count(),0,
+        "Procurement must not show unqualified zero inventory warning claims");
+      readinessVerdict="VERIFIED_PROCUREMENT_INVENTORY_HOLD";
+    }
     if (route === "/command/ibpe-operating-workspace") {
       // Route SSR must be responsive and its separate authenticated ERP read
       // must actually succeed. Loading or error screens do not pass acceptance.
