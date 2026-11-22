@@ -314,9 +314,9 @@ function OperationsReady() {
         <Kpi label="Live shortages" value={lineageLoaded ? String(shortages) : "On demand"} hint="Loaded with governed lineage" tone={lineageLoaded && shortages ? "warn" : undefined} />
         <Kpi
           label="Inventory alerts"
-          value={warningsLoaded ? String(warnings.length) : "Loading"}
+          value={warningsError ? "HOLD" : warningsLoaded ? String(warnings.length) : "Loading"}
           hint={warningsError ? "Inventory warning check unavailable" : "MSL / stockout"}
-          tone={warningsLoaded && warnings.length ? "warn" : warningsLoaded && !warningsError ? "ok" : undefined}
+          tone={warningsError ? "warn" : warningsLoaded && warnings.length ? "warn" : warningsLoaded ? "ok" : undefined}
         />
         <Kpi label="Quality releases" value={qualityLoaded ? String(releases) : "On demand"} hint={qualityLoaded ? `${openNcr} open NCR` : "Load quality authority"} tone={qualityLoaded && openNcr ? "warn" : undefined} />
         <Kpi label="Posted dispatch" value={dispatchLoaded ? String(currentDispatch.length) : "On demand"} hint="Load canonical dispatch register" tone={dispatchLoaded && currentDispatch.length ? "ok" : undefined} />
