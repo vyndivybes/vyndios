@@ -28,13 +28,16 @@ SELECT
  ) AS consumed_cancelled_reservation
 `;
 
+/** @param {unknown} row */
 export function assertVaosWipSource(row){
- if(!row || typeof row!=='object'
-  ||!Array.isArray(row.records)
-  ||typeof row.active_cancelled_traveller!=='boolean'
-  ||typeof row.consumed_cancelled_reservation!=='boolean')
+ const value=/** @type {Record<string,unknown>|null} */ (
+  row !== null && typeof row === 'object' ? row : null
+ );
+ if(!value || !Array.isArray(value.records)
+  ||typeof value.active_cancelled_traveller!=='boolean'
+  ||typeof value.consumed_cancelled_reservation!=='boolean')
   throw Error('VYNDI_WIP_SOURCE_INVALID');
- if(row.active_cancelled_traveller || row.consumed_cancelled_reservation)
+ if(value.active_cancelled_traveller || value.consumed_cancelled_reservation)
   throw Error('VYNDI_WIP_CANCELLED_LINEAGE_UNRECONCILED');
- return {records:row.records};
+ return {records:value.records};
 }
