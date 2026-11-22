@@ -25,6 +25,10 @@ export const INVENTORY_SCOPE_SQL = `
 
 const SCOPE_HOLD = 'VYNDI_INVENTORY_VENTURE_SCOPE_HOLD: Legacy stock/ATP combines or cannot attribute inventory ventures. Physical stock actions and stock summaries are unavailable until owner/source lineage is independently reconciled. Internal planning and draft preparation remain available.';
 
+/**
+ * @param {import('./db').Sql} sql
+ * @returns {Promise<Readonly<{ventureCount:1,sourceAuthorityCertified:false,productionWriteAuthorized:false}>>}
+ */
 export async function requireSingleVentureInventorySource(sql) {
   const rows=await sql.query(INVENTORY_SCOPE_SQL);
   const count=rows?.[0]?.venture_count;
