@@ -4,25 +4,53 @@ import { InventoryWorkspaceNav } from "@/components/inventory-workspace-nav";
 import { SupplierRiskPanel } from "@/components/supplier-risk-panel";
 import { SupplierPerformancePanel } from "@/components/supplier-performance-panel";
 import { getInventoryMslWarnings } from "@/lib/inventory-authority";
+import {isInventoryVentureSourceHold} from "@/lib/procurement-source-readiness.mjs";
 import { getConfiguredDemandShortages } from "@/lib/production-job-card";
 import { getSupplierRiskIntelligence } from "@/lib/supplier-risk-authority";
 import { getSupplierPerformanceState } from "@/lib/supplier-performance-authority";
 
 export const Route = createFileRoute("/command/procurement")({
   loader: async () => {
-    const [warnings,demandShortages,supplierRisk,supplierPerformance]=await Promise.all([
-      getInventoryMslWarnings(),
-      getConfiguredDemandShortages(),
-      getSupplierRiskIntelligence(),
-      getSupplierPerformanceState(),
+    // Inventory/ATP reads are fail-closed under unresolved mixed-venture
+    // history. Only this explicit source HOLD becomes partial planning UI.
+    // Unrelated auth, schema, supplier and transport errors still propagate.
+    const inventory = (async () => {
+      try {
+        const warnings=await getInventoryMslWarnings();
+        const demandShortages=await getConfiguredDemandShortages();
+        return {warnings,demandShortages,inventoryScopeHold:false};
+      } catch (error) {
+        if (isInventoryVentureSourceHold(error))
+          return {warnings:[],demandShortages:[],inventoryScopeHold:true};
+        throw error;
+      }
+    })();
+    const [inventoryData,supplierRisk,supplierPerformance]=await Promise.all([
+      inventory,getSupplierRiskIntelligence(),getSupplierPerformanceState(),
     ]);
-    return { warnings,demandShortages,supplierRisk,supplierPerformance };
+    return {...inventoryData,supplierRisk,supplierPerformance};
   },
   component: Procurement,
 });
 
 function Procurement() {
-  const { warnings, demandShortages, supplierRisk, supplierPerformance } = Route.useLoaderData();
+  const { warnings, demandShortages, supplierRisk, supplierPerformance, inventoryScopeHold } = Route.useLoaderData();
+  if (inventoryScopeHold) return (
+    <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+      <h1 className="font-display text-4xl text-accent">Procurement</h1>
+      <section role="alert" data-procurement-source-readiness="source-scope-hold"
+        className="mt-5 rounded-xl border border-warn/60 p-5">
+        <p className="text-sm font-bold text-warn">Stock and replenishment source HOLD</p>
+        <p className="mt-2 text-sm text-muted">VYNDI_INVENTORY_VENTURE_SCOPE_HOLD: Historical inventory and ATP combine ventures. Stock availability, shortages, purchase quantities and replenishment signals cannot be certified. Internal supplier review and draft preparation may continue; purchase commitments still require founder approval.</p>
+        <div className="mt-3 flex flex-wrap gap-4 text-sm">
+          <Link to="/command/procurement-planning" className="text-accent">Open internal procurement planning</Link>
+          <Link to="/command/inventory" className="text-accent">Inspect stock source HOLD</Link>
+        </div>
+      </section>
+      <div className="mt-6"><SupplierRiskPanel state={supplierRisk} /></div>
+      <div className="mt-6"><SupplierPerformancePanel state={supplierPerformance} /></div>
+    </main>
+  );
   const critical = warnings.filter((x: any) => x.status === "critical").length;
   const low = warnings.filter((x: any) => x.status === "low").length;
   const shortage = warnings.reduce((sum: number, x: any) => sum + Number(x.shortage_quantity), 0);
