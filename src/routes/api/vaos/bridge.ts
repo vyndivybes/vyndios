@@ -1,4 +1,5 @@
 import { createOntologyReadReceipt } from "@/lib/vaos-ontology-read-receipt";
+import {validateInternalDraftWrite, VAOS_INTERNAL_DRAFT_ACTION} from "@/lib/vaos-internal-draft-write";
 import { readManagingDirectorIdentityEvidence } from "@/lib/vaos-md-identity-read.mjs";
 import { readVaosIsolationDiagnostics } from "@/lib/vaos-isolation-diagnostics.mjs";
 import {A01_SINGLE_VENTURE_GUARD_CTE,assertSingleVentureSource} from "@/lib/vaos-single-venture-source-guard";
@@ -346,11 +347,15 @@ export const Route = createFileRoute("/api/vaos/bridge")({
         }
 
         const purpose = String(payload.purpose ?? "").trim();
-        if (purpose === "write-execute") {
+        const requestedAction = String(payload.actionType ?? "").trim();
+        // Real production writes are authorized ONLY for pre-operational,
+        // classification-locked internal drafts. All ERP effects stay blocked.
+        if (purpose === "write-execute" && requestedAction !== VAOS_INTERNAL_DRAFT_ACTION) {
           return json({ ok: false, error: "write_execution_not_commissioned" }, 403);
         }
 
-        const expectedPurpose = purpose === "write-qualify" ? "write-qualify" : "read-observe";
+        const expectedPurpose = purpose === "write-qualify" ? "write-qualify"
+          : purpose === "write-execute" ? "write-execute" : "read-observe";
         const signedContext = validateVaosBridgeSignedContext({
           payload,
           requestMethod: request.method,
@@ -365,6 +370,47 @@ export const Route = createFileRoute("/api/vaos/bridge")({
         const sql = await getSql();
         const timestampMs = Number(timestamp.length === 10 ? Number(timestamp) * 1000 : Number(timestamp));
         const expiresAt = new Date(timestampMs + VAOS_BRIDGE_MAX_SKEW_SECONDS * 1000).toISOString();
+
+        if (purpose === "write-execute") {
+          const check = validateInternalDraftWrite(payload);
+          if (!check.ok) return json({ok:false,error:"internal_draft_scope_denied"},403);
+          const input = check.value;
+          const claimed = await sql.query<{claimed:boolean}>(
+            "select claim_vyndi_vaos_bridge_nonce($1,$2,$3,$4,$5::timestamptz) as claimed",
+            [nonce,keyId,bodySha256,actionType,expiresAt],
+          );
+          if (claimed[0]?.claimed !== true)
+            return json({ok:false,error:"replay_detected"},409);
+          const contentSha = await sha256Hex(input.content);
+          const sourceReference = `VAOS|${input.missionId}|${input.intentId}`;
+          const rows = await sql.query<{result:Record<string,unknown>}>(
+            "select persist_vaos_internal_draft($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) as result",
+            [
+              input.recordId,input.intentId,input.executionJobId,input.idempotencyKey,
+              input.approvalId,input.category,input.title,input.content,contentSha,sourceReference,
+            ],
+          );
+          const receipt=rows[0]?.result;
+          if (!receipt || receipt.status!=="DRAFT_PERSISTED" ||
+              receipt.recordId!==input.recordId ||
+              receipt.contentSha256!==contentSha ||
+              receipt.classification!=="INTERNAL_DRAFT" ||
+              receipt.state!==input.state ||
+              receipt.revision!==1)
+            return json({ok:false,error:"internal_draft_readback_failed"},503);
+          return json({
+            ok:true,protocolVersion:payload.protocolVersion,
+            actionType,effectClass:"internal-draft-mutation",
+            readOnly:false,sourceAuthority:"persist_vaos_internal_draft",
+            classification:"INTERNAL_DRAFT",
+            recordId:input.recordId,category:input.category,
+            state:receipt.state,revision:receipt.revision,
+            idempotencyReplay:receipt.replay===true,
+            contentSha256:contentSha,bodySha256,nonce,
+            externalDispatchExecuted:false,purchaseCommitted:false,
+            operationalErpWritesEnabled:false,
+          });
+        }
 
         if (purpose === "write-qualify") {
           if (
