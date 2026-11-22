@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { chromium } from "playwright";
+import {assertProductionRouteReadiness} from "./production-route-readiness-policy.mjs";
 import { summarizePublicFailureDiagnostics } from "./slo-failure-diagnostics.mjs";
 
 const baseUrl = (process.env.VYNDI_TEST_BASE_URL || "http://127.0.0.1:8081").replace(/\/$/, "");
@@ -143,6 +144,7 @@ try {
       let status = null;
       let ok = false;
       let error = null;
+      let readinessVerdict = "NOT_APPLICABLE";
       try {
         const response = await page.goto(`${baseUrl}${route}`, {
           waitUntil: "domcontentloaded",
@@ -151,8 +153,16 @@ try {
         status = response?.status() ?? null;
         assert.ok(response?.ok(), `${route} returned HTTP ${status ?? "none"}`);
         if (cpuBoundClientRoutes.has(route)) {
-          // The HTML shell alone is not qualification; await canonical readback.
-          await page.locator('[data-route-readiness="ready"]').waitFor({ state: "attached", timeout: 30_000 });
+          // A trusted, explicit Inventory source HOLD is service availability,
+          // not an assertion of authoritative stock. Other routes require READY.
+          const terminal = page.locator('[data-route-readiness="ready"], [data-route-readiness="error"]');
+          await terminal.first().waitFor({ state: "attached", timeout: 30_000 });
+          readinessVerdict = assertProductionRouteReadiness({
+            route,
+            state: await terminal.first().getAttribute("data-route-readiness"),
+            visibleText: await terminal.first().innerText(),
+            expectInventoryHold: process.env.VYNDI_TEST_EXPECT_INVENTORY_SCOPE_HOLD === "1",
+          });
         }
         await page.locator("body").waitFor({ state: "visible", timeout: 30_000 });
         await page.waitForFunction(() => (document.body?.innerText || "").trim().length > 40, undefined, { timeout: 30_000 });
@@ -170,6 +180,7 @@ try {
           sample,
           status,
           ok,
+          readinessVerdict,
           durationMs: Date.now() - started,
           pageErrors,
           error,
