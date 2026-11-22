@@ -4,6 +4,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql } from "@/lib/db";
+import {requireSingleVentureInventorySource} from "@/lib/inventory-venture-source-guard.mjs";
 import { getCommandRole } from "@/lib/command-access";
 import { canPerform } from "@/lib/page-access";
 import { requireBusinessActor } from "@/lib/business-actor";
@@ -281,6 +282,7 @@ export const refreshProductionReservations = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const actor = await requireBusinessActor("edit", { userId: context.userId, email: context.userEmail });
     const sql = await getSql();
+    await requireSingleVentureInventorySource(sql);
     await assertPhysicalJobCard(sql,data.jobCardId);
     const lines = await sql.query<{ id: string }>(`select id from epr_production_job_card_lines where job_card_id=$1 and sku is not null order by id`, [data.jobCardId]);
     for (const line of lines) {
@@ -295,6 +297,7 @@ export const issueProductionReservation = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const actor = await requireBusinessActor("edit", { userId: context.userId, email: context.userEmail });
     const sql = await getSql();
+    await requireSingleVentureInventorySource(sql);
     await assertPhysicalReservation(sql,data.reservationId);
     const movementId = `MOV-${crypto.randomUUID()}`;
     const ledgerId = `LED-${crypto.randomUUID()}`;
