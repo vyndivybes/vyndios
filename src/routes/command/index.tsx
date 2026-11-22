@@ -8,6 +8,7 @@ import { getOperatingLineage } from "@/lib/operating-lineage";
 import { canAccessRoute } from "@/lib/page-access";
 import { getDecisionInboxData } from "@/lib/procure-to-pay-authority";
 import { useVeloxis } from "@/lib/store";
+import { INTERNAL_STARTUP_MODE } from "@/lib/internal-startup-mode";
 
 export const Route = createFileRoute("/command/")({
   loader: async ({ context }) => {
@@ -58,9 +59,9 @@ function CommandCentre() {
   );
 
   const workflow = [
-    ["Demand / Orders", `${lineage.length} committed order${lineage.length === 1 ? "" : "s"}`, "/command/sales"],
+    ["Demand / Orders", `${lineage.length} source order record${lineage.length === 1 ? "" : "s"} (classification required)`, "/command/sales"],
     ["Job Card / BOM", `${currentJobCards}/${lineage.length} current job-card lineage`, "/command/production"],
-    ["Material", shortageLines ? `${shortageLines} live shortage line(s)` : "No live order-linked shortage", "/command/inventory"],
+    ["Material", shortageLines ? `${shortageLines} source shortage line(s)` : "No source order-linked shortage", "/command/inventory"],
     ["Purchase", `${linkedPos} linked PO record(s)`, "/command/purchase-execution"],
     ["Receiving", `${grns} GRN record(s)`, "/command/receiving"],
     ["Traveller / Build", `${travellers} traveller(s)`, "/command/production"],
@@ -70,6 +71,17 @@ function CommandCentre() {
 
   return (
     <div className="space-y-6">
+      <section aria-label="Internal startup operating mode" className="rounded-xl border border-accent/40 bg-surface/50 p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.15em] text-accent">Internal startup workspace · {INTERNAL_STARTUP_MODE.company}</p>
+        <p className="mt-2 text-sm text-fg">Startup planning and preparation — engineering coordination, supplier research, draft CRM, finance scenarios and internal task review.</p>
+        <p className="mt-2 text-xs leading-5 text-muted">Historical source records are simulation-only by founder declaration. New source records require their own classification. VAOS may autonomously observe and prepare internal advice; existing authenticated write controls and real-world approval gates are unchanged.</p>
+        <div className="mt-3 flex flex-wrap gap-4 text-xs font-semibold text-accent">
+          {accessible("/command/founder-command") && <WorkLink to="/command/founder-command">Founder plan</WorkLink>}
+          {accessible("/command/actions") && <WorkLink to="/command/actions">Internal tasks</WorkLink>}
+          {accessible("/command/engineering") && <WorkLink to="/command/engineering">Engineering</WorkLink>}
+          {accessible("/command/decision-inbox") && <WorkLink to="/command/decision-inbox">Review queue</WorkLink>}
+        </div>
+      </section>
       <BusinessIntelligenceStudio />
       <header className="flex flex-col gap-4 border-b border-border pb-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
@@ -87,8 +99,8 @@ function CommandCentre() {
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi label="Needs action" value={String(actionItems.length)} hint="Governed Action Inbox" tone={actionItems.length ? "warn" : "ok"} />
-        <Kpi label="Orders in flow" value={String(lineage.length)} hint={`${currentJobCards}/${lineage.length} current Job Cards`} tone={lineage.length && currentJobCards === lineage.length ? "ok" : "warn"} />
-        <Kpi label="Live shortage lines" value={String(shortageLines)} hint={`${linkedPos} linked PO records`} tone={shortageLines ? "danger" : "ok"} />
+        <Kpi label="Source order records" value={String(lineage.length)} hint={`${currentJobCards}/${lineage.length} current Job Cards`} tone={lineage.length && currentJobCards === lineage.length ? "ok" : "warn"} />
+        <Kpi label="Source shortage lines" value={String(shortageLines)} hint={`${linkedPos} linked PO records`} tone={shortageLines ? "danger" : "ok"} />
         <Kpi label="Canonical cash" value={lakh(currentCash)} hint={currentCashMonth ? `M${currentCashMonth} · verified cash authority` : "No verified cash actual"} tone={cashTone} />
       </div>
 
