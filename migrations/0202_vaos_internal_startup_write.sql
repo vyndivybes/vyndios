@@ -31,7 +31,7 @@ create table if not exists vyndi_vaos_internal_drafts (
     or (category not in ('PURCHASE_REQUEST_DRAFT','SUPPLIER_OUTREACH_DRAFT')
         and state = 'DRAFT_PREPARED'))
 );
-revoke all on vyndi_vaos_internal_drafts from public, anon, authenticated;
+revoke all on vyndi_vaos_internal_drafts from public;
 
 create table if not exists vyndi_vaos_internal_draft_events (
   event_id uuid primary key default gen_random_uuid(),
@@ -43,7 +43,7 @@ create table if not exists vyndi_vaos_internal_draft_events (
   occurred_at timestamptz not null default now(),
   unique(record_id,event_type)
 );
-revoke all on vyndi_vaos_internal_draft_events from public, anon, authenticated;
+revoke all on vyndi_vaos_internal_draft_events from public;
 
 create or replace function persist_vaos_internal_draft(
   p_record_id text,
@@ -127,4 +127,4 @@ begin
 end;
 $$;
 revoke all on function persist_vaos_internal_draft(text,text,text,text,text,text,text,text,text,text)
-  from public, anon, authenticated;
+  from public;
