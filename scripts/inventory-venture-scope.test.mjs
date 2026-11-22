@@ -50,3 +50,19 @@ test('receiving and production physical inventory posting paths require unambigu
   assert.ok(s.indexOf('await requireSingleVentureInventorySource(sql);')<s.indexOf(effect),anchor+' must gate before stock effect');
  }
 });
+
+test('all specialist inventory readers and warning summaries are source-gated before legacy global ATP',async()=>{
+ const source=await readFile(new URL('../src/lib/inventory-authority.ts',import.meta.url),'utf8');
+ assert.match(source,/import \{requireSingleVentureInventorySource\} from "@\/lib\/inventory-venture-source-guard.mjs"/);
+ const start=source.indexOf('async function requireInventoryView()');
+ const end=source.indexOf('export const getAuthoritativeInventory',start);
+ const block=source.slice(start,end);
+ assert.match(block,/getSql\(\)/);
+ assert.match(block,/await requireSingleVentureInventorySource\(sql\)/);
+ assert.ok(block.indexOf('requireSingleVentureInventorySource(sql)')>block.indexOf('getSql()'));
+ for(const name of ['getAuthoritativeInventory','getInventoryMslWarnings','getInventoryControlSummary']){
+  const offset=source.indexOf('export const '+name+'=');
+  assert.ok(offset>0,name+' missing');
+  assert.match(source.slice(offset,offset+180),/await requireInventoryView\(\)/,name+' must guard before source reads');
+ }
+});
