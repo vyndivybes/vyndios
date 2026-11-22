@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getCommandRole } from "@/lib/command-access";
 import { requireBusinessActor } from "@/lib/business-actor";
 import { getSql } from "@/lib/db";
+import {requireSingleVentureInventorySource} from "@/lib/inventory-venture-source-guard.mjs";
 import { getRouteMeta } from "@/lib/page-metadata";
 import { canPerform } from "@/lib/page-access";
 
@@ -110,6 +111,7 @@ async function requireInventoryWrite() {
 export const getMasterInventoryItems = createServerFn({ method: "GET" }).handler(async () => {
   await requireInventoryView();
   const sql = await getSql();
+  await requireSingleVentureInventorySource(sql);
   return sql.query<MasterInventoryItemRecord>(`
     with fifo as (
       select sku,vyndi_canonical_unit(unit) as unit,count(*)::int as lot_count,
@@ -138,6 +140,7 @@ export const getMasterInventoryItems = createServerFn({ method: "GET" }).handler
 export const getMasterInventoryData = createServerFn({ method: "GET" }).handler(async () => {
   await requireInventoryView();
   const sql = await getSql();
+  await requireSingleVentureInventorySource(sql);
   const [items, lots] = await Promise.all([
     sql.query<MasterInventoryItemRecord>(`
       with fifo as (
@@ -192,6 +195,7 @@ export const saveMasterInventoryEntry = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const actor = await requireInventoryWrite();
     const sql = await getSql();
+    await requireSingleVentureInventorySource(sql);
 
     const existing = await sql.query<{ id:string }>(
       `select id from master_inventory_items
@@ -238,6 +242,7 @@ export const issueMasterInventoryFifo = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const actor = await requireInventoryWrite();
     const sql = await getSql();
+    await requireSingleVentureInventorySource(sql);
     const movementId = `ISS-${crypto.randomUUID()}`;
     const ledgerEntryId = `LED-${crypto.randomUUID()}`;
     const rows = await sql.query<{ issue_id: string; quantity_issued: number | string; issue_value_inr: number | string }>(
