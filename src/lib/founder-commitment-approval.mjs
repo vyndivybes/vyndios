@@ -14,6 +14,8 @@ export const FOUNDER_COMMITMENT_PRINCIPAL_SQL = `
    LIMIT 2
 `;
 const denied=()=>{throw Error('FOUNDER_COMMITMENT_APPROVAL_REQUIRED: Only an individually authenticated, email-verified managing director with an admin role may authorize purchase commitments or supplier-payment posting. Internal drafts remain permitted.');};
+/** @typedef {{userId:string,role:import('./page-access').CommandRole}} FounderActor */
+/** @param {{actor?:FounderActor|null,sql?:import('./db').Sql|null}} options */
 export async function requireVerifiedFounderCommitment({actor,sql}={}){
  if(!actor||actor.role!=='admin'||typeof actor.userId!=='string'||!actor.userId.trim()
    ||!sql||typeof sql.query!=='function')denied();
