@@ -32,3 +32,21 @@ test('master inventory read and physical receipt/issue fail closed before legacy
  assert.match(source,/saveMasterInventoryEntry[\s\S]*?await requireSingleVentureInventorySource\(sql\);[\s\S]*?save_vyndi_master_inventory_entry/);
  assert.match(source,/issueMasterInventoryFifo[\s\S]*?await requireSingleVentureInventorySource\(sql\);[\s\S]*?issue_vyndi_master_inventory_fifo/);
 });
+
+
+test('receiving and production physical inventory posting paths require unambiguous source venture',async()=>{
+ const p2p=await readFile(new URL('../src/lib/procure-to-pay-authority.ts',import.meta.url),'utf8');
+ const cards=await readFile(new URL('../src/lib/production-job-card.ts',import.meta.url),'utf8');
+ const release=await readFile(new URL('../src/lib/production-release-authority.ts',import.meta.url),'utf8');
+ for(const [source,anchor,effect] of [
+  [p2p,'postGoodsReceipt','post_vyndi_goods_receipt'],
+  [p2p,'resolveGoodsReceipt','resolve_vyndi_goods_receipt'],
+  [cards,'refreshProductionReservations','reserve_epr_inventory_for_job_line'],
+  [cards,'issueProductionReservation','consume_epr_inventory_reservation'],
+  [release,'approveProductionBatch','approve_vyndi_production_batch'],
+ ]){
+  const s=source.slice(source.indexOf('export const '+anchor+' ='));
+  assert.ok(s.includes('await requireSingleVentureInventorySource(sql);'),anchor+' must gate the stock source');
+  assert.ok(s.indexOf('await requireSingleVentureInventorySource(sql);')<s.indexOf(effect),anchor+' must gate before stock effect');
+ }
+});
