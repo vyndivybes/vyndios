@@ -36,3 +36,12 @@ test('all canonical stock/ATP/shortage readers refuse unqualified multi-venture 
   assert.ok(block.indexOf('await requireSingleVentureInventorySource(sql);')<block.indexOf('vyndi_live_job_card_requirements'));
  }
 });
+
+test('production four-department browser acceptance requires exact procurement HOLD evidence',async()=>{
+ const smoke=await readFile(new URL('./vyndi-production-playwright-smoke.mjs',import.meta.url),'utf8');
+ assert.match(smoke,/route === "\/command\/procurement"/);
+ assert.match(smoke,/VYNDI_TEST_EXPECT_INVENTORY_SCOPE_HOLD/);
+ assert.match(smoke,/data-procurement-source-readiness="source-scope-hold"/);
+ assert.match(smoke,/VERIFIED_PROCUREMENT_INVENTORY_HOLD/);
+ assert.match(smoke,/No active MSL warnings/);
+});
