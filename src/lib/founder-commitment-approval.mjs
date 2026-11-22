@@ -18,9 +18,9 @@ const denied=()=>{throw Error('FOUNDER_COMMITMENT_APPROVAL_REQUIRED: Only an ind
 /** @param {{actor?:FounderActor|null,sql?:import('./db').Sql|null}} options */
 export async function requireVerifiedFounderCommitment({actor,sql}={}){
  if(!actor||actor.role!=='admin'||typeof actor.userId!=='string'||!actor.userId.trim()
-   ||!sql||typeof sql.query!=='function')denied();
+   ||!sql||typeof sql.query!=='function')return denied();
  const rows=await sql.query(FOUNDER_COMMITMENT_PRINCIPAL_SQL,[actor.userId,FOUNDER_EMAIL]);
- if(!Array.isArray(rows)||rows.length!==1||rows[0]?.verified_founder_id!==actor.userId)denied();
+ if(!Array.isArray(rows)||rows.length!==1||rows[0]?.verified_founder_id!==actor.userId)return denied();
  return Object.freeze({
   founderVerified:true,
   purchaseReleaseAuthorizedByThisCheck:true,
