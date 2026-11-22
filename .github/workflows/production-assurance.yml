@@ -23,6 +23,9 @@ jobs:
       VYNDI_TEST_EMAIL: ${{ secrets.VYNDI_TEST_EMAIL }}
       VYNDI_TEST_PASSWORD: ${{ secrets.VYNDI_TEST_PASSWORD }}
       VYNDI_TEST_EXPECTED_SHA: ${{ github.sha }}
+      # Independently observed production has two overlapping inventory ventures.
+      # Verify the known fail-closed Inventory source HOLD, not a generic error.
+      VYNDI_TEST_EXPECT_INVENTORY_SCOPE_HOLD: "1"
       VYNDI_SLO_ENFORCE_LATENCY: "1"
       VYNDI_SLO_SAMPLE_COUNT: "5"
       VYNDI_SLO_ROUTE_P95_LIMIT_MS: "4000"
