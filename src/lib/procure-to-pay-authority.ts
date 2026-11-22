@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireBusinessActor } from "@/lib/business-actor";
 import { getCommandRole } from "@/lib/command-access";
 import { getSql, type SqlRow } from "@/lib/db";
+import {requireVerifiedFounderCommitment} from "@/lib/founder-commitment-approval.mjs";
 import { canPerform } from "@/lib/page-access";
 import { getRouteMeta } from "@/lib/page-metadata";
 
@@ -75,6 +76,7 @@ export const saveSupplier = createServerFn({ method: "POST" })
     const permission = data.approvalStatus === "approved" ? "approve" : "edit";
     const actor = await requirePageActor("/command/purchase-execution", permission);
     const sql = await getSql();
+    if(data.approvalStatus === "approved") await requireVerifiedFounderCommitment({actor,sql});
     const rows = await sql.query<{ upsert_vyndi_supplier: string }>(
       `select upsert_vyndi_supplier($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
       [
@@ -148,9 +150,11 @@ export const transitionPurchaseOrder = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
-    const permission = data.nextStatus === "approved" ? "approve" : "edit";
-    const actor = await requirePageActor("/command/purchase-execution", permission);
+    // Any PO lifecycle transition beyond draft preparation, including
+    // cancellation, needs an independently verified founder approval.
+    const actor = await requirePageActor("/command/purchase-execution", "approve");
     const sql = await getSql();
+    await requireVerifiedFounderCommitment({actor,sql});
     const rows = await sql.query<{ transition_vyndi_purchase_order: string }>(
       `select transition_vyndi_purchase_order($1,$2,$3,$4,$5)`,
       [data.id, data.nextStatus, data.sourceReference, actor.userId, actor.role],
@@ -321,6 +325,7 @@ export const approveSupplierInvoice = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const actor = await requirePageActor("/command/payables", "approve");
     const sql = await getSql();
+    await requireVerifiedFounderCommitment({actor,sql});
     await sql.query(`select approve_vyndi_supplier_invoice($1,$2,$3)`, [
       data.id,
       actor.userId,
@@ -340,8 +345,9 @@ export const postSupplierPayment = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
-    const actor = await requirePageActor("/command/payables", "edit");
+    const actor = await requirePageActor("/command/payables", "approve");
     const sql = await getSql();
+    await requireVerifiedFounderCommitment({actor,sql});
     await sql.query(`select post_vyndi_supplier_payment($1,$2,$3::date,$4,$5,$6,$7)`, [
       data.id.toUpperCase(),
       data.supplierInvoiceId,
