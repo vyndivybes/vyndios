@@ -1,4 +1,5 @@
 import { createOntologyReadReceipt } from "@/lib/vaos-ontology-read-receipt";
+import {VAOS_WIP_ATOMIC_SOURCE_SQL, assertVaosWipSource} from "@/lib/vaos-wip-source-read.mjs";
 import {validateInternalDraftWrite, VAOS_INTERNAL_DRAFT_ACTION} from "@/lib/vaos-internal-draft-write";
 import { readManagingDirectorIdentityEvidence } from "@/lib/vaos-md-identity-read.mjs";
 import { readVaosIsolationDiagnostics } from "@/lib/vaos-isolation-diagnostics.mjs";
@@ -233,11 +234,15 @@ async function executeRead(
   }
 
   if (actionType === "PRODUCTION.OBSERVE_WIP") {
-    const rows = await sql.query<{ record: unknown }>(
-      "select to_jsonb(j) as record from epr_production_job_cards j order by j.created_at desc limit $1",
-      [limit],
-    );
-    return { records: rows.map((row) => row.record) };
+    // Historical cancellation/consumption anomalies invalidate active-WIP
+    // source authority. Never turn a cancelled card into productive progress.
+    // Both exception flags and eligible rows derive from one SQL statement.
+    const rows = await sql.query<{
+      records: unknown[];
+      active_cancelled_traveller: boolean;
+      consumed_cancelled_reservation: boolean;
+    }>(VAOS_WIP_ATOMIC_SOURCE_SQL, [limit]);
+    return assertVaosWipSource(rows[0]);
   }
 
   if (actionType === "MAINTENANCE.OBSERVE_ASSET") {
@@ -529,6 +534,9 @@ export const Route = createFileRoute("/api/vaos/bridge")({
         }catch(error){
           if(error instanceof Error && error.message === "VYNDI_ONTOLOGY_VENTURE_SCOPE_UNVERIFIED"){
             return json({ok:false,error:"source_venture_scope_unverified"},409);
+          }
+          if(error instanceof Error && error.message === "VYNDI_WIP_CANCELLED_LINEAGE_UNRECONCILED"){
+            return json({ok:false,error:"source_wip_provenance_unverified"},409);
           }
           throw error;
         }
