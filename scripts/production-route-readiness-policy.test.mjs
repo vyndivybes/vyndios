@@ -13,7 +13,7 @@ test('current mixed-venture source acceptance requires explicit visible HOLD rat
  assert.throws(()=>assertProductionRouteReadiness({route:'/command/inventory',state:'error',visibleText:'',expectInventoryHold:true}),/INVENTORY_SOURCE_HOLD_NOT_CONFIRMED/);
 });
 test('all other departmental browser checks still require actual readiness and no unexpected errors',()=>{
- for(const route of ['/command/quality','/command/risk','/command/financial-cockpit','/command/operations','/command/actuals']){
+ for(const route of ['/command/quality','/command/risk','/command/financial-cockpit','/command/actuals']){
   assert.equal(assertProductionRouteReadiness({route,state:'ready',visibleText:'loaded',expectInventoryHold:true}),'READY');
   assert.throws(()=>assertProductionRouteReadiness({route,state:'error',visibleText:hold,expectInventoryHold:true}),/ROUTE_NOT_READY/);
  }
@@ -52,4 +52,13 @@ test('SLO and responsive operator UAT must accept only the exact inventory scope
   assert.match(s,/assertProductionRouteReadiness\(\{/,name+' must classify terminal state, not blindly accept error');
   assert.match(s,/readinessVerdict/,name+' must persist observable result');
  }
+});
+
+test('Operations reports explicit partial stock source HOLD without permitting generic failure or false READY',()=>{
+ const opsHold='Inventory warnings unavailable: VYNDI_INVENTORY_VENTURE_SCOPE_HOLD: Legacy stock/ATP combines or cannot attribute inventory ventures.';
+ assert.equal(assertProductionRouteReadiness({route:'/command/operations',state:'error',visibleText:opsHold,expectInventoryHold:true}),'VERIFIED_OPERATIONS_INVENTORY_HOLD');
+ for(const [state,visibleText] of [['ready',opsHold],['loading',opsHold],['error','permission denied'],['error','Internal Server Error'],['error','not VYNDI_INVENTORY_VENTURE_SCOPE_HOLD']]){
+  assert.throws(()=>assertProductionRouteReadiness({route:'/command/operations',state,visibleText,expectInventoryHold:true}),/OPERATIONS_INVENTORY_HOLD_NOT_CONFIRMED/);
+ }
+ assert.throws(()=>assertProductionRouteReadiness({route:'/command/operations',state:'error',visibleText:opsHold,expectInventoryHold:false}),/ROUTE_NOT_READY/);
 });
