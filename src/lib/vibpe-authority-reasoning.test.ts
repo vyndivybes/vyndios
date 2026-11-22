@@ -59,3 +59,39 @@ test("R3-D returns deterministic downstream impact paths for authority questions
   assert.ok(result.impactNodeIds.includes("OBJ-EK75-FRAME-GEOMETRY"));
   assert.ok(result.impactNodeIds.includes("G10-FORMAL-RELEASE"));
 });
+
+test("VIBPE Co-Pilot withholds controlling revision and impact lineage when authority graph is contradictory", () => {
+  const seed = createVedmR3aSeed();
+  seed.nodes.push({
+    id: "CONFLICTING-GEOMETRY",
+    kind: "document_revision",
+    domain: "frame_geometry",
+    title: "Conflicting geometry authority",
+    revision: "test",
+    lifecycle: "controlling",
+    effectiveFrom: "2026-09-28",
+    sourceRef: "TEST",
+    releaseEffect: "none",
+  });
+  const invalidGraph = compileVedmAuthorityGraph(seed, "2026-09-28");
+  assert.equal(invalidGraph.valid, false);
+  const result = evaluateVibpeAuthorityContext("What is the current frame geometry?", [], invalidGraph);
+  assert.equal(result.status, "contradiction");
+  assert.equal(result.releaseAuthority, false);
+  assert.equal(result.controllingAuthorityId, null);
+  assert.deepEqual(result.impactNodeIds, []);
+  assert.match(result.answerPrefix, /cannot be resolved/i);
+  assert.doesNotMatch(result.answerPrefix, /VEDM-301 Rev 5\.3\.9/i);
+  assert.ok(result.issues.some((issue) => issue.code === "AUTHORITY_GRAPH_CONFLICT"));
+});
+
+test("VIBPE Co-Pilot refuses provisional FK75 status on an invalid authority graph", () => {
+  const seed = createVedmR3aSeed();
+  seed.nodes = seed.nodes.filter((node) => node.id !== "VEDM-301-R539-EK75");
+  const invalidGraph = compileVedmAuthorityGraph(seed, "2026-09-28");
+  const result = evaluateVibpeAuthorityContext("Is FK75 released?", [], invalidGraph);
+  assert.equal(result.controllingAuthorityId, null);
+  assert.equal(result.releaseAuthority, false);
+  assert.match(result.answerPrefix, /cannot be resolved/i);
+  assert.doesNotMatch(result.answerPrefix, /preferred front-end development/i);
+});
