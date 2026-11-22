@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireBusinessActor } from "@/lib/business-actor";
 import { getCommandRole } from "@/lib/command-access";
 import { getSql, type SqlRow } from "@/lib/db";
+import {requireSingleVentureInventorySource} from "@/lib/inventory-venture-source-guard.mjs";
 import {requireVerifiedFounderCommitment} from "@/lib/founder-commitment-approval.mjs";
 import { canPerform } from "@/lib/page-access";
 import { getRouteMeta } from "@/lib/page-metadata";
@@ -196,6 +197,7 @@ export const postGoodsReceipt = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const actor = await requirePageActor("/command/receiving", "edit");
     const sql = await getSql();
+    await requireSingleVentureInventorySource(sql);
     const rows = await sql.query<{ post_vyndi_goods_receipt: string }>(
       `select post_vyndi_goods_receipt($1,$2,$3::date,$4,$5,$6,$7,$8,$9,$10,$11)`,
       [
@@ -227,6 +229,7 @@ export const resolveGoodsReceipt = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const actor = await requirePageActor("/command/receiving", "edit");
     const sql = await getSql();
+    await requireSingleVentureInventorySource(sql);
     await sql.query(`select resolve_vyndi_goods_receipt($1,$2,$3::date,$4,$5,$6)`, [
       data.id,
       data.resolution,
