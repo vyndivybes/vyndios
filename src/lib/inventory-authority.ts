@@ -1,9 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getCommandRole } from "@/lib/command-access";
 import { getSql } from "@/lib/db";
+import {requireSingleVentureInventorySource} from "@/lib/inventory-venture-source-guard.mjs";
 import { canPerform } from "@/lib/page-access";
 
-async function requireInventoryView(){const role=await getCommandRole();if(!role||!canPerform(role,"view"))throw new Error("Inventory view permission denied.");}
+async function requireInventoryView(){const role=await getCommandRole();if(!role||!canPerform(role,"view"))throw new Error("Inventory view permission denied.");const sql=await getSql();await requireSingleVentureInventorySource(sql);}
 
 /** Specialist read model over the same physical ledger used by Master Inventory and Production. */
 export const getAuthoritativeInventory=createServerFn({method:"GET"}).handler(async()=>{await requireInventoryView();const sql=await getSql();return sql`

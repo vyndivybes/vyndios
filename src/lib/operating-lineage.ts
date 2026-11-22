@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { optionalAuthMiddleware } from "@/lib/auth/middleware";
 import { requireBusinessActor } from "@/lib/business-actor";
 import { getSql } from "@/lib/db";
+import {requireSingleVentureInventorySource} from "@/lib/inventory-venture-source-guard.mjs";
 
 export type OperatingLineageRow = {
   salesOrderId: string;
@@ -65,6 +66,9 @@ export const getOperatingLineage = createServerFn({ method: "GET" })
     );
 
     const sql = await getSql();
+    // Global shortage/ATP joins are not venture isolated; never publish
+    // apparently qualified supply status from historical simulation ledgers.
+    await requireSingleVentureInventorySource(sql);
     const rows = await sql.query<Record<string, unknown>>(`
       select
         o.id as sales_order_id,

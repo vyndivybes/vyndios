@@ -50,3 +50,32 @@ test('receiving and production physical inventory posting paths require unambigu
   assert.ok(s.indexOf('await requireSingleVentureInventorySource(sql);')<s.indexOf(effect),anchor+' must gate before stock effect');
  }
 });
+
+test('all specialist inventory readers and warning summaries are source-gated before legacy global ATP',async()=>{
+ const source=await readFile(new URL('../src/lib/inventory-authority.ts',import.meta.url),'utf8');
+ assert.match(source,/import \{requireSingleVentureInventorySource\} from "@\/lib\/inventory-venture-source-guard.mjs"/);
+ const start=source.indexOf('async function requireInventoryView()');
+ const end=source.indexOf('export const getAuthoritativeInventory',start);
+ const block=source.slice(start,end);
+ assert.match(block,/getSql\(\)/);
+ assert.match(block,/await requireSingleVentureInventorySource\(sql\)/);
+ assert.ok(block.indexOf('requireSingleVentureInventorySource(sql)')>block.indexOf('getSql()'));
+ for(const name of ['getAuthoritativeInventory','getInventoryMslWarnings','getInventoryControlSummary']){
+  const offset=source.indexOf('export const '+name+'=');
+  assert.ok(offset>0,name+' missing');
+  assert.match(source.slice(offset,offset+180),/await requireInventoryView\(\)/,name+' must guard before source reads');
+ }
+});
+
+
+test('Operations business lineage cannot infer shortage readiness from cross-venture global ATP',async()=>{
+ const s=await readFile(new URL('../src/lib/operating-lineage.ts',import.meta.url),'utf8');
+ assert.match(s,/import \{requireSingleVentureInventorySource\} from "@\/lib\/inventory-venture-source-guard.mjs"/);
+ const start=s.indexOf('export const getOperatingLineage');
+ const block=s.slice(start);
+ assert.ok(block.indexOf('await requireSingleVentureInventorySource(sql);') > block.indexOf('const sql = await getSql();'));
+ assert.ok(block.indexOf('await requireSingleVentureInventorySource(sql);') < block.indexOf('vyndi_live_job_card_requirements'));
+ const ops=await readFile(new URL('../src/routes/command/operations.tsx',import.meta.url),'utf8');
+ assert.match(ops,/value=\{warningsError \? "HOLD" : warningsLoaded \? String\(warnings.length\) : "Loading"\}/);
+ assert.match(ops,/Inventory warnings unavailable/);
+});
