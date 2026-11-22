@@ -74,7 +74,7 @@ function CommandCentre() {
       <section aria-label="Internal startup operating mode" className="rounded-xl border border-accent/40 bg-surface/50 p-4">
         <p className="text-xs font-semibold uppercase tracking-[0.15em] text-accent">Internal startup workspace · {INTERNAL_STARTUP_MODE.company}</p>
         <p className="mt-2 text-sm text-fg">Startup planning and preparation — engineering coordination, supplier research, draft CRM, finance scenarios and internal task review.</p>
-        <p className="mt-2 text-xs leading-5 text-muted">Historical source records are simulation-only by founder declaration. New source records require their own classification. VAOS may autonomously observe and prepare internal advice; existing authenticated write controls and real-world approval gates are unchanged.</p>
+        <p className="mt-2 text-xs leading-5 text-muted">Historical source records are simulation-only by founder declaration. New source records require their own classification. Founder-authorized VAOS may autonomously prepare and persist audited internal drafts, planning reports and internal task proposals; existing authenticated role and source controls still apply. Purchase commitments and external communications remain awaiting founder approval.</p>
         <div className="mt-3 flex flex-wrap gap-4 text-xs font-semibold text-accent">
           {accessible("/command/founder-command") && <WorkLink to="/command/founder-command">Founder plan</WorkLink>}
           {accessible("/command/actions") && <WorkLink to="/command/actions">Internal tasks</WorkLink>}
