@@ -256,6 +256,14 @@ try {
         expectInventoryHold: process.env.VYNDI_TEST_EXPECT_INVENTORY_SCOPE_HOLD === "1",
       });
     }
+    if (route === "/command/inventory-ledgers/components"
+        && process.env.VYNDI_TEST_EXPECT_INVENTORY_SCOPE_HOLD === "1") {
+      const sourceHold = page.locator('[data-ledger-readiness="source-scope-hold"]');
+      await sourceHold.waitFor({ state: "attached", timeout: 30_000 });
+      assert.match(await sourceHold.innerText(), /VYNDI_INVENTORY_VENTURE_SCOPE_HOLD/,
+        "Ledger must show the exact audited source HOLD rather than fake stock or a generic error");
+      readinessVerdict = "VERIFIED_INVENTORY_SOURCE_HOLD";
+    }
     if (route === "/command/ibpe-operating-workspace") {
       // Route SSR must be responsive and its separate authenticated ERP read
       // must actually succeed. Loading or error screens do not pass acceptance.
