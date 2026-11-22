@@ -41,3 +41,15 @@ test('inventory-ledger loader returns an explicit source HOLD and cannot render 
  assert.match(browser,/data-ledger-readiness="source-scope-hold"/);
  assert.match(browser,/VYNDI_INVENTORY_VENTURE_SCOPE_HOLD/);
 });
+
+
+test('SLO and responsive operator UAT must accept only the exact inventory scope HOLD',async()=>{
+ for(const name of ['vyndi-observability-slo.mjs','operator-ux-hardening.mjs']){
+  const s=await readFile(new URL('./'+name,import.meta.url),'utf8');
+  assert.match(s,/import \{assertProductionRouteReadiness\} from ".\/production-route-readiness-policy.mjs"/,name+' must share strict readiness policy');
+  assert.match(s,/VYNDI_TEST_EXPECT_INVENTORY_SCOPE_HOLD/,name+' must obey explicit source evidence expectation');
+  assert.match(s,/\[data-route-readiness="ready"\],\s*\[data-route-readiness="error"\]/,name+' must observe both terminal states');
+  assert.match(s,/assertProductionRouteReadiness\(\{/,name+' must classify terminal state, not blindly accept error');
+  assert.match(s,/readinessVerdict/,name+' must persist observable result');
+ }
+});
