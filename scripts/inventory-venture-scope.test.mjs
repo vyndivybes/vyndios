@@ -66,3 +66,16 @@ test('all specialist inventory readers and warning summaries are source-gated be
   assert.match(source.slice(offset,offset+180),/await requireInventoryView\(\)/,name+' must guard before source reads');
  }
 });
+
+
+test('Operations business lineage cannot infer shortage readiness from cross-venture global ATP',async()=>{
+ const s=await readFile(new URL('../src/lib/operating-lineage.ts',import.meta.url),'utf8');
+ assert.match(s,/import \{requireSingleVentureInventorySource\} from "@\/lib\/inventory-venture-source-guard.mjs"/);
+ const start=s.indexOf('export const getOperatingLineage');
+ const block=s.slice(start);
+ assert.ok(block.indexOf('await requireSingleVentureInventorySource(sql);') > block.indexOf('const sql = await getSql();'));
+ assert.ok(block.indexOf('await requireSingleVentureInventorySource(sql);') < block.indexOf('vyndi_live_job_card_requirements'));
+ const ops=await readFile(new URL('../src/routes/command/operations.tsx',import.meta.url),'utf8');
+ assert.match(ops,/value=\{warningsError \? "HOLD" : warningsLoaded \? String\(warnings.length\) : "Loading"\}/);
+ assert.match(ops,/Inventory warnings unavailable/);
+});
