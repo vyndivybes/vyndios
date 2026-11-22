@@ -60,18 +60,14 @@ test("R3-D returns deterministic downstream impact paths for authority questions
   assert.ok(result.impactNodeIds.includes("G10-FORMAL-RELEASE"));
 });
 
-test("VIBPE Co-Pilot withholds controlling revision and impact lineage when authority graph is contradictory", () => {
+test("VIBPE Co-Pilot withholds controlling revision and impact lineage when authority graph is invalid", () => {
   const seed = createVedmR3aSeed();
-  seed.nodes.push({
-    id: "CONFLICTING-GEOMETRY",
-    kind: "document_revision",
-    domain: "frame_geometry",
-    title: "Conflicting geometry authority",
-    revision: "test",
-    lifecycle: "controlling",
-    effectiveFrom: "2026-09-28",
-    sourceRef: "TEST",
-    releaseEffect: "none",
+  // A broken evidence relationship invalidates the graph while its controlling
+  // document still exists; do not leak that document as verified authority.
+  seed.edges.push({
+    from: "VEDM-301-R539-EK75",
+    to: "MISSING-EVIDENCE",
+    relation: "EVIDENCED_BY",
   });
   const invalidGraph = compileVedmAuthorityGraph(seed, "2026-09-28");
   assert.equal(invalidGraph.valid, false);
