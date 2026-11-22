@@ -4,6 +4,7 @@ import { z } from "zod";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { requireBusinessActor } from "@/lib/business-actor";
 import { getSql } from "@/lib/db";
+import {requireSingleVentureInventorySource} from "@/lib/inventory-venture-source-guard.mjs";
 
 export const approveProductionBatch = createServerFn({ method: "POST" })
   .validator(z.object({ jobCardId: z.string().min(1).max(160) }))
@@ -11,6 +12,7 @@ export const approveProductionBatch = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const actor = await requireBusinessActor("approve", { userId: context.userId, email: context.userEmail });
     const sql = await getSql();
+    await requireSingleVentureInventorySource(sql);
     await assertPhysicalJobCard(sql,data.jobCardId);
     const rows = await sql.query<{
       job_card_id: string;
