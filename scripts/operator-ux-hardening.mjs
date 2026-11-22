@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { chromium } from "playwright";
+import {assertProductionRouteReadiness} from "./production-route-readiness-policy.mjs";
 
 const baseUrl = (process.env.VYNDI_TEST_BASE_URL || "http://127.0.0.1:8081").replace(/\/$/, "");
 const email = process.env.VYNDI_TEST_EMAIL;
@@ -112,8 +113,18 @@ try {
 
       const startedAt = Date.now();
       await spaNavigate(page, route);
+      let readinessVerdict = "NOT_APPLICABLE";
       if (["/command/inventory", "/command/operations", "/command/risk", "/command/quality", "/command/financial-cockpit"].includes(route)) {
-        await page.locator('[data-route-readiness="ready"]').waitFor({ state: "attached", timeout: 30_000 });
+        // Verify exact source HOLD only for Inventory, no false zero-stock
+        // dashboard. Preserve full READY requirement elsewhere.
+        const terminal = page.locator('[data-route-readiness="ready"], [data-route-readiness="error"]');
+        await terminal.first().waitFor({ state: "attached", timeout: 30_000 });
+        readinessVerdict = assertProductionRouteReadiness({
+          route,
+          state: await terminal.first().getAttribute("data-route-readiness"),
+          visibleText: await terminal.first().innerText(),
+          expectInventoryHold: process.env.VYNDI_TEST_EXPECT_INVENTORY_SCOPE_HOLD === "1",
+        });
       }
       await page.locator("body").waitFor({ state: "visible", timeout: 30_000 });
       await page.waitForTimeout(120);
@@ -142,6 +153,7 @@ try {
       results.push({
         viewport: viewport.name,
         route,
+        readinessVerdict,
         overflow,
         pageErrors,
         routeNetworkEvidence,
