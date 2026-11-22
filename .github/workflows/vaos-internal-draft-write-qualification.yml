@@ -1,0 +1,33 @@
+name: VAOS Internal Draft Write Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'migrations/0202_vaos_internal_startup_write.sql'
+      - 'src/lib/vaos-internal-draft-write.ts'
+      - 'src/routes/api/vaos/bridge.ts'
+      - 'scripts/vaos-internal-startup-write.test.mjs'
+      - '.github/workflows/vaos-internal-draft-write-qualification.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'migrations/0202_vaos_internal_startup_write.sql'
+      - 'src/lib/vaos-internal-draft-write.ts'
+      - 'src/routes/api/vaos/bridge.ts'
+      - 'scripts/vaos-internal-startup-write.test.mjs'
+permissions:
+  contents: read
+jobs:
+  internal-write-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify signed internal-write allowlist, idempotent SQL, replay, and no external effects
+        run: node --experimental-strip-types --test scripts/vaos-internal-startup-write.test.mjs
+      - name: Verify migration numbering and application plan
+        run: npm run db:validate
