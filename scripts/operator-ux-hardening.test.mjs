@@ -19,8 +19,20 @@ test("finance viewport UAT scopes readiness to the newly mounted Consolidated Fi
   assert.ok(blockStart >= 0 && blockEnd > blockStart, "readiness must be checked in its route-specific block");
   const block = source.slice(blockStart, blockEnd);
   assert.match(block, /route === "\/command\/financial-cockpit"/, "financial route must have a dedicated target-scoped terminal");
-  assert.match(block, /getByRole\("heading", \{ name: "Consolidated Finance", level: 1, exact: true \}\)/, "only a Finance heading identifies the new route");
+  assert.match(block, /getByRole\("heading", \{ name: \/\^Consolidated Finance\(\?: Overview\)\?\$\/, level: 1 \}\)/, "both approved-plan and unapproved Finance headings must identify this route");
   assert.match(block, /\.filter\(\{\s*has:.*\}\)/s, "terminal must be filtered by the target heading, not a stale Operations status");
   assert.match(block, /data-route-readiness="ready"/, "genuine ready state must be accepted");
   assert.match(block, /data-route-readiness="error"/, "genuine error state must remain observable and fail closed");
+});
+
+
+test("Finance readiness selector covers both genuine UI states and excludes Operations", async () => {
+  const route = await readFile(new URL("../src/routes/command/financial-cockpit.tsx", import.meta.url), "utf8");
+  assert.match(route, /<h1[^>]*>Consolidated Finance<\/h1>/, "the pending/error and blocked Finance heading exists");
+  assert.match(route, /<h1[^>]*>Consolidated Finance Overview<\/h1>/, "the approved-plan Finance heading exists");
+  const selector = /^Consolidated Finance(?: Overview)?$/;
+  assert.match("Consolidated Finance", selector);
+  assert.match("Consolidated Finance Overview", selector);
+  assert.doesNotMatch("Operations", selector);
+  assert.doesNotMatch("Inventory warnings unavailable", selector);
 });
