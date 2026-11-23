@@ -221,6 +221,27 @@ try {
   }
   assert.deepEqual(loginErrors, [], `Login emitted browser errors: ${loginErrors.join(" | ")}`);
 
+  if (process.env.VYNDI_TEST_EMPLOYEE_OBSERVATIONS === "1") {
+    const employees = ["planning", "commercial", "procurement", "inventory", "production", "engineering-quality", "finance", "people"];
+    const endpoint = new URL("/api/runtime/digital-employee-observation", baseUrl);
+    evidence.employeeObservations = [];
+    for (const employeeId of employees) {
+      endpoint.searchParams.set("employee", employeeId);
+      const response = await context.request.get(endpoint.toString(), { timeout: 30_000 });
+      assert.ok(response.ok(), `Employee ${employeeId} returned HTTP ${response.status()}`);
+      const observation = await response.json();
+      assert.equal(observation.employeeId, employeeId);
+      assert.equal(observation.executionEnabled, false);
+      if (expectedSha) assert.equal(observation.sourceSha, expectedSha);
+      assert.ok(["ADVISORY", "HOLD"].includes(observation.status), employeeId);
+      if (observation.status === "ADVISORY") assert.match(observation.fingerprint, /^[0-9a-f]{64}$/);
+      else assert.equal(observation.fingerprint, null);
+      assert.equal(Object.hasOwn(observation.source, "records"), false);
+      evidence.employeeObservations.push({ employeeId, status: observation.status });
+      console.log(`Employee observation ${employeeId}: ${observation.status}`);
+    }
+  }
+
   for (const route of selectedRoutes) {
     const page = await context.newPage();
     const pageErrors = [];

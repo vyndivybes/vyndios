@@ -112,6 +112,8 @@ jobs:
 
       - name: Authenticated protected-route smoke
         run: npm run test:browser:production
+        env:
+          VYNDI_TEST_EMPLOYEE_OBSERVATIONS: "1"
 
       - name: Production SLO observation
         run: npm run observe:slo
