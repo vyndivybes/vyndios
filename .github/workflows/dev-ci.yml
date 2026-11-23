@@ -199,3 +199,9 @@ jobs:
       - name: Cloudflare production bundle
         run: npm run build:bundle
 
+      - name: Worker dependency exposure regression
+        run: node --test scripts/worker-dependency-exposure.test.mjs
+
+      - name: Inspect emitted Worker for picomatch provenance
+        run: node scripts/worker-dependency-exposure.mjs
+
