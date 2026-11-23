@@ -132,7 +132,13 @@ try {
           ? page.locator('[data-route-readiness="error"]').filter({
               hasText: "Inventory warnings unavailable: VYNDI_INVENTORY_VENTURE_SCOPE_HOLD:",
             })
-          : page.locator('[data-route-readiness="ready"], [data-route-readiness="error"]');
+          : route === "/command/financial-cockpit"
+            // SPA navigation updates the URL before React swaps out the old
+            // Operations HOLD. Scope the terminal to the freshly mounted
+            // Finance page so we neither accept nor reject the previous route.
+            ? page.locator('section[data-route-readiness="ready"], section[data-route-readiness="error"]')
+                .filter({ has: page.getByRole("heading", { name: "Consolidated Finance", level: 1, exact: true }) })
+            : page.locator('[data-route-readiness="ready"], [data-route-readiness="error"]');
         await terminal.first().waitFor({ state: "attached", timeout: 30_000 });
         readinessVerdict = assertProductionRouteReadiness({
           route,
