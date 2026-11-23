@@ -10,6 +10,8 @@ test('Chrome DevTools is isolated and rejects telemetry, CrUX and attached brows
   const chrome = config.mcp['chrome-devtools'];
   assert.equal(chrome.type, 'local');
   assert.equal(chrome.enabled, true);
+  assert.ok(chrome.command.includes("chrome-devtools-mcp@1.13.0"), "Chrome DevTools MCP version must be pinned");
+  assert.ok(!chrome.command.some((arg) => /@latest$/.test(arg)), "No floating npm versions");
   for (const flag of ['--isolated', '--no-usage-statistics', '--no-performance-crux']) {
     assert.ok(chrome.command.includes(flag), flag);
   }
