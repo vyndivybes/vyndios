@@ -35,7 +35,7 @@ test('Decision Inbox does not read unscoped material shortages but retains non-s
  assert.match(block,/await requireSingleVentureInventorySource\(sql\)/);
  assert.match(block,/isInventoryVentureSourceHold\(error\)/);
  assert.match(block,/materialScopeHold/);
- assert.match(block,/materialExceptions\.rows/);
+ assert.match(block,/materialExceptionRead\\.rows/);
  for(const tag of ['purchaseApprovals','receivingExceptions','payableApprovals','planApprovals','ibpeManagementActions']){
   assert.match(block,new RegExp('\\.\\.\\.'+tag));
  }
