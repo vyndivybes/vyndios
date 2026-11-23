@@ -62,3 +62,17 @@ test('Operations reports explicit partial stock source HOLD without permitting g
  }
  assert.throws(()=>assertProductionRouteReadiness({route:'/command/operations',state:'error',visibleText:opsHold,expectInventoryHold:false}),/ROUTE_NOT_READY/);
 });
+
+
+test('SPA operator viewport qualification waits for the Operations route marker, never stale Inventory HOLD',async()=>{
+ const operations=await readFile(new URL('../src/routes/command/operations.tsx',import.meta.url),'utf8');
+ const ux=await readFile(new URL('./operator-ux-hardening.mjs',import.meta.url),'utf8');
+ for(const state of ['loading','error','ready']){
+  assert.match(operations,new RegExp('data-operations-readiness="'+state+'"'));
+ }
+ assert.match(ux,/route === "\/command\/operations"/);
+ assert.match(ux,/\[data-operations-readiness="ready"\], \[data-operations-readiness="error"\]/);
+ assert.match(ux,/await terminal\.first\(\)\.waitFor\(\{ state: "attached", timeout: 30_000 \}\)/);
+ assert.match(ux,/assertProductionRouteReadiness\(\{/);
+ assert.match(ux,/expectInventoryHold: process\.env\.VYNDI_TEST_EXPECT_INVENTORY_SCOPE_HOLD === "1"/);
+});
