@@ -41,3 +41,14 @@ test("production browser and SLO probes must await genuine data readiness", () =
   assert.match(slo, /aggregate\.p95Ms/);
   assert.match(slo, /aggregate\.p99Ms/);
 });
+
+test("protected Command tree defers heavy React SSR while retaining server-side role checks", () => {
+  const source = read("src/routes/command/route.tsx");
+  const declaration = source.match(/createFileRoute\("\/command"\)\(\{([\s\S]*?)component: CommandRoot/);
+  assert.ok(declaration, "must preserve protected parent route");
+  assert.match(declaration[1], /ssr:\s*"data-only"/, "render Command React UI on client, keep server beforeLoad");
+  assert.match(declaration[1], /beforeLoad:\s*async/, "access control must still run on server");
+  assert.match(declaration[1], /await getCommandRole\(\)/, "server-side session/role check must remain");
+  assert.match(declaration[1], /throw redirect\(/, "unauthenticated users must still be redirected");
+  assert.doesNotMatch(declaration[1], /ssr:\s*false/, "do not bypass server-side route authorization");
+});
