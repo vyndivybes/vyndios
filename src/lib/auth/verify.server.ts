@@ -73,9 +73,9 @@ export async function getSessionUser(
   const cacheKey = bearerToken ? "bearer" : "cookie";
   return sessionRequestMemo(request, cacheKey, async () => {
     const session = await timeStage("session.verify", () =>
-      withSessionDeadline(() => withAuthPostgresRequest(() =>
-        auth.api.getSession({ headers, query: { disableCookieCache: true } }),
-      )),
+      withSessionDeadline(() =>
+        withAuthPostgresRequest(() => auth.api.getSession({ headers, query: { disableCookieCache: true } })),
+      ),
     ).catch(async (error) => {
       if (error instanceof SessionVerificationTimeoutError) {
         console.warn("[auth] Session verification exceeded its deadline");
