@@ -1,0 +1,30 @@
+name: Governed agent toolchain contract
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - opencode.json
+      - .agents/skills/**
+      - docs/development/agent-toolchain-batch1.md
+      - scripts/agent-toolchain-contract.test.mjs
+      - scripts/design-tooling-contract.test.mjs
+      - .github/workflows/agent-toolchain-contract.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Existing Stitch and Chrome DevTools contract
+        run: node --test scripts/design-tooling-contract.test.mjs
+      - name: New agent-toolchain least-privilege contract
+        run: node --test scripts/agent-toolchain-contract.test.mjs
