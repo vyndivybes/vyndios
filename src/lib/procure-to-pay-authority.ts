@@ -4,6 +4,7 @@ import { requireBusinessActor } from "@/lib/business-actor";
 import { getCommandRole } from "@/lib/command-access";
 import { getSql, type SqlRow } from "@/lib/db";
 import {requireSingleVentureInventorySource} from "@/lib/inventory-venture-source-guard.mjs";
+import {isInventoryVentureSourceHold} from "@/lib/procurement-source-readiness.mjs";
 import {requireVerifiedFounderCommitment} from "@/lib/founder-commitment-approval.mjs";
 import { canPerform } from "@/lib/page-access";
 import { getRouteMeta } from "@/lib/page-metadata";
@@ -371,7 +372,7 @@ export const getDecisionInboxData = createServerFn({ method: "GET" }).handler(as
     receivingExceptions,
     payableApprovals,
     planApprovals,
-    materialExceptions,
+    materialExceptionRead,
     ibpeManagementActions,
   ] = await Promise.all([
     sql.query<SqlRow>(
@@ -400,7 +401,11 @@ export const getDecisionInboxData = createServerFn({ method: "GET" }).handler(as
               '/command/governance' as route,coalesce(submitted_at,created_at)::text as created_at
          from vyndi_plan_revisions where status='pending_approval' order by revision`,
     ),
-    sql.query<SqlRow>(
+    (async () => {
+      try {
+        // Do not show incomplete material-exception counts from global ATP.
+        await requireSingleVentureInventorySource(sql);
+        const rows=await sql.query<SqlRow>(
       `select r.job_card_line_id as id,'Material shortage' as kind,'high' as priority,
               r.sku||' short by '||r.shortage_quantity||' '||r.unit as title,
               'Job card '||r.job_card_id||' · required M'||r.due_month as detail,
@@ -414,7 +419,13 @@ export const getDecisionInboxData = createServerFn({ method: "GET" }).handler(as
         where r.shortage_quantity>0
           and r.job_card_status in ('released','in_progress')
         order by r.due_month,r.sku,r.job_card_id`,
-    ),
+        );
+        return {rows,sourceHold:false};
+      }catch(error){
+        if(!isInventoryVentureSourceHold(error))throw error;
+        return {rows:[] as SqlRow[],sourceHold:true};
+      }
+    })(),
     sql.query<SqlRow>(
       `select id,'IBPE management action' as kind,
               case when status='blocked' then 'high' else 'medium' end as priority,
@@ -436,10 +447,10 @@ export const getDecisionInboxData = createServerFn({ method: "GET" }).handler(as
     ...receivingExceptions,
     ...payableApprovals,
     ...planApprovals,
-    ...materialExceptions,
+    ...materialExceptionRead.rows,
     ...ibpeManagementActions,
   ].filter((item) => canPerform(role, "view", getRouteMeta(String(item.route))));
-  return { items };
+  return { items, materialScopeHold:materialExceptionRead.sourceHold };
 });
 
 
