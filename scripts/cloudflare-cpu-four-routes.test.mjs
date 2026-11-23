@@ -52,3 +52,16 @@ test("protected Command tree defers heavy React SSR while retaining server-side 
   assert.match(declaration[1], /throw redirect\(/, "unauthenticated users must still be redirected");
   assert.doesNotMatch(declaration[1], /ssr:\s*false/, "do not bypass server-side route authorization");
 });
+
+test("production acceptance waits for the authenticated Command shell before inspecting page evidence", () => {
+  const smoke = read("scripts/vyndi-production-playwright-smoke.mjs");
+  const slo = read("scripts/vyndi-observability-slo.mjs");
+  for (const [script, source] of [["smoke", smoke], ["slo", slo]]) {
+    const anchor = source.indexOf('await page.locator(\'[data-vyndi-full-view="command-system"]\').waitFor');
+    const body = source.indexOf('const body = (await page.locator("body").innerText()).trim();');
+    assert.ok(anchor > 0 && body > anchor,
+      script + " must await the protected shell hydration, not accept the public footer as loaded content");
+    assert.match(source, /assert\.ok\(response\?\.ok\(\)/,
+      script + " must still reject HTTP 503 and other navigation failures");
+  }
+});
