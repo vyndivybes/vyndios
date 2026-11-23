@@ -132,7 +132,9 @@ try {
           ? page.locator('[data-route-readiness="error"]').filter({
               hasText: "Inventory warnings unavailable: VYNDI_INVENTORY_VENTURE_SCOPE_HOLD:",
             })
-          : page.locator('[data-route-readiness="ready"], [data-route-readiness="error"]');
+          : route === "/command/inventory"
+            ? page.locator('[data-inventory-readiness="ready"], [data-inventory-readiness="error"]')
+            : page.locator('[data-route-readiness="ready"], [data-route-readiness="error"]');
         await terminal.first().waitFor({ state: "attached", timeout: 30_000 });
         readinessVerdict = assertProductionRouteReadiness({
           route,
