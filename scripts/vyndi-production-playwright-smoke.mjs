@@ -244,6 +244,13 @@ try {
       });
     }
     assert.ok(response?.ok(), `${route} returned HTTP ${response?.status() ?? "none"}`);
+    // Data-only SSR returns a safe public shell; await the authenticated
+    // Command UI before examining route evidence. This is a bounded positive
+    // readiness check, never a waiver for HTTP 5xx or missing business data.
+    await page.locator('[data-vyndi-full-view="command-system"]').waitFor({
+      state: "visible",
+      timeout: 30_000,
+    });
     let readinessVerdict = "NOT_APPLICABLE";
     if(route === "/command" && process.env.VYNDI_TEST_EXPECT_INVENTORY_SCOPE_HOLD === "1"){
       const sourceHold=page.locator('[data-command-source-readiness="source-scope-hold"]');
