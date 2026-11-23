@@ -245,6 +245,15 @@ try {
     }
     assert.ok(response?.ok(), `${route} returned HTTP ${response?.status() ?? "none"}`);
     let readinessVerdict = "NOT_APPLICABLE";
+    if(route === "/command" && process.env.VYNDI_TEST_EXPECT_INVENTORY_SCOPE_HOLD === "1"){
+      const sourceHold=page.locator('[data-command-source-readiness="source-scope-hold"]');
+      await sourceHold.waitFor({state:"visible",timeout:30_000});
+      assert.match(await sourceHold.innerText(),/VYNDI_INVENTORY_VENTURE_SCOPE_HOLD/,
+        "Founder dashboard must remain accessible while unqualified source lineage is held");
+      assert.equal(await page.getByText("No source order-linked shortage").count(),0,
+        "Unqualified inventory lineage must never present zero shortages as a fact");
+      readinessVerdict="VERIFIED_COMMAND_SOURCE_HOLD";
+    }
     if (cpuBoundClientRoutes.has(route)) {
       // The only accepted non-ready route is a precise inventory source HOLD.
       const settled = page.locator('[data-route-readiness="ready"], [data-route-readiness="error"]');
