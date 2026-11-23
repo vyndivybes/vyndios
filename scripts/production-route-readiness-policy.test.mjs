@@ -82,3 +82,16 @@ test('responsive SPA UAT waits for the new Operations component and exact source
  assert.throws(()=>assertProductionRouteReadiness({route:'/command/operations',state:'error',visibleText:prior,expectInventoryHold:true}),/OPERATIONS_INVENTORY_HOLD_NOT_CONFIRMED/);
  assert.throws(()=>assertProductionRouteReadiness({route:'/command/operations',state:'ready',visibleText:'loaded',expectInventoryHold:true}),/OPERATIONS_INVENTORY_HOLD_NOT_CONFIRMED/);
 });
+
+
+test('responsive Inventory SPA acceptance waits for the Inventory component instead of a stale prior route',async()=>{
+ const inventory=await readFile(new URL('../src/routes/command/inventory.tsx',import.meta.url),'utf8');
+ const ux=await readFile(new URL('./operator-ux-hardening.mjs',import.meta.url),'utf8');
+ assert.match(inventory,/data-inventory-readiness=\{state\.status\}/);
+ assert.match(inventory,/data-inventory-readiness="ready"/);
+ assert.match(ux,/route === "\/command\/inventory"/);
+ assert.match(ux,/\[data-inventory-readiness="ready"\], \[data-inventory-readiness="error"\]/);
+ assert.match(ux,/expectInventoryHold: process\.env\.VYNDI_TEST_EXPECT_INVENTORY_SCOPE_HOLD === "1"/);
+ const unrelated='Inventory warnings unavailable: VYNDI_INVENTORY_VENTURE_SCOPE_HOLD: unrelated route';
+ assert.throws(()=>assertProductionRouteReadiness({route:'/command/inventory',state:'ready',visibleText:unrelated,expectInventoryHold:true}),/INVENTORY_SOURCE_HOLD_NOT_CONFIRMED/);
+});
