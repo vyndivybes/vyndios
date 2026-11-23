@@ -36,3 +36,26 @@ test("Finance readiness selector covers both genuine UI states and excludes Oper
   assert.doesNotMatch("Operations", selector);
   assert.doesNotMatch("Inventory warnings unavailable", selector);
 });
+
+
+test("all asynchronous route readiness checks bind to the newly rendered page", async () => {
+  for (const [route, heading] of [
+    ["/command/inventory", "Master Inventory"],
+    ["/command/risk", "Risk Register"],
+    ["/command/quality", "Quality & Product Compliance"],
+  ]) {
+    assert.ok(source.includes(JSON.stringify(route) + ': ' + JSON.stringify(heading)), route + " route identity must be explicit");
+  }
+  assert.match(source, /const targetHeading = readinessHeadings\[route\]/, "select the heading from the active route");
+  assert.match(source, /filter\(\{ has: page\.getByRole\("heading", \{ name: targetHeading, level: 1, exact: true \}\) \}\)/,
+    "terminal status must be a descendant of the active route's heading-bearing section");
+  assert.match(source, /expectedOperationsHold[\s\S]*?const terminal[\s\S]*?assertProductionRouteReadiness\(/,
+    "the existing explicit Operations HOLD and fail-closed verdict must remain");
+});
+
+test("inventory HOLD readiness belongs to Master Inventory, never stale Quality or Risk", async () => {
+  const inventory = await readFile(new URL("../src/routes/command/inventory.tsx", import.meta.url), "utf8");
+  assert.match(inventory, /<section data-route-readiness=\{state\.status\}/);
+  assert.match(inventory, /<h1[^>]*>Master Inventory<\/h1>/);
+  assert.match(inventory, /VYNDI_INVENTORY_VENTURE_SCOPE_HOLD|MasterInventory/);
+});

@@ -16,6 +16,15 @@ const viewports = [
   { name: "mobile-390", width: 390, height: 844 },
 ];
 const routes = ["/command", "/command/intelligence", "/command/planning", "/command/engineering", "/command/scenarios", "/command/quality", "/command/procurement", "/command/risk", "/command/ibpe-operating-workspace/optimizer", "/command/ibpe-operating-workspace/release", "/command/sales", "/command/inventory", "/command/operations", "/command/financial-cockpit"];
+// A SPA URL transition can finish before the destination React tree mounts.
+// Only the new route's own heading-bearing terminal can prove readiness.
+// Do not accept a stale readiness marker from the previous workspace.
+const readinessHeadings = Object.freeze({
+  "/command/inventory": "Master Inventory",
+  "/command/risk": "Risk Register",
+  "/command/quality": "Quality & Product Compliance",
+});
+
 const evidenceRoot = resolve(process.env.VYNDI_UX_EVIDENCE_DIR || "artifacts/operator-ux-hardening");
 await mkdir(evidenceRoot, { recursive: true });
 
@@ -128,17 +137,22 @@ try {
       if (["/command/inventory", "/command/operations", "/command/risk", "/command/quality", "/command/financial-cockpit"].includes(route)) {
         // Preserve exact authoritative inventory source HOLD and fail closed
         // for unrelated authentication, transport or application errors.
+        const targetHeading = readinessHeadings[route];
         const terminal = expectedOperationsHold
           ? page.locator('[data-route-readiness="error"]').filter({
               hasText: "Inventory warnings unavailable: VYNDI_INVENTORY_VENTURE_SCOPE_HOLD:",
             })
           : route === "/command/financial-cockpit"
-            // SPA navigation updates the URL before React swaps out the old
-            // Operations HOLD. Scope the terminal to the freshly mounted
-            // Finance page so we neither accept nor reject the previous route.
+            // Finance shows two legitimate headings, depending on whether
+            // an approved operating plan is available.
             ? page.locator('section[data-route-readiness="ready"], section[data-route-readiness="error"]')
                 .filter({ has: page.getByRole("heading", { name: /^Consolidated Finance(?: Overview)?$/, level: 1 }) })
-            : page.locator('[data-route-readiness="ready"], [data-route-readiness="error"]');
+            : targetHeading
+              // Inventory, Risk and Quality have unique H1 markers in their
+              // own terminal section. Never read a prior route's status.
+              ? page.locator('section[data-route-readiness="ready"], section[data-route-readiness="error"]')
+                  .filter({ has: page.getByRole("heading", { name: targetHeading, level: 1, exact: true }) })
+              : page.locator('[data-route-readiness="ready"], [data-route-readiness="error"]');
         await terminal.first().waitFor({ state: "attached", timeout: 30_000 });
         readinessVerdict = assertProductionRouteReadiness({
           route,
