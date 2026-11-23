@@ -156,12 +156,12 @@ function MasterInventory() {
     }
   }
   if (state.status !== "ready") return (
-    <section data-route-readiness={state.status} role={state.status === "error" ? "alert" : "status"} className="space-y-3">
+    <section data-route-readiness={state.status} data-inventory-readiness={state.status} role={state.status === "error" ? "alert" : "status"} className="space-y-3">
       <h1 className="font-display text-4xl">Master Inventory</h1>
       <p className="text-sm text-muted">{state.status === "error" ? state.error : "Loading canonical stock, ledger and demand coverage…"}</p>
     </section>
   );
-  return <section data-route-readiness="ready"><MasterInventoryReady data={{ items: state.items, role }} onReload={refreshItems} /></section>;
+  return <section data-route-readiness="ready" data-inventory-readiness="ready"><MasterInventoryReady data={{ items: state.items, role }} onReload={refreshItems} /></section>;
 }
 
 function MasterInventoryReady({ data, onReload }: { data: InventoryReadback; onReload: () => Promise<void> }) {
