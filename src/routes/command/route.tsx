@@ -141,6 +141,10 @@ function normalizeCommandPath(pathname: string) {
 }
 
 export const Route = createFileRoute("/command")({
+  // Free Workers CPU ceiling: authenticate and authorize on the server, but do
+  // not SSR the heavy Command shell or descendant enterprise workspaces.
+  // TanStack Start data-only SSR retains beforeLoad redirects and role checks.
+  ssr: "data-only",
   beforeLoad: async ({ location }) => {
     // One scalar role lookup proves both authenticated Command access and RBAC.
     // This avoids resolving the same Better Auth identity + persisted role two
