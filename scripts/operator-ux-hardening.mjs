@@ -117,7 +117,9 @@ try {
       if (["/command/inventory", "/command/operations", "/command/risk", "/command/quality", "/command/financial-cockpit"].includes(route)) {
         // Verify exact source HOLD only for Inventory, no false zero-stock
         // dashboard. Preserve full READY requirement elsewhere.
-        const terminal = page.locator('[data-route-readiness="ready"], [data-route-readiness="error"]');
+        const terminal = route === "/command/operations"
+          ? page.locator('[data-operations-readiness="ready"], [data-operations-readiness="error"]')
+          : page.locator('[data-route-readiness="ready"], [data-route-readiness="error"]');
         await terminal.first().waitFor({ state: "attached", timeout: 30_000 });
         readinessVerdict = assertProductionRouteReadiness({
           route,
