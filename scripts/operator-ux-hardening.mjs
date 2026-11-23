@@ -114,10 +114,25 @@ try {
       const startedAt = Date.now();
       await spaNavigate(page, route);
       let readinessVerdict = "NOT_APPLICABLE";
+      const expectedOperationsHold = route === "/command/operations" &&
+        process.env.VYNDI_TEST_EXPECT_INVENTORY_SCOPE_HOLD === "1";
+      if (expectedOperationsHold) {
+        // SPA URL updates before the new route finishes rendering; a prior
+        // Inventory HOLD may still be present. Require the target H1 and the
+        // actual Operations warning result before reading its terminal state.
+        await page.getByRole("heading", { name: "Operations", level: 1, exact: true }).waitFor({ state: "visible", timeout: 30_000 });
+        await page.locator('[data-route-readiness="error"]')
+          .filter({ hasText: "Inventory warnings unavailable: VYNDI_INVENTORY_VENTURE_SCOPE_HOLD:" })
+          .waitFor({ state: "visible", timeout: 30_000 });
+      }
       if (["/command/inventory", "/command/operations", "/command/risk", "/command/quality", "/command/financial-cockpit"].includes(route)) {
-        // Verify exact source HOLD only for Inventory, no false zero-stock
-        // dashboard. Preserve full READY requirement elsewhere.
-        const terminal = page.locator('[data-route-readiness="ready"], [data-route-readiness="error"]');
+        // Preserve exact authoritative inventory source HOLD and fail closed
+        // for unrelated authentication, transport or application errors.
+        const terminal = expectedOperationsHold
+          ? page.locator('[data-route-readiness="error"]').filter({
+              hasText: "Inventory warnings unavailable: VYNDI_INVENTORY_VENTURE_SCOPE_HOLD:",
+            })
+          : page.locator('[data-route-readiness="ready"], [data-route-readiness="error"]');
         await terminal.first().waitFor({ state: "attached", timeout: 30_000 });
         readinessVerdict = assertProductionRouteReadiness({
           route,

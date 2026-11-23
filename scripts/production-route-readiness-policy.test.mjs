@@ -62,3 +62,23 @@ test('Operations reports explicit partial stock source HOLD without permitting g
  }
  assert.throws(()=>assertProductionRouteReadiness({route:'/command/operations',state:'error',visibleText:opsHold,expectInventoryHold:false}),/ROUTE_NOT_READY/);
 });
+
+
+test('responsive SPA UAT waits for the new Operations component and exact source HOLD before inspecting readiness',async()=>{
+ const script=await readFile(new URL('./operator-ux-hardening.mjs',import.meta.url),'utf8');
+ const begin=script.indexOf('await spaNavigate(page, route);');
+ const end=script.indexOf('readinessVerdict = assertProductionRouteReadiness({',begin);
+ assert.ok(begin>=0&&end>begin);
+ const segment=script.slice(begin,end);
+ assert.match(segment,/route === "\/command\/operations"/);
+ assert.match(segment,/getByRole\("heading",\s*\{\s*name:\s*"Operations",\s*level:\s*1,\s*exact:\s*true\s*\}\)\.waitFor/);
+ assert.match(segment,/\[data-route-readiness="error"\]/);
+ assert.match(segment,/Inventory warnings unavailable: VYNDI_INVENTORY_VENTURE_SCOPE_HOLD:/);
+ assert.match(segment,/waitFor\(\{\s*state:\s*"visible",\s*timeout:\s*30_000\s*\}\)/);
+ // Neither an old Inventory HOLD element nor a new generic error may satisfy
+ // this route-specific acceptance; the existing policy remains strictly checked.
+ assert.match(segment,/const terminal = .*expectedOperationsHold/);
+ const prior='Master Inventory VYNDI_INVENTORY_VENTURE_SCOPE_HOLD: Legacy stock/ATP combines different ventures.';
+ assert.throws(()=>assertProductionRouteReadiness({route:'/command/operations',state:'error',visibleText:prior,expectInventoryHold:true}),/OPERATIONS_INVENTORY_HOLD_NOT_CONFIRMED/);
+ assert.throws(()=>assertProductionRouteReadiness({route:'/command/operations',state:'ready',visibleText:'loaded',expectInventoryHold:true}),/OPERATIONS_INVENTORY_HOLD_NOT_CONFIRMED/);
+});
