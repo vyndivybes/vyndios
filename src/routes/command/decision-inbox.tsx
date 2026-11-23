@@ -15,7 +15,7 @@ type Item = Record<string, unknown>;
 const text = (row: Item, key: string) => String(row[key] ?? "");
 
 function DecisionInbox() {
-  const { items } = Route.useLoaderData();
+  const { items, materialScopeHold } = Route.useLoaderData();
   const router = useRouter();
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -58,16 +58,22 @@ function DecisionInbox() {
         <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">Review actions waiting across planning, purchasing, receiving, finance and IBPE. Expand a queue to inspect its evidence, then open the relevant workspace to complete the transaction.</p>
       </header>
 
+      {materialScopeHold && (
+        <section role="alert" data-inbox-source-readiness="source-scope-hold" className="rounded-xl border border-warn/50 bg-surface px-4 py-3">
+          <p className="text-sm font-bold text-warn">Material exception source HOLD · VYNDI_INVENTORY_VENTURE_SCOPE_HOLD</p>
+          <p className="mt-2 text-xs text-muted">The review queue is partial: purchase, finance and management approvals remain available; shortage and material exception counts are withheld, NOT zero, until stock is venture-isolated.</p>
+        </section>
+      )}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi label="Needs action" value={String(items.length)} hint={`${groups.length} grouped queues`} tone={items.length ? "warn" : "ok"} />
+        <Kpi label="Needs action" value={materialScopeHold ? "PARTIAL" : String(items.length)} hint={materialScopeHold ? "Non-stock approval records only" : `${groups.length} grouped queues`} tone={materialScopeHold || items.length ? "warn" : "ok"} />
         <Kpi label="High priority" value={String(high)} hint="Blocks execution or truth" tone={high ? "danger" : "ok"} />
         <Kpi label="Approvals" value={String(approvals)} hint="Authorised decision required" />
-        <Kpi label="Exceptions" value={String(exceptions)} hint="Resolve at source" />
+        <Kpi label="Exceptions" value={materialScopeHold ? "HOLD" : String(exceptions)} hint={materialScopeHold ? "Material exceptions unverified" : "Resolve at source"} />
       </div>
 
       {message ? <p className="rounded-lg border border-border bg-surface px-4 py-3 text-xs text-muted">{message}</p> : null}
 
-      {items.length === 0 ? (
+      {items.length === 0 && !materialScopeHold ? (
         <section className="rounded-xl border border-ok/30 bg-ok/5 p-8 text-center">
           <CheckCircle2 className="mx-auto size-8 text-ok" />
           <h2 className="mt-3 font-display text-xl text-fg">No governed action is waiting</h2>
@@ -163,7 +169,7 @@ function DecisionInbox() {
 
       <p className="text-xs leading-5 text-subtle">
         Queue scope: pending plan and PO approvals, matched or blocked supplier invoices, receiving exceptions,
-        current-revision active production-material shortages and open IBPE management actions.
+        {materialScopeHold ? "material shortages are withheld pending venture source isolation" : "current-revision active production-material shortages"} and open IBPE management actions.
       </p>
     </main>
   );

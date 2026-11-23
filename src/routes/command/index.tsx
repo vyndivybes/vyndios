@@ -5,6 +5,7 @@ import { FOUNDER_GATES, FOUNDER_STATUS_LABELS, resolveFounderActions } from "@/l
 import { listCanonicalCashAuthority } from "@/lib/finance-governance-authority";
 import { lakh } from "@/lib/format";
 import { getOperatingLineage } from "@/lib/operating-lineage";
+import {readCommandLineage} from "@/lib/command-centre-source-readiness.mjs";
 import { canAccessRoute } from "@/lib/page-access";
 import { getDecisionInboxData } from "@/lib/procure-to-pay-authority";
 import { useVeloxis } from "@/lib/store";
@@ -12,12 +13,15 @@ import { INTERNAL_STARTUP_MODE } from "@/lib/internal-startup-mode";
 
 export const Route = createFileRoute("/command/")({
   loader: async ({ context }) => {
-    const [lineage, inbox, cashAuthority] = await Promise.all([
-      getOperatingLineage(),
+    // A mixed-venture stock source HOLD must not crash the founder's internal
+    // planning desk. All unrelated auth/database failures remain fatal.
+    const [lineageRead, inbox, cashAuthority] = await Promise.all([
+      readCommandLineage(getOperatingLineage),
       getDecisionInboxData(),
       listCanonicalCashAuthority(),
     ]);
-    return { role: context.commandRole, lineage, inbox, cashAuthority };
+    return { role: context.commandRole, lineage:lineageRead.rows,
+      lineageScopeHold:lineageRead.sourceHold, inbox, cashAuthority };
   },
   component: CommandCentre,
 });
@@ -26,7 +30,8 @@ const PRIORITY_RANK = { critical: 0, high: 1, normal: 2 } as const;
 const text = (row: Record<string, unknown>, key: string) => String(row[key] ?? "");
 
 function CommandCentre() {
-  const { role, lineage, inbox, cashAuthority } = Route.useLoaderData();
+  const { role, lineage, lineageScopeHold, inbox, cashAuthority } = Route.useLoaderData();
+  const materialScopeHold=Boolean(inbox.materialScopeHold);
   const accessible = (to: string) => canAccessRoute(role, to);
   const actionProgress = useVeloxis((s) => s.actions);
   const founderActions = resolveFounderActions(actionProgress);
@@ -59,18 +64,24 @@ function CommandCentre() {
   );
 
   const workflow = [
-    ["Demand / Orders", `${lineage.length} source order record${lineage.length === 1 ? "" : "s"} (classification required)`, "/command/sales"],
-    ["Job Card / BOM", `${currentJobCards}/${lineage.length} current job-card lineage`, "/command/production"],
-    ["Material", shortageLines ? `${shortageLines} source shortage line(s)` : "No source order-linked shortage", "/command/inventory"],
-    ["Purchase", `${linkedPos} linked PO record(s)`, "/command/purchase-execution"],
-    ["Receiving", `${grns} GRN record(s)`, "/command/receiving"],
-    ["Traveller / Build", `${travellers} traveller(s)`, "/command/production"],
+    ["Demand / Orders", lineageScopeHold ? "HOLD — inventory-linked lineage unverified" : (`${lineage.length} source order record${lineage.length === 1 ? "" : "s"} (classification required)`), "/command/sales"],
+    ["Job Card / BOM", lineageScopeHold ? "HOLD — inventory-linked lineage unverified" : (`${currentJobCards}/${lineage.length} current job-card lineage`), "/command/production"],
+    ["Material", lineageScopeHold ? "HOLD — inventory-linked lineage unverified" : (shortageLines ? `${shortageLines} source shortage line(s)` : "No source order-linked shortage"), "/command/inventory"],
+    ["Purchase", lineageScopeHold ? "HOLD — inventory-linked lineage unverified" : (`${linkedPos} linked PO record(s)`), "/command/purchase-execution"],
+    ["Receiving", lineageScopeHold ? "HOLD — inventory-linked lineage unverified" : (`${grns} GRN record(s)`), "/command/receiving"],
+    ["Traveller / Build", lineageScopeHold ? "HOLD — inventory-linked lineage unverified" : (`${travellers} traveller(s)`), "/command/production"],
     ["Quality", "Specialist inspection / NCR control", "/command/quality"],
-    ["Shipment → Collection", `${shipments} shipment · ${invoices} invoice · ${collections} collection`, "/command/receivables"],
+    ["Shipment → Collection", lineageScopeHold ? "HOLD — inventory-linked lineage unverified" : (`${shipments} shipment · ${invoices} invoice · ${collections} collection`), "/command/receivables"],
   ] as const;
 
   return (
     <div className="space-y-6">
+      {lineageScopeHold && (
+        <section role="alert" data-command-source-readiness="source-scope-hold" className="rounded-xl border border-warn/50 bg-surface p-4">
+          <p className="text-sm font-bold text-warn">Inventory-linked workflow HOLD · VYNDI_INVENTORY_VENTURE_SCOPE_HOLD</p>
+          <p className="mt-2 text-xs leading-5 text-muted">Legacy inventory and ATP combine distinct ventures. Order-linked job cards, shortages, purchasing/receiving genealogy, traveller and dispatch counts are unavailable, NOT zero. Continue internal tasks, engineering preparation and founder-reviewed draft workflows; do not make stock, physical production or purchasing commitments from these sources.</p>
+        </section>
+      )}
       <section aria-label="Internal startup operating mode" className="rounded-xl border border-accent/40 bg-surface/50 p-4">
         <p className="text-xs font-semibold uppercase tracking-[0.15em] text-accent">Internal startup workspace · {INTERNAL_STARTUP_MODE.company}</p>
         <p className="mt-2 text-sm text-fg">Startup planning and preparation — engineering coordination, supplier research, draft CRM, finance scenarios and internal task review.</p>
@@ -98,17 +109,17 @@ function CommandCentre() {
       </header>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi label="Needs action" value={String(actionItems.length)} hint="Governed Action Inbox" tone={actionItems.length ? "warn" : "ok"} />
-        <Kpi label="Source order records" value={String(lineage.length)} hint={`${currentJobCards}/${lineage.length} current Job Cards`} tone={lineage.length && currentJobCards === lineage.length ? "ok" : "warn"} />
-        <Kpi label="Source shortage lines" value={String(shortageLines)} hint={`${linkedPos} linked PO records`} tone={shortageLines ? "danger" : "ok"} />
+        <Kpi label="Needs action" value={materialScopeHold ? "PARTIAL" : String(actionItems.length)} hint={materialScopeHold ? "Non-stock approval records only · material exceptions source HOLD" : "Governed Action Inbox"} tone={materialScopeHold || actionItems.length ? "warn" : "ok"} />
+        <Kpi label="Source order records" value={lineageScopeHold ? "HOLD" : String(lineage.length)} hint={lineageScopeHold ? "Inventory-linked lineage not certified" : `${currentJobCards}/${lineage.length} current Job Cards`} tone={lineageScopeHold ? "warn" : lineage.length && currentJobCards === lineage.length ? "ok" : "warn"} />
+        <Kpi label="Source shortage lines" value={lineageScopeHold ? "HOLD" : String(shortageLines)} hint={lineageScopeHold ? "Inventory venture scope unverified" : `${linkedPos} linked PO records`} tone={lineageScopeHold ? "warn" : shortageLines ? "danger" : "ok"} />
         <Kpi label="Canonical cash" value={lakh(currentCash)} hint={currentCashMonth ? `M${currentCashMonth} · verified cash authority` : "No verified cash actual"} tone={cashTone} />
       </div>
 
       <Panel title="Today’s control room" kicker="Review the queue, follow orders or open planning">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[
-            ["Action Inbox", `${actionItems.length} governed action(s) waiting`, "/command/decision-inbox"],
-            ["Operations", `${lineage.length} order lineage row(s) · ${shortageLines} shortages`, "/command/operations"],
+            ["Action Inbox", materialScopeHold ? "PARTIAL · non-stock approvals only" : `${actionItems.length} governed action(s) waiting`, "/command/decision-inbox"],
+            ["Operations", lineageScopeHold ? "HOLD · inventory-linked lineage unverified" : `${lineage.length} order lineage row(s) · ${shortageLines} shortages`, "/command/operations"],
             ["ERP Reports", "Reports across sales, operations and finance", "/command/control-tower"],
             ["VIBPE Workspace", "Planning briefings and saved reports", "/command/ibpe-operating-workspace"],
           ]
@@ -125,7 +136,7 @@ function CommandCentre() {
 
       <Panel title="Exceptions now" kicker="Review up to eight items, then open the inbox for the full queue">
         {actionItems.length === 0 ? (
-          <p className="text-sm text-muted">No governed action is waiting.</p>
+          <p className="text-sm text-muted">{materialScopeHold ? "No non-stock approvals currently shown; material exceptions are withheld under source HOLD." : "No governed action is waiting."}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full table-auto text-left text-xs">
