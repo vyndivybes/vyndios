@@ -152,6 +152,13 @@ try {
         });
         status = response?.status() ?? null;
         assert.ok(response?.ok(), `${route} returned HTTP ${status ?? "none"}`);
+        // Data-only SSR returns a safe public shell; await the authenticated
+        // Command UI before examining route evidence. This is a bounded positive
+        // readiness check, never a waiver for HTTP 5xx or missing business data.
+        await page.locator('[data-vyndi-full-view="command-system"]').waitFor({
+          state: "visible",
+          timeout: 30_000,
+        });
         if (cpuBoundClientRoutes.has(route)) {
           // A trusted, explicit Inventory source HOLD is service availability,
           // not an assertion of authoritative stock. Other routes require READY.
