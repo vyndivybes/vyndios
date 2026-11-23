@@ -1,6 +1,7 @@
 import { getRequest } from "@tanstack/react-start/server";
 import { timeStage } from "../request-timing.server";
 import { createRequestMemoizer } from "../request-memo.server";
+import { SessionVerificationTimeoutError, withSessionDeadline } from "./session-deadline";
 import { gateIdentityEnabled } from "./gate-identity.server";
 import { auth, authConfigured, logSessionLookupFailure, withAuthPostgresRequest } from "./server";
 
@@ -71,7 +72,15 @@ export async function getSessionUser(
   }
   const cacheKey = bearerToken ? "bearer" : "cookie";
   return sessionRequestMemo(request, cacheKey, async () => {
-    const session = await timeStage("session.verify", () => withAuthPostgresRequest(() => auth.api.getSession({ headers, query: { disableCookieCache: true } }))).catch(async (error) => {
+    const session = await timeStage("session.verify", () =>
+      withSessionDeadline(() =>
+        withAuthPostgresRequest(() => auth.api.getSession({ headers, query: { disableCookieCache: true } })),
+      ),
+    ).catch(async (error) => {
+      if (error instanceof SessionVerificationTimeoutError) {
+        console.warn("[auth] Session verification exceeded its deadline");
+        throw error;
+      }
       await logSessionLookupFailure(request, error);
       throw error;
     });
