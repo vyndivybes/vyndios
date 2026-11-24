@@ -48,6 +48,14 @@ export const VYNDI_BI_RELATED:Record<Employee,readonly string[]>={
  "engineering-configuration":["vyndi_engineering_change_requests","vyndi_engineering_change_effectivity","vyndi_engineering_configuration_manifests"],
  security:["vyndi_access_role_change_requests"]
 };
+/** Bounded primary-source projection for the internal employee observation endpoint. */
+export async function readEmployeeBiSource(sql: Sql, department: Employee, day: string) {
+ const scope = validateBiScope({ employeeId: department, from: day, to: day, limit: 1 });
+ const { sourceTable, currentRecordedStates, currentSourceCount, excludedTrainingCount, unclassifiedOriginCount } =
+  await readOne(sql, department, scope.from, scope.to, 0, scope.limit, VYNDI_BI_DEPARTMENTS[department].table);
+ return { sourceTable, currentRecordedStates, currentSourceCount, excludedTrainingCount, unclassifiedOriginCount };
+}
+
 const SAFE_FIELDS=["id","status","state","outcome","stage","action","source_reference","record_origin","reference","sku",
 "revision","bom_revision","release_disposition","priority","closed_at","completed_at","updated_at","created_at",
 "recorded_at","posted_at","entry_date","due_date","due_at","occurred_at","event_at","effective_at",

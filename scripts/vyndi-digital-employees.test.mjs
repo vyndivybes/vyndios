@@ -52,3 +52,29 @@ test("missing identity, ungoverned evidence and stale or future snapshots produc
   assert.equal(evaluateVyndiAgentRequest(request("finance", "prepare", { evidence: { ...governedEvidence, capturedAt: "2026-11-16T23:00:00Z" } }), now).status, "HOLD");
   assert.equal(evaluateVyndiAgentRequest(request("finance", "prepare", { evidence: { ...governedEvidence, capturedAt: "2026-11-19T00:00:00Z" } }), now).status, "HOLD");
 });
+
+test("employee primary source reads expose aggregate counts without rows", async () => {
+  const { readEmployeeBiSource } = await import("../src/lib/vaos-enterprise-bi-read.ts");
+  const read = await readEmployeeBiSource({
+    async query(statement, params) {
+      assert.match(statement, /from vyndi_people_records r/);
+      assert.deepEqual(params.slice(0, 4), ["2026-11-18", "2026-11-18", 1, 0]);
+      return [{
+        summary: [{ status: "pending", quantity: 1, current: 1, undated: 0, training: 2, unknown: 0 }],
+        records: [{ id: "confidential-source-record" }],
+      }];
+    },
+  }, "people", "2026-11-18");
+  assert.equal(read.currentSourceCount, 1);
+  assert.equal(read.excludedTrainingCount, 2);
+  assert.equal(read.unclassifiedOriginCount, 0);
+  assert.equal(read.currentRecordedStates.pending, 1);
+  assert.equal(Object.hasOwn(read, "records"), false);
+});
+
+test("employee primary source reads reject unknown scope before querying", async () => {
+  const { readEmployeeBiSource } = await import("../src/lib/vaos-enterprise-bi-read.ts");
+  await assert.rejects(readEmployeeBiSource({
+    async query() { assert.fail("Invalid scope must never query the database"); },
+  }, "invalid", "2026-11-18"), /INVALID_BI_SCOPE/);
+});
