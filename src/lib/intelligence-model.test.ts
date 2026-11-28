@@ -68,3 +68,25 @@ test("missing governed snapshot stays unavailable instead of displaying invented
     reason: "No complete governed IBPE run is available. Run governed IBPE to create a planning snapshot.",
   });
 });
+
+test("eight supervisory review lenses continue without a planning run and never alter worker authority", async () => {
+  const { buildSupervisoryReview } = await import("./supervisory-review.ts");
+  const missing = input(); missing.run = null;
+  const review = buildSupervisoryReview({ planning: buildGovernedIntelligence(missing), readiness: null });
+  assert.deepEqual(review.lenses.map(x => x.id), ["orchestrator", "project", "vibpe", "qa", "risk", "security", "knowledge", "release"]);
+  assert.ok(review.lenses.every(x => x.state === "SOURCE_UNAVAILABLE" && x.nextAction && x.experiment && x.metric));
+  assert.equal(review.actionAuthorized, false);
+  assert.equal(review.workerDispatchAuthorized, false);
+  assert.equal(review.benefitsVerified, false);
+});
+test("supervisory review retains planning provenance, does not infer security or release from IBPE, and rejects stale planning evidence", async () => {
+  const { buildSupervisoryReview } = await import("./supervisory-review.ts");
+  const review = buildSupervisoryReview({ planning: buildGovernedIntelligence(input()), readiness: null });
+  assert.equal(review.lenses.find(x => x.id === "orchestrator")?.state, "BOUNDED_EVIDENCE");
+  assert.equal(review.lenses.find(x => x.id === "security")?.state, "SOURCE_UNAVAILABLE");
+  assert.equal(review.lenses.find(x => x.id === "release")?.state, "SOURCE_UNAVAILABLE");
+  assert.ok(review.lenses.every(x => x.measuredBenefit === null && x.actionAuthorized === false));
+  const stale = input(); stale.readAt = "2026-10-06T19:00:00Z";
+  const staleReview = buildSupervisoryReview({ planning: buildGovernedIntelligence(stale), readiness: null });
+  assert.equal(staleReview.lenses.find(x => x.id === "orchestrator")?.state, "STALE_OR_MISMATCHED");
+});
