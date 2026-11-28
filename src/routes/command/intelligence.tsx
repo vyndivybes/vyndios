@@ -5,6 +5,7 @@ import { getGovernedIntelligence } from "@/lib/intelligence-data";
 import { getReadinessIntelligenceState } from "@/lib/readiness-authority";
 import { EnterpriseDigitalThreadPanel } from "@/components/enterprise-digital-thread-panel";
 import { IntelligenceAdvisoryDeck } from "@/components/intelligence-advisory-deck";
+import { buildSupervisoryReview } from "@/lib/supervisory-review";
 
 export const Route = createFileRoute("/command/intelligence")({
   loader: async () => {
@@ -62,6 +63,25 @@ function Intelligence() {
 
     <EnterpriseDigitalThreadPanel />
 
+    <Panel title="Supervisory intelligence review" kicker="Eight advisory lenses · existing evidence · proposed experiments">
+      <p className="mb-3 text-xs leading-5 text-muted">Compare recorded evidence with general engineering and business practices. Unavailable evidence limits only the affected review. These are conditional recommendations, not model-generated results, measured savings, worker dispatch or release authority.</p>
+      <div className="grid gap-3 md:grid-cols-2">
+        {buildSupervisoryReview({ planning: data, readiness }).lenses.map(lens => (
+          <details key={lens.id} className="rounded-xl border border-border p-3">
+            <summary className="cursor-pointer text-sm font-semibold text-fg">{lens.name} · {lens.state === "BOUNDED_EVIDENCE" ? "evidence available" : lens.state === "STALE_OR_MISMATCHED" ? "refresh source" : "conditional advice"}</summary>
+            <div className="mt-3 space-y-2 text-xs leading-5 text-muted">
+              <p><strong>Recorded evidence:</strong> {lens.observation}</p>
+              <p><strong>General practice:</strong> {lens.guidance}</p>
+              <p><strong>Hypothesis:</strong> {lens.hypothesis}</p>
+              <p><strong>Next action:</strong> {lens.nextAction}</p>
+              <p><strong>Proposed experiment:</strong> {lens.experiment}</p>
+              <p><strong>Measure:</strong> {lens.metric}</p>
+              <p className="break-words text-subtle">Source references: {lens.sourceRefs.join(" · ") || "not available"}. Benefit not measured.</p>
+            </div>
+          </details>
+        ))}
+      </div>
+    </Panel>
     <IntelligenceAdvisoryDeck />
 
     {!data.available ? <Panel title="Governed snapshot required" kicker="No values inferred">
